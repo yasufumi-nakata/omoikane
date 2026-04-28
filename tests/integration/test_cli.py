@@ -789,6 +789,21 @@ class CliIntegrationTests(unittest.TestCase):
                 "long_term_media_renewal_registry_endpoint_certificate_quorum_ok"
             ]
         )
+        self.assertTrue(
+            result["validation"][
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound"
+            ]
+        )
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])
@@ -815,6 +830,16 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(
             result["validation"][
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["validation"][
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["validation"][
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored"
             ]
         )
         self.assertEqual(

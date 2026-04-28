@@ -2239,7 +2239,7 @@ entries:
       - docs/02-subsystems/mind-substrate/memory-model.md
       - agents/guardians/integrity-guardian.yaml
       - reference-runtime
-    rationale: Required to serialize four-target MemoryCrystal replication, Merkle audit, council-escalated reconcile, multi-jurisdiction threshold key succession with threshold policy authority binding, and long-term coldstore/trustee media renewal proof plus refresh / revocation window, media registry verifier, and registry endpoint certificate lifecycle binding without mutating the source manifest or storing raw key / raw jurisdiction policy / raw threshold policy / raw media / raw revocation / raw registry / raw endpoint certificate material.
+    rationale: Required to serialize four-target MemoryCrystal replication, Merkle audit, council-escalated reconcile, multi-jurisdiction threshold key succession with threshold policy authority binding, and long-term coldstore/trustee media renewal proof plus refresh / revocation window, media registry verifier, registry endpoint certificate lifecycle, CT readback/quorum, and SCT policy authority binding without mutating the source manifest or storing raw key / raw jurisdiction policy / raw threshold policy / raw media / raw revocation / raw registry / raw endpoint certificate / raw CT log / raw SCT authority material.
   - priority: P1
     kind: idl
     file: specs/interfaces/mind.memory_replication.v0.idl
@@ -2247,14 +2247,14 @@ entries:
       - docs/03-protocols/memory-replication.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make the L2 MemoryCrystal replication quorum, reconciliation, multi-jurisdiction signer-roster-bound key succession, quorum threshold policy authority, and long-term media renewal refresh / revocation / registry verifier / endpoint certificate lifecycle contract machine-readable.
+    rationale: Required to make the L2 MemoryCrystal replication quorum, reconciliation, multi-jurisdiction signer-roster-bound key succession, quorum threshold policy authority, and long-term media renewal refresh / revocation / registry verifier / endpoint certificate lifecycle / CT readback / SCT policy authority contract machine-readable.
   - priority: P1
     kind: eval
     file: evals/continuity/memory_replication_quorum.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects four-target placement, quorum-bound Merkle audit, council-escalated reconciliation, raw-key-redacted threshold key succession, raw-policy / raw-roster-redacted multi-jurisdiction signer roster authority, raw-threshold-policy-redacted quorum authority, and raw-media / raw-revocation / raw-registry / raw-endpoint-certificate-redacted long-term media renewal readback plus refresh-window verifier quorum.
+    rationale: Protects four-target placement, quorum-bound Merkle audit, council-escalated reconciliation, raw-key-redacted threshold key succession, raw-policy / raw-roster-redacted multi-jurisdiction signer roster authority, raw-threshold-policy-redacted quorum authority, and raw-media / raw-revocation / raw-registry / raw-endpoint-certificate / raw-CT-log / raw-SCT-authority-redacted long-term media renewal readback plus refresh-window verifier quorum.
   - priority: P1
     kind: schema
     file: specs/schemas/semantic_memory_snapshot.schema

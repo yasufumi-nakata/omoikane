@@ -119,6 +119,28 @@ class MindSchemaContractTests(unittest.TestCase):
         )
         self.assertEqual("complete", endpoint_certificate_lifecycle["quorum_status"])
         self.assertEqual("current", endpoint_certificate_lifecycle["freshness_status"])
+        self.assertEqual(
+            "long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1",
+            endpoint_certificate_lifecycle["ct_log_readback_policy_id"],
+        )
+        self.assertEqual(
+            "long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1",
+            endpoint_certificate_lifecycle["ct_log_quorum_policy_id"],
+        )
+        self.assertEqual(
+            "long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1",
+            endpoint_certificate_lifecycle["sct_policy_authority_policy_id"],
+        )
+        self.assertEqual("current", endpoint_certificate_lifecycle["ct_log_readback_status"])
+        self.assertEqual("complete", endpoint_certificate_lifecycle["ct_log_quorum_status"])
+        self.assertEqual(
+            "verified",
+            endpoint_certificate_lifecycle["sct_policy_authority_status"],
+        )
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["ct_log_refs"]))
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["ct_log_refs"][0]))
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["ct_log_quorum_digest_set"]))
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["sct_policy_authority_digest_set"]))
         self.assertFalse(
             endpoint_certificate_lifecycle["raw_certificate_payload_stored"]
         )
@@ -130,6 +152,16 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(
             endpoint_certificate_lifecycle[
                 "raw_certificate_lifecycle_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            endpoint_certificate_lifecycle[
+                "raw_certificate_ct_log_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            endpoint_certificate_lifecycle[
+                "raw_sct_policy_authority_payload_stored"
             ]
         )
 

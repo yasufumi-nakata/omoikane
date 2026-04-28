@@ -74,6 +74,15 @@ MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID = (
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_LIFECYCLE_POLICY_ID = (
     "long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1"
 )
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID = (
+    "long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1"
+)
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID = (
+    "long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1"
+)
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID = (
+    "long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1"
+)
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION = "JP-13"
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS = (
     "JP-13",
@@ -87,6 +96,8 @@ MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD = 2
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_RESPONSE_TIMEOUT_MS = 250
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_FRESHNESS_WINDOW_DAYS = 90
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS = 2
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT = 2
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS = 86400
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_THRESHOLD = 2
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD = 2
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROLES = (
@@ -1005,6 +1016,15 @@ class MemoryReplicationService:
             "long_term_media_renewal_registry_endpoint_certificate_lifecycle_policy_id": (
                 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_LIFECYCLE_POLICY_ID
             ),
+            "long_term_media_renewal_registry_endpoint_certificate_ct_log_readback_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+            ),
+            "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+            ),
+            "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+            ),
             "long_term_media_renewal_targets": list(
                 MEMORY_REPLICATION_LONG_TERM_TARGETS
             ),
@@ -1031,6 +1051,12 @@ class MemoryReplicationService:
             ),
             "long_term_media_renewal_registry_endpoint_certificate_chain_generations": (
                 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS
+            ),
+            "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_required_log_count": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            ),
+            "long_term_media_renewal_registry_endpoint_certificate_sct_timestamp_window_seconds": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
             ),
             "verify_policy_id": MEMORY_REPLICATION_VERIFY_POLICY_ID,
             "reconcile_policy_id": MEMORY_REPLICATION_RECONCILE_POLICY_ID,
@@ -1374,6 +1400,33 @@ class MemoryReplicationService:
                     "replication_policy.long_term_media_renewal_registry_endpoint_certificate_lifecycle_policy_id mismatch"
                 )
             if (
+                policy.get(
+                    "long_term_media_renewal_registry_endpoint_certificate_ct_log_readback_policy_id"
+                )
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_endpoint_certificate_ct_log_readback_policy_id mismatch"
+                )
+            if (
+                policy.get(
+                    "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_policy_id"
+                )
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_policy_id mismatch"
+                )
+            if (
+                policy.get(
+                    "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_policy_id"
+                )
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_policy_id mismatch"
+                )
+            if (
                 policy.get("long_term_media_renewal_targets")
                 != list(MEMORY_REPLICATION_LONG_TERM_TARGETS)
             ):
@@ -1439,6 +1492,24 @@ class MemoryReplicationService:
             ):
                 errors.append(
                     "replication_policy.long_term_media_renewal_registry_endpoint_certificate_chain_generations mismatch"
+                )
+            if (
+                policy.get(
+                    "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_required_log_count"
+                )
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_required_log_count mismatch"
+                )
+            if (
+                policy.get(
+                    "long_term_media_renewal_registry_endpoint_certificate_sct_timestamp_window_seconds"
+                )
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_endpoint_certificate_sct_timestamp_window_seconds mismatch"
                 )
             if policy.get("verify_policy_id") != MEMORY_REPLICATION_VERIFY_POLICY_ID:
                 errors.append("replication_policy.verify_policy_id mismatch")
@@ -1820,6 +1891,21 @@ class MemoryReplicationService:
                     "registry_endpoint_certificate_quorum_ok"
                 ]
             ),
+            "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound": (
+                long_term_media_renewal_validation[
+                    "registry_endpoint_certificate_ct_log_bound"
+                ]
+            ),
+            "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok": (
+                long_term_media_renewal_validation[
+                    "registry_endpoint_certificate_ct_log_quorum_ok"
+                ]
+            ),
+            "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound": (
+                long_term_media_renewal_validation[
+                    "registry_endpoint_certificate_sct_policy_authority_bound"
+                ]
+            ),
             "raw_key_material_stored": key_succession_validation[
                 "raw_key_material_stored"
             ],
@@ -1866,6 +1952,16 @@ class MemoryReplicationService:
             "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": (
                 long_term_media_renewal_validation[
                     "raw_media_registry_endpoint_certificate_lifecycle_payload_stored"
+                ]
+            ),
+            "raw_media_registry_endpoint_certificate_ct_log_payload_stored": (
+                long_term_media_renewal_validation[
+                    "raw_media_registry_endpoint_certificate_ct_log_payload_stored"
+                ]
+            ),
+            "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": (
+                long_term_media_renewal_validation[
+                    "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored"
                 ]
             ),
             "errors": errors,
@@ -3591,6 +3687,18 @@ class MemoryReplicationService:
         previous_certificate_refs = []
         previous_certificate_fingerprints = []
         previous_retirement_digest_set = []
+        ct_log_refs = []
+        ct_log_leaf_digest_set = []
+        ct_log_inclusion_proof_digest_set = []
+        ct_log_readback_digest_set = []
+        ct_log_quorum_digest_set = []
+        sct_timestamp_digest_set = []
+        sct_policy_registry_refs = []
+        sct_policy_registry_digest_set = []
+        sct_signer_roster_refs = []
+        sct_signer_roster_digest_set = []
+        sct_signer_verifier_quorum_digest_set = []
+        sct_policy_authority_digest_set = []
         for jurisdiction, endpoint_ref, response_digest in zip(
             registry_jurisdictions,
             registry_endpoint_refs,
@@ -3703,6 +3811,158 @@ class MemoryReplicationService:
                     }
                 )
             )
+            endpoint_ct_log_refs = [
+                (
+                    "certificate-transparency-log://memory-replication/"
+                    f"{jurisdiction_key}/media-registry-endpoint/primary"
+                ),
+                (
+                    "certificate-transparency-log://memory-replication/"
+                    f"{jurisdiction_key}/media-registry-endpoint/backup"
+                ),
+            ]
+            ct_log_leaf_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "certificate_ref": certificate_ref,
+                        "certificate_fingerprint": certificate_fingerprint,
+                        "certificate_chain_digest": certificate_chain_digest,
+                        "source_manifest_digest": source_manifest_digest,
+                    }
+                )
+            )
+            endpoint_ct_log_inclusion_digests = [
+                sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "ct_log_ref": ct_log_ref,
+                            "ct_log_leaf_digest": ct_log_leaf_digest,
+                            "certificate_chain_digest": certificate_chain_digest,
+                            "registry_response_digest": response_digest,
+                        }
+                    )
+                )
+                for ct_log_ref in endpoint_ct_log_refs
+            ]
+            ct_log_readback_digest = sha256_text(
+                canonical_json(
+                    {
+                        "policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+                        ),
+                        "jurisdiction": jurisdiction,
+                        "ct_log_ref": endpoint_ct_log_refs[0],
+                        "ct_log_leaf_digest": ct_log_leaf_digest,
+                        "ct_log_inclusion_proof_digest": (
+                            endpoint_ct_log_inclusion_digests[0]
+                        ),
+                        "previous_retirement_digest": previous_retirement_digest,
+                        "status": "current",
+                    }
+                )
+            )
+            ct_log_quorum_digest = sha256_text(
+                canonical_json(
+                    {
+                        "policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+                        ),
+                        "jurisdiction": jurisdiction,
+                        "ct_log_refs": endpoint_ct_log_refs,
+                        "ct_log_leaf_digest": ct_log_leaf_digest,
+                        "ct_log_inclusion_proof_digests": (
+                            endpoint_ct_log_inclusion_digests
+                        ),
+                        "ct_log_readback_digest": ct_log_readback_digest,
+                        "required_log_count": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+                        ),
+                        "status": "complete",
+                    }
+                )
+            )
+            sct_timestamp_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "ct_log_quorum_digest": ct_log_quorum_digest,
+                        "timestamp_window_seconds": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                        ),
+                        "registry_response_signature_digest": response_signature_digest_set[
+                            len(ct_log_refs)
+                        ],
+                        "status": "within-window",
+                    }
+                )
+            )
+            sct_policy_registry_ref = (
+                "sct-policy-registry://memory-replication/"
+                f"{jurisdiction_key}/media-registry-endpoint"
+            )
+            sct_policy_registry_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "policy_registry_ref": sct_policy_registry_ref,
+                        "ct_log_quorum_policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+                        ),
+                        "timestamp_window_seconds": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                        ),
+                    }
+                )
+            )
+            sct_signer_roster_ref = (
+                "sct-signer-roster://memory-replication/"
+                f"{jurisdiction_key}/media-registry-endpoint"
+            )
+            sct_signer_roster_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "signer_roster_ref": sct_signer_roster_ref,
+                        "policy_registry_digest": sct_policy_registry_digest,
+                        "required_roles": [
+                            "certificate-authority",
+                            "integrity-guardian",
+                        ],
+                    }
+                )
+            )
+            sct_signer_verifier_quorum_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "sct_signer_roster_digest": sct_signer_roster_digest,
+                        "registry_response_signature_digest": response_signature_digest_set[
+                            len(ct_log_refs)
+                        ],
+                        "quorum_status": "complete",
+                    }
+                )
+            )
+            sct_policy_authority_digest = sha256_text(
+                canonical_json(
+                    {
+                        "policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+                        ),
+                        "jurisdiction": jurisdiction,
+                        "sct_policy_registry_digest": sct_policy_registry_digest,
+                        "sct_signer_roster_digest": sct_signer_roster_digest,
+                        "sct_signer_verifier_quorum_digest": (
+                            sct_signer_verifier_quorum_digest
+                        ),
+                        "sct_timestamp_digest": sct_timestamp_digest,
+                        "ct_log_quorum_digest": ct_log_quorum_digest,
+                        "status": "verified",
+                    }
+                )
+            )
             endpoint_certificate_refs.append(certificate_ref)
             endpoint_certificate_fingerprints.append(certificate_fingerprint)
             certificate_authority_refs.append(authority_ref)
@@ -3716,7 +3976,62 @@ class MemoryReplicationService:
             previous_certificate_refs.append(previous_certificate_ref)
             previous_certificate_fingerprints.append(previous_certificate_fingerprint)
             previous_retirement_digest_set.append(previous_retirement_digest)
+            ct_log_refs.append(endpoint_ct_log_refs)
+            ct_log_leaf_digest_set.append(ct_log_leaf_digest)
+            ct_log_inclusion_proof_digest_set.append(
+                endpoint_ct_log_inclusion_digests[0]
+            )
+            ct_log_readback_digest_set.append(ct_log_readback_digest)
+            ct_log_quorum_digest_set.append(ct_log_quorum_digest)
+            sct_timestamp_digest_set.append(sct_timestamp_digest)
+            sct_policy_registry_refs.append(sct_policy_registry_ref)
+            sct_policy_registry_digest_set.append(sct_policy_registry_digest)
+            sct_signer_roster_refs.append(sct_signer_roster_ref)
+            sct_signer_roster_digest_set.append(sct_signer_roster_digest)
+            sct_signer_verifier_quorum_digest_set.append(
+                sct_signer_verifier_quorum_digest
+            )
+            sct_policy_authority_digest_set.append(sct_policy_authority_digest)
 
+        ct_log_readback_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+                    ),
+                    "ct_log_readback_digest_set": ct_log_readback_digest_set,
+                    "endpoint_certificate_fingerprints": endpoint_certificate_fingerprints,
+                }
+            )
+        )
+        ct_log_quorum_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+                    ),
+                    "ct_log_quorum_digest_set": ct_log_quorum_digest_set,
+                    "sct_timestamp_digest_set": sct_timestamp_digest_set,
+                    "required_log_count": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+                    ),
+                }
+            )
+        )
+        sct_policy_authority_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+                    ),
+                    "sct_policy_authority_digest_set": (
+                        sct_policy_authority_digest_set
+                    ),
+                    "sct_policy_registry_digest_set": sct_policy_registry_digest_set,
+                    "sct_signer_roster_digest_set": sct_signer_roster_digest_set,
+                }
+            )
+        )
         certificate_lifecycle_quorum_digest = sha256_text(
             canonical_json(
                 {
@@ -3731,6 +4046,11 @@ class MemoryReplicationService:
                     "ocsp_response_digest_set": ocsp_response_digest_set,
                     "renewal_event_digest_set": renewal_event_digest_set,
                     "previous_retirement_digest_set": previous_retirement_digest_set,
+                    "ct_log_readback_set_digest": ct_log_readback_set_digest,
+                    "ct_log_quorum_set_digest": ct_log_quorum_set_digest,
+                    "sct_policy_authority_set_digest": (
+                        sct_policy_authority_set_digest
+                    ),
                     "response_digest_set": list(response_digest_set),
                     "response_signature_digest_set": list(response_signature_digest_set),
                     "quorum_threshold": (
@@ -3774,6 +4094,38 @@ class MemoryReplicationService:
             "previous_certificate_refs": previous_certificate_refs,
             "previous_certificate_fingerprints": previous_certificate_fingerprints,
             "previous_retirement_digest_set": previous_retirement_digest_set,
+            "ct_log_readback_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+            ),
+            "ct_log_quorum_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+            ),
+            "sct_policy_authority_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+            ),
+            "ct_log_refs": ct_log_refs,
+            "ct_log_leaf_digest_set": ct_log_leaf_digest_set,
+            "ct_log_inclusion_proof_digest_set": ct_log_inclusion_proof_digest_set,
+            "ct_log_readback_digest_set": ct_log_readback_digest_set,
+            "ct_log_quorum_digest_set": ct_log_quorum_digest_set,
+            "sct_timestamp_digest_set": sct_timestamp_digest_set,
+            "sct_policy_registry_refs": sct_policy_registry_refs,
+            "sct_policy_registry_digest_set": sct_policy_registry_digest_set,
+            "sct_signer_roster_refs": sct_signer_roster_refs,
+            "sct_signer_roster_digest_set": sct_signer_roster_digest_set,
+            "sct_signer_verifier_quorum_digest_set": (
+                sct_signer_verifier_quorum_digest_set
+            ),
+            "sct_policy_authority_digest_set": sct_policy_authority_digest_set,
+            "ct_log_readback_set_digest": ct_log_readback_set_digest,
+            "ct_log_quorum_set_digest": ct_log_quorum_set_digest,
+            "sct_policy_authority_set_digest": sct_policy_authority_set_digest,
+            "ct_log_quorum_required_log_count": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            ),
+            "sct_timestamp_window_seconds": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+            ),
             "certificate_freshness_window_days": (
                 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_FRESHNESS_WINDOW_DAYS
             ),
@@ -3785,9 +4137,14 @@ class MemoryReplicationService:
             "quorum_status": "complete",
             "freshness_status": "current",
             "certificate_lifecycle_status": "current-not-revoked",
+            "ct_log_readback_status": "current",
+            "ct_log_quorum_status": "complete",
+            "sct_policy_authority_status": "verified",
             "raw_certificate_payload_stored": False,
             "raw_certificate_freshness_payload_stored": False,
             "raw_certificate_lifecycle_payload_stored": False,
+            "raw_certificate_ct_log_payload_stored": False,
+            "raw_sct_policy_authority_payload_stored": False,
         }
         receipt["digest"] = sha256_text(
             canonical_json(
@@ -3819,6 +4176,8 @@ class MemoryReplicationService:
         raw_media_registry_endpoint_certificate_payload_stored = False
         raw_media_registry_endpoint_certificate_freshness_payload_stored = False
         raw_media_registry_endpoint_certificate_lifecycle_payload_stored = False
+        raw_media_registry_endpoint_certificate_ct_log_payload_stored = False
+        raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored = False
         target_ids: List[str] = []
         readback_ok = False
         refresh_interval_days = None
@@ -3833,6 +4192,9 @@ class MemoryReplicationService:
             "registry_endpoint_certificate_lifecycle_bound": False,
             "registry_endpoint_certificate_freshness_ok": False,
             "registry_endpoint_certificate_quorum_ok": False,
+            "registry_endpoint_certificate_ct_log_bound": False,
+            "registry_endpoint_certificate_ct_log_quorum_ok": False,
+            "registry_endpoint_certificate_sct_policy_authority_bound": False,
             "raw_media_revocation_payload_stored": False,
             "raw_media_refresh_payload_stored": False,
             "raw_media_registry_payload_stored": False,
@@ -3840,6 +4202,8 @@ class MemoryReplicationService:
             "raw_media_registry_endpoint_certificate_payload_stored": False,
             "raw_media_registry_endpoint_certificate_freshness_payload_stored": False,
             "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": False,
+            "raw_media_registry_endpoint_certificate_ct_log_payload_stored": False,
+            "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": False,
         }
         if not isinstance(receipt, dict):
             errors.append("long_term_media_renewal must be an object")
@@ -3858,6 +4222,9 @@ class MemoryReplicationService:
                 "registry_endpoint_certificate_lifecycle_bound": False,
                 "registry_endpoint_certificate_freshness_ok": False,
                 "registry_endpoint_certificate_quorum_ok": False,
+                "registry_endpoint_certificate_ct_log_bound": False,
+                "registry_endpoint_certificate_ct_log_quorum_ok": False,
+                "registry_endpoint_certificate_sct_policy_authority_bound": False,
                 "raw_media_payload_stored": False,
                 "raw_media_readback_payload_stored": False,
                 "raw_media_revocation_payload_stored": False,
@@ -3867,6 +4234,8 @@ class MemoryReplicationService:
                 "raw_media_registry_endpoint_certificate_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_freshness_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": False,
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored": False,
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": False,
             }
 
         if receipt.get("kind") != "memory_replication_long_term_media_renewal":
@@ -4090,6 +4459,16 @@ class MemoryReplicationService:
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored"
             ]
         )
+        raw_media_registry_endpoint_certificate_ct_log_payload_stored = (
+            refresh_window_validation[
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored"
+            ]
+        )
+        raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored = (
+            refresh_window_validation[
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored"
+            ]
+        )
         self._require_non_empty_string(
             receipt.get("council_review_ref"),
             "long_term_media_renewal.council_review_ref",
@@ -4136,6 +4515,8 @@ class MemoryReplicationService:
             and not raw_media_registry_endpoint_certificate_payload_stored
             and not raw_media_registry_endpoint_certificate_freshness_payload_stored
             and not raw_media_registry_endpoint_certificate_lifecycle_payload_stored
+            and not raw_media_registry_endpoint_certificate_ct_log_payload_stored
+            and not raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
             and not local_errors
         )
 
@@ -4169,6 +4550,19 @@ class MemoryReplicationService:
             "registry_endpoint_certificate_quorum_ok": refresh_window_validation[
                 "registry_endpoint_certificate_quorum_ok"
             ],
+            "registry_endpoint_certificate_ct_log_bound": refresh_window_validation[
+                "registry_endpoint_certificate_ct_log_bound"
+            ],
+            "registry_endpoint_certificate_ct_log_quorum_ok": (
+                refresh_window_validation[
+                    "registry_endpoint_certificate_ct_log_quorum_ok"
+                ]
+            ),
+            "registry_endpoint_certificate_sct_policy_authority_bound": (
+                refresh_window_validation[
+                    "registry_endpoint_certificate_sct_policy_authority_bound"
+                ]
+            ),
             "raw_media_payload_stored": raw_media_payload_stored,
             "raw_media_readback_payload_stored": raw_media_readback_payload_stored,
             "raw_media_revocation_payload_stored": raw_media_revocation_payload_stored,
@@ -4185,6 +4579,12 @@ class MemoryReplicationService:
             ),
             "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": (
                 raw_media_registry_endpoint_certificate_lifecycle_payload_stored
+            ),
+            "raw_media_registry_endpoint_certificate_ct_log_payload_stored": (
+                raw_media_registry_endpoint_certificate_ct_log_payload_stored
+            ),
+            "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": (
+                raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
             ),
         }
 
@@ -4207,6 +4607,8 @@ class MemoryReplicationService:
         raw_media_registry_endpoint_certificate_payload_stored = False
         raw_media_registry_endpoint_certificate_freshness_payload_stored = False
         raw_media_registry_endpoint_certificate_lifecycle_payload_stored = False
+        raw_media_registry_endpoint_certificate_ct_log_payload_stored = False
+        raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored = False
         source_proof_current = False
         revocation_check_ok = False
         registry_verifier_bound = False
@@ -4214,6 +4616,9 @@ class MemoryReplicationService:
         registry_endpoint_certificate_lifecycle_bound = False
         registry_endpoint_certificate_freshness_ok = False
         registry_endpoint_certificate_quorum_ok = False
+        registry_endpoint_certificate_ct_log_bound = False
+        registry_endpoint_certificate_ct_log_quorum_ok = False
+        registry_endpoint_certificate_sct_policy_authority_bound = False
         if not isinstance(receipt, dict):
             errors.append("long_term_media_renewal.refresh_window must be an object")
             return {
@@ -4226,6 +4631,9 @@ class MemoryReplicationService:
                 "registry_endpoint_certificate_lifecycle_bound": False,
                 "registry_endpoint_certificate_freshness_ok": False,
                 "registry_endpoint_certificate_quorum_ok": False,
+                "registry_endpoint_certificate_ct_log_bound": False,
+                "registry_endpoint_certificate_ct_log_quorum_ok": False,
+                "registry_endpoint_certificate_sct_policy_authority_bound": False,
                 "raw_media_revocation_payload_stored": False,
                 "raw_media_refresh_payload_stored": False,
                 "raw_media_registry_payload_stored": False,
@@ -4233,6 +4641,8 @@ class MemoryReplicationService:
                 "raw_media_registry_endpoint_certificate_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_freshness_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": False,
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored": False,
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": False,
             }
 
         prefix = "long_term_media_renewal.refresh_window"
@@ -4360,6 +4770,17 @@ class MemoryReplicationService:
         registry_endpoint_certificate_quorum_ok = (
             registry_verifier_validation["endpoint_certificate_quorum_ok"]
         )
+        registry_endpoint_certificate_ct_log_bound = (
+            registry_verifier_validation["endpoint_certificate_ct_log_bound"]
+        )
+        registry_endpoint_certificate_ct_log_quorum_ok = (
+            registry_verifier_validation["endpoint_certificate_ct_log_quorum_ok"]
+        )
+        registry_endpoint_certificate_sct_policy_authority_bound = (
+            registry_verifier_validation[
+                "endpoint_certificate_sct_policy_authority_bound"
+            ]
+        )
         raw_media_registry_payload_stored = registry_verifier_validation[
             "raw_media_registry_payload_stored"
         ]
@@ -4379,6 +4800,16 @@ class MemoryReplicationService:
         raw_media_registry_endpoint_certificate_lifecycle_payload_stored = (
             registry_verifier_validation[
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored"
+            ]
+        )
+        raw_media_registry_endpoint_certificate_ct_log_payload_stored = (
+            registry_verifier_validation[
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored"
+            ]
+        )
+        raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored = (
+            registry_verifier_validation[
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored"
             ]
         )
         if receipt.get("source_proof_status") == "current-not-revoked":
@@ -4418,6 +4849,9 @@ class MemoryReplicationService:
             and registry_endpoint_certificate_lifecycle_bound
             and registry_endpoint_certificate_freshness_ok
             and registry_endpoint_certificate_quorum_ok
+            and registry_endpoint_certificate_ct_log_bound
+            and registry_endpoint_certificate_ct_log_quorum_ok
+            and registry_endpoint_certificate_sct_policy_authority_bound
             and receipt.get("revoked_source_fail_closed") is True
             and receipt.get("raw_revocation_payload_stored") is False
             and not raw_media_registry_payload_stored
@@ -4425,6 +4859,8 @@ class MemoryReplicationService:
             and not raw_media_registry_endpoint_certificate_payload_stored
             and not raw_media_registry_endpoint_certificate_freshness_payload_stored
             and not raw_media_registry_endpoint_certificate_lifecycle_payload_stored
+            and not raw_media_registry_endpoint_certificate_ct_log_payload_stored
+            and not raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
             and not local_errors
         )
 
@@ -4445,6 +4881,15 @@ class MemoryReplicationService:
             "registry_endpoint_certificate_quorum_ok": (
                 registry_endpoint_certificate_quorum_ok
             ),
+            "registry_endpoint_certificate_ct_log_bound": (
+                registry_endpoint_certificate_ct_log_bound
+            ),
+            "registry_endpoint_certificate_ct_log_quorum_ok": (
+                registry_endpoint_certificate_ct_log_quorum_ok
+            ),
+            "registry_endpoint_certificate_sct_policy_authority_bound": (
+                registry_endpoint_certificate_sct_policy_authority_bound
+            ),
             "raw_media_revocation_payload_stored": raw_media_revocation_payload_stored,
             "raw_media_refresh_payload_stored": raw_media_refresh_payload_stored,
             "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
@@ -4459,6 +4904,12 @@ class MemoryReplicationService:
             ),
             "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": (
                 raw_media_registry_endpoint_certificate_lifecycle_payload_stored
+            ),
+            "raw_media_registry_endpoint_certificate_ct_log_payload_stored": (
+                raw_media_registry_endpoint_certificate_ct_log_payload_stored
+            ),
+            "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": (
+                raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
             ),
         }
 
@@ -4482,6 +4933,8 @@ class MemoryReplicationService:
         raw_media_registry_endpoint_certificate_payload_stored = False
         raw_media_registry_endpoint_certificate_freshness_payload_stored = False
         raw_media_registry_endpoint_certificate_lifecycle_payload_stored = False
+        raw_media_registry_endpoint_certificate_ct_log_payload_stored = False
+        raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored = False
         if not isinstance(receipt, dict):
             errors.append("long_term_media_renewal.refresh_window.registry_verifier must be an object")
             return {
@@ -4490,11 +4943,16 @@ class MemoryReplicationService:
                 "endpoint_certificate_lifecycle_bound": False,
                 "endpoint_certificate_freshness_ok": False,
                 "endpoint_certificate_quorum_ok": False,
+                "endpoint_certificate_ct_log_bound": False,
+                "endpoint_certificate_ct_log_quorum_ok": False,
+                "endpoint_certificate_sct_policy_authority_bound": False,
                 "raw_media_registry_payload_stored": False,
                 "raw_media_registry_response_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_freshness_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": False,
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored": False,
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": False,
                 "endpoint_certificate_lifecycle_digest": "",
             }
 
@@ -4672,6 +5130,16 @@ class MemoryReplicationService:
                 "raw_certificate_lifecycle_payload_stored"
             ]
         )
+        raw_media_registry_endpoint_certificate_ct_log_payload_stored = (
+            endpoint_certificate_lifecycle_validation[
+                "raw_certificate_ct_log_payload_stored"
+            ]
+        )
+        raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored = (
+            endpoint_certificate_lifecycle_validation[
+                "raw_sct_policy_authority_payload_stored"
+            ]
+        )
         expected_registry_quorum_digest = sha256_text(
             canonical_json(
                 {
@@ -4743,6 +5211,8 @@ class MemoryReplicationService:
             and not raw_media_registry_endpoint_certificate_payload_stored
             and not raw_media_registry_endpoint_certificate_freshness_payload_stored
             and not raw_media_registry_endpoint_certificate_lifecycle_payload_stored
+            and not raw_media_registry_endpoint_certificate_ct_log_payload_stored
+            and not raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
             and not local_errors
         )
 
@@ -4759,6 +5229,17 @@ class MemoryReplicationService:
             "endpoint_certificate_quorum_ok": (
                 endpoint_certificate_lifecycle_validation["quorum_ok"]
             ),
+            "endpoint_certificate_ct_log_bound": (
+                endpoint_certificate_lifecycle_validation["ct_log_bound"]
+            ),
+            "endpoint_certificate_ct_log_quorum_ok": (
+                endpoint_certificate_lifecycle_validation["ct_log_quorum_ok"]
+            ),
+            "endpoint_certificate_sct_policy_authority_bound": (
+                endpoint_certificate_lifecycle_validation[
+                    "sct_policy_authority_bound"
+                ]
+            ),
             "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
             "raw_media_registry_response_payload_stored": (
                 raw_media_registry_response_payload_stored
@@ -4771,6 +5252,12 @@ class MemoryReplicationService:
             ),
             "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": (
                 raw_media_registry_endpoint_certificate_lifecycle_payload_stored
+            ),
+            "raw_media_registry_endpoint_certificate_ct_log_payload_stored": (
+                raw_media_registry_endpoint_certificate_ct_log_payload_stored
+            ),
+            "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": (
+                raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
             ),
             "endpoint_certificate_lifecycle_digest": (
                 endpoint_certificate_lifecycle_validation["digest"]
@@ -4796,6 +5283,8 @@ class MemoryReplicationService:
         raw_certificate_payload_stored = False
         raw_certificate_freshness_payload_stored = False
         raw_certificate_lifecycle_payload_stored = False
+        raw_certificate_ct_log_payload_stored = False
+        raw_sct_policy_authority_payload_stored = False
         if not isinstance(receipt, dict):
             errors.append(
                 "long_term_media_renewal.refresh_window.registry_verifier.endpoint_certificate_lifecycle must be an object"
@@ -4804,9 +5293,14 @@ class MemoryReplicationService:
                 "bound": False,
                 "freshness_ok": False,
                 "quorum_ok": False,
+                "ct_log_bound": False,
+                "ct_log_quorum_ok": False,
+                "sct_policy_authority_bound": False,
                 "raw_certificate_payload_stored": False,
                 "raw_certificate_freshness_payload_stored": False,
                 "raw_certificate_lifecycle_payload_stored": False,
+                "raw_certificate_ct_log_payload_stored": False,
+                "raw_sct_policy_authority_payload_stored": False,
                 "digest": "",
             }
 
@@ -4871,6 +5365,18 @@ class MemoryReplicationService:
         expected_previous_certificate_refs = []
         expected_previous_certificate_fingerprints = []
         expected_previous_retirement_digest_set = []
+        expected_ct_log_refs = []
+        expected_ct_log_leaf_digest_set = []
+        expected_ct_log_inclusion_proof_digest_set = []
+        expected_ct_log_readback_digest_set = []
+        expected_ct_log_quorum_digest_set = []
+        expected_sct_timestamp_digest_set = []
+        expected_sct_policy_registry_refs = []
+        expected_sct_policy_registry_digest_set = []
+        expected_sct_signer_roster_refs = []
+        expected_sct_signer_roster_digest_set = []
+        expected_sct_signer_verifier_quorum_digest_set = []
+        expected_sct_policy_authority_digest_set = []
         for jurisdiction, endpoint_ref, response_digest in zip(
             registry_jurisdictions,
             registry_endpoint_refs,
@@ -4983,6 +5489,158 @@ class MemoryReplicationService:
                     }
                 )
             )
+            endpoint_ct_log_refs = [
+                (
+                    "certificate-transparency-log://memory-replication/"
+                    f"{jurisdiction_key}/media-registry-endpoint/primary"
+                ),
+                (
+                    "certificate-transparency-log://memory-replication/"
+                    f"{jurisdiction_key}/media-registry-endpoint/backup"
+                ),
+            ]
+            ct_log_leaf_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "certificate_ref": certificate_ref,
+                        "certificate_fingerprint": certificate_fingerprint,
+                        "certificate_chain_digest": certificate_chain_digest,
+                        "source_manifest_digest": source_manifest_digest,
+                    }
+                )
+            )
+            endpoint_ct_log_inclusion_digests = [
+                sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "ct_log_ref": ct_log_ref,
+                            "ct_log_leaf_digest": ct_log_leaf_digest,
+                            "certificate_chain_digest": certificate_chain_digest,
+                            "registry_response_digest": response_digest,
+                        }
+                    )
+                )
+                for ct_log_ref in endpoint_ct_log_refs
+            ]
+            ct_log_readback_digest = sha256_text(
+                canonical_json(
+                    {
+                        "policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+                        ),
+                        "jurisdiction": jurisdiction,
+                        "ct_log_ref": endpoint_ct_log_refs[0],
+                        "ct_log_leaf_digest": ct_log_leaf_digest,
+                        "ct_log_inclusion_proof_digest": (
+                            endpoint_ct_log_inclusion_digests[0]
+                        ),
+                        "previous_retirement_digest": previous_retirement_digest,
+                        "status": "current",
+                    }
+                )
+            )
+            ct_log_quorum_digest = sha256_text(
+                canonical_json(
+                    {
+                        "policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+                        ),
+                        "jurisdiction": jurisdiction,
+                        "ct_log_refs": endpoint_ct_log_refs,
+                        "ct_log_leaf_digest": ct_log_leaf_digest,
+                        "ct_log_inclusion_proof_digests": (
+                            endpoint_ct_log_inclusion_digests
+                        ),
+                        "ct_log_readback_digest": ct_log_readback_digest,
+                        "required_log_count": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+                        ),
+                        "status": "complete",
+                    }
+                )
+            )
+            sct_timestamp_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "ct_log_quorum_digest": ct_log_quorum_digest,
+                        "timestamp_window_seconds": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                        ),
+                        "registry_response_signature_digest": response_signature_digest_set[
+                            len(expected_ct_log_refs)
+                        ],
+                        "status": "within-window",
+                    }
+                )
+            )
+            sct_policy_registry_ref = (
+                "sct-policy-registry://memory-replication/"
+                f"{jurisdiction_key}/media-registry-endpoint"
+            )
+            sct_policy_registry_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "policy_registry_ref": sct_policy_registry_ref,
+                        "ct_log_quorum_policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+                        ),
+                        "timestamp_window_seconds": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+                        ),
+                    }
+                )
+            )
+            sct_signer_roster_ref = (
+                "sct-signer-roster://memory-replication/"
+                f"{jurisdiction_key}/media-registry-endpoint"
+            )
+            sct_signer_roster_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "signer_roster_ref": sct_signer_roster_ref,
+                        "policy_registry_digest": sct_policy_registry_digest,
+                        "required_roles": [
+                            "certificate-authority",
+                            "integrity-guardian",
+                        ],
+                    }
+                )
+            )
+            sct_signer_verifier_quorum_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "sct_signer_roster_digest": sct_signer_roster_digest,
+                        "registry_response_signature_digest": response_signature_digest_set[
+                            len(expected_ct_log_refs)
+                        ],
+                        "quorum_status": "complete",
+                    }
+                )
+            )
+            sct_policy_authority_digest = sha256_text(
+                canonical_json(
+                    {
+                        "policy_id": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+                        ),
+                        "jurisdiction": jurisdiction,
+                        "sct_policy_registry_digest": sct_policy_registry_digest,
+                        "sct_signer_roster_digest": sct_signer_roster_digest,
+                        "sct_signer_verifier_quorum_digest": (
+                            sct_signer_verifier_quorum_digest
+                        ),
+                        "sct_timestamp_digest": sct_timestamp_digest,
+                        "ct_log_quorum_digest": ct_log_quorum_digest,
+                        "status": "verified",
+                    }
+                )
+            )
             expected_endpoint_certificate_refs.append(certificate_ref)
             expected_endpoint_certificate_fingerprints.append(certificate_fingerprint)
             expected_certificate_authority_refs.append(authority_ref)
@@ -5000,6 +5658,24 @@ class MemoryReplicationService:
                 previous_certificate_fingerprint
             )
             expected_previous_retirement_digest_set.append(previous_retirement_digest)
+            expected_ct_log_refs.append(endpoint_ct_log_refs)
+            expected_ct_log_leaf_digest_set.append(ct_log_leaf_digest)
+            expected_ct_log_inclusion_proof_digest_set.append(
+                endpoint_ct_log_inclusion_digests[0]
+            )
+            expected_ct_log_readback_digest_set.append(ct_log_readback_digest)
+            expected_ct_log_quorum_digest_set.append(ct_log_quorum_digest)
+            expected_sct_timestamp_digest_set.append(sct_timestamp_digest)
+            expected_sct_policy_registry_refs.append(sct_policy_registry_ref)
+            expected_sct_policy_registry_digest_set.append(sct_policy_registry_digest)
+            expected_sct_signer_roster_refs.append(sct_signer_roster_ref)
+            expected_sct_signer_roster_digest_set.append(sct_signer_roster_digest)
+            expected_sct_signer_verifier_quorum_digest_set.append(
+                sct_signer_verifier_quorum_digest
+            )
+            expected_sct_policy_authority_digest_set.append(
+                sct_policy_authority_digest
+            )
 
         expected_lists = {
             "endpoint_certificate_refs": expected_endpoint_certificate_refs,
@@ -5023,8 +5699,101 @@ class MemoryReplicationService:
                 expected_previous_certificate_fingerprints
             ),
             "previous_retirement_digest_set": expected_previous_retirement_digest_set,
+            "ct_log_refs": expected_ct_log_refs,
+            "ct_log_leaf_digest_set": expected_ct_log_leaf_digest_set,
+            "ct_log_inclusion_proof_digest_set": (
+                expected_ct_log_inclusion_proof_digest_set
+            ),
+            "ct_log_readback_digest_set": expected_ct_log_readback_digest_set,
+            "ct_log_quorum_digest_set": expected_ct_log_quorum_digest_set,
+            "sct_timestamp_digest_set": expected_sct_timestamp_digest_set,
+            "sct_policy_registry_refs": expected_sct_policy_registry_refs,
+            "sct_policy_registry_digest_set": (
+                expected_sct_policy_registry_digest_set
+            ),
+            "sct_signer_roster_refs": expected_sct_signer_roster_refs,
+            "sct_signer_roster_digest_set": expected_sct_signer_roster_digest_set,
+            "sct_signer_verifier_quorum_digest_set": (
+                expected_sct_signer_verifier_quorum_digest_set
+            ),
+            "sct_policy_authority_digest_set": (
+                expected_sct_policy_authority_digest_set
+            ),
         }
         for field_name, expected_value in expected_lists.items():
+            if receipt.get(field_name) != expected_value:
+                local_errors.append(f"{prefix}.{field_name} mismatch")
+
+        expected_ct_log_readback_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+                    ),
+                    "ct_log_readback_digest_set": (
+                        expected_ct_log_readback_digest_set
+                    ),
+                    "endpoint_certificate_fingerprints": (
+                        expected_endpoint_certificate_fingerprints
+                    ),
+                }
+            )
+        )
+        expected_ct_log_quorum_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+                    ),
+                    "ct_log_quorum_digest_set": expected_ct_log_quorum_digest_set,
+                    "sct_timestamp_digest_set": expected_sct_timestamp_digest_set,
+                    "required_log_count": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+                    ),
+                }
+            )
+        )
+        expected_sct_policy_authority_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+                    ),
+                    "sct_policy_authority_digest_set": (
+                        expected_sct_policy_authority_digest_set
+                    ),
+                    "sct_policy_registry_digest_set": (
+                        expected_sct_policy_registry_digest_set
+                    ),
+                    "sct_signer_roster_digest_set": (
+                        expected_sct_signer_roster_digest_set
+                    ),
+                }
+            )
+        )
+        expected_scalar_fields = {
+            "ct_log_readback_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_READBACK_POLICY_ID
+            ),
+            "ct_log_quorum_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POLICY_ID
+            ),
+            "sct_policy_authority_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID
+            ),
+            "ct_log_readback_set_digest": expected_ct_log_readback_set_digest,
+            "ct_log_quorum_set_digest": expected_ct_log_quorum_set_digest,
+            "sct_policy_authority_set_digest": (
+                expected_sct_policy_authority_set_digest
+            ),
+            "ct_log_quorum_required_log_count": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            ),
+            "sct_timestamp_window_seconds": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS
+            ),
+        }
+        for field_name, expected_value in expected_scalar_fields.items():
             if receipt.get(field_name) != expected_value:
                 local_errors.append(f"{prefix}.{field_name} mismatch")
 
@@ -5049,6 +5818,13 @@ class MemoryReplicationService:
                     "renewal_event_digest_set": expected_renewal_event_digest_set,
                     "previous_retirement_digest_set": (
                         expected_previous_retirement_digest_set
+                    ),
+                    "ct_log_readback_set_digest": (
+                        expected_ct_log_readback_set_digest
+                    ),
+                    "ct_log_quorum_set_digest": expected_ct_log_quorum_set_digest,
+                    "sct_policy_authority_set_digest": (
+                        expected_sct_policy_authority_set_digest
                     ),
                     "response_digest_set": list(response_digest_set),
                     "response_signature_digest_set": list(
@@ -5093,6 +5869,14 @@ class MemoryReplicationService:
             local_errors.append(
                 f"{prefix}.certificate_lifecycle_status must equal current-not-revoked"
             )
+        if receipt.get("ct_log_readback_status") != "current":
+            local_errors.append(f"{prefix}.ct_log_readback_status must equal current")
+        if receipt.get("ct_log_quorum_status") != "complete":
+            local_errors.append(f"{prefix}.ct_log_quorum_status must equal complete")
+        if receipt.get("sct_policy_authority_status") != "verified":
+            local_errors.append(
+                f"{prefix}.sct_policy_authority_status must equal verified"
+            )
         if receipt.get("raw_certificate_payload_stored") is not False:
             raw_certificate_payload_stored = True
             local_errors.append(f"{prefix}.raw_certificate_payload_stored must be false")
@@ -5105,6 +5889,16 @@ class MemoryReplicationService:
             raw_certificate_lifecycle_payload_stored = True
             local_errors.append(
                 f"{prefix}.raw_certificate_lifecycle_payload_stored must be false"
+            )
+        if receipt.get("raw_certificate_ct_log_payload_stored") is not False:
+            raw_certificate_ct_log_payload_stored = True
+            local_errors.append(
+                f"{prefix}.raw_certificate_ct_log_payload_stored must be false"
+            )
+        if receipt.get("raw_sct_policy_authority_payload_stored") is not False:
+            raw_sct_policy_authority_payload_stored = True
+            local_errors.append(
+                f"{prefix}.raw_sct_policy_authority_payload_stored must be false"
             )
         digest = receipt.get("digest")
         self._require_digest(digest, f"{prefix}.digest", local_errors)
@@ -5127,6 +5921,34 @@ class MemoryReplicationService:
             and not raw_certificate_freshness_payload_stored
             and not raw_certificate_lifecycle_payload_stored
             and not raw_certificate_payload_stored
+            and receipt.get("ct_log_readback_status") == "current"
+            and receipt.get("ct_log_quorum_status") == "complete"
+            and receipt.get("sct_policy_authority_status") == "verified"
+            and not raw_certificate_ct_log_payload_stored
+            and not raw_sct_policy_authority_payload_stored
+            and not local_errors
+        )
+        ct_log_bound = (
+            receipt.get("ct_log_readback_set_digest")
+            == expected_ct_log_readback_set_digest
+            and receipt.get("ct_log_readback_status") == "current"
+            and not raw_certificate_ct_log_payload_stored
+            and not local_errors
+        )
+        ct_log_quorum_ok = (
+            ct_log_bound
+            and receipt.get("ct_log_quorum_set_digest")
+            == expected_ct_log_quorum_set_digest
+            and receipt.get("ct_log_quorum_status") == "complete"
+            and receipt.get("ct_log_quorum_required_log_count")
+            == MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT
+            and not local_errors
+        )
+        sct_policy_authority_bound = (
+            receipt.get("sct_policy_authority_set_digest")
+            == expected_sct_policy_authority_set_digest
+            and receipt.get("sct_policy_authority_status") == "verified"
+            and not raw_sct_policy_authority_payload_stored
             and not local_errors
         )
         quorum_ok = (
@@ -5135,6 +5957,12 @@ class MemoryReplicationService:
             and receipt.get("quorum_status") == "complete"
             and receipt.get("certificate_lifecycle_quorum_digest")
             == expected_certificate_lifecycle_quorum_digest
+            and receipt.get("ct_log_readback_set_digest")
+            == expected_ct_log_readback_set_digest
+            and receipt.get("ct_log_quorum_set_digest")
+            == expected_ct_log_quorum_set_digest
+            and receipt.get("sct_policy_authority_set_digest")
+            == expected_sct_policy_authority_set_digest
             and freshness_ok
             and not local_errors
         )
@@ -5144,12 +5972,21 @@ class MemoryReplicationService:
             "bound": not local_errors,
             "freshness_ok": freshness_ok,
             "quorum_ok": quorum_ok,
+            "ct_log_bound": ct_log_bound,
+            "ct_log_quorum_ok": ct_log_quorum_ok,
+            "sct_policy_authority_bound": sct_policy_authority_bound,
             "raw_certificate_payload_stored": raw_certificate_payload_stored,
             "raw_certificate_freshness_payload_stored": (
                 raw_certificate_freshness_payload_stored
             ),
             "raw_certificate_lifecycle_payload_stored": (
                 raw_certificate_lifecycle_payload_stored
+            ),
+            "raw_certificate_ct_log_payload_stored": (
+                raw_certificate_ct_log_payload_stored
+            ),
+            "raw_sct_policy_authority_payload_stored": (
+                raw_sct_policy_authority_payload_stored
             ),
             "digest": digest if isinstance(digest, str) else "",
         }

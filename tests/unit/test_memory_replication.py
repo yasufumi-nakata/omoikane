@@ -62,6 +62,21 @@ class MemoryReplicationServiceTests(unittest.TestCase):
                 "long_term_media_renewal_registry_endpoint_certificate_quorum_ok"
             ]
         )
+        self.assertTrue(
+            validation[
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound"
+            ]
+        )
+        self.assertTrue(
+            validation[
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok"
+            ]
+        )
+        self.assertTrue(
+            validation[
+                "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound"
+            ]
+        )
         self.assertFalse(validation["raw_key_material_stored"])
         self.assertFalse(validation["raw_shard_material_stored"])
         self.assertFalse(validation["raw_signer_roster_payload_stored"])
@@ -84,6 +99,16 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertFalse(
             validation[
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            validation[
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            validation[
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored"
             ]
         )
         media_renewal = session["long_term_media_renewal"]
@@ -131,8 +156,31 @@ class MemoryReplicationServiceTests(unittest.TestCase):
             endpoint_certificate_lifecycle["registry_response_digest_set"],
         )
         self.assertEqual(2, len(endpoint_certificate_lifecycle["endpoint_certificate_refs"]))
+        self.assertEqual(
+            "long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1",
+            endpoint_certificate_lifecycle["ct_log_readback_policy_id"],
+        )
+        self.assertEqual(
+            "long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1",
+            endpoint_certificate_lifecycle["ct_log_quorum_policy_id"],
+        )
+        self.assertEqual(
+            "long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1",
+            endpoint_certificate_lifecycle["sct_policy_authority_policy_id"],
+        )
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["ct_log_refs"]))
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["ct_log_refs"][0]))
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["ct_log_readback_digest_set"]))
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["ct_log_quorum_digest_set"]))
+        self.assertEqual(2, len(endpoint_certificate_lifecycle["sct_policy_authority_digest_set"]))
         self.assertEqual("complete", endpoint_certificate_lifecycle["quorum_status"])
         self.assertEqual("current", endpoint_certificate_lifecycle["freshness_status"])
+        self.assertEqual("current", endpoint_certificate_lifecycle["ct_log_readback_status"])
+        self.assertEqual("complete", endpoint_certificate_lifecycle["ct_log_quorum_status"])
+        self.assertEqual(
+            "verified",
+            endpoint_certificate_lifecycle["sct_policy_authority_status"],
+        )
         self.assertEqual(
             "current-not-revoked",
             endpoint_certificate_lifecycle["certificate_lifecycle_status"],
@@ -148,6 +196,16 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertFalse(
             endpoint_certificate_lifecycle[
                 "raw_certificate_lifecycle_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            endpoint_certificate_lifecycle[
+                "raw_certificate_ct_log_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            endpoint_certificate_lifecycle[
+                "raw_sct_policy_authority_payload_stored"
             ]
         )
         signer_roster_quorum = session["key_succession"]["signer_roster_quorum"]
@@ -520,6 +578,44 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(
             any(
                 "raw_certificate_lifecycle_payload_stored" in error
+                for error in validation["errors"]
+            )
+        )
+
+    def test_validate_session_rejects_raw_media_registry_endpoint_certificate_ct_log_payload_storage(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        certificate_lifecycle = session["long_term_media_renewal"]["refresh_window"][
+            "registry_verifier"
+        ]["endpoint_certificate_lifecycle"]
+        certificate_lifecycle["raw_certificate_ct_log_payload_stored"] = True
+        certificate_lifecycle["digest"] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"]["registry_verifier"][
+            "digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"][
+            "refresh_commit_digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(
+            validation[
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound"
+            ]
+        )
+        self.assertTrue(
+            validation[
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored"
+            ]
+        )
+        self.assertTrue(
+            any(
+                "raw_certificate_ct_log_payload_stored" in error
                 for error in validation["errors"]
             )
         )

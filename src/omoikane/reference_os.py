@@ -11799,6 +11799,15 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_registry_endpoint_certificate_quorum_ok": replication_validation[
                     "long_term_media_renewal_registry_endpoint_certificate_quorum_ok"
                 ],
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound"
+                ],
                 "session_digest": replication_session["digest"],
             },
             actor="MemoryReplicationService",
@@ -11891,6 +11900,15 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_registry_endpoint_certificate_quorum_ok": replication_validation[
                     "long_term_media_renewal_registry_endpoint_certificate_quorum_ok"
                 ],
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_ct_log_bound"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound"
+                ],
                 "raw_signer_roster_payload_stored": replication_validation[
                     "raw_signer_roster_payload_stored"
                 ],
@@ -11926,6 +11944,12 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": replication_validation[
                     "raw_media_registry_endpoint_certificate_lifecycle_payload_stored"
+                ],
+                "raw_media_registry_endpoint_certificate_ct_log_payload_stored": replication_validation[
+                    "raw_media_registry_endpoint_certificate_ct_log_payload_stored"
+                ],
+                "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored": replication_validation[
+                    "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored"
                 ],
                 "ok": manifest_validation["ok"] and replication_validation["ok"],
             },

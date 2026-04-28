@@ -69,10 +69,16 @@ reference runtime ではこの protocol を
   `long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` が各 registry
   endpoint の certificate fingerprint、chain digest、OCSP / revocation digest、
   renewal event、previous certificate retirement digest を registry response quorum と
-  同じ source proof set へ束縛する。
+  同じ source proof set へ束縛する。さらに
+  `long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1` /
+  `long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1` /
+  `long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1`
+  により、CT-style readback、2-log quorum、SCT timestamp window、
+  SCT policy authority を digest-only に束縛する。
   raw media payload / raw readback payload / raw revocation payload / raw refresh payload /
   raw registry payload / raw response payload / raw endpoint certificate payload /
-  raw certificate freshness payload / raw certificate lifecycle payload は保存しない
+  raw certificate freshness payload / raw certificate lifecycle payload /
+  raw certificate CT log payload / raw SCT policy authority payload は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)

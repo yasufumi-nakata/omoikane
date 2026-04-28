@@ -43,6 +43,7 @@ operations:
       - long_term_media_renewal.refresh_window must bind the source proof set to current-not-revoked status, 90-day revocation checks, next refresh refs, and fail-closed stale/revoked proof handling without storing raw revocation or refresh payloads
       - long_term_media_renewal.refresh_window.registry_verifier must bind JP-13 and SG-01 registry response digests, response signatures, timeout budget, and quorum digest to the source proof set without storing raw registry or response payloads
       - long_term_media_renewal.refresh_window.registry_verifier.endpoint_certificate_lifecycle must bind each registry endpoint to current certificate fingerprints, chain digests, OCSP/revocation digests, renewal and previous-retirement evidence, and the registry response quorum without storing raw certificate payloads
+      - long_term_media_renewal.refresh_window.registry_verifier.endpoint_certificate_lifecycle must additionally bind CT-style readback, two-log quorum, SCT timestamp window, and SCT policy authority evidence without storing raw CT log or SCT authority payloads
   validate_session:
     summary: Validate one replication session against the fixed quorum and reconciliation policy.
     input:
@@ -89,6 +90,9 @@ operations:
           - long_term_media_renewal_registry_endpoint_certificate_lifecycle_bound
           - long_term_media_renewal_registry_endpoint_certificate_freshness_ok
           - long_term_media_renewal_registry_endpoint_certificate_quorum_ok
+          - long_term_media_renewal_registry_endpoint_certificate_ct_log_bound
+          - long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok
+          - long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound
           - raw_key_material_stored
           - raw_shard_material_stored
           - raw_signer_roster_payload_stored
@@ -103,6 +107,8 @@ operations:
           - raw_media_registry_endpoint_certificate_payload_stored
           - raw_media_registry_endpoint_certificate_freshness_payload_stored
           - raw_media_registry_endpoint_certificate_lifecycle_payload_stored
+          - raw_media_registry_endpoint_certificate_ct_log_payload_stored
+          - raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
           - errors
         properties:
           ok:
@@ -184,6 +190,12 @@ operations:
             type: boolean
           long_term_media_renewal_registry_endpoint_certificate_quorum_ok:
             type: boolean
+          long_term_media_renewal_registry_endpoint_certificate_ct_log_bound:
+            type: boolean
+          long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok:
+            type: boolean
+          long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound:
+            type: boolean
           raw_key_material_stored:
             type: boolean
           raw_shard_material_stored:
@@ -211,6 +223,10 @@ operations:
           raw_media_registry_endpoint_certificate_freshness_payload_stored:
             type: boolean
           raw_media_registry_endpoint_certificate_lifecycle_payload_stored:
+            type: boolean
+          raw_media_registry_endpoint_certificate_ct_log_payload_stored:
+            type: boolean
+          raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored:
             type: boolean
           errors:
             type: array

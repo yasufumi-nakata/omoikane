@@ -11,6 +11,8 @@ capabilities:
   - memory-replication.long-term-media-renewal-refresh.attest
   - memory-replication.long-term-media-registry-verifier.attest
   - memory-replication.long-term-media-registry-endpoint-certificate-lifecycle.attest
+  - memory-replication.long-term-media-registry-endpoint-certificate-ct-log.attest
+  - memory-replication.long-term-media-registry-endpoint-certificate-sct-policy.attest
   - continuity.public-verification.attest
   - collective.dissolution-receipt.attest
   - collective.recovery-verifier-transport.attest
@@ -77,7 +79,7 @@ when_to_invoke: |
   - MemoryCrystal replication の long-term media renewal receipt が coldstore / trustee の renewed media proof、readback digest、migration attestation digest、3650 日 refresh interval、1000 年 target horizon に束縛され、raw media / raw readback payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal refresh window が source proof digest set、current-not-revoked status、90 日 revocation check、next refresh ref、stale / revoked source fail-closed に束縛され、raw revocation / raw refresh payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal registry verifier が JP-13 / SG-01 の registry response digest、response signature digest、250ms timeout budget、quorum digest に束縛され、raw registry / raw response payload を保存していないことを検証する時
-  - MemoryCrystal replication の long-term media renewal registry endpoint certificate lifecycle が endpoint certificate fingerprint、certificate chain digest、OCSP / revocation digest、renewal event、previous certificate retirement digest に束縛され、raw endpoint certificate / raw certificate freshness / raw certificate lifecycle payload を保存していないことを検証する時
+  - MemoryCrystal replication の long-term media renewal registry endpoint certificate lifecycle が endpoint certificate fingerprint、certificate chain digest、OCSP / revocation digest、renewal event、previous certificate retirement digest、CT-style readback、2-log quorum、SCT timestamp window、SCT policy authority に束縛され、raw endpoint certificate / raw certificate freshness / raw certificate lifecycle / raw CT log / raw SCT policy authority payload を保存していないことを検証する時
   - Collective dissolution receipt が全 member confirmation、schema version、IdentityConfirmation digest proof、digest-only audit ref に束縛されていることを検証する時
   - Collective dissolution 後の member recovery proof が remote reviewer verifier transport receipt と raw payload 非保存に束縛されていることを検証する時
   - Collective dissolution 後の recovery verifier transport receipt set が authenticated non-loopback authority-route trace と raw route payload 非保存に束縛されていることを検証する時

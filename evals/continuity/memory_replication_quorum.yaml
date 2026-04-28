@@ -45,6 +45,9 @@ expect:
   long_term_media_renewal_registry_endpoint_certificate_lifecycle_bound: true
   long_term_media_renewal_registry_endpoint_certificate_freshness_ok: true
   long_term_media_renewal_registry_endpoint_certificate_quorum_ok: true
+  long_term_media_renewal_registry_endpoint_certificate_ct_log_bound: true
+  long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok: true
+  long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound: true
   long_term_media_renewal_registry_jurisdictions:
     - JP-13
     - SG-01
@@ -64,6 +67,8 @@ expect:
   raw_media_registry_endpoint_certificate_payload_stored: false
   raw_media_registry_endpoint_certificate_freshness_payload_stored: false
   raw_media_registry_endpoint_certificate_lifecycle_payload_stored: false
+  raw_media_registry_endpoint_certificate_ct_log_payload_stored: false
+  raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored: false
   raw_media_registry_payload_stored: false
   raw_media_registry_response_payload_stored: false
   memory_replication_ledger_count: 1

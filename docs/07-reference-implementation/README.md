@@ -805,9 +805,15 @@ digest、response signature digest、250ms timeout budget、quorum digest、
 `long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` による registry
 endpoint certificate fingerprint、certificate chain digest、OCSP / revocation digest、
 renewal event、previous certificate retirement digest、
+`long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1` /
+`long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1` /
+`long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1`
+による CT-style readback、2-log quorum、SCT timestamp window、
+SCT policy authority の digest-only binding、
 raw media / raw readback / raw revocation / raw refresh / raw registry /
 raw response / raw endpoint certificate / raw certificate freshness /
-raw certificate lifecycle payload redaction、
+raw certificate lifecycle / raw certificate CT log /
+raw SCT policy authority payload redaction、
 `memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract

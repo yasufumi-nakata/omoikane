@@ -6,8 +6,8 @@ description: >
   placement, plaintext metadata plus encrypted payload transfer, random-block
   Merkle audit, council-escalated reconciliation, and raw-payload-redacted
   multi-jurisdiction key succession plus digest-only long-term media registry
-  verification with endpoint certificate lifecycle binding without mutating the
-  source manifest.
+  verification with endpoint certificate lifecycle, CT readback/quorum, and SCT
+  policy authority binding without mutating the source manifest.
 type: object
 additionalProperties: false
 required:
@@ -71,6 +71,9 @@ properties:
       - long_term_media_renewal_refresh_policy_id
       - long_term_media_renewal_registry_verifier_policy_id
       - long_term_media_renewal_registry_endpoint_certificate_lifecycle_policy_id
+      - long_term_media_renewal_registry_endpoint_certificate_ct_log_readback_policy_id
+      - long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_policy_id
+      - long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_policy_id
       - long_term_media_renewal_targets
       - long_term_media_renewal_refresh_interval_days
       - long_term_media_renewal_revocation_check_window_days
@@ -80,6 +83,8 @@ properties:
       - long_term_media_renewal_registry_response_timeout_ms
       - long_term_media_renewal_registry_endpoint_certificate_freshness_window_days
       - long_term_media_renewal_registry_endpoint_certificate_chain_generations
+      - long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_required_log_count
+      - long_term_media_renewal_registry_endpoint_certificate_sct_timestamp_window_seconds
       - verify_policy_id
       - reconcile_policy_id
       - minimum_consensus_targets
@@ -169,6 +174,15 @@ properties:
       long_term_media_renewal_registry_endpoint_certificate_lifecycle_policy_id:
         type: string
         const: long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1
+      long_term_media_renewal_registry_endpoint_certificate_ct_log_readback_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1
+      long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1
+      long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1
       long_term_media_renewal_targets:
         type: array
         minItems: 2
@@ -204,6 +218,12 @@ properties:
       long_term_media_renewal_registry_endpoint_certificate_chain_generations:
         type: integer
         const: 2
+      long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_required_log_count:
+        type: integer
+        const: 2
+      long_term_media_renewal_registry_endpoint_certificate_sct_timestamp_window_seconds:
+        type: integer
+        const: 86400
       verify_policy_id:
         type: string
         const: merkle-random-block-audit-v1
@@ -948,6 +968,26 @@ $defs:
       - previous_certificate_refs
       - previous_certificate_fingerprints
       - previous_retirement_digest_set
+      - ct_log_readback_policy_id
+      - ct_log_quorum_policy_id
+      - sct_policy_authority_policy_id
+      - ct_log_refs
+      - ct_log_leaf_digest_set
+      - ct_log_inclusion_proof_digest_set
+      - ct_log_readback_digest_set
+      - ct_log_quorum_digest_set
+      - sct_timestamp_digest_set
+      - sct_policy_registry_refs
+      - sct_policy_registry_digest_set
+      - sct_signer_roster_refs
+      - sct_signer_roster_digest_set
+      - sct_signer_verifier_quorum_digest_set
+      - sct_policy_authority_digest_set
+      - ct_log_readback_set_digest
+      - ct_log_quorum_set_digest
+      - sct_policy_authority_set_digest
+      - ct_log_quorum_required_log_count
+      - sct_timestamp_window_seconds
       - certificate_freshness_window_days
       - certificate_lifecycle_generation_count
       - certificate_lifecycle_quorum_digest
@@ -955,9 +995,14 @@ $defs:
       - quorum_status
       - freshness_status
       - certificate_lifecycle_status
+      - ct_log_readback_status
+      - ct_log_quorum_status
+      - sct_policy_authority_status
       - raw_certificate_payload_stored
       - raw_certificate_freshness_payload_stored
       - raw_certificate_lifecycle_payload_stored
+      - raw_certificate_ct_log_payload_stored
+      - raw_sct_policy_authority_payload_stored
       - digest
     properties:
       kind:
@@ -1127,6 +1172,130 @@ $defs:
         items:
           type: string
           pattern: "^[0-9a-f]{64}$"
+      ct_log_readback_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1
+      ct_log_quorum_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1
+      sct_policy_authority_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1
+      ct_log_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          type: array
+          minItems: 2
+          maxItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            pattern: "^certificate-transparency-log://memory-replication/"
+      ct_log_leaf_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      ct_log_inclusion_proof_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      ct_log_readback_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      ct_log_quorum_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      sct_timestamp_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      sct_policy_registry_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^sct-policy-registry://memory-replication/"
+      sct_policy_registry_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      sct_signer_roster_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^sct-signer-roster://memory-replication/"
+      sct_signer_roster_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      sct_signer_verifier_quorum_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      sct_policy_authority_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      ct_log_readback_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      ct_log_quorum_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      sct_policy_authority_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      ct_log_quorum_required_log_count:
+        type: integer
+        const: 2
+      sct_timestamp_window_seconds:
+        type: integer
+        const: 86400
       certificate_freshness_window_days:
         type: integer
         const: 90
@@ -1148,6 +1317,15 @@ $defs:
       certificate_lifecycle_status:
         type: string
         const: current-not-revoked
+      ct_log_readback_status:
+        type: string
+        const: current
+      ct_log_quorum_status:
+        type: string
+        const: complete
+      sct_policy_authority_status:
+        type: string
+        const: verified
       raw_certificate_payload_stored:
         type: boolean
         const: false
@@ -1155,6 +1333,12 @@ $defs:
         type: boolean
         const: false
       raw_certificate_lifecycle_payload_stored:
+        type: boolean
+        const: false
+      raw_certificate_ct_log_payload_stored:
+        type: boolean
+        const: false
+      raw_sct_policy_authority_payload_stored:
         type: boolean
         const: false
       digest:
