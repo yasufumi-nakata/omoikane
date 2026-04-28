@@ -2895,10 +2895,39 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertIn("councilor", snapshot["role_index"])
         self.assertIn("docs.propose-change", snapshot["capability_index"])
         self.assertGreaterEqual(snapshot["selection_ready_counts"]["guardian_ready"], 1)
+        self.assertEqual(
+            "repo-local-agent-source-digest-manifest-v1",
+            snapshot["source_digest_profile"],
+        )
+        self.assertEqual(snapshot["entry_count"], snapshot["source_definition_count"])
+        self.assertEqual(snapshot["entry_count"], len(snapshot["source_definition_digests"]))
+        self.assertEqual(
+            sha256_text(
+                canonical_json(
+                    {"source_definition_digests": snapshot["source_definition_digests"]}
+                )
+            ),
+            snapshot["source_manifest_digest"],
+        )
+        self.assertFalse(snapshot["raw_source_payload_stored"])
+        source_digests = {
+            source["source_ref"]: source for source in snapshot["source_definition_digests"]
+        }
         for entry in snapshot["entries"]:
             self.assertTrue(entry["substrate_requirements"], entry["agent_id"])
             self.assertTrue(entry["input_schema_ref"], entry["agent_id"])
             self.assertTrue(entry["output_schema_ref"], entry["agent_id"])
+            source_digest = source_digests[entry["source_ref"]]
+            self.assertEqual(entry["agent_id"], source_digest["agent_id"])
+            self.assertEqual(entry["role"], source_digest["role"])
+            self.assertEqual(
+                sha256_text((repo_root / entry["source_ref"]).read_text(encoding="utf-8")),
+                source_digest["sha256"],
+            )
+            self.assertEqual(
+                len((repo_root / entry["source_ref"]).read_text(encoding="utf-8").encode("utf-8")),
+                source_digest["byte_length"],
+            )
             if entry["role"] == "researcher":
                 self.assertTrue(entry["research_domain_refs"], entry["agent_id"])
                 self.assertTrue(entry["evidence_policy_ref"], entry["agent_id"])
@@ -3389,6 +3418,29 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         )
         self.assertEqual("build-surface", session["builder_handoff"][0]["role_scope_kind"])
         self.assertIn("src/omoikane/", session["builder_handoff"][0]["role_scope_refs"])
+        builder_targets = {
+            selection["coverage_area"]: selection
+            for selection in session["builder_handoff"]
+        }
+        self.assertEqual(
+            ["src/omoikane/", "tests/unit/", "tests/integration/"],
+            builder_targets["runtime"]["coverage_target_path_refs"],
+        )
+        self.assertEqual(
+            ["specs/interfaces/", "specs/schemas/"],
+            builder_targets["schema"]["coverage_target_path_refs"],
+        )
+        self.assertEqual(["evals/"], builder_targets["eval"]["coverage_target_path_refs"])
+        self.assertEqual(
+            ["docs/", "meta/decision-log/"],
+            builder_targets["docs"]["coverage_target_path_refs"],
+        )
+        for selection in builder_targets.values():
+            self.assertEqual(
+                "coverage-area-target-path-binding-v1",
+                selection["coverage_scope_binding_profile"],
+            )
+            self.assertTrue(selection["coverage_targets_bound"], selection["coverage_area"])
         self.assertEqual("self-modify-patch-v1", session["proposal_profile"])
 
     def test_prepare_memory_edit_convocation_selects_memory_sensitive_roles(self) -> None:

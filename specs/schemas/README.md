@@ -210,6 +210,7 @@
 - `yaoyorozu_worker_patch_candidate_receipt.schema`
 - `yaoyorozu_worker_workspace_delta_receipt.schema`
 - `yaoyorozu_registry_snapshot.schema`
+  - raw `agents/**/*.yaml` の source_ref / agent_id / role / sha256 / byte_length manifest と source manifest digest を保持し、raw source payload 非保存を検証する
 
 ## 次段階
 

@@ -122,6 +122,15 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "build-surface",
             result["convocation"]["builder_handoff"][0]["role_scope_kind"],
         )
+        self.assertEqual(
+            "coverage-area-target-path-binding-v1",
+            result["convocation"]["builder_handoff"][0]["coverage_scope_binding_profile"],
+        )
+        self.assertTrue(result["convocation"]["builder_handoff"][0]["coverage_targets_bound"])
+        self.assertEqual(
+            ["src/omoikane/", "tests/unit/", "tests/integration/"],
+            result["convocation"]["builder_handoff"][0]["coverage_target_path_refs"],
+        )
         self.assertFalse(
             result["convocation"]["builder_handoff"][0]["raw_role_scope_payload_stored"]
         )

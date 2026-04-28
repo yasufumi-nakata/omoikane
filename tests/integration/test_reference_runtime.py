@@ -2820,6 +2820,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["non_source_workspace_count"])
         self.assertEqual("self-modify-patch-v1", result["validation"]["proposal_profile"])
         self.assertTrue(result["validation"]["workspace_discovery_ok"])
+        self.assertTrue(result["validation"]["registry_source_digest_manifest_bound"])
+        self.assertFalse(result["validation"]["raw_source_payload_stored"])
         self.assertTrue(result["validation"]["workspace_review_budget_respected"])
         self.assertEqual(3, result["validation"]["profile_workspace_review_budget"])
         self.assertEqual(
@@ -2840,6 +2842,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["consensus_direct_handoff_blocked"])
         self.assertTrue(result["validation"]["workspace_discovery_bound"])
         self.assertTrue(result["validation"]["builder_profile_policy_ready"])
+        self.assertTrue(result["validation"]["builder_coverage_target_paths_bound"])
         self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["workspace_execution_bound"])
         self.assertTrue(result["validation"]["workspace_execution_policy_ready"])

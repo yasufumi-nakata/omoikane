@@ -91,6 +91,8 @@ YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE = (
     "human-oversight-channel-preseed-attestation-v1"
 )
 YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE = "registry-selection-scope-binding-v1"
+YAOYOROZU_COVERAGE_SCOPE_BINDING_PROFILE = "coverage-area-target-path-binding-v1"
+YAOYOROZU_AGENT_SOURCE_DIGEST_PROFILE = "repo-local-agent-source-digest-manifest-v1"
 AGENT_SOURCE_DEFINITION_SCHEMA_VERSION = "1.0.0"
 AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
 AGENT_SOURCE_ALLOWED_ROLES = {"councilor", "builder", "researcher", "guardian"}
@@ -2942,6 +2944,7 @@ class YaoyorozuRegistryService:
     def sync_from_agents_directory(self, agents_root: Path) -> Dict[str, Any]:
         repo_root = agents_root.resolve().parent
         self._entries = {}
+        source_definition_digests: List[Dict[str, Any]] = []
         for definition_path in sorted(agents_root.resolve().rglob("*.yaml")):
             parsed = _parse_agent_definition(definition_path)
             source_errors = _validate_agent_source_definition(parsed, definition_path, repo_root)
@@ -2952,11 +2955,22 @@ class YaoyorozuRegistryService:
                     + "; ".join(source_errors)
                 )
             agent_id = str(parsed.get("name") or definition_path.stem).strip()
+            source_ref = str(definition_path.relative_to(repo_root))
+            source_text = definition_path.read_text(encoding="utf-8")
+            source_definition_digests.append(
+                {
+                    "source_ref": source_ref,
+                    "agent_id": agent_id,
+                    "role": str(parsed.get("role", "unknown")).strip() or "unknown",
+                    "sha256": sha256_text(source_text),
+                    "byte_length": len(source_text.encode("utf-8")),
+                }
+            )
             entry = YaoyorozuRegistryEntry(
                 agent_id=agent_id,
                 display_name=_pascal_case(agent_id),
                 role=str(parsed.get("role", "unknown")).strip() or "unknown",
-                source_ref=str(definition_path.relative_to(repo_root)),
+                source_ref=source_ref,
                 capabilities=_normalize_string_list(parsed.get("capabilities", [])),
                 trust_floor=float(parsed.get("trust_floor", self._policy.cold_start_score)),
                 substrate_requirements=_normalize_string_list(
@@ -2996,9 +3010,17 @@ class YaoyorozuRegistryService:
                 capability_index.setdefault(capability, []).append(agent_id)
             entries.append(entry.to_dict(trust_snapshot))
 
+        source_manifest_digest = sha256_text(
+            canonical_json({"source_definition_digests": source_definition_digests})
+        )
         snapshot_body = {
             "policy_id": self._policy.policy_id,
             "source_root": str(self._agents_root.relative_to(repo_root)),
+            "source_digest_profile": YAOYOROZU_AGENT_SOURCE_DIGEST_PROFILE,
+            "source_definition_count": len(source_definition_digests),
+            "source_definition_digests": source_definition_digests,
+            "source_manifest_digest": source_manifest_digest,
+            "raw_source_payload_stored": False,
             "entry_count": len(entries),
             "role_index": role_index,
             "capability_index": capability_index,
@@ -7397,15 +7419,22 @@ class YaoyorozuRegistryService:
         if not cls._selection_scope_bound(selection, "build-surface"):
             return False
         coverage_area = str(selection.get("coverage_area", "")).strip()
-        expected_prefixes = {
-            "runtime": ("src/", "tests/"),
-            "schema": ("specs/",),
-            "eval": ("evals/", "tests/"),
-            "docs": ("docs/", "agents/", "meta/"),
-        }.get(coverage_area, ())
-        refs = [str(ref) for ref in selection.get("role_scope_refs", [])]
-        return bool(expected_prefixes) and any(
-            ref.startswith(expected_prefixes) for ref in refs
+        target_path_refs = [str(ref) for ref in selection.get("coverage_target_path_refs", [])]
+        expected_targets = list(YAOYOROZU_WORKER_TARGET_PATHS.get(coverage_area, []))
+        scope_refs = [str(ref) for ref in selection.get("role_scope_refs", [])]
+        target_paths_bound = bool(expected_targets) and target_path_refs == expected_targets
+        target_paths_bound = target_paths_bound and all(
+            any(
+                target_ref == scope_ref or target_ref.startswith(scope_ref)
+                for scope_ref in scope_refs
+            )
+            for target_ref in target_path_refs
+        )
+        return (
+            target_paths_bound
+            and selection.get("coverage_scope_binding_profile")
+            == YAOYOROZU_COVERAGE_SCOPE_BINDING_PROFILE
+            and selection.get("coverage_targets_bound") is True
         )
 
     def _select_named_agent(
@@ -7498,4 +7527,15 @@ class YaoyorozuRegistryService:
         }
         if coverage_area:
             result["coverage_area"] = coverage_area
+            target_path_refs = list(self._policy.worker_target_paths.get(coverage_area, []))
+            scope_refs = [str(ref) for ref in result["role_scope_refs"]]
+            result["coverage_target_path_refs"] = target_path_refs
+            result["coverage_scope_binding_profile"] = YAOYOROZU_COVERAGE_SCOPE_BINDING_PROFILE
+            result["coverage_targets_bound"] = bool(target_path_refs) and all(
+                any(
+                    target_ref == scope_ref or target_ref.startswith(scope_ref)
+                    for scope_ref in scope_refs
+                )
+                for target_ref in target_path_refs
+            )
         return result

@@ -505,6 +505,10 @@ proposal profile ごとの review policy で走査した `yaoyorozu_workspace_di
 repo-local `agents/` から materialize した trust-bound registry snapshot、
 raw `agents/**/*.yaml` が `agent_source_definition.schema` の必須 field、
 non-empty substrate / schema refs、repo-local policy refs を満たしてから registry 化されること、
+同じ registry snapshot が `repo-local-agent-source-digest-manifest-v1` として
+各 raw source definition の `source_ref`、`agent_id`、`role`、`sha256`、`byte_length` を
+`source_definition_digests` に束縛し、ordered digest set 由来の
+`source_manifest_digest` を返しながら `raw_source_payload_stored=false` を固定すること、
 `councilor` role では `deliberation_scope_refs` と `deliberation_policy_ref` を
 raw source definition と materialized registry entry の両方に保持し、
 議事 transcript 本体ではなく repo-local deliberation boundary ref だけを渡すこと、
@@ -528,7 +532,12 @@ profile-specific council panel には selected agent の role に応じた
 `deliberation` / `oversight` / `research-evidence` scope を持たせ、
 builder handoff には `role_scope_kind=build-surface` を持たせ、
 `raw_role_scope_payload_stored=false` のまま scope refs / policy ref だけを
-same-session Council artifact に残すこと、
+same-session Council artifact に残すこと、さらに builder handoff ごとに
+`coverage-area-target-path-binding-v1` で `coverage_area` と
+`coverage_target_path_refs` を束縛し、`runtime=src/omoikane/ + tests/unit/ + tests/integration/`、
+`schema=specs/interfaces/ + specs/schemas/`、`eval=evals/`、
+`docs=docs/ + meta/decision-log/` の target path set が selected builder の
+`build_surface_refs` に覆われること、
 `Speaker` / `Recorder` / `GuardianLiaison` / `SelfLiaison` の standing role、
 `self-modify-patch-v1` の `DesignAuditor` / `ChangeAdvocate` /
 `ConservatismAdvocate` / `EthicsCommittee` panel と、

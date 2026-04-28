@@ -83,6 +83,8 @@ operations:
       - guardian definitions must bind non-empty oversight_scope_refs and attestation_policy_ref before registry materialization
       - every entry must carry a trust_snapshot and trust_floor
       - role_index and capability_index must remain machine-readable
+      - source_definition_digests must bind every raw agents/**/*.yaml file by source_ref, agent_id, role, sha256, and byte_length
+      - source_manifest_digest must be derived from the ordered source_definition_digests while raw_source_payload_stored remains false
       - councilor registry entries must preserve deliberation surface refs and deliberation policy refs without storing raw deliberation transcripts
       - researcher registry entries must preserve research domain refs and evidence policy refs without storing raw research payloads
       - builder registry entries must preserve repo-local build surface refs and execution policy refs before handoff
@@ -135,6 +137,8 @@ operations:
       - selected Councilor, Guardian, and Builder entries must carry registry-selection-scope-binding-v1 scope refs and policy refs without raw deliberation, audit, or build payloads
       - proposal_profile must fix the required and optional builder coverage policy surfaced by the convocation artifact
       - requested_optional_builder_coverage_areas, when present, must stay within the selected profile's optional coverage and become first-class dispatch_builder_coverage_areas
+      - each selected Builder handoff must bind coverage_area to fixed coverage_target_path_refs using coverage-area-target-path-binding-v1
+      - selected Builder build_surface_refs must cover every target path ref bound to its coverage_area
   prepare_worker_dispatch:
     summary: >
       Convert one selected bounded Yaoyorozu convocation into a same-host worker dispatch plan

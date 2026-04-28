@@ -545,6 +545,9 @@ $defs:
       - candidate_agent_ids
       - selection_reason
       - coverage_area
+      - coverage_target_path_refs
+      - coverage_scope_binding_profile
+      - coverage_targets_bound
     properties:
       role_id:
         type: string
@@ -613,6 +616,16 @@ $defs:
           - schema
           - eval
           - docs
+      coverage_target_path_refs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          pattern: "^(src|tests|specs|evals|docs|agents|meta|research)/"
+      coverage_scope_binding_profile:
+        const: coverage-area-target-path-binding-v1
+      coverage_targets_bound:
+        type: boolean
 examples:
   - kind: council_convocation_session
     schema_version: 1.0.0
@@ -841,6 +854,12 @@ examples:
           - codex-builder
         selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
         coverage_area: runtime
+        coverage_target_path_refs:
+          - src/omoikane/
+          - tests/unit/
+          - tests/integration/
+        coverage_scope_binding_profile: coverage-area-target-path-binding-v1
+        coverage_targets_bound: true
       - role_id: builder-schema
         role_label: BuilderHandoff
         selected_agent_id: schema-builder
@@ -866,6 +885,11 @@ examples:
           - schema-builder
         selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
         coverage_area: schema
+        coverage_target_path_refs:
+          - specs/interfaces/
+          - specs/schemas/
+        coverage_scope_binding_profile: coverage-area-target-path-binding-v1
+        coverage_targets_bound: true
       - role_id: builder-eval
         role_label: BuilderHandoff
         selected_agent_id: eval-builder
@@ -891,6 +915,10 @@ examples:
           - eval-builder
         selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
         coverage_area: eval
+        coverage_target_path_refs:
+          - evals/
+        coverage_scope_binding_profile: coverage-area-target-path-binding-v1
+        coverage_targets_bound: true
       - role_id: builder-docs
         role_label: BuilderHandoff
         selected_agent_id: doc-sync-builder
@@ -918,6 +946,11 @@ examples:
           - doc-sync-builder
         selection_reason: Top-1 deterministic candidate selected from repo-local agent registry.
         coverage_area: docs
+        coverage_target_path_refs:
+          - docs/
+          - meta/decision-log/
+        coverage_scope_binding_profile: coverage-area-target-path-binding-v1
+        coverage_targets_bound: true
     selection_summary:
       required_council_role_count: 4
       selected_council_role_count: 4

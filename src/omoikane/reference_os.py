@@ -4210,6 +4210,22 @@ json.dump(response, sys.stdout)
             substrate="classical-silicon",
         )
         ledger_verification = self.ledger.verify()
+        registry_source_digest_manifest_bound = (
+            registry_snapshot["source_definition_count"] == registry_snapshot["entry_count"]
+            and registry_snapshot["source_definition_count"]
+            == len(registry_snapshot["source_definition_digests"])
+            and registry_snapshot["source_manifest_digest"]
+            == sha256_text(
+                canonical_json(
+                    {
+                        "source_definition_digests": registry_snapshot[
+                            "source_definition_digests"
+                        ]
+                    }
+                )
+            )
+            and registry_snapshot["raw_source_payload_stored"] is False
+        )
 
         return {
             "identity": {
@@ -4249,6 +4265,8 @@ json.dump(response, sys.stdout)
                     "cross_workspace_coverage_complete"
                 ],
                 "registry_entry_count": registry_snapshot["entry_count"],
+                "registry_source_digest_manifest_bound": registry_source_digest_manifest_bound,
+                "raw_source_payload_stored": registry_snapshot["raw_source_payload_stored"],
                 "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
                 "weighted_vote_ready_count": registry_snapshot["selection_ready_counts"][
                     "weighted_vote_ready"
@@ -4285,6 +4303,9 @@ json.dump(response, sys.stdout)
                     "council_panel_scope_binding_ok"
                 ],
                 "builder_handoff_scope_binding_ok": convocation["validation"][
+                    "builder_handoff_scope_binding_ok"
+                ],
+                "builder_coverage_target_paths_bound": convocation["validation"][
                     "builder_handoff_scope_binding_ok"
                 ],
                 "raw_selection_scope_payload_stored": convocation["validation"][
@@ -4486,6 +4507,7 @@ json.dump(response, sys.stdout)
                     and task_graph_binding_validation["ok"]
                     and build_request_binding_validation["ok"]
                     and execution_chain_validation["ok"]
+                    and registry_source_digest_manifest_bound
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),
             },

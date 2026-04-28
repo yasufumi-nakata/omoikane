@@ -15,6 +15,8 @@ must:
   - builder registry entries preserve repo-local build surface and execution policy refs before any handoff
   - guardian source definitions must bind non-empty oversight_scope_refs and attestation_policy_ref before registry materialization
   - guardian registry entries preserve reviewer-facing oversight scope and attestation policy refs without storing raw audit payloads
+  - registry snapshot must bind every raw agents/**/*.yaml source file to source_ref, agent_id, role, sha256, byte_length, and source_manifest_digest without storing raw source payloads
+  - builder handoff selections must bind each coverage_area to the fixed worker target path refs covered by the selected builder build_surface_refs
 expected:
   agent_source_definition_schema_bound: true
   missing_schema_ref_rejected: true
@@ -28,3 +30,6 @@ expected:
   guardian_oversight_scope_refs_required: true
   guardian_attestation_policy_ref_required: true
   registry_entries_non_empty_contract: true
+  registry_source_digest_manifest_bound: true
+  raw_source_payload_stored: false
+  builder_coverage_target_paths_bound: true

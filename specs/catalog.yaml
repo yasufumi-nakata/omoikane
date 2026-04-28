@@ -2605,7 +2605,7 @@ entries:
       - docs/02-subsystems/agentic/README.md
       - docs/04-ai-governance/subagent-roster.md
       - reference-runtime
-    rationale: Required to materialize the repo-local Yaoyorozu registry from agents/ as a machine-readable snapshot.
+    rationale: Required to materialize the repo-local Yaoyorozu registry from agents/ as a machine-readable snapshot with digest-only raw source definition provenance and no raw source payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/council_convocation_session.schema
@@ -2614,7 +2614,7 @@ entries:
       - docs/02-subsystems/agentic/council-composition.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to bind standing roles, council panel selection, registry-derived role scope refs / policy refs, builder handoff coverage, and the selected workspace-discovery policy into one deterministic convocation artifact.
+    rationale: Required to bind standing roles, council panel selection, registry-derived role scope refs / policy refs, builder handoff coverage target paths, and the selected workspace-discovery policy into one deterministic convocation artifact.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_dispatch_plan.schema
@@ -2758,7 +2758,7 @@ entries:
       - specs/schemas/agent_registry_entry.schema
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects schema-bound raw agent definition validation before registry materialization, including non-empty substrate requirements, schema refs, councilor deliberation-scope refs, researcher evidence-scope refs, builder surface/execution policy refs, and guardian oversight scope/attestation policy refs.
+    rationale: Protects schema-bound raw agent definition validation before registry materialization, including non-empty substrate requirements, schema refs, councilor deliberation-scope refs, researcher evidence-scope refs, builder surface/execution policy refs, guardian oversight scope/attestation policy refs, source digest manifest binding, and builder coverage target path binding.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_external_workspace_execution.yaml

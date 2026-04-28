@@ -138,6 +138,7 @@ status: decided | superseded
 - [2026-04-28_memory-replication-endpoint-certificate-rollover-chain.md](2026-04-28_memory-replication-endpoint-certificate-rollover-chain.md)
 - [2026-04-28_yaoyorozu-researcher-evidence-scope.md](2026-04-28_yaoyorozu-researcher-evidence-scope.md)
 - [2026-04-28_yaoyorozu-builder-surface-scope.md](2026-04-28_yaoyorozu-builder-surface-scope.md)
+- [2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md](2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md)
 - [2026-04-28_self-model-autonomy-review-boundary.md](2026-04-28_self-model-autonomy-review-boundary.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

@@ -2540,6 +2540,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(2, result["validation"]["non_source_workspace_count"])
         self.assertEqual("self-modify-patch-v1", result["validation"]["proposal_profile"])
         self.assertTrue(result["validation"]["workspace_discovery_ok"])
+        self.assertTrue(result["validation"]["registry_source_digest_manifest_bound"])
+        self.assertFalse(result["validation"]["raw_source_payload_stored"])
         self.assertTrue(result["validation"]["workspace_review_budget_respected"])
         self.assertEqual(3, result["validation"]["profile_workspace_review_budget"])
         self.assertEqual(
@@ -2555,6 +2557,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["standing_role_scope_binding_ok"])
         self.assertTrue(result["validation"]["council_panel_scope_binding_ok"])
         self.assertTrue(result["validation"]["builder_handoff_scope_binding_ok"])
+        self.assertTrue(result["validation"]["builder_coverage_target_paths_bound"])
         self.assertFalse(result["validation"]["raw_selection_scope_payload_stored"])
         self.assertEqual(
             "registry-selection-scope-binding-v1",

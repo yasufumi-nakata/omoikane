@@ -49,6 +49,8 @@ capabilities:
   - gap-report.continuity-ledger-binding.attest
   - gap-report.continuity-ledger-entry.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest
+  - yaoyorozu.agent-source.digest-manifest.attest
+  - yaoyorozu.builder-coverage.target-path-binding.attest
   - wms.time-rate-deviation.attest
   - wms.time-rate-attestation-transport.attest
   - wms.distributed-approval-fanout.attest
@@ -120,6 +122,8 @@ when_to_invoke: |
   - gap-report の scan_receipt が実 ContinuityLedger entry ref / hash / payload ref と self+guardian 署名 role に束縛されていることを検証する時
   - Yaoyorozu councilor source definition が deliberation_scope_refs と deliberation_policy_ref を registry entry へ保持し、raw deliberation transcript ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時
+  - Yaoyorozu registry snapshot が raw agents/**/*.yaml source set を digest-only manifest に束縛し、raw source payload を保存していないことを検証する時
+  - Yaoyorozu builder handoff が coverage area ごとの fixed target path refs を selected builder の build_surface_refs に束縛していることを検証する時
   - WMS shared reality の requested time_rate deviation が fixed-time-rate private escape evidence に束縛され、WorldState.time_rate が変更されていないことを検証する時
   - WMS shared reality の requested time_rate deviation が participant subjective-time IMC attestation receipt set に束縛されていることを検証する時
   - WMS shared reality の complete approval collection が Federation distributed transport fan-out receipt に束縛されていることを検証する時
