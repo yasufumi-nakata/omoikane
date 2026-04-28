@@ -10,6 +10,7 @@ imports:
   self_model_pathological_self_assessment_escalation_receipt: ../schemas/self_model_pathological_self_assessment_escalation_receipt.schema
   self_model_care_trustee_handoff_receipt: ../schemas/self_model_care_trustee_handoff_receipt.schema
   self_model_external_adjudication_result_receipt: ../schemas/self_model_external_adjudication_result_receipt.schema
+  self_model_external_adjudication_verifier_receipt: ../schemas/self_model_external_adjudication_verifier_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
   self_model_value_autonomy_review_receipt: ../schemas/self_model_value_autonomy_review_receipt.schema
   self_model_value_acceptance_receipt: ../schemas/self_model_value_acceptance_receipt.schema
@@ -366,6 +367,75 @@ operations:
           os_adjudication_authority_allowed:
             type: boolean
           adjudication_commit_digest_bound:
+            type: boolean
+  build_external_adjudication_verifier_receipt:
+    summary: Bind live appeal/review verifier responses to an external adjudication result without importing verifier authority into the OS.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - external_adjudication_result_receipt
+          - verifier_receipts
+          - council_resolution_ref
+          - guardian_boundary_ref
+          - continuity_review_ref
+        properties:
+          external_adjudication_result_receipt:
+            schema_ref: self_model_external_adjudication_result_receipt
+          verifier_receipts:
+            type: array
+            minItems: 2
+            items:
+              type: object
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+          continuity_review_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_external_adjudication_verifier_receipt
+  validate_external_adjudication_verifier_receipt:
+    summary: Fail closed unless live verifier responses meet jurisdiction quorum, signed-envelope, and freshness boundaries while preserving external authority.
+    input:
+      schema_ref: self_model_external_adjudication_verifier_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - verifier_quorum_status
+          - appeal_review_live_verifier_bound
+          - jurisdiction_policy_live_verifier_bound
+          - signed_response_envelope_bound
+          - freshness_window_bound
+          - stale_response_accepted
+          - revoked_response_accepted
+          - os_adjudication_authority_allowed
+          - verifier_quorum_digest_bound
+        properties:
+          ok:
+            type: boolean
+          verifier_quorum_status:
+            type: string
+          appeal_review_live_verifier_bound:
+            type: boolean
+          jurisdiction_policy_live_verifier_bound:
+            type: boolean
+          signed_response_envelope_bound:
+            type: boolean
+          freshness_window_bound:
+            type: boolean
+          stale_response_accepted:
+            type: boolean
+          revoked_response_accepted:
+            type: boolean
+          os_adjudication_authority_allowed:
+            type: boolean
+          verifier_quorum_digest_bound:
             type: boolean
   build_value_generation_receipt:
     summary: Bind self-authored value-generation candidates without external veto, forced stability lock, or immediate writeback.

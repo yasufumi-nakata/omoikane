@@ -202,6 +202,40 @@ class MindSchemaContractTests(unittest.TestCase):
             result["external_adjudication"]["raw_medical_result_payload_stored"]
         )
 
+    def test_self_model_demo_external_adjudication_verifier_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_external_adjudication_verifier_receipt.schema",
+            result["external_adjudication_verifier"],
+        )
+        self.assertTrue(result["validation"]["external_adjudication_verifier"]["ok"])
+        self.assertEqual(
+            "complete",
+            result["external_adjudication_verifier"]["verifier_quorum_status"],
+        )
+        self.assertTrue(
+            result["external_adjudication_verifier"][
+                "appeal_review_live_verifier_bound"
+            ]
+        )
+        self.assertTrue(
+            result["external_adjudication_verifier"][
+                "jurisdiction_policy_live_verifier_bound"
+            ]
+        )
+        self.assertTrue(result["external_adjudication_verifier"]["freshness_window_bound"])
+        self.assertFalse(result["external_adjudication_verifier"]["stale_response_accepted"])
+        self.assertFalse(result["external_adjudication_verifier"]["revoked_response_accepted"])
+        self.assertFalse(
+            result["external_adjudication_verifier"][
+                "os_adjudication_authority_allowed"
+            ]
+        )
+        self.assertFalse(
+            result["external_adjudication_verifier"]["raw_verifier_payload_stored"]
+        )
+
     def test_self_model_demo_value_generation_matches_public_schema(self) -> None:
         result = self.runtime.run_self_model_demo()
 

@@ -73,6 +73,117 @@ class QualiaBufferTests(unittest.TestCase):
         self.assertEqual([1, 2], [tick["tick_id"] for tick in recent])
 
 
+def _build_external_adjudication_receipt(monitor: SelfModelMonitor) -> dict[str, object]:
+    observation = monitor.update(
+        SelfModelSnapshot(
+            identity_id="id-1",
+            values=["continuity"],
+            goals=["safe-self-construction"],
+            traits={"caution": 0.84},
+        )
+    )
+    calibration = monitor.build_advisory_calibration_receipt(
+        observation,
+        reviewer_evidence_refs=["evidence://self-model/self-report/abrupt-review"],
+        self_consent_ref="consent://self-model-calibration/advisory-review-v1",
+        council_resolution_ref="council://self-model-calibration/no-forced-writeback",
+        guardian_redaction_ref="guardian://self-model-calibration/redacted-witness-set",
+        proposed_adjustments=[{"trait": "caution", "direction": "increase", "delta": 0.12}],
+    )
+    escalation = monitor.build_pathology_escalation_receipt(
+        calibration,
+        risk_signal_refs=["risk://self-model/pathology-boundary/abrupt-divergence"],
+        consent_or_emergency_review_ref=(
+            "consent-or-emergency://self-model/pathology-escalation/review-v1"
+        ),
+        council_resolution_ref="council://self-model/pathology-escalation/boundary-only",
+        guardian_boundary_ref="guardian://self-model/pathology-escalation/no-os-diagnosis",
+        medical_system_ref="external-medical://jp-13/self-model-review-board/v1",
+        legal_system_ref="external-legal://jp-13/capacity-review-boundary/v1",
+        care_handoff_ref="handoff://self-model/pathology-escalation/human-care-team/v1",
+    )
+    handoff = monitor.build_care_trustee_handoff_receipt(
+        escalation,
+        trustee_refs=["trustee://jp-13/self-model/long-term-trustee/v1"],
+        care_team_refs=["care-team://jp-13/self-model/care-board/v1"],
+        legal_guardian_refs=["legal-guardian://jp-13/self-model/capacity-review/v1"],
+        responsibility_boundary_refs=[
+            "boundary://self-model/care-trustee/no-os-trustee-role/v1",
+            "boundary://self-model/care-trustee/external-adjudication-required/v1",
+        ],
+        consent_or_emergency_review_ref=(
+            "consent-or-emergency://self-model/care-trustee/review-v1"
+        ),
+        council_resolution_ref="council://self-model/care-trustee/boundary-only",
+        guardian_boundary_ref="guardian://self-model/care-trustee/no-os-authority",
+        long_term_review_schedule_ref="schedule://self-model/care-trustee/quarterly-review/v1",
+        escalation_continuity_ref="continuity://self-model/care-trustee/escalation-chain/v1",
+    )
+    return monitor.build_external_adjudication_result_receipt(
+        handoff,
+        medical_adjudication_result_refs=[
+            "external-medical-result://jp-13/self-model/no-os-diagnosis/v1"
+        ],
+        legal_adjudication_result_refs=[
+            "external-legal-result://jp-13/self-model/capacity-boundary/v1"
+        ],
+        trustee_adjudication_result_refs=[
+            "external-trustee-result://jp-13/self-model/trustee-appointment/v1"
+        ],
+        jurisdiction_policy_refs=[
+            "jurisdiction-policy://jp-13/self-model/medical-review/v1"
+        ],
+        appeal_or_review_refs=[
+            "appeal-review://jp-13/self-model/adjudication/periodic-review/v1"
+        ],
+        consent_or_emergency_review_ref=(
+            "consent-or-emergency://self-model/external-adjudication/result-review-v1"
+        ),
+        council_resolution_ref="council://self-model/external-adjudication/boundary-only",
+        guardian_boundary_ref="guardian://self-model/external-adjudication/no-os-authority",
+        continuity_review_ref="continuity://self-model/external-adjudication/result-chain/v1",
+    )
+
+
+def _external_adjudication_verifier_inputs(
+    adjudication: dict[str, object],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "verifier_ref": "verifier://jp-13/self-model/appeal-review-live/v1",
+            "verifier_endpoint": "https://verifier.jp-13.example.invalid/self-model/appeal-review",
+            "jurisdiction": "JP-13",
+            "checked_at_ref": "timestamp://self-model/external-adjudication/verifier/jp-13",
+            "response_ref": "response://jp-13/self-model/appeal-review/live-verification/v1",
+            "response_status": "verified",
+            "freshness_window_seconds": 900,
+            "observed_latency_ms": 42.5,
+            "signed_response_envelope_ref": "signed-envelope://jp-13/self-model/appeal-review/v1",
+            "response_signing_key_ref": "key://jp-13/self-model/appeal-review/verifier-key/v1",
+            "covered_appeal_or_review_refs": adjudication["appeal_or_review_refs"],
+            "verifier_key_ref": "key://jp-13/self-model/appeal-review/verifier-key/v1",
+            "trust_root_ref": "trust-root://jp-13/self-model/appeal-review/pki/v1",
+            "route_ref": "route://jp-13/self-model/appeal-review/live-json/v1",
+        },
+        {
+            "verifier_ref": "verifier://us-ca/self-model/appeal-review-live/v1",
+            "verifier_endpoint": "https://verifier.us-ca.example.invalid/self-model/appeal-review",
+            "jurisdiction": "US-CA",
+            "checked_at_ref": "timestamp://self-model/external-adjudication/verifier/us-ca",
+            "response_ref": "response://us-ca/self-model/appeal-review/live-verification/v1",
+            "response_status": "verified",
+            "freshness_window_seconds": 900,
+            "observed_latency_ms": 57.25,
+            "signed_response_envelope_ref": "signed-envelope://us-ca/self-model/appeal-review/v1",
+            "response_signing_key_ref": "key://us-ca/self-model/appeal-review/verifier-key/v1",
+            "covered_appeal_or_review_refs": adjudication["appeal_or_review_refs"],
+            "verifier_key_ref": "key://us-ca/self-model/appeal-review/verifier-key/v1",
+            "trust_root_ref": "trust-root://us-ca/self-model/appeal-review/pki/v1",
+            "route_ref": "route://us-ca/self-model/appeal-review/live-json/v1",
+        },
+    ]
+
+
 class SelfModelMonitorTests(unittest.TestCase):
     def test_stable_drift_stays_below_fixed_threshold(self) -> None:
         monitor = SelfModelMonitor()
@@ -587,6 +698,69 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "os_adjudication_authority_allowed must be false",
+            validation["errors"],
+        )
+
+    def test_external_adjudication_verifier_binds_live_quorum(self) -> None:
+        monitor = SelfModelMonitor()
+        adjudication = _build_external_adjudication_receipt(monitor)
+
+        verifier = monitor.build_external_adjudication_verifier_receipt(
+            adjudication,
+            verifier_receipts=_external_adjudication_verifier_inputs(adjudication),
+            council_resolution_ref=(
+                "council://self-model/external-adjudication/verifier-network-boundary"
+            ),
+            guardian_boundary_ref=(
+                "guardian://self-model/external-adjudication/verifier-no-os-authority"
+            ),
+            continuity_review_ref=(
+                "continuity://self-model/external-adjudication/verifier-chain/v1"
+            ),
+        )
+        validation = monitor.validate_external_adjudication_verifier_receipt(verifier)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("complete", validation["verifier_quorum_status"])
+        self.assertTrue(validation["appeal_review_live_verifier_bound"])
+        self.assertTrue(validation["jurisdiction_policy_live_verifier_bound"])
+        self.assertTrue(validation["signed_response_envelope_bound"])
+        self.assertTrue(validation["freshness_window_bound"])
+        self.assertTrue(validation["verifier_quorum_digest_bound"])
+        self.assertEqual(
+            adjudication["receipt_digest"],
+            verifier["source_adjudication_receipt_digest"],
+        )
+        self.assertFalse(verifier["stale_response_accepted"])
+        self.assertFalse(verifier["revoked_response_accepted"])
+        self.assertFalse(verifier["os_adjudication_authority_allowed"])
+        self.assertFalse(verifier["self_model_writeback_allowed"])
+        self.assertFalse(verifier["raw_verifier_payload_stored"])
+
+    def test_external_adjudication_verifier_rejects_revoked_response(self) -> None:
+        monitor = SelfModelMonitor()
+        adjudication = _build_external_adjudication_receipt(monitor)
+        verifier = monitor.build_external_adjudication_verifier_receipt(
+            adjudication,
+            verifier_receipts=_external_adjudication_verifier_inputs(adjudication),
+            council_resolution_ref=(
+                "council://self-model/external-adjudication/verifier-network-boundary"
+            ),
+            guardian_boundary_ref=(
+                "guardian://self-model/external-adjudication/verifier-no-os-authority"
+            ),
+            continuity_review_ref=(
+                "continuity://self-model/external-adjudication/verifier-chain/v1"
+            ),
+        )
+        tampered = copy.deepcopy(verifier)
+        tampered["verifier_receipts"][0]["response_status"] = "revoked"
+
+        validation = monitor.validate_external_adjudication_verifier_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "verifier_receipts[0].response_status must be verified",
             validation["errors"],
         )
 

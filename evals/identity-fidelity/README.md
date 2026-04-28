@@ -11,6 +11,7 @@
 - `self_model_pathology_escalation_boundary.yaml`
 - `self_model_care_trustee_handoff.yaml`
 - `self_model_external_adjudication_boundary.yaml`
+- `self_model_external_adjudication_verifier_network.yaml`
 - `self_model_value_generation_freedom.yaml`
 - `self_model_autonomy_review_boundary.yaml`
 - `self_model_value_acceptance_writeback.yaml`
@@ -42,6 +43,12 @@ external-adjudication branch と対応し、外部医療・法制度・trustee �
 jurisdiction policy と appeal/review path 付き digest-only refs として束縛し、
 OS adjudication authority、OS medical / legal authority、OS trustee role、SelfModel
 writeback、raw result payload 保存へ昇格しないことを保護する。
+
+`self_model_external_adjudication_verifier_network.yaml` は `self-model-demo` の
+external-adjudication-verifier branch と対応し、appeal/review path と jurisdiction policy の
+live verifier response を JP-13 / US-CA quorum、signed response envelope、freshness window へ
+digest-only に束縛し、stale / revoked response 受容、OS adjudication authority、
+SelfModel writeback、raw verifier payload 保存へ昇格しないことを保護する。
 
 `self_model_value_generation_freedom.yaml` は `self-model-demo` の value-generation branch
 と対応し、新しく生成された価値候補が self-authored proposal として digest-only に

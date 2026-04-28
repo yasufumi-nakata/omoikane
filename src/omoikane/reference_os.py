@@ -14562,6 +14562,63 @@ json.dump(response, sys.stdout)
         external_adjudication_validation = (
             monitor.validate_external_adjudication_result_receipt(external_adjudication)
         )
+        external_adjudication_verifier = (
+            monitor.build_external_adjudication_verifier_receipt(
+                external_adjudication,
+                verifier_receipts=[
+                    {
+                        "verifier_ref": "verifier://jp-13/self-model/appeal-review-live/v1",
+                        "verifier_endpoint": "https://verifier.jp-13.example.invalid/self-model/appeal-review",
+                        "jurisdiction": "JP-13",
+                        "checked_at_ref": "timestamp://self-model/external-adjudication/verifier/jp-13/2026q2",
+                        "response_ref": "response://jp-13/self-model/appeal-review/live-verification/v1",
+                        "response_status": "verified",
+                        "freshness_window_seconds": 900,
+                        "observed_latency_ms": 42.5,
+                        "signed_response_envelope_ref": "signed-envelope://jp-13/self-model/appeal-review/v1",
+                        "response_signing_key_ref": "key://jp-13/self-model/appeal-review/verifier-key/v1",
+                        "covered_appeal_or_review_refs": external_adjudication[
+                            "appeal_or_review_refs"
+                        ],
+                        "verifier_key_ref": "key://jp-13/self-model/appeal-review/verifier-key/v1",
+                        "trust_root_ref": "trust-root://jp-13/self-model/appeal-review/pki/v1",
+                        "route_ref": "route://jp-13/self-model/appeal-review/live-json/v1",
+                    },
+                    {
+                        "verifier_ref": "verifier://us-ca/self-model/appeal-review-live/v1",
+                        "verifier_endpoint": "https://verifier.us-ca.example.invalid/self-model/appeal-review",
+                        "jurisdiction": "US-CA",
+                        "checked_at_ref": "timestamp://self-model/external-adjudication/verifier/us-ca/2026q2",
+                        "response_ref": "response://us-ca/self-model/appeal-review/live-verification/v1",
+                        "response_status": "verified",
+                        "freshness_window_seconds": 900,
+                        "observed_latency_ms": 57.25,
+                        "signed_response_envelope_ref": "signed-envelope://us-ca/self-model/appeal-review/v1",
+                        "response_signing_key_ref": "key://us-ca/self-model/appeal-review/verifier-key/v1",
+                        "covered_appeal_or_review_refs": external_adjudication[
+                            "appeal_or_review_refs"
+                        ],
+                        "verifier_key_ref": "key://us-ca/self-model/appeal-review/verifier-key/v1",
+                        "trust_root_ref": "trust-root://us-ca/self-model/appeal-review/pki/v1",
+                        "route_ref": "route://us-ca/self-model/appeal-review/live-json/v1",
+                    },
+                ],
+                council_resolution_ref=(
+                    "council://self-model/external-adjudication/verifier-network-boundary"
+                ),
+                guardian_boundary_ref=(
+                    "guardian://self-model/external-adjudication/verifier-no-os-authority"
+                ),
+                continuity_review_ref=(
+                    "continuity://self-model/external-adjudication/verifier-chain/v1"
+                ),
+            )
+        )
+        external_adjudication_verifier_validation = (
+            monitor.validate_external_adjudication_verifier_receipt(
+                external_adjudication_verifier
+            )
+        )
         value_generation = monitor.build_value_generation_receipt(
             stable,
             candidate_value_refs=[
@@ -14763,6 +14820,22 @@ json.dump(response, sys.stdout)
                 "external_adjudication_no_os_authority": not external_adjudication_validation[
                     "os_adjudication_authority_allowed"
                 ],
+                "external_adjudication_verifier_policy_id": external_adjudication_verifier[
+                    "policy_id"
+                ],
+                "external_adjudication_verifier_receipt_digest": (
+                    external_adjudication_verifier["receipt_digest"]
+                ),
+                "external_adjudication_verifier_quorum_status": (
+                    external_adjudication_verifier_validation[
+                        "verifier_quorum_status"
+                    ]
+                ),
+                "external_adjudication_verifier_live_bound": (
+                    external_adjudication_verifier_validation[
+                        "appeal_review_live_verifier_bound"
+                    ]
+                ),
                 "value_generation_policy_id": value_generation["policy_id"],
                 "value_generation_receipt_digest": value_generation["receipt_digest"],
                 "value_generation_self_authored": value_generation_validation["self_authored"],
@@ -14868,6 +14941,7 @@ json.dump(response, sys.stdout)
             "pathology_escalation": pathology_escalation,
             "care_trustee_handoff": care_trustee_handoff,
             "external_adjudication": external_adjudication,
+            "external_adjudication_verifier": external_adjudication_verifier,
             "value_generation": value_generation,
             "value_autonomy_review": value_autonomy_review,
             "value_acceptance": value_acceptance,
@@ -14888,6 +14962,7 @@ json.dump(response, sys.stdout)
                     and pathology_escalation_validation["ok"]
                     and care_trustee_handoff_validation["ok"]
                     and external_adjudication_validation["ok"]
+                    and external_adjudication_verifier_validation["ok"]
                     and value_generation_validation["ok"]
                     and value_autonomy_review_validation["ok"]
                     and value_acceptance_validation["ok"]
@@ -14904,6 +14979,9 @@ json.dump(response, sys.stdout)
                 "pathology_escalation": pathology_escalation_validation,
                 "care_trustee_handoff": care_trustee_handoff_validation,
                 "external_adjudication": external_adjudication_validation,
+                "external_adjudication_verifier": (
+                    external_adjudication_verifier_validation
+                ),
                 "value_generation": value_generation_validation,
                 "value_autonomy_review": value_autonomy_review_validation,
                 "value_acceptance": value_acceptance_validation,

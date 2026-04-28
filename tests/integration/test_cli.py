@@ -1338,6 +1338,27 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["care_trustee_handoff"]["os_trustee_role_allowed"])
         self.assertFalse(result["care_trustee_handoff"]["raw_trustee_payload_stored"])
         self.assertEqual(
+            "self-model-external-adjudication-live-verifier-network-v1",
+            result["external_adjudication_verifier"]["policy_id"],
+        )
+        self.assertEqual(
+            "complete",
+            result["validation"]["external_adjudication_verifier"][
+                "verifier_quorum_status"
+            ],
+        )
+        self.assertTrue(
+            result["validation"]["external_adjudication_verifier"][
+                "appeal_review_live_verifier_bound"
+            ]
+        )
+        self.assertFalse(
+            result["external_adjudication_verifier"]["stale_response_accepted"]
+        )
+        self.assertFalse(
+            result["external_adjudication_verifier"]["raw_verifier_payload_stored"]
+        )
+        self.assertEqual(
             "self-model-self-authored-value-generation-v1",
             result["value_generation"]["policy_id"],
         )

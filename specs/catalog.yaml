@@ -811,6 +811,17 @@ entries:
     rationale: Required to serialize external medical, legal, trustee, jurisdiction policy, and appeal/review result refs after care trustee handoff without making the OS an adjudicator, medical authority, legal authority, trustee, writeback path, or raw result payload store.
   - priority: P1
     kind: schema
+    file: specs/schemas/self_model_external_adjudication_verifier_receipt.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+      - evals/identity-fidelity/self_model_external_adjudication_verifier_network.yaml
+      - agents/guardians/identity-guardian.yaml
+      - reference-runtime
+    rationale: Required to serialize live appeal/review verifier responses for external adjudication results with jurisdiction quorum, signed response envelope, freshness window, no stale or revoked response acceptance, no OS adjudication authority, and no raw verifier payload storage.
+  - priority: P1
+    kind: schema
     file: specs/schemas/self_model_value_generation_receipt.schema
     consumers:
       - specs/interfaces/mind.self_model.v0.idl
@@ -897,6 +908,7 @@ entries:
       - specs/schemas/self_model_pathological_self_assessment_escalation_receipt.schema
       - specs/schemas/self_model_care_trustee_handoff_receipt.schema
       - specs/schemas/self_model_external_adjudication_result_receipt.schema
+      - specs/schemas/self_model_external_adjudication_verifier_receipt.schema
       - specs/schemas/self_model_value_generation_receipt.schema
       - specs/schemas/self_model_value_autonomy_review_receipt.schema
       - specs/schemas/self_model_value_acceptance_receipt.schema
@@ -904,7 +916,7 @@ entries:
       - specs/schemas/self_model_value_timeline_receipt.schema
       - specs/schemas/self_model_value_archive_retention_proof.schema
       - specs/schemas/self_model_value_archive_retention_refresh_receipt.schema
-    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, pathology escalation external handoff boundary, care trustee responsibility handoff boundary, external adjudication result boundary, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, value timeline lineage, value archive retention proof, and archive proof refresh contracts machine-readable.
+    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, pathology escalation external handoff boundary, care trustee responsibility handoff boundary, external adjudication result and live verifier boundaries, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, value timeline lineage, value archive retention proof, and archive proof refresh contracts machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
@@ -3098,6 +3110,15 @@ entries:
       - specs/schemas/self_model_external_adjudication_result_receipt.schema
       - agents/guardians/identity-guardian.yaml
     rationale: Protects external adjudication result handling from becoming OS adjudication authority, OS medical/legal authority, OS trustee role, SelfModel writeback, or raw external result payload storage.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/self_model_external_adjudication_verifier_network.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - specs/schemas/self_model_external_adjudication_verifier_receipt.schema
+      - agents/guardians/identity-guardian.yaml
+    rationale: Protects external adjudication live verifier handling from accepting stale or revoked appeal/review responses, missing jurisdiction quorum or signed envelopes, becoming OS adjudication authority, or storing raw verifier payloads.
   - priority: P1
     kind: eval
     file: evals/identity-fidelity/self_model_value_generation_freedom.yaml

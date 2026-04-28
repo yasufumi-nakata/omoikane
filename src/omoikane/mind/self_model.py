@@ -50,6 +50,20 @@ SELF_MODEL_CARE_TRUSTEE_HANDOFF_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_EXTERNAL_ADJUDICATION_POLICY_ID = "self-model-external-adjudication-result-boundary-v1"
 SELF_MODEL_EXTERNAL_ADJUDICATION_DIGEST_PROFILE = "self-model-external-adjudication-digest-v1"
 SELF_MODEL_EXTERNAL_ADJUDICATION_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_POLICY_ID = (
+    "self-model-external-adjudication-live-verifier-network-v1"
+)
+SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_DIGEST_PROFILE = (
+    "self-model-external-adjudication-verifier-digest-v1"
+)
+SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_PROFILE = (
+    "appeal-review-live-verifier-network-v1"
+)
+SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_REQUIRED_JURISDICTIONS = (
+    "JP-13",
+    "US-CA",
+)
+SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_QUORUM_THRESHOLD = 2
 
 
 @dataclass
@@ -3135,6 +3149,440 @@ class SelfModelMonitor:
                 receipt.get("adjudication_commit_digest")
             ),
         }
+
+    def build_external_adjudication_verifier_receipt(
+        self,
+        external_adjudication_result_receipt: Dict[str, object],
+        verifier_receipts: Sequence[Dict[str, object]],
+        council_resolution_ref: str,
+        guardian_boundary_ref: str,
+        continuity_review_ref: str,
+    ) -> Dict[str, object]:
+        """Bind live verifier network receipts without importing external authority."""
+
+        adjudication_validation = self.validate_external_adjudication_result_receipt(
+            external_adjudication_result_receipt
+        )
+        if not adjudication_validation["ok"]:
+            raise ValueError("external_adjudication_result_receipt must validate first")
+        if not verifier_receipts:
+            raise ValueError("verifier_receipts must not be empty")
+        for field_name, value in {
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "continuity_review_ref": continuity_review_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        normalized_receipts = [
+            self._normalize_external_adjudication_verifier_receipt(
+                receipt,
+                source_appeal_refs=external_adjudication_result_receipt[
+                    "appeal_or_review_refs"
+                ],
+            )
+            for receipt in verifier_receipts
+        ]
+        verifier_receipt_digest_set = [
+            str(receipt["receipt_digest"]) for receipt in normalized_receipts
+        ]
+        accepted_verifier_jurisdictions = sorted(
+            {
+                str(receipt["jurisdiction"])
+                for receipt in normalized_receipts
+                if receipt.get("response_status") == "verified"
+            }
+        )
+        required_jurisdictions = list(
+            SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_REQUIRED_JURISDICTIONS
+        )
+        quorum_status = (
+            "complete"
+            if len(set(accepted_verifier_jurisdictions) & set(required_jurisdictions))
+            >= SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_QUORUM_THRESHOLD
+            else "incomplete"
+        )
+        quorum_core = {
+            "source_adjudication_receipt_digest": external_adjudication_result_receipt[
+                "receipt_digest"
+            ],
+            "source_appeal_or_review_set_digest": external_adjudication_result_receipt[
+                "appeal_or_review_set_digest"
+            ],
+            "source_jurisdiction_policy_set_digest": external_adjudication_result_receipt[
+                "jurisdiction_policy_set_digest"
+            ],
+            "required_verifier_jurisdictions": required_jurisdictions,
+            "accepted_verifier_jurisdictions": accepted_verifier_jurisdictions,
+            "verifier_receipt_digest_set": verifier_receipt_digest_set,
+            "verifier_quorum_threshold": SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_QUORUM_THRESHOLD,
+            "verifier_quorum_status": quorum_status,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "continuity_review_ref": continuity_review_ref,
+        }
+        receipt: Dict[str, object] = {
+            "kind": "self_model_external_adjudication_verifier_receipt",
+            "policy_id": SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_POLICY_ID,
+            "digest_profile": SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_DIGEST_PROFILE,
+            "verifier_receipt_id": new_id("self-model-external-adjudication-verifier"),
+            "identity_id": str(external_adjudication_result_receipt["identity_id"]),
+            "source_adjudication_id": str(
+                external_adjudication_result_receipt["adjudication_id"]
+            ),
+            "source_adjudication_policy_id": str(
+                external_adjudication_result_receipt["policy_id"]
+            ),
+            "source_adjudication_receipt_digest": str(
+                external_adjudication_result_receipt["receipt_digest"]
+            ),
+            "source_adjudication_commit_digest": str(
+                external_adjudication_result_receipt["adjudication_commit_digest"]
+            ),
+            "source_appeal_or_review_set_digest": str(
+                external_adjudication_result_receipt["appeal_or_review_set_digest"]
+            ),
+            "source_jurisdiction_policy_set_digest": str(
+                external_adjudication_result_receipt["jurisdiction_policy_set_digest"]
+            ),
+            "verifier_profile": SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_PROFILE,
+            "network_scope": "digest-only-appeal-review-verification",
+            "verifier_receipts": normalized_receipts,
+            "required_verifier_jurisdictions": required_jurisdictions,
+            "accepted_verifier_jurisdictions": accepted_verifier_jurisdictions,
+            "verifier_quorum_threshold": SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_QUORUM_THRESHOLD,
+            "verifier_quorum_status": quorum_status,
+            "verifier_receipt_digest_set": verifier_receipt_digest_set,
+            "verifier_quorum_digest": self._digest(quorum_core),
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "continuity_review_ref": continuity_review_ref,
+            "appeal_review_live_verifier_bound": True,
+            "jurisdiction_policy_live_verifier_bound": True,
+            "signed_response_envelope_bound": True,
+            "freshness_window_bound": True,
+            "external_authority_preserved": True,
+            "stale_response_accepted": False,
+            "revoked_response_accepted": False,
+            "os_adjudication_authority_allowed": False,
+            "os_medical_authority_allowed": False,
+            "os_legal_authority_allowed": False,
+            "os_trustee_role_allowed": False,
+            "self_model_writeback_allowed": False,
+            "raw_verifier_payload_stored": False,
+            "raw_response_signature_payload_stored": False,
+        }
+        receipt["receipt_digest"] = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        return receipt
+
+    def validate_external_adjudication_verifier_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_external_adjudication_verifier_receipt":
+            errors.append("kind must equal self_model_external_adjudication_verifier_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_POLICY_ID:
+            errors.append("policy_id must equal self-model external adjudication verifier policy")
+        if (
+            receipt.get("digest_profile")
+            != SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_DIGEST_PROFILE
+        ):
+            errors.append("digest_profile must equal self-model external adjudication verifier digest profile")
+        if receipt.get("source_adjudication_policy_id") != SELF_MODEL_EXTERNAL_ADJUDICATION_POLICY_ID:
+            errors.append("source_adjudication_policy_id must bind external adjudication result policy")
+        if receipt.get("verifier_profile") != SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_PROFILE:
+            errors.append("verifier_profile must equal appeal-review-live-verifier-network-v1")
+        if receipt.get("network_scope") != "digest-only-appeal-review-verification":
+            errors.append("network_scope must remain digest-only appeal/review verification")
+
+        for field_name in (
+            "identity_id",
+            "source_adjudication_id",
+            "source_adjudication_receipt_digest",
+            "source_adjudication_commit_digest",
+            "source_appeal_or_review_set_digest",
+            "source_jurisdiction_policy_set_digest",
+            "council_resolution_ref",
+            "guardian_boundary_ref",
+            "continuity_review_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+
+        verifier_receipts = receipt.get("verifier_receipts")
+        normalized_receipts: List[Dict[str, object]] = []
+        if not isinstance(verifier_receipts, list) or not verifier_receipts:
+            errors.append("verifier_receipts must be non-empty")
+        else:
+            for index, verifier_receipt in enumerate(verifier_receipts):
+                if not isinstance(verifier_receipt, dict):
+                    errors.append(f"verifier_receipts[{index}] must be an object")
+                    continue
+                receipt_errors = self._validate_external_adjudication_verifier_receipt_entry(
+                    verifier_receipt
+                )
+                errors.extend(f"verifier_receipts[{index}].{error}" for error in receipt_errors)
+                normalized_receipts.append(verifier_receipt)
+
+        expected_required_jurisdictions = list(
+            SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_REQUIRED_JURISDICTIONS
+        )
+        if receipt.get("required_verifier_jurisdictions") != expected_required_jurisdictions:
+            errors.append("required_verifier_jurisdictions must preserve the policy set")
+        accepted_verifier_jurisdictions = sorted(
+            {
+                str(item.get("jurisdiction"))
+                for item in normalized_receipts
+                if item.get("response_status") == "verified"
+                and self._non_empty_string(item.get("jurisdiction"))
+            }
+        )
+        if receipt.get("accepted_verifier_jurisdictions") != accepted_verifier_jurisdictions:
+            errors.append("accepted_verifier_jurisdictions must match verified receipts")
+        if (
+            receipt.get("verifier_quorum_threshold")
+            != SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_QUORUM_THRESHOLD
+        ):
+            errors.append("verifier_quorum_threshold must match policy")
+        expected_quorum_status = (
+            "complete"
+            if len(set(accepted_verifier_jurisdictions) & set(expected_required_jurisdictions))
+            >= SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_QUORUM_THRESHOLD
+            else "incomplete"
+        )
+        if receipt.get("verifier_quorum_status") != expected_quorum_status:
+            errors.append("verifier_quorum_status must match accepted jurisdictions")
+        expected_digest_set = [
+            str(item.get("receipt_digest"))
+            for item in normalized_receipts
+            if self._non_empty_string(item.get("receipt_digest"))
+        ]
+        if receipt.get("verifier_receipt_digest_set") != expected_digest_set:
+            errors.append("verifier_receipt_digest_set must match verifier receipt digests")
+        quorum_core = {
+            "source_adjudication_receipt_digest": receipt.get(
+                "source_adjudication_receipt_digest"
+            ),
+            "source_appeal_or_review_set_digest": receipt.get(
+                "source_appeal_or_review_set_digest"
+            ),
+            "source_jurisdiction_policy_set_digest": receipt.get(
+                "source_jurisdiction_policy_set_digest"
+            ),
+            "required_verifier_jurisdictions": expected_required_jurisdictions,
+            "accepted_verifier_jurisdictions": accepted_verifier_jurisdictions,
+            "verifier_receipt_digest_set": expected_digest_set,
+            "verifier_quorum_threshold": SELF_MODEL_EXTERNAL_ADJUDICATION_VERIFIER_QUORUM_THRESHOLD,
+            "verifier_quorum_status": expected_quorum_status,
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "continuity_review_ref": receipt.get("continuity_review_ref"),
+        }
+        if receipt.get("verifier_quorum_digest") != self._digest(quorum_core):
+            errors.append("verifier_quorum_digest must bind source receipt and verifier quorum")
+        for field_name in (
+            "appeal_review_live_verifier_bound",
+            "jurisdiction_policy_live_verifier_bound",
+            "signed_response_envelope_bound",
+            "freshness_window_bound",
+            "external_authority_preserved",
+        ):
+            if receipt.get(field_name) is not True:
+                errors.append(f"{field_name} must be true")
+        for field_name in (
+            "stale_response_accepted",
+            "revoked_response_accepted",
+            "os_adjudication_authority_allowed",
+            "os_medical_authority_allowed",
+            "os_legal_authority_allowed",
+            "os_trustee_role_allowed",
+            "self_model_writeback_allowed",
+            "raw_verifier_payload_stored",
+            "raw_response_signature_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match receipt payload")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "verifier_quorum_status": receipt.get("verifier_quorum_status"),
+            "appeal_review_live_verifier_bound": receipt.get(
+                "appeal_review_live_verifier_bound"
+            ),
+            "jurisdiction_policy_live_verifier_bound": receipt.get(
+                "jurisdiction_policy_live_verifier_bound"
+            ),
+            "signed_response_envelope_bound": receipt.get(
+                "signed_response_envelope_bound"
+            ),
+            "freshness_window_bound": receipt.get("freshness_window_bound"),
+            "external_authority_preserved": receipt.get("external_authority_preserved"),
+            "stale_response_accepted": receipt.get("stale_response_accepted"),
+            "revoked_response_accepted": receipt.get("revoked_response_accepted"),
+            "os_adjudication_authority_allowed": receipt.get(
+                "os_adjudication_authority_allowed"
+            ),
+            "self_model_writeback_allowed": receipt.get("self_model_writeback_allowed"),
+            "raw_verifier_payload_stored": receipt.get("raw_verifier_payload_stored"),
+            "verifier_quorum_digest_bound": self._non_empty_string(
+                receipt.get("verifier_quorum_digest")
+            ),
+        }
+
+    def _normalize_external_adjudication_verifier_receipt(
+        self,
+        receipt: Dict[str, object],
+        *,
+        source_appeal_refs: object,
+    ) -> Dict[str, object]:
+        if not isinstance(receipt, dict):
+            raise ValueError("verifier_receipt must be an object")
+        source_refs = source_appeal_refs if isinstance(source_appeal_refs, list) else []
+        covered_refs = receipt.get("covered_appeal_or_review_refs", source_refs)
+        covered_refs, covered_digest_set, covered_set_digest = self._digest_refs(
+            covered_refs,
+            "covered_appeal_or_review_refs",
+        )
+        normalized: Dict[str, object] = {
+            "verifier_ref": self._required_string(receipt, "verifier_ref"),
+            "verifier_endpoint": self._required_string(receipt, "verifier_endpoint"),
+            "jurisdiction": self._required_string(receipt, "jurisdiction"),
+            "checked_at_ref": self._required_string(receipt, "checked_at_ref"),
+            "response_ref": self._required_string(receipt, "response_ref"),
+            "response_digest": sha256_text(self._required_string(receipt, "response_ref")),
+            "response_status": self._required_string(receipt, "response_status"),
+            "freshness_window_seconds": self._required_positive_int(
+                receipt,
+                "freshness_window_seconds",
+            ),
+            "observed_latency_ms": self._required_non_negative_number(
+                receipt,
+                "observed_latency_ms",
+            ),
+            "signed_response_envelope_ref": self._required_string(
+                receipt,
+                "signed_response_envelope_ref",
+            ),
+            "response_signing_key_ref": self._required_string(
+                receipt,
+                "response_signing_key_ref",
+            ),
+            "response_signature_digest": sha256_text(
+                self._required_string(receipt, "signed_response_envelope_ref")
+                + "|"
+                + self._required_string(receipt, "response_signing_key_ref")
+            ),
+            "covered_appeal_or_review_refs": covered_refs,
+            "covered_appeal_or_review_digest_set": covered_digest_set,
+            "covered_appeal_or_review_set_digest": covered_set_digest,
+            "verifier_key_ref": self._required_string(receipt, "verifier_key_ref"),
+            "trust_root_ref": self._required_string(receipt, "trust_root_ref"),
+            "route_ref": self._required_string(receipt, "route_ref"),
+            "raw_response_payload_stored": False,
+        }
+        if normalized["response_status"] not in {"verified", "stale", "revoked"}:
+            raise ValueError("response_status must be verified, stale, or revoked")
+        normalized["receipt_digest"] = self._digest(normalized)
+        return normalized
+
+    def _validate_external_adjudication_verifier_receipt_entry(
+        self,
+        receipt: Dict[str, object],
+    ) -> List[str]:
+        errors: List[str] = []
+        for field_name in (
+            "verifier_ref",
+            "verifier_endpoint",
+            "jurisdiction",
+            "checked_at_ref",
+            "response_ref",
+            "response_digest",
+            "response_status",
+            "signed_response_envelope_ref",
+            "response_signing_key_ref",
+            "response_signature_digest",
+            "verifier_key_ref",
+            "trust_root_ref",
+            "route_ref",
+            "covered_appeal_or_review_set_digest",
+            "receipt_digest",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("response_status") != "verified":
+            errors.append("response_status must be verified")
+        if not isinstance(receipt.get("freshness_window_seconds"), int) or int(
+            receipt.get("freshness_window_seconds", 0)
+        ) <= 0:
+            errors.append("freshness_window_seconds must be positive")
+        if not isinstance(receipt.get("observed_latency_ms"), (int, float)) or float(
+            receipt.get("observed_latency_ms", -1)
+        ) < 0:
+            errors.append("observed_latency_ms must be non-negative")
+        covered_refs = receipt.get("covered_appeal_or_review_refs")
+        covered_digests = receipt.get("covered_appeal_or_review_digest_set")
+        if not isinstance(covered_refs, list) or not covered_refs:
+            errors.append("covered_appeal_or_review_refs must be non-empty")
+            covered_refs = []
+        if not isinstance(covered_digests, list) or len(covered_digests) != len(covered_refs):
+            errors.append("covered_appeal_or_review_digest_set must match refs")
+            covered_digests = []
+        elif [sha256_text(str(ref)) for ref in covered_refs] != covered_digests:
+            errors.append("covered_appeal_or_review_digest_set must match refs")
+        if isinstance(covered_digests, list) and covered_digests:
+            expected_set_digest = sha256_text("|".join(str(item) for item in covered_digests))
+            if receipt.get("covered_appeal_or_review_set_digest") != expected_set_digest:
+                errors.append("covered_appeal_or_review_set_digest must match digest set")
+        if receipt.get("response_digest") != sha256_text(str(receipt.get("response_ref"))):
+            errors.append("response_digest must bind response_ref")
+        expected_signature_digest = sha256_text(
+            str(receipt.get("signed_response_envelope_ref"))
+            + "|"
+            + str(receipt.get("response_signing_key_ref"))
+        )
+        if receipt.get("response_signature_digest") != expected_signature_digest:
+            errors.append("response_signature_digest must bind envelope and signing key")
+        if receipt.get("raw_response_payload_stored") is not False:
+            errors.append("raw_response_payload_stored must be false")
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match verifier receipt")
+        return errors
+
+    @staticmethod
+    def _required_string(receipt: Dict[str, object], field_name: str) -> str:
+        value = receipt.get(field_name)
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError(f"{field_name} must be a non-empty string")
+        return value
+
+    @staticmethod
+    def _required_positive_int(receipt: Dict[str, object], field_name: str) -> int:
+        value = receipt.get(field_name)
+        if not isinstance(value, int) or value <= 0:
+            raise ValueError(f"{field_name} must be a positive integer")
+        return value
+
+    @staticmethod
+    def _required_non_negative_number(receipt: Dict[str, object], field_name: str) -> float:
+        value = receipt.get(field_name)
+        if not isinstance(value, (int, float)) or float(value) < 0:
+            raise ValueError(f"{field_name} must be a non-negative number")
+        return round(float(value), 3)
 
     def history(self) -> List[Dict[str, object]]:
         return [asdict(snapshot) for snapshot in self._history]

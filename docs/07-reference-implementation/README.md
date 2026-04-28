@@ -656,6 +656,18 @@ continuity review ref を digest-only に束ねる。
 `os_trustee_role_allowed=false`、`self_model_writeback_allowed=false`、
 `raw_medical_result_payload_stored=false` を確認し、OS が外部判断結果の保管・監査経路を
 持っても判断主体へ昇格しない境界を固定する。
+さらに `self-model-external-adjudication-live-verifier-network-v1` receipt は、
+external adjudication result の appeal / review set と jurisdiction policy set を
+JP-13 / US-CA の live verifier response、signed response envelope、freshness window、
+trust root / route ref へ digest-only に束ねる。
+この branch は `network_scope=digest-only-appeal-review-verification`、
+`verifier_quorum_status=complete`、
+`appeal_review_live_verifier_bound=true`、
+`jurisdiction_policy_live_verifier_bound=true`、
+`signed_response_envelope_bound=true`、
+`stale_response_accepted=false`、`revoked_response_accepted=false`、
+`raw_verifier_payload_stored=false` を確認し、live verifier network が
+OS adjudication authority や SelfModel writeback authority に昇格しない境界を固定する。
 同じ demo は stable drift から生じた新しい価値候補を
 `self-model-self-authored-value-generation-v1` receipt に束縛し、
 `generation_mode=self-authored-bounded-experiment`、

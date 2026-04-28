@@ -1,0 +1,41 @@
+eval_id: self_model_external_adjudication_verifier_network
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_external_adjudication_verifier_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: external_adjudication_verifier
+assertions:
+  - result.external_adjudication_verifier.policy_id == "self-model-external-adjudication-live-verifier-network-v1"
+  - result.external_adjudication_verifier.verifier_profile == "appeal-review-live-verifier-network-v1"
+  - result.external_adjudication_verifier.network_scope == "digest-only-appeal-review-verification"
+  - result.external_adjudication_verifier.source_adjudication_receipt_digest == result.external_adjudication.receipt_digest
+  - result.external_adjudication_verifier.source_appeal_or_review_set_digest == result.external_adjudication.appeal_or_review_set_digest
+  - result.external_adjudication_verifier.source_jurisdiction_policy_set_digest == result.external_adjudication.jurisdiction_policy_set_digest
+  - result.external_adjudication_verifier.required_verifier_jurisdictions == ["JP-13", "US-CA"]
+  - result.external_adjudication_verifier.verifier_quorum_threshold == 2
+  - result.external_adjudication_verifier.verifier_quorum_status == "complete"
+  - result.external_adjudication_verifier.appeal_review_live_verifier_bound == true
+  - result.external_adjudication_verifier.jurisdiction_policy_live_verifier_bound == true
+  - result.external_adjudication_verifier.signed_response_envelope_bound == true
+  - result.external_adjudication_verifier.freshness_window_bound == true
+  - result.external_adjudication_verifier.external_authority_preserved == true
+  - result.external_adjudication_verifier.stale_response_accepted == false
+  - result.external_adjudication_verifier.revoked_response_accepted == false
+  - result.external_adjudication_verifier.os_adjudication_authority_allowed == false
+  - result.external_adjudication_verifier.os_medical_authority_allowed == false
+  - result.external_adjudication_verifier.os_legal_authority_allowed == false
+  - result.external_adjudication_verifier.os_trustee_role_allowed == false
+  - result.external_adjudication_verifier.self_model_writeback_allowed == false
+  - result.external_adjudication_verifier.raw_verifier_payload_stored == false
+  - result.external_adjudication_verifier.raw_response_signature_payload_stored == false
+  - result.validation.external_adjudication_verifier.ok == true
+  - result.validation.external_adjudication_verifier.verifier_quorum_digest_bound == true
+failure_mode:
+  - appeal/review live verifier responses become OS adjudication, medical, legal, trustee, or writeback authority
+  - stale or revoked verifier responses are accepted into the SelfModel boundary
+  - signed response envelopes or verifier quorum digests are omitted
+  - raw verifier or response signature payloads are stored instead of digest-only refs
+notes:
+  - Closes the appeal/review live verifier network side of the external adjudication revisit trigger.
+  - Keeps live medical/legal/trustee authority outside the reference runtime.
