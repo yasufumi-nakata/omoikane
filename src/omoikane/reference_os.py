@@ -11770,6 +11770,15 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_refresh_commit_digest": replication_session[
                     "long_term_media_renewal"
                 ]["refresh_window"]["refresh_commit_digest"],
+                "long_term_media_renewal_cadence_policy_digest": replication_session[
+                    "long_term_media_renewal"
+                ]["cadence_policy"]["cadence_commit_digest"],
+                "long_term_media_renewal_cadence_policy_bound": replication_validation[
+                    "long_term_media_renewal_cadence_policy_bound"
+                ],
+                "long_term_media_renewal_cadence_effective_refresh_interval_days": replication_validation[
+                    "long_term_media_renewal_cadence_effective_refresh_interval_days"
+                ],
                 "long_term_media_renewal_registry_verifier_digest": replication_session[
                     "long_term_media_renewal"
                 ]["refresh_window"]["registry_verifier"]["digest"],
@@ -11876,6 +11885,12 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_target_horizon_years": replication_validation[
                     "long_term_media_renewal_target_horizon_years"
                 ],
+                "long_term_media_renewal_cadence_policy_bound": replication_validation[
+                    "long_term_media_renewal_cadence_policy_bound"
+                ],
+                "long_term_media_renewal_cadence_effective_refresh_interval_days": replication_validation[
+                    "long_term_media_renewal_cadence_effective_refresh_interval_days"
+                ],
                 "long_term_media_renewal_refresh_window_bound": replication_validation[
                     "long_term_media_renewal_refresh_window_bound"
                 ],
@@ -11929,6 +11944,9 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_media_readback_payload_stored": replication_validation[
                     "raw_media_readback_payload_stored"
+                ],
+                "raw_media_cadence_payload_stored": replication_validation[
+                    "raw_media_cadence_payload_stored"
                 ],
                 "raw_media_revocation_payload_stored": replication_validation[
                     "raw_media_revocation_payload_stored"

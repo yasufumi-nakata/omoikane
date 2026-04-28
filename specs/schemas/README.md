@@ -114,7 +114,7 @@
 - `memory_crystal_manifest.schema`
 - `memory_edit_session.schema`
 - `memory_replication_session.schema`
-  - includes long-term media renewal refresh / revocation window binding plus registry endpoint certificate CT/SCT evidence for coldstore and trustee proof sets
+  - includes long-term media renewal cadence policy, refresh / revocation window binding, and registry endpoint certificate CT/SCT evidence for coldstore and trustee proof sets
 - `metacognition_report.schema`
 - `metacognition_shift.schema`
 - `naming_policy.schema`

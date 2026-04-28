@@ -798,8 +798,12 @@ raw key material, raw jurisdiction policy payload, raw quorum threshold policy p
 and raw roster payload redaction)、
 `long-term-media-renewal-proof-v1` による `coldstore` / `trustee` の
 renewed media proof、readback digest、3650 日 refresh interval、1000 年 target horizon、
+`long-term-media-renewal-cadence-policy-v1` による identity cadence class、
+JP-13 / SG-01 jurisdiction cadence policy digest、target refresh interval、
+effective refresh / revocation window、
 `long-term-media-renewal-refresh-window-v1` による current-not-revoked source proof、
 90 日 revocation check、next refresh ref、stale / revoked source fail-closed、
+cadence policy digest binding、
 `long-term-media-renewal-registry-verifier-v1` による JP-13 / SG-01 registry response
 digest、response signature digest、250ms timeout budget、quorum digest、
 `long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` による registry
@@ -811,7 +815,7 @@ retirement digest、
 `long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1`
 による CT-style readback、2-log quorum、SCT timestamp window、
 SCT policy authority の digest-only binding、
-raw media / raw readback / raw revocation / raw refresh / raw registry /
+raw media / raw readback / raw cadence / raw revocation / raw refresh / raw registry /
 raw response / raw endpoint certificate / raw certificate freshness /
 raw certificate lifecycle / raw certificate CT log /
 raw SCT policy authority payload redaction、

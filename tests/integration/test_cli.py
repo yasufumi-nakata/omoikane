@@ -759,6 +759,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["long_term_media_renewal_readback_ok"])
         self.assertEqual(3650, result["validation"]["long_term_media_renewal_refresh_interval_days"])
         self.assertEqual(1000, result["validation"]["long_term_media_renewal_target_horizon_years"])
+        self.assertTrue(result["validation"]["long_term_media_renewal_cadence_policy_bound"])
+        self.assertEqual(
+            3650,
+            result["validation"][
+                "long_term_media_renewal_cadence_effective_refresh_interval_days"
+            ],
+        )
         self.assertTrue(result["validation"]["long_term_media_renewal_refresh_window_bound"])
         self.assertTrue(result["validation"]["long_term_media_renewal_source_proof_current"])
         self.assertTrue(result["validation"]["long_term_media_renewal_revocation_check_ok"])
@@ -817,6 +824,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["validation"]["raw_quorum_threshold_policy_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_readback_payload_stored"])
+        self.assertFalse(result["validation"]["raw_media_cadence_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_revocation_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_refresh_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_registry_payload_stored"])
@@ -904,6 +912,20 @@ class CliIntegrationTests(unittest.TestCase):
             result["memory_replication"]["session"]["long_term_media_renewal"][
                 "refresh_window"
             ]["policy_id"],
+        )
+        self.assertEqual(
+            "long-term-media-renewal-cadence-policy-v1",
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "cadence_policy"
+            ]["policy_id"],
+        )
+        self.assertEqual(
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "cadence_policy"
+            ]["cadence_commit_digest"],
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "refresh_window"
+            ]["cadence_policy_digest"],
         )
         self.assertEqual(
             "current-not-revoked",

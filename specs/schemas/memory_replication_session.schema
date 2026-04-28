@@ -69,6 +69,7 @@ properties:
       - key_succession_quorum_threshold_policy_id
       - long_term_media_renewal_policy_id
       - long_term_media_renewal_refresh_policy_id
+      - long_term_media_renewal_cadence_policy_id
       - long_term_media_renewal_registry_verifier_policy_id
       - long_term_media_renewal_registry_endpoint_certificate_lifecycle_policy_id
       - long_term_media_renewal_registry_endpoint_certificate_ct_log_readback_policy_id
@@ -168,6 +169,9 @@ properties:
       long_term_media_renewal_refresh_policy_id:
         type: string
         const: long-term-media-renewal-refresh-window-v1
+      long_term_media_renewal_cadence_policy_id:
+        type: string
+        const: long-term-media-renewal-cadence-policy-v1
       long_term_media_renewal_registry_verifier_policy_id:
         type: string
         const: long-term-media-renewal-registry-verifier-v1
@@ -482,6 +486,7 @@ $defs:
       - refresh_interval_days
       - target_horizon_years
       - next_refresh_due_ref
+      - cadence_policy
       - refresh_window
       - council_review_ref
       - guardian_attestation_ref
@@ -559,6 +564,8 @@ $defs:
       next_refresh_due_ref:
         type: string
         minLength: 1
+      cadence_policy:
+        $ref: "#/$defs/long_term_media_renewal_cadence_policy"
       refresh_window:
         $ref: "#/$defs/long_term_media_renewal_refresh_window"
       council_review_ref:
@@ -651,6 +658,127 @@ $defs:
       proof_digest:
         type: string
         pattern: "^[0-9a-f]{64}$"
+  long_term_media_renewal_cadence_policy:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - schema_version
+      - policy_id
+      - cadence_policy_receipt_id
+      - identity_id
+      - source_manifest_digest
+      - renewal_target_ids
+      - source_media_proof_set_digest
+      - identity_cadence_class
+      - identity_cadence_class_ref
+      - identity_cadence_class_digest
+      - jurisdiction_policy_refs
+      - jurisdiction_policy_digest_set
+      - target_refresh_interval_days
+      - effective_refresh_interval_days
+      - effective_revocation_check_window_days
+      - next_refresh_due_ref
+      - council_review_ref
+      - guardian_attestation_ref
+      - raw_identity_cadence_payload_stored
+      - raw_jurisdiction_cadence_payload_stored
+      - status
+      - cadence_commit_digest
+    properties:
+      kind:
+        type: string
+        const: memory_replication_long_term_media_renewal_cadence_policy
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: long-term-media-renewal-cadence-policy-v1
+      cadence_policy_receipt_id:
+        type: string
+        minLength: 1
+      identity_id:
+        type: string
+        minLength: 1
+      source_manifest_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      renewal_target_ids:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [coldstore, trustee]
+      source_media_proof_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      identity_cadence_class:
+        type: string
+        const: continuity-critical-standard
+      identity_cadence_class_ref:
+        type: string
+        minLength: 1
+      identity_cadence_class_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      jurisdiction_policy_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      jurisdiction_policy_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      target_refresh_interval_days:
+        type: object
+        additionalProperties: false
+        required:
+          - coldstore
+          - trustee
+        properties:
+          coldstore:
+            type: integer
+            const: 3650
+          trustee:
+            type: integer
+            const: 3650
+      effective_refresh_interval_days:
+        type: integer
+        const: 3650
+      effective_revocation_check_window_days:
+        type: integer
+        const: 90
+      next_refresh_due_ref:
+        type: string
+        minLength: 1
+      council_review_ref:
+        type: string
+        minLength: 1
+      guardian_attestation_ref:
+        type: string
+        minLength: 1
+      raw_identity_cadence_payload_stored:
+        type: boolean
+        const: false
+      raw_jurisdiction_cadence_payload_stored:
+        type: boolean
+        const: false
+      status:
+        type: string
+        const: cadence-policy-bound
+      cadence_commit_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
   long_term_media_renewal_refresh_window:
     type: object
     additionalProperties: false
@@ -670,6 +798,7 @@ $defs:
       - refresh_due_ref
       - revocation_registry_refs
       - revocation_registry_digest_set
+      - cadence_policy_digest
       - registry_verifier
       - next_required_refresh_ref
       - council_review_ref
@@ -751,6 +880,9 @@ $defs:
         items:
           type: string
           pattern: "^[0-9a-f]{64}$"
+      cadence_policy_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
       registry_verifier:
         $ref: "#/$defs/long_term_media_renewal_registry_verifier"
       next_required_refresh_ref:

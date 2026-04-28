@@ -40,6 +40,7 @@ operations:
       - key_succession must additionally bind JP-13 and SG-01 signer roster policies into a digest-only multi-jurisdiction quorum without storing raw jurisdiction policy payloads
       - multi-jurisdiction key_succession quorum threshold must be bound to a digest-only policy registry and authority signature quorum before complete status is allowed
       - long_term_media_renewal must bind coldstore and trustee copies to renewed media proofs, readback digests, a 3650-day refresh interval, and a 1000-year target horizon without storing raw media or readback payloads
+      - long_term_media_renewal.cadence_policy must bind the selected identity cadence class and JP-13 / SG-01 jurisdiction cadence policy digests to the effective refresh interval without storing raw cadence payloads
       - long_term_media_renewal.refresh_window must bind the source proof set to current-not-revoked status, 90-day revocation checks, next refresh refs, and fail-closed stale/revoked proof handling without storing raw revocation or refresh payloads
       - long_term_media_renewal.refresh_window.registry_verifier must bind JP-13 and SG-01 registry response digests, response signatures, timeout budget, and quorum digest to the source proof set without storing raw registry or response payloads
       - long_term_media_renewal.refresh_window.registry_verifier.endpoint_certificate_lifecycle must bind each registry endpoint to current certificate fingerprints, 3-generation chain digests, OCSP/revocation digests, renewal and previous-retirement evidence, and the registry response quorum without storing raw certificate payloads
@@ -81,6 +82,8 @@ operations:
           - long_term_media_renewal_readback_ok
           - long_term_media_renewal_refresh_interval_days
           - long_term_media_renewal_target_horizon_years
+          - long_term_media_renewal_cadence_policy_bound
+          - long_term_media_renewal_cadence_effective_refresh_interval_days
           - long_term_media_renewal_refresh_window_bound
           - long_term_media_renewal_source_proof_current
           - long_term_media_renewal_revocation_check_ok
@@ -101,6 +104,7 @@ operations:
           - raw_quorum_threshold_policy_payload_stored
           - raw_media_payload_stored
           - raw_media_readback_payload_stored
+          - raw_media_cadence_payload_stored
           - raw_media_revocation_payload_stored
           - raw_media_refresh_payload_stored
           - raw_media_registry_payload_stored
@@ -173,6 +177,10 @@ operations:
             type: integer
           long_term_media_renewal_target_horizon_years:
             type: integer
+          long_term_media_renewal_cadence_policy_bound:
+            type: boolean
+          long_term_media_renewal_cadence_effective_refresh_interval_days:
+            type: integer
           long_term_media_renewal_refresh_window_bound:
             type: boolean
           long_term_media_renewal_source_proof_current:
@@ -212,6 +220,8 @@ operations:
           raw_media_payload_stored:
             type: boolean
           raw_media_readback_payload_stored:
+            type: boolean
+          raw_media_cadence_payload_stored:
             type: boolean
           raw_media_revocation_payload_stored:
             type: boolean

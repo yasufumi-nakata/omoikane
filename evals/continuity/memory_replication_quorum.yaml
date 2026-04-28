@@ -5,8 +5,8 @@ summary: >
   quorum-bound reconcile、council escalation、threshold key succession、
   multi-jurisdiction signer roster quorum、quorum threshold policy authority、
   long-term media renewal / readback proof、refresh / revocation window、
-  media registry verifier quorum と 3-generation endpoint certificate chain を
-  digest-bound に返すこと
+  identity / jurisdiction-bound cadence policy、media registry verifier quorum と
+  3-generation endpoint certificate chain を digest-bound に返すこと
 checks:
   - name: memory replication demo smoke
     command: PYTHONPATH=src python3 -m omoikane.cli memory-replication-demo --json
@@ -37,6 +37,8 @@ expect:
   long_term_media_renewal_readback_ok: true
   long_term_media_renewal_refresh_interval_days: 3650
   long_term_media_renewal_target_horizon_years: 1000
+  long_term_media_renewal_cadence_policy_bound: true
+  long_term_media_renewal_cadence_effective_refresh_interval_days: 3650
   long_term_media_renewal_refresh_window_bound: true
   long_term_media_renewal_source_proof_current: true
   long_term_media_renewal_revocation_check_ok: true
@@ -64,6 +66,7 @@ expect:
   raw_quorum_threshold_policy_payload_stored: false
   raw_media_payload_stored: false
   raw_media_readback_payload_stored: false
+  raw_media_cadence_payload_stored: false
   raw_media_revocation_payload_stored: false
   raw_media_refresh_payload_stored: false
   raw_media_registry_endpoint_certificate_payload_stored: false

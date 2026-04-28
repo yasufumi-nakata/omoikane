@@ -60,9 +60,12 @@ reference runtime ではこの protocol を
 - `long-term-media-renewal-proof-v1` receipt を同じ session に束縛し、
   `coldstore` / `trustee` の long-term copy を renewed media proof、readback digest、
   migration attestation digest、3650 日 refresh interval、1000 年 target horizon へ固定する。
-  さらに `long-term-media-renewal-refresh-window-v1` receipt が source proof set を
+  さらに `long-term-media-renewal-cadence-policy-v1` receipt が identity cadence class、
+  JP-13 / SG-01 jurisdiction cadence policy digest、target 別 refresh interval、
+  effective refresh / revocation window を同じ proof set に束縛する。
+  `long-term-media-renewal-refresh-window-v1` receipt は source proof set を
   current-not-revoked status、90 日 revocation check window、次回 refresh ref、
-  stale / revoked proof fail-closed に束縛し、
+  stale / revoked proof fail-closed と cadence policy digest に束縛し、
   `long-term-media-renewal-registry-verifier-v1` が JP-13 / SG-01 の registry response
   digest、response signature digest、250ms timeout budget、quorum digest を
   source proof set に束縛する。さらに
@@ -75,7 +78,8 @@ reference runtime ではこの protocol を
   `long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1`
   により、CT-style readback、2-log quorum、SCT timestamp window、
   SCT policy authority を digest-only に束縛する。
-  raw media payload / raw readback payload / raw revocation payload / raw refresh payload /
+  raw media payload / raw readback payload / raw cadence payload /
+  raw revocation payload / raw refresh payload /
   raw registry payload / raw response payload / raw endpoint certificate payload /
   raw certificate freshness payload / raw certificate lifecycle payload /
   raw certificate CT log payload / raw SCT policy authority payload は保存しない

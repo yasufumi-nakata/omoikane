@@ -83,6 +83,9 @@ MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_POL
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_POLICY_AUTHORITY_POLICY_ID = (
     "long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1"
 )
+MEMORY_REPLICATION_MEDIA_RENEWAL_CADENCE_POLICY_ID = (
+    "long-term-media-renewal-cadence-policy-v1"
+)
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION = "JP-13"
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS = (
     "JP-13",
@@ -111,6 +114,9 @@ MEMORY_REPLICATION_LONG_TERM_TARGETS = ("coldstore", "trustee")
 MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS = 3650
 MEMORY_REPLICATION_MEDIA_RENEWAL_REVOCATION_CHECK_WINDOW_DAYS = 90
 MEMORY_REPLICATION_MEDIA_RENEWAL_TARGET_HORIZON_YEARS = 1000
+MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS = (
+    "continuity-critical-standard"
+)
 MEMORY_REPLICATION_MIN_CONSENSUS_TARGETS = 3
 MEMORY_REPLICATION_KEY_SUCCESSION_REQUIRED_GUARDIANS = 2
 MEMORY_REPLICATION_ALLOWED_STATUS = {"clean", "degraded-but-recoverable"}
@@ -211,6 +217,12 @@ def _memory_replication_media_renewal_refresh_digest_payload(
     receipt: Dict[str, Any],
 ) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "refresh_commit_digest"}
+
+
+def _memory_replication_media_renewal_cadence_digest_payload(
+    receipt: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "cadence_commit_digest"}
 
 
 def _memory_replication_media_registry_verifier_digest_payload(
@@ -1010,6 +1022,9 @@ class MemoryReplicationService:
             "long_term_media_renewal_refresh_policy_id": (
                 MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_POLICY_ID
             ),
+            "long_term_media_renewal_cadence_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_CADENCE_POLICY_ID
+            ),
             "long_term_media_renewal_registry_verifier_policy_id": (
                 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID
             ),
@@ -1382,6 +1397,13 @@ class MemoryReplicationService:
             ):
                 errors.append(
                     "replication_policy.long_term_media_renewal_refresh_policy_id mismatch"
+                )
+            if (
+                policy.get("long_term_media_renewal_cadence_policy_id")
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_CADENCE_POLICY_ID
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_cadence_policy_id mismatch"
                 )
             if (
                 policy.get("long_term_media_renewal_registry_verifier_policy_id")
@@ -1858,6 +1880,14 @@ class MemoryReplicationService:
             "long_term_media_renewal_target_horizon_years": (
                 long_term_media_renewal_validation["target_horizon_years"]
             ),
+            "long_term_media_renewal_cadence_policy_bound": (
+                long_term_media_renewal_validation["cadence_policy_bound"]
+            ),
+            "long_term_media_renewal_cadence_effective_refresh_interval_days": (
+                long_term_media_renewal_validation[
+                    "cadence_effective_refresh_interval_days"
+                ]
+            ),
             "long_term_media_renewal_refresh_window_bound": (
                 long_term_media_renewal_validation["refresh_window_bound"]
             ),
@@ -1931,6 +1961,9 @@ class MemoryReplicationService:
             ],
             "raw_media_readback_payload_stored": long_term_media_renewal_validation[
                 "raw_media_readback_payload_stored"
+            ],
+            "raw_media_cadence_payload_stored": long_term_media_renewal_validation[
+                "raw_media_cadence_payload_stored"
             ],
             "raw_media_revocation_payload_stored": long_term_media_renewal_validation[
                 "raw_media_revocation_payload_stored"
@@ -3384,12 +3417,29 @@ class MemoryReplicationService:
 
         proof_digest_set = [proof["proof_digest"] for proof in media_proofs]
         readback_digest_set = [proof["readback_digest"] for proof in media_proofs]
+        source_media_proof_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": MEMORY_REPLICATION_MEDIA_RENEWAL_POLICY_ID,
+                    "renewal_target_ids": list(MEMORY_REPLICATION_LONG_TERM_TARGETS),
+                    "proof_digest_set": proof_digest_set,
+                    "readback_digest_set": readback_digest_set,
+                }
+            )
+        )
+        cadence_policy = self._build_long_term_media_renewal_cadence_policy(
+            identity_id=identity_id,
+            source_manifest_digest=source_manifest_digest,
+            renewal_target_ids=list(MEMORY_REPLICATION_LONG_TERM_TARGETS),
+            source_media_proof_set_digest=source_media_proof_set_digest,
+        )
         refresh_window = self._build_long_term_media_renewal_refresh_window(
             identity_id=identity_id,
             source_manifest_digest=source_manifest_digest,
             renewal_target_ids=list(MEMORY_REPLICATION_LONG_TERM_TARGETS),
             proof_digest_set=proof_digest_set,
             readback_digest_set=readback_digest_set,
+            cadence_policy_digest=cadence_policy["cadence_commit_digest"],
         )
         receipt = {
             "kind": "memory_replication_long_term_media_renewal",
@@ -3410,6 +3460,7 @@ class MemoryReplicationService:
             "next_refresh_due_ref": (
                 "schedule://memory-replication/long-term-media/3650d"
             ),
+            "cadence_policy": cadence_policy,
             "refresh_window": refresh_window,
             "council_review_ref": "council://memory-replication/media-renewal-001",
             "guardian_attestation_ref": (
@@ -3424,6 +3475,110 @@ class MemoryReplicationService:
         )
         return receipt
 
+    def _build_long_term_media_renewal_cadence_policy(
+        self,
+        *,
+        identity_id: str,
+        source_manifest_digest: str,
+        renewal_target_ids: Sequence[str],
+        source_media_proof_set_digest: str,
+    ) -> Dict[str, Any]:
+        jurisdiction_policy_refs = [
+            (
+                "jurisdiction-policy://memory-replication/"
+                f"{jurisdiction.lower()}/media-renewal-cadence/v1"
+            )
+            for jurisdiction in MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS
+        ]
+        jurisdiction_policy_digest_set = [
+            sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "jurisdiction_policy_ref": policy_ref,
+                        "identity_cadence_class": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS
+                        ),
+                        "refresh_interval_days": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS
+                        ),
+                        "revocation_check_window_days": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REVOCATION_CHECK_WINDOW_DAYS
+                        ),
+                        "status": "current",
+                    }
+                )
+            )
+            for jurisdiction, policy_ref in zip(
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS,
+                jurisdiction_policy_refs,
+            )
+        ]
+        identity_cadence_class_ref = (
+            "identity-cadence://memory-replication/"
+            f"{identity_id}/{MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS}"
+        )
+        identity_cadence_class_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "identity_cadence_class": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS
+                    ),
+                    "identity_cadence_class_ref": identity_cadence_class_ref,
+                    "target_horizon_years": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_TARGET_HORIZON_YEARS
+                    ),
+                }
+            )
+        )
+        target_refresh_interval_days = {
+            target_id: MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS
+            for target_id in renewal_target_ids
+        }
+        receipt = {
+            "kind": "memory_replication_long_term_media_renewal_cadence_policy",
+            "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
+            "policy_id": MEMORY_REPLICATION_MEDIA_RENEWAL_CADENCE_POLICY_ID,
+            "cadence_policy_receipt_id": new_id("memory-media-renewal-cadence"),
+            "identity_id": identity_id,
+            "source_manifest_digest": source_manifest_digest,
+            "renewal_target_ids": list(renewal_target_ids),
+            "source_media_proof_set_digest": source_media_proof_set_digest,
+            "identity_cadence_class": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS
+            ),
+            "identity_cadence_class_ref": identity_cadence_class_ref,
+            "identity_cadence_class_digest": identity_cadence_class_digest,
+            "jurisdiction_policy_refs": jurisdiction_policy_refs,
+            "jurisdiction_policy_digest_set": jurisdiction_policy_digest_set,
+            "target_refresh_interval_days": target_refresh_interval_days,
+            "effective_refresh_interval_days": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS
+            ),
+            "effective_revocation_check_window_days": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REVOCATION_CHECK_WINDOW_DAYS
+            ),
+            "next_refresh_due_ref": (
+                "schedule://memory-replication/long-term-media/3650d"
+            ),
+            "council_review_ref": (
+                "council://memory-replication/media-renewal-cadence-001"
+            ),
+            "guardian_attestation_ref": (
+                "guardian://memory-replication/media-renewal-cadence/integrity-guardian"
+            ),
+            "raw_identity_cadence_payload_stored": False,
+            "raw_jurisdiction_cadence_payload_stored": False,
+            "status": "cadence-policy-bound",
+        }
+        receipt["cadence_commit_digest"] = sha256_text(
+            canonical_json(
+                _memory_replication_media_renewal_cadence_digest_payload(receipt)
+            )
+        )
+        return receipt
+
     def _build_long_term_media_renewal_refresh_window(
         self,
         *,
@@ -3432,6 +3587,7 @@ class MemoryReplicationService:
         renewal_target_ids: Sequence[str],
         proof_digest_set: Sequence[str],
         readback_digest_set: Sequence[str],
+        cadence_policy_digest: str,
     ) -> Dict[str, Any]:
         source_media_proof_set_digest = sha256_text(
             canonical_json(
@@ -3499,6 +3655,7 @@ class MemoryReplicationService:
             ),
             "revocation_registry_refs": revocation_registry_refs,
             "revocation_registry_digest_set": revocation_registry_digest_set,
+            "cadence_policy_digest": cadence_policy_digest,
             "registry_verifier": registry_verifier,
             "next_required_refresh_ref": (
                 "schedule://memory-replication/long-term-media/next-required-refresh"
@@ -4201,6 +4358,7 @@ class MemoryReplicationService:
         local_errors: List[str] = []
         raw_media_payload_stored = False
         raw_media_readback_payload_stored = False
+        raw_media_cadence_payload_stored = False
         raw_media_revocation_payload_stored = False
         raw_media_refresh_payload_stored = False
         raw_media_registry_payload_stored = False
@@ -4246,6 +4404,8 @@ class MemoryReplicationService:
                 "readback_ok": False,
                 "refresh_interval_days": None,
                 "target_horizon_years": None,
+                "cadence_policy_bound": False,
+                "cadence_effective_refresh_interval_days": None,
                 "refresh_window_bound": False,
                 "source_proof_current": False,
                 "revocation_check_ok": False,
@@ -4261,6 +4421,7 @@ class MemoryReplicationService:
                 "registry_endpoint_certificate_chain_generation_count": 0,
                 "raw_media_payload_stored": False,
                 "raw_media_readback_payload_stored": False,
+                "raw_media_cadence_payload_stored": False,
                 "raw_media_revocation_payload_stored": False,
                 "raw_media_refresh_payload_stored": False,
                 "raw_media_registry_payload_stored": False,
@@ -4448,9 +4609,39 @@ class MemoryReplicationService:
             local_errors.append("long_term_media_renewal.proof_digest_set mismatch")
         if receipt.get("readback_digest_set") != readback_digest_set:
             local_errors.append("long_term_media_renewal.readback_digest_set mismatch")
+        source_media_proof_set_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": MEMORY_REPLICATION_MEDIA_RENEWAL_POLICY_ID,
+                    "renewal_target_ids": list(target_ids),
+                    "proof_digest_set": proof_digest_set,
+                    "readback_digest_set": readback_digest_set,
+                }
+            )
+        )
+        cadence_policy_validation = (
+            self._validate_long_term_media_renewal_cadence_policy(
+                receipt.get("cadence_policy"),
+                identity_id=identity_id,
+                source_manifest_digest=source_manifest_digest,
+                target_ids=target_ids,
+                source_media_proof_set_digest=source_media_proof_set_digest,
+                errors=local_errors,
+            )
+        )
+        raw_media_cadence_payload_stored = cadence_policy_validation[
+            "raw_media_cadence_payload_stored"
+        ]
         refresh_interval_days = receipt.get("refresh_interval_days")
         if refresh_interval_days != MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS:
             local_errors.append("long_term_media_renewal.refresh_interval_days mismatch")
+        if (
+            refresh_interval_days
+            != cadence_policy_validation["effective_refresh_interval_days"]
+        ):
+            local_errors.append(
+                "long_term_media_renewal.refresh_interval_days must match cadence policy"
+            )
         target_horizon_years = receipt.get("target_horizon_years")
         if target_horizon_years != MEMORY_REPLICATION_MEDIA_RENEWAL_TARGET_HORIZON_YEARS:
             local_errors.append("long_term_media_renewal.target_horizon_years mismatch")
@@ -4466,6 +4657,7 @@ class MemoryReplicationService:
             target_ids=target_ids,
             proof_digest_set=proof_digest_set,
             readback_digest_set=readback_digest_set,
+            cadence_policy_digest=cadence_policy_validation["cadence_commit_digest"],
             errors=local_errors,
         )
         raw_media_revocation_payload_stored = refresh_window_validation[
@@ -4543,8 +4735,10 @@ class MemoryReplicationService:
             proof_target_ids == list(MEMORY_REPLICATION_LONG_TERM_TARGETS)
             and len(proof_readback_statuses) == len(MEMORY_REPLICATION_LONG_TERM_TARGETS)
             and refresh_window_validation["bound"]
+            and cadence_policy_validation["bound"]
             and not raw_media_payload_stored
             and not raw_media_readback_payload_stored
+            and not raw_media_cadence_payload_stored
             and not raw_media_revocation_payload_stored
             and not raw_media_refresh_payload_stored
             and not raw_media_registry_payload_stored
@@ -4566,6 +4760,10 @@ class MemoryReplicationService:
             "readback_ok": readback_ok,
             "refresh_interval_days": refresh_interval_days,
             "target_horizon_years": target_horizon_years,
+            "cadence_policy_bound": cadence_policy_validation["bound"],
+            "cadence_effective_refresh_interval_days": (
+                cadence_policy_validation["effective_refresh_interval_days"]
+            ),
             "refresh_window_bound": refresh_window_validation["bound"],
             "source_proof_current": refresh_window_validation["source_proof_current"],
             "revocation_check_ok": refresh_window_validation["revocation_check_ok"],
@@ -4607,6 +4805,7 @@ class MemoryReplicationService:
             ),
             "raw_media_payload_stored": raw_media_payload_stored,
             "raw_media_readback_payload_stored": raw_media_readback_payload_stored,
+            "raw_media_cadence_payload_stored": raw_media_cadence_payload_stored,
             "raw_media_revocation_payload_stored": raw_media_revocation_payload_stored,
             "raw_media_refresh_payload_stored": raw_media_refresh_payload_stored,
             "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
@@ -4630,6 +4829,197 @@ class MemoryReplicationService:
             ),
         }
 
+    def _validate_long_term_media_renewal_cadence_policy(
+        self,
+        receipt: Any,
+        *,
+        identity_id: Any,
+        source_manifest_digest: Any,
+        target_ids: Sequence[str],
+        source_media_proof_set_digest: str,
+        errors: List[str],
+    ) -> Dict[str, Any]:
+        local_errors: List[str] = []
+        raw_identity_cadence_payload_stored = False
+        raw_jurisdiction_cadence_payload_stored = False
+        if not isinstance(receipt, dict):
+            errors.append("long_term_media_renewal.cadence_policy must be an object")
+            return {
+                "bound": False,
+                "effective_refresh_interval_days": None,
+                "effective_revocation_check_window_days": None,
+                "raw_media_cadence_payload_stored": False,
+                "cadence_commit_digest": "",
+            }
+
+        prefix = "long_term_media_renewal.cadence_policy"
+        if receipt.get("kind") != "memory_replication_long_term_media_renewal_cadence_policy":
+            local_errors.append(f"{prefix}.kind mismatch")
+        if receipt.get("schema_version") != MEMORY_REPLICATION_SCHEMA_VERSION:
+            local_errors.append(f"{prefix}.schema_version mismatch")
+        if receipt.get("policy_id") != MEMORY_REPLICATION_MEDIA_RENEWAL_CADENCE_POLICY_ID:
+            local_errors.append(f"{prefix}.policy_id mismatch")
+        self._require_non_empty_string(
+            receipt.get("cadence_policy_receipt_id"),
+            f"{prefix}.cadence_policy_receipt_id",
+            local_errors,
+        )
+        if receipt.get("identity_id") != identity_id:
+            local_errors.append(f"{prefix}.identity_id must match renewal receipt")
+        if receipt.get("source_manifest_digest") != source_manifest_digest:
+            local_errors.append(f"{prefix}.source_manifest_digest must match renewal receipt")
+        if receipt.get("renewal_target_ids") != list(target_ids):
+            local_errors.append(f"{prefix}.renewal_target_ids mismatch")
+        if receipt.get("source_media_proof_set_digest") != source_media_proof_set_digest:
+            local_errors.append(f"{prefix}.source_media_proof_set_digest mismatch")
+
+        identity_cadence_class_ref = (
+            "identity-cadence://memory-replication/"
+            f"{identity_id}/{MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS}"
+        )
+        expected_identity_cadence_class_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "identity_cadence_class": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS
+                    ),
+                    "identity_cadence_class_ref": identity_cadence_class_ref,
+                    "target_horizon_years": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_TARGET_HORIZON_YEARS
+                    ),
+                }
+            )
+        )
+        if (
+            receipt.get("identity_cadence_class")
+            != MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS
+        ):
+            local_errors.append(f"{prefix}.identity_cadence_class mismatch")
+        if receipt.get("identity_cadence_class_ref") != identity_cadence_class_ref:
+            local_errors.append(f"{prefix}.identity_cadence_class_ref mismatch")
+        if (
+            receipt.get("identity_cadence_class_digest")
+            != expected_identity_cadence_class_digest
+        ):
+            local_errors.append(f"{prefix}.identity_cadence_class_digest mismatch")
+
+        expected_jurisdiction_policy_refs = [
+            (
+                "jurisdiction-policy://memory-replication/"
+                f"{jurisdiction.lower()}/media-renewal-cadence/v1"
+            )
+            for jurisdiction in MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS
+        ]
+        jurisdiction_policy_refs = self._validate_string_list(
+            receipt.get("jurisdiction_policy_refs"),
+            f"{prefix}.jurisdiction_policy_refs",
+            local_errors,
+            unique=True,
+            minimum=len(MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS),
+        )
+        if jurisdiction_policy_refs != expected_jurisdiction_policy_refs:
+            local_errors.append(f"{prefix}.jurisdiction_policy_refs mismatch")
+        expected_jurisdiction_policy_digest_set = [
+            sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "jurisdiction_policy_ref": policy_ref,
+                        "identity_cadence_class": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_IDENTITY_CADENCE_CLASS
+                        ),
+                        "refresh_interval_days": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS
+                        ),
+                        "revocation_check_window_days": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REVOCATION_CHECK_WINDOW_DAYS
+                        ),
+                        "status": "current",
+                    }
+                )
+            )
+            for jurisdiction, policy_ref in zip(
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS,
+                expected_jurisdiction_policy_refs,
+            )
+        ]
+        jurisdiction_policy_digest_set = self._validate_digest_list(
+            receipt.get("jurisdiction_policy_digest_set"),
+            f"{prefix}.jurisdiction_policy_digest_set",
+            local_errors,
+            minimum=len(MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS),
+        )
+        if jurisdiction_policy_digest_set != expected_jurisdiction_policy_digest_set:
+            local_errors.append(f"{prefix}.jurisdiction_policy_digest_set mismatch")
+
+        target_refresh_interval_days = receipt.get("target_refresh_interval_days")
+        expected_target_refresh_interval_days = {
+            target_id: MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS
+            for target_id in target_ids
+        }
+        if target_refresh_interval_days != expected_target_refresh_interval_days:
+            local_errors.append(f"{prefix}.target_refresh_interval_days mismatch")
+        if (
+            receipt.get("effective_refresh_interval_days")
+            != MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_INTERVAL_DAYS
+        ):
+            local_errors.append(f"{prefix}.effective_refresh_interval_days mismatch")
+        if (
+            receipt.get("effective_revocation_check_window_days")
+            != MEMORY_REPLICATION_MEDIA_RENEWAL_REVOCATION_CHECK_WINDOW_DAYS
+        ):
+            local_errors.append(
+                f"{prefix}.effective_revocation_check_window_days mismatch"
+            )
+        for field_name in (
+            "next_refresh_due_ref",
+            "council_review_ref",
+            "guardian_attestation_ref",
+        ):
+            self._require_non_empty_string(
+                receipt.get(field_name),
+                f"{prefix}.{field_name}",
+                local_errors,
+            )
+        if receipt.get("raw_identity_cadence_payload_stored") is not False:
+            raw_identity_cadence_payload_stored = True
+            local_errors.append(f"{prefix}.raw_identity_cadence_payload_stored must be false")
+        if receipt.get("raw_jurisdiction_cadence_payload_stored") is not False:
+            raw_jurisdiction_cadence_payload_stored = True
+            local_errors.append(
+                f"{prefix}.raw_jurisdiction_cadence_payload_stored must be false"
+            )
+        if receipt.get("status") != "cadence-policy-bound":
+            local_errors.append(f"{prefix}.status must equal cadence-policy-bound")
+        digest = receipt.get("cadence_commit_digest")
+        self._require_digest(digest, f"{prefix}.cadence_commit_digest", local_errors)
+        if isinstance(digest, str):
+            expected_digest = sha256_text(
+                canonical_json(
+                    _memory_replication_media_renewal_cadence_digest_payload(receipt)
+                )
+            )
+            if digest != expected_digest:
+                local_errors.append(f"{prefix}.cadence_commit_digest mismatch")
+
+        raw_payload_stored = (
+            raw_identity_cadence_payload_stored
+            or raw_jurisdiction_cadence_payload_stored
+        )
+        errors.extend(local_errors)
+        return {
+            "bound": not local_errors,
+            "effective_refresh_interval_days": receipt.get(
+                "effective_refresh_interval_days"
+            ),
+            "effective_revocation_check_window_days": receipt.get(
+                "effective_revocation_check_window_days"
+            ),
+            "raw_media_cadence_payload_stored": raw_payload_stored,
+            "cadence_commit_digest": digest if isinstance(digest, str) else "",
+        }
+
     def _validate_long_term_media_renewal_refresh_window(
         self,
         receipt: Any,
@@ -4639,6 +5029,7 @@ class MemoryReplicationService:
         target_ids: Sequence[str],
         proof_digest_set: Sequence[str],
         readback_digest_set: Sequence[str],
+        cadence_policy_digest: str,
         errors: List[str],
     ) -> Dict[str, Any]:
         local_errors: List[str] = []
@@ -4789,6 +5180,13 @@ class MemoryReplicationService:
         ]
         if revocation_registry_digest_set != expected_revocation_registry_digest_set:
             local_errors.append(f"{prefix}.revocation_registry_digest_set mismatch")
+        self._require_digest(
+            receipt.get("cadence_policy_digest"),
+            f"{prefix}.cadence_policy_digest",
+            local_errors,
+        )
+        if receipt.get("cadence_policy_digest") != cadence_policy_digest:
+            local_errors.append(f"{prefix}.cadence_policy_digest mismatch")
         registry_verifier_validation = (
             self._validate_long_term_media_renewal_registry_verifier(
                 receipt.get("registry_verifier"),

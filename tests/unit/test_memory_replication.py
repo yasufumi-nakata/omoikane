@@ -41,6 +41,13 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(validation["long_term_media_renewal_readback_ok"])
         self.assertEqual(3650, validation["long_term_media_renewal_refresh_interval_days"])
         self.assertEqual(1000, validation["long_term_media_renewal_target_horizon_years"])
+        self.assertTrue(validation["long_term_media_renewal_cadence_policy_bound"])
+        self.assertEqual(
+            3650,
+            validation[
+                "long_term_media_renewal_cadence_effective_refresh_interval_days"
+            ],
+        )
         self.assertTrue(validation["long_term_media_renewal_refresh_window_bound"])
         self.assertTrue(validation["long_term_media_renewal_source_proof_current"])
         self.assertTrue(validation["long_term_media_renewal_revocation_check_ok"])
@@ -90,6 +97,7 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertFalse(validation["raw_quorum_threshold_policy_payload_stored"])
         self.assertFalse(validation["raw_media_payload_stored"])
         self.assertFalse(validation["raw_media_readback_payload_stored"])
+        self.assertFalse(validation["raw_media_cadence_payload_stored"])
         self.assertFalse(validation["raw_media_revocation_payload_stored"])
         self.assertFalse(validation["raw_media_refresh_payload_stored"])
         self.assertFalse(validation["raw_media_registry_payload_stored"])
@@ -122,10 +130,31 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertEqual(["coldstore", "trustee"], media_renewal["renewal_target_ids"])
         self.assertEqual(2, len(media_renewal["proof_digest_set"]))
         self.assertEqual(2, len(media_renewal["readback_digest_set"]))
+        cadence_policy = media_renewal["cadence_policy"]
+        self.assertEqual(
+            "long-term-media-renewal-cadence-policy-v1",
+            cadence_policy["policy_id"],
+        )
+        self.assertEqual(
+            "continuity-critical-standard",
+            cadence_policy["identity_cadence_class"],
+        )
+        self.assertEqual(
+            {"coldstore": 3650, "trustee": 3650},
+            cadence_policy["target_refresh_interval_days"],
+        )
+        self.assertEqual(3650, cadence_policy["effective_refresh_interval_days"])
+        self.assertEqual(90, cadence_policy["effective_revocation_check_window_days"])
+        self.assertFalse(cadence_policy["raw_identity_cadence_payload_stored"])
+        self.assertFalse(cadence_policy["raw_jurisdiction_cadence_payload_stored"])
         refresh_window = media_renewal["refresh_window"]
         self.assertEqual(
             "long-term-media-renewal-refresh-window-v1",
             refresh_window["policy_id"],
+        )
+        self.assertEqual(
+            cadence_policy["cadence_commit_digest"],
+            refresh_window["cadence_policy_digest"],
         )
         self.assertEqual("current-not-revoked", refresh_window["source_proof_status"])
         self.assertEqual("within-window", refresh_window["refresh_status"])
@@ -452,6 +481,61 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertFalse(validation["long_term_media_renewal_source_proof_current"])
         self.assertTrue(
             any("source_proof_status" in error for error in validation["errors"])
+        )
+
+    def test_validate_session_rejects_media_renewal_cadence_policy_drift(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        cadence_policy = session["long_term_media_renewal"]["cadence_policy"]
+        cadence_policy["effective_refresh_interval_days"] = 1825
+        cadence_policy["cadence_commit_digest"] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"][
+            "cadence_policy_digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"][
+            "refresh_commit_digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["long_term_media_renewal_cadence_policy_bound"])
+        self.assertTrue(
+            any(
+                "effective_refresh_interval_days" in error
+                for error in validation["errors"]
+            )
+        )
+
+    def test_validate_session_rejects_raw_media_cadence_payload_storage(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        cadence_policy = session["long_term_media_renewal"]["cadence_policy"]
+        cadence_policy["raw_jurisdiction_cadence_payload_stored"] = True
+        cadence_policy["cadence_commit_digest"] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"][
+            "cadence_policy_digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"][
+            "refresh_commit_digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["long_term_media_renewal_cadence_policy_bound"])
+        self.assertTrue(validation["raw_media_cadence_payload_stored"])
+        self.assertTrue(
+            any(
+                "raw_jurisdiction_cadence_payload_stored" in error
+                for error in validation["errors"]
+            )
         )
 
     def test_validate_session_rejects_raw_media_revocation_payload_storage(self) -> None:

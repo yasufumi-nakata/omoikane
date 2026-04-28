@@ -93,10 +93,23 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertEqual(2, len(media_renewal["readback_digest_set"]))
         self.assertFalse(media_renewal["raw_media_payload_stored"])
         self.assertFalse(media_renewal["raw_media_readback_payload_stored"])
+        cadence_policy = media_renewal["cadence_policy"]
+        self.assertEqual(
+            "long-term-media-renewal-cadence-policy-v1",
+            cadence_policy["policy_id"],
+        )
+        self.assertEqual(3650, cadence_policy["effective_refresh_interval_days"])
+        self.assertEqual(90, cadence_policy["effective_revocation_check_window_days"])
+        self.assertFalse(cadence_policy["raw_identity_cadence_payload_stored"])
+        self.assertFalse(cadence_policy["raw_jurisdiction_cadence_payload_stored"])
         refresh_window = media_renewal["refresh_window"]
         self.assertEqual(
             "long-term-media-renewal-refresh-window-v1",
             refresh_window["policy_id"],
+        )
+        self.assertEqual(
+            cadence_policy["cadence_commit_digest"],
+            refresh_window["cadence_policy_digest"],
         )
         self.assertEqual("current-not-revoked", refresh_window["source_proof_status"])
         self.assertEqual("within-window", refresh_window["refresh_status"])

@@ -136,10 +136,14 @@ multi-jurisdiction signer roster quorum digest、quorum threshold policy authori
 digest だけを保存し、raw key / raw shard material / raw jurisdiction policy payload /
 raw quorum threshold policy payload / raw signer roster payload は保存しない。
 同じ session の `long-term-media-renewal-proof-v1` は、
+`long-term-media-renewal-cadence-policy-v1` と
 `long-term-media-renewal-refresh-window-v1` を nested receipt として持ち、
-source proof digest set と readback digest set を current-not-revoked status、
-90 日 revocation check window、次回 refresh ref、stale / revoked proof fail-closed
-に束縛する。さらに `long-term-media-renewal-registry-verifier-v1` が
+identity cadence class、JP-13 / SG-01 jurisdiction cadence policy digest、
+target refresh interval、effective refresh / revocation window を同じ proof set に
+束縛した上で、source proof digest set と readback digest set を
+current-not-revoked status、90 日 revocation check window、次回 refresh ref、
+stale / revoked proof fail-closed、cadence policy digest に束縛する。
+さらに `long-term-media-renewal-registry-verifier-v1` が
 JP-13 / SG-01 の registry response digest、response signature digest、250ms timeout、
 quorum digest を source proof set と revocation registry digest set に束縛し、
 `long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` が
@@ -147,8 +151,8 @@ registry endpoint certificate fingerprint、3 世代 certificate chain digest、
 revocation digest、renewal event、jurisdiction ごとの 2 本の previous certificate
 retirement digest、CT-style readback、2-log quorum、SCT timestamp window、SCT
 policy authority を同じ registry response quorum に束縛する。
-raw media / raw readback に加えて raw revocation / raw refresh / raw registry /
-raw response / raw endpoint certificate / raw certificate freshness /
+raw media / raw readback に加えて raw cadence / raw revocation / raw refresh /
+raw registry / raw response / raw endpoint certificate / raw certificate freshness /
 raw certificate lifecycle / raw CT log / raw SCT policy authority payload も保存しない。
 
 ## トラウマ記憶の扱い
