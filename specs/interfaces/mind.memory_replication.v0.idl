@@ -6,7 +6,8 @@ summary: >
   Deterministic four-target MemoryCrystal replication contract with plaintext
   metadata plus encrypted payload transfer, random-block Merkle audit, and
   council-escalated reconciliation plus threshold key succession recovery with
-  multi-jurisdiction signer roster authority and long-term media renewal proof.
+  multi-jurisdiction signer roster authority, long-term media renewal proof, and
+  digest-only media registry verifier quorum.
 imports:
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
   memory_replication_session: ../schemas/memory_replication_session.schema
@@ -40,6 +41,7 @@ operations:
       - multi-jurisdiction key_succession quorum threshold must be bound to a digest-only policy registry and authority signature quorum before complete status is allowed
       - long_term_media_renewal must bind coldstore and trustee copies to renewed media proofs, readback digests, a 3650-day refresh interval, and a 1000-year target horizon without storing raw media or readback payloads
       - long_term_media_renewal.refresh_window must bind the source proof set to current-not-revoked status, 90-day revocation checks, next refresh refs, and fail-closed stale/revoked proof handling without storing raw revocation or refresh payloads
+      - long_term_media_renewal.refresh_window.registry_verifier must bind JP-13 and SG-01 registry response digests, response signatures, timeout budget, and quorum digest to the source proof set without storing raw registry or response payloads
   validate_session:
     summary: Validate one replication session against the fixed quorum and reconciliation policy.
     input:
@@ -81,6 +83,8 @@ operations:
           - long_term_media_renewal_source_proof_current
           - long_term_media_renewal_revocation_check_ok
           - long_term_media_renewal_revocation_check_window_days
+          - long_term_media_renewal_registry_verifier_bound
+          - long_term_media_renewal_registry_verifier_quorum_ok
           - raw_key_material_stored
           - raw_shard_material_stored
           - raw_signer_roster_payload_stored
@@ -90,6 +94,8 @@ operations:
           - raw_media_readback_payload_stored
           - raw_media_revocation_payload_stored
           - raw_media_refresh_payload_stored
+          - raw_media_registry_payload_stored
+          - raw_media_registry_response_payload_stored
           - errors
         properties:
           ok:
@@ -161,6 +167,10 @@ operations:
             type: boolean
           long_term_media_renewal_revocation_check_window_days:
             type: integer
+          long_term_media_renewal_registry_verifier_bound:
+            type: boolean
+          long_term_media_renewal_registry_verifier_quorum_ok:
+            type: boolean
           raw_key_material_stored:
             type: boolean
           raw_shard_material_stored:
@@ -178,6 +188,10 @@ operations:
           raw_media_revocation_payload_stored:
             type: boolean
           raw_media_refresh_payload_stored:
+            type: boolean
+          raw_media_registry_payload_stored:
+            type: boolean
+          raw_media_registry_response_payload_stored:
             type: boolean
           errors:
             type: array

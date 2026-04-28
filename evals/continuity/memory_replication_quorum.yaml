@@ -4,8 +4,8 @@ summary: >
   MemoryCrystal replication が four-target placement、random-block Merkle audit、
   quorum-bound reconcile、council escalation、threshold key succession、
   multi-jurisdiction signer roster quorum、quorum threshold policy authority、
-  long-term media renewal / readback proof、refresh / revocation window を
-  digest-bound に返すこと
+  long-term media renewal / readback proof、refresh / revocation window、
+  media registry verifier quorum を digest-bound に返すこと
 checks:
   - name: memory replication demo smoke
     command: PYTHONPATH=src python3 -m omoikane.cli memory-replication-demo --json
@@ -40,6 +40,12 @@ expect:
   long_term_media_renewal_source_proof_current: true
   long_term_media_renewal_revocation_check_ok: true
   long_term_media_renewal_revocation_check_window_days: 90
+  long_term_media_renewal_registry_verifier_bound: true
+  long_term_media_renewal_registry_verifier_quorum_ok: true
+  long_term_media_renewal_registry_jurisdictions:
+    - JP-13
+    - SG-01
+  long_term_media_renewal_registry_response_timeout_ms: 250
   key_succession_signer_roster_quorum_jurisdictions:
     - JP-13
     - SG-01
@@ -52,4 +58,6 @@ expect:
   raw_media_readback_payload_stored: false
   raw_media_revocation_payload_stored: false
   raw_media_refresh_payload_stored: false
+  raw_media_registry_payload_stored: false
+  raw_media_registry_response_payload_stored: false
   memory_replication_ledger_count: 1

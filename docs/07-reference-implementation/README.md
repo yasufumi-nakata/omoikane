@@ -797,7 +797,10 @@ and raw roster payload redaction)、
 renewed media proof、readback digest、3650 日 refresh interval、1000 年 target horizon、
 `long-term-media-renewal-refresh-window-v1` による current-not-revoked source proof、
 90 日 revocation check、next refresh ref、stale / revoked source fail-closed、
-raw media / raw readback / raw revocation / raw refresh payload redaction、
+`long-term-media-renewal-registry-verifier-v1` による JP-13 / SG-01 registry response
+digest、response signature digest、250ms timeout budget、quorum digest、
+raw media / raw readback / raw revocation / raw refresh / raw registry /
+raw response payload redaction、
 `memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract

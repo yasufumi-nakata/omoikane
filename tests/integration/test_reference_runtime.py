@@ -778,6 +778,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
             90,
             result["validation"]["long_term_media_renewal_revocation_check_window_days"],
         )
+        self.assertTrue(
+            result["validation"]["long_term_media_renewal_registry_verifier_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "long_term_media_renewal_registry_verifier_quorum_ok"
+            ]
+        )
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])
@@ -787,6 +795,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(result["validation"]["raw_media_readback_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_revocation_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_refresh_payload_stored"])
+        self.assertFalse(result["validation"]["raw_media_registry_payload_stored"])
+        self.assertFalse(
+            result["validation"]["raw_media_registry_response_payload_stored"]
+        )
         self.assertEqual(
             ["primary", "mirror"],
             result["validation"]["replication"]["immediate_target_ids"],
@@ -848,6 +860,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["memory_replication"]["session"]["long_term_media_renewal"][
                 "refresh_window"
             ]["source_proof_status"],
+        )
+        self.assertEqual(
+            "long-term-media-renewal-registry-verifier-v1",
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "refresh_window"
+            ]["registry_verifier"]["policy_id"],
+        )
+        self.assertEqual(
+            ["JP-13", "SG-01"],
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "refresh_window"
+            ]["registry_verifier"]["registry_jurisdictions"],
         )
         self.assertEqual(
             ["JP-13", "SG-01"],

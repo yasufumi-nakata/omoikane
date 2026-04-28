@@ -139,7 +139,11 @@ raw quorum threshold policy payload / raw signer roster payload は保存しな�
 `long-term-media-renewal-refresh-window-v1` を nested receipt として持ち、
 source proof digest set と readback digest set を current-not-revoked status、
 90 日 revocation check window、次回 refresh ref、stale / revoked proof fail-closed
-に束縛する。raw media / raw readback に加えて raw revocation / raw refresh payload も保存しない。
+に束縛する。さらに `long-term-media-renewal-registry-verifier-v1` が
+JP-13 / SG-01 の registry response digest、response signature digest、250ms timeout、
+quorum digest を source proof set と revocation registry digest set に束縛する。
+raw media / raw readback に加えて raw revocation / raw refresh / raw registry /
+raw response payload も保存しない。
 
 ## トラウマ記憶の扱い
 

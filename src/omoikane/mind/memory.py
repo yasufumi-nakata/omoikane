@@ -68,11 +68,20 @@ MEMORY_REPLICATION_MEDIA_RENEWAL_POLICY_ID = "long-term-media-renewal-proof-v1"
 MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_POLICY_ID = (
     "long-term-media-renewal-refresh-window-v1"
 )
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID = (
+    "long-term-media-renewal-registry-verifier-v1"
+)
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTION = "JP-13"
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_JURISDICTIONS = (
     "JP-13",
     "SG-01",
 )
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS = (
+    "JP-13",
+    "SG-01",
+)
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD = 2
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_RESPONSE_TIMEOUT_MS = 250
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_THRESHOLD = 2
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_QUORUM_THRESHOLD = 2
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROLES = (
@@ -186,6 +195,12 @@ def _memory_replication_media_renewal_refresh_digest_payload(
     receipt: Dict[str, Any],
 ) -> Dict[str, Any]:
     return {key: value for key, value in receipt.items() if key != "refresh_commit_digest"}
+
+
+def _memory_replication_media_registry_verifier_digest_payload(
+    receipt: Dict[str, Any],
+) -> Dict[str, Any]:
+    return {key: value for key, value in receipt.items() if key != "digest"}
 
 
 def _memory_replication_media_proof_digest_payload(
@@ -973,6 +988,9 @@ class MemoryReplicationService:
             "long_term_media_renewal_refresh_policy_id": (
                 MEMORY_REPLICATION_MEDIA_RENEWAL_REFRESH_POLICY_ID
             ),
+            "long_term_media_renewal_registry_verifier_policy_id": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID
+            ),
             "long_term_media_renewal_targets": list(
                 MEMORY_REPLICATION_LONG_TERM_TARGETS
             ),
@@ -984,6 +1002,15 @@ class MemoryReplicationService:
             ),
             "long_term_media_renewal_target_horizon_years": (
                 MEMORY_REPLICATION_MEDIA_RENEWAL_TARGET_HORIZON_YEARS
+            ),
+            "long_term_media_renewal_registry_jurisdictions": list(
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS
+            ),
+            "long_term_media_renewal_registry_quorum_threshold": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+            ),
+            "long_term_media_renewal_registry_response_timeout_ms": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_RESPONSE_TIMEOUT_MS
             ),
             "verify_policy_id": MEMORY_REPLICATION_VERIFY_POLICY_ID,
             "reconcile_policy_id": MEMORY_REPLICATION_RECONCILE_POLICY_ID,
@@ -1311,6 +1338,13 @@ class MemoryReplicationService:
                     "replication_policy.long_term_media_renewal_refresh_policy_id mismatch"
                 )
             if (
+                policy.get("long_term_media_renewal_registry_verifier_policy_id")
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_verifier_policy_id mismatch"
+                )
+            if (
                 policy.get("long_term_media_renewal_targets")
                 != list(MEMORY_REPLICATION_LONG_TERM_TARGETS)
             ):
@@ -1337,6 +1371,27 @@ class MemoryReplicationService:
             ):
                 errors.append(
                     "replication_policy.long_term_media_renewal_target_horizon_years mismatch"
+                )
+            if (
+                policy.get("long_term_media_renewal_registry_jurisdictions")
+                != list(MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS)
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_jurisdictions mismatch"
+                )
+            if (
+                policy.get("long_term_media_renewal_registry_quorum_threshold")
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_quorum_threshold mismatch"
+                )
+            if (
+                policy.get("long_term_media_renewal_registry_response_timeout_ms")
+                != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_RESPONSE_TIMEOUT_MS
+            ):
+                errors.append(
+                    "replication_policy.long_term_media_renewal_registry_response_timeout_ms mismatch"
                 )
             if policy.get("verify_policy_id") != MEMORY_REPLICATION_VERIFY_POLICY_ID:
                 errors.append("replication_policy.verify_policy_id mismatch")
@@ -1697,6 +1752,12 @@ class MemoryReplicationService:
             "long_term_media_renewal_revocation_check_window_days": (
                 long_term_media_renewal_validation["revocation_check_window_days"]
             ),
+            "long_term_media_renewal_registry_verifier_bound": (
+                long_term_media_renewal_validation["registry_verifier_bound"]
+            ),
+            "long_term_media_renewal_registry_verifier_quorum_ok": (
+                long_term_media_renewal_validation["registry_verifier_quorum_ok"]
+            ),
             "raw_key_material_stored": key_succession_validation[
                 "raw_key_material_stored"
             ],
@@ -1723,6 +1784,12 @@ class MemoryReplicationService:
             ],
             "raw_media_refresh_payload_stored": long_term_media_renewal_validation[
                 "raw_media_refresh_payload_stored"
+            ],
+            "raw_media_registry_payload_stored": long_term_media_renewal_validation[
+                "raw_media_registry_payload_stored"
+            ],
+            "raw_media_registry_response_payload_stored": long_term_media_renewal_validation[
+                "raw_media_registry_response_payload_stored"
             ],
             "errors": errors,
         }
@@ -3224,6 +3291,16 @@ class MemoryReplicationService:
                 revocation_registry_refs,
             )
         ]
+        registry_verifier = self._build_long_term_media_renewal_registry_verifier(
+            identity_id=identity_id,
+            source_manifest_digest=source_manifest_digest,
+            renewal_target_ids=renewal_target_ids,
+            proof_digest_set=proof_digest_set,
+            readback_digest_set=readback_digest_set,
+            source_media_proof_set_digest=source_media_proof_set_digest,
+            revocation_registry_refs=revocation_registry_refs,
+            revocation_registry_digest_set=revocation_registry_digest_set,
+        )
         receipt = {
             "kind": "memory_replication_long_term_media_renewal_refresh_window",
             "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
@@ -3244,6 +3321,7 @@ class MemoryReplicationService:
             ),
             "revocation_registry_refs": revocation_registry_refs,
             "revocation_registry_digest_set": revocation_registry_digest_set,
+            "registry_verifier": registry_verifier,
             "next_required_refresh_ref": (
                 "schedule://memory-replication/long-term-media/next-required-refresh"
             ),
@@ -3267,6 +3345,132 @@ class MemoryReplicationService:
         )
         return receipt
 
+    def _build_long_term_media_renewal_registry_verifier(
+        self,
+        *,
+        identity_id: str,
+        source_manifest_digest: str,
+        renewal_target_ids: Sequence[str],
+        proof_digest_set: Sequence[str],
+        readback_digest_set: Sequence[str],
+        source_media_proof_set_digest: str,
+        revocation_registry_refs: Sequence[str],
+        revocation_registry_digest_set: Sequence[str],
+    ) -> Dict[str, Any]:
+        registry_jurisdictions = list(
+            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS
+        )
+        registry_endpoint_refs = [
+            (
+                "registry://memory-replication/"
+                f"{jurisdiction.lower()}/media-renewal/status/v1"
+            )
+            for jurisdiction in registry_jurisdictions
+        ]
+        request_payload_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "source_manifest_digest": source_manifest_digest,
+                    "renewal_target_ids": list(renewal_target_ids),
+                    "source_media_proof_set_digest": source_media_proof_set_digest,
+                    "revocation_registry_refs": list(revocation_registry_refs),
+                    "registry_endpoint_refs": registry_endpoint_refs,
+                }
+            )
+        )
+        response_digest_set = []
+        response_signature_digest_set = []
+        for jurisdiction, endpoint_ref in zip(
+            registry_jurisdictions,
+            registry_endpoint_refs,
+        ):
+            response_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "registry_endpoint_ref": endpoint_ref,
+                        "request_payload_digest": request_payload_digest,
+                        "source_manifest_digest": source_manifest_digest,
+                        "source_media_proof_set_digest": source_media_proof_set_digest,
+                        "revocation_registry_digest_set": list(
+                            revocation_registry_digest_set
+                        ),
+                        "registry_status": "current-not-revoked",
+                    }
+                )
+            )
+            response_digest_set.append(response_digest)
+            response_signature_digest_set.append(
+                sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "response_digest": response_digest,
+                            "signer_ref": (
+                                "signer://memory-replication/"
+                                f"{jurisdiction.lower()}/media-registry"
+                            ),
+                        }
+                    )
+                )
+            )
+        registry_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID
+                    ),
+                    "source_media_proof_set_digest": source_media_proof_set_digest,
+                    "revocation_registry_digest_set": list(
+                        revocation_registry_digest_set
+                    ),
+                    "response_digest_set": response_digest_set,
+                    "response_signature_digest_set": response_signature_digest_set,
+                    "quorum_threshold": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+                    ),
+                }
+            )
+        )
+        receipt = {
+            "kind": "memory_replication_long_term_media_renewal_registry_verifier",
+            "schema_version": MEMORY_REPLICATION_SCHEMA_VERSION,
+            "policy_id": MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID,
+            "verifier_receipt_id": new_id("memory-media-registry-verifier"),
+            "identity_id": identity_id,
+            "source_manifest_digest": source_manifest_digest,
+            "renewal_target_ids": list(renewal_target_ids),
+            "source_proof_digest_set": list(proof_digest_set),
+            "source_readback_digest_set": list(readback_digest_set),
+            "source_media_proof_set_digest": source_media_proof_set_digest,
+            "revocation_registry_refs": list(revocation_registry_refs),
+            "revocation_registry_digest_set": list(revocation_registry_digest_set),
+            "registry_jurisdictions": registry_jurisdictions,
+            "registry_endpoint_refs": registry_endpoint_refs,
+            "request_payload_digest": request_payload_digest,
+            "response_payload_kind": "media-renewal-registry-status-response",
+            "response_timeout_ms": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_RESPONSE_TIMEOUT_MS
+            ),
+            "response_digest_set": response_digest_set,
+            "response_signature_digest_set": response_signature_digest_set,
+            "registry_quorum_digest": registry_quorum_digest,
+            "quorum_threshold": (
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+            ),
+            "quorum_status": "complete",
+            "registry_status": "current-not-revoked",
+            "raw_registry_payload_stored": False,
+            "raw_response_payload_stored": False,
+        }
+        receipt["digest"] = sha256_text(
+            canonical_json(
+                _memory_replication_media_registry_verifier_digest_payload(receipt)
+            )
+        )
+        return receipt
+
     def _validate_long_term_media_renewal(
         self,
         receipt: Any,
@@ -3283,6 +3487,8 @@ class MemoryReplicationService:
         raw_media_readback_payload_stored = False
         raw_media_revocation_payload_stored = False
         raw_media_refresh_payload_stored = False
+        raw_media_registry_payload_stored = False
+        raw_media_registry_response_payload_stored = False
         target_ids: List[str] = []
         readback_ok = False
         refresh_interval_days = None
@@ -3292,8 +3498,12 @@ class MemoryReplicationService:
             "source_proof_current": False,
             "revocation_check_ok": False,
             "revocation_check_window_days": None,
+            "registry_verifier_bound": False,
+            "registry_verifier_quorum_ok": False,
             "raw_media_revocation_payload_stored": False,
             "raw_media_refresh_payload_stored": False,
+            "raw_media_registry_payload_stored": False,
+            "raw_media_registry_response_payload_stored": False,
         }
         if not isinstance(receipt, dict):
             errors.append("long_term_media_renewal must be an object")
@@ -3307,10 +3517,14 @@ class MemoryReplicationService:
                 "source_proof_current": False,
                 "revocation_check_ok": False,
                 "revocation_check_window_days": None,
+                "registry_verifier_bound": False,
+                "registry_verifier_quorum_ok": False,
                 "raw_media_payload_stored": False,
                 "raw_media_readback_payload_stored": False,
                 "raw_media_revocation_payload_stored": False,
                 "raw_media_refresh_payload_stored": False,
+                "raw_media_registry_payload_stored": False,
+                "raw_media_registry_response_payload_stored": False,
             }
 
         if receipt.get("kind") != "memory_replication_long_term_media_renewal":
@@ -3515,6 +3729,12 @@ class MemoryReplicationService:
         raw_media_refresh_payload_stored = refresh_window_validation[
             "raw_media_refresh_payload_stored"
         ]
+        raw_media_registry_payload_stored = refresh_window_validation[
+            "raw_media_registry_payload_stored"
+        ]
+        raw_media_registry_response_payload_stored = refresh_window_validation[
+            "raw_media_registry_response_payload_stored"
+        ]
         self._require_non_empty_string(
             receipt.get("council_review_ref"),
             "long_term_media_renewal.council_review_ref",
@@ -3556,6 +3776,8 @@ class MemoryReplicationService:
             and not raw_media_readback_payload_stored
             and not raw_media_revocation_payload_stored
             and not raw_media_refresh_payload_stored
+            and not raw_media_registry_payload_stored
+            and not raw_media_registry_response_payload_stored
             and not local_errors
         )
 
@@ -3572,10 +3794,20 @@ class MemoryReplicationService:
             "revocation_check_window_days": refresh_window_validation[
                 "revocation_check_window_days"
             ],
+            "registry_verifier_bound": refresh_window_validation[
+                "registry_verifier_bound"
+            ],
+            "registry_verifier_quorum_ok": refresh_window_validation[
+                "registry_verifier_quorum_ok"
+            ],
             "raw_media_payload_stored": raw_media_payload_stored,
             "raw_media_readback_payload_stored": raw_media_readback_payload_stored,
             "raw_media_revocation_payload_stored": raw_media_revocation_payload_stored,
             "raw_media_refresh_payload_stored": raw_media_refresh_payload_stored,
+            "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
+            "raw_media_registry_response_payload_stored": (
+                raw_media_registry_response_payload_stored
+            ),
         }
 
     def _validate_long_term_media_renewal_refresh_window(
@@ -3592,8 +3824,12 @@ class MemoryReplicationService:
         local_errors: List[str] = []
         raw_media_revocation_payload_stored = False
         raw_media_refresh_payload_stored = False
+        raw_media_registry_payload_stored = False
+        raw_media_registry_response_payload_stored = False
         source_proof_current = False
         revocation_check_ok = False
+        registry_verifier_bound = False
+        registry_verifier_quorum_ok = False
         if not isinstance(receipt, dict):
             errors.append("long_term_media_renewal.refresh_window must be an object")
             return {
@@ -3601,8 +3837,12 @@ class MemoryReplicationService:
                 "source_proof_current": False,
                 "revocation_check_ok": False,
                 "revocation_check_window_days": None,
+                "registry_verifier_bound": False,
+                "registry_verifier_quorum_ok": False,
                 "raw_media_revocation_payload_stored": False,
                 "raw_media_refresh_payload_stored": False,
+                "raw_media_registry_payload_stored": False,
+                "raw_media_registry_response_payload_stored": False,
             }
 
         prefix = "long_term_media_renewal.refresh_window"
@@ -3705,6 +3945,28 @@ class MemoryReplicationService:
         ]
         if revocation_registry_digest_set != expected_revocation_registry_digest_set:
             local_errors.append(f"{prefix}.revocation_registry_digest_set mismatch")
+        registry_verifier_validation = (
+            self._validate_long_term_media_renewal_registry_verifier(
+                receipt.get("registry_verifier"),
+                identity_id=identity_id,
+                source_manifest_digest=source_manifest_digest,
+                target_ids=target_ids,
+                proof_digest_set=proof_digest_set,
+                readback_digest_set=readback_digest_set,
+                source_media_proof_set_digest=expected_media_proof_set_digest,
+                revocation_registry_refs=revocation_registry_refs,
+                revocation_registry_digest_set=revocation_registry_digest_set,
+                errors=local_errors,
+            )
+        )
+        registry_verifier_bound = registry_verifier_validation["bound"]
+        registry_verifier_quorum_ok = registry_verifier_validation["quorum_ok"]
+        raw_media_registry_payload_stored = registry_verifier_validation[
+            "raw_media_registry_payload_stored"
+        ]
+        raw_media_registry_response_payload_stored = registry_verifier_validation[
+            "raw_media_registry_response_payload_stored"
+        ]
         if receipt.get("source_proof_status") == "current-not-revoked":
             source_proof_current = True
         else:
@@ -3737,8 +3999,12 @@ class MemoryReplicationService:
         revocation_check_ok = (
             source_proof_current
             and revocation_registry_digest_set == expected_revocation_registry_digest_set
+            and registry_verifier_bound
+            and registry_verifier_quorum_ok
             and receipt.get("revoked_source_fail_closed") is True
             and receipt.get("raw_revocation_payload_stored") is False
+            and not raw_media_registry_payload_stored
+            and not raw_media_registry_response_payload_stored
             and not local_errors
         )
 
@@ -3748,8 +4014,261 @@ class MemoryReplicationService:
             "source_proof_current": source_proof_current,
             "revocation_check_ok": revocation_check_ok,
             "revocation_check_window_days": receipt.get("revocation_check_window_days"),
+            "registry_verifier_bound": registry_verifier_bound,
+            "registry_verifier_quorum_ok": registry_verifier_quorum_ok,
             "raw_media_revocation_payload_stored": raw_media_revocation_payload_stored,
             "raw_media_refresh_payload_stored": raw_media_refresh_payload_stored,
+            "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
+            "raw_media_registry_response_payload_stored": (
+                raw_media_registry_response_payload_stored
+            ),
+        }
+
+    def _validate_long_term_media_renewal_registry_verifier(
+        self,
+        receipt: Any,
+        *,
+        identity_id: Any,
+        source_manifest_digest: Any,
+        target_ids: Sequence[str],
+        proof_digest_set: Sequence[str],
+        readback_digest_set: Sequence[str],
+        source_media_proof_set_digest: Any,
+        revocation_registry_refs: Sequence[str],
+        revocation_registry_digest_set: Sequence[str],
+        errors: List[str],
+    ) -> Dict[str, Any]:
+        local_errors: List[str] = []
+        raw_media_registry_payload_stored = False
+        raw_media_registry_response_payload_stored = False
+        if not isinstance(receipt, dict):
+            errors.append("long_term_media_renewal.refresh_window.registry_verifier must be an object")
+            return {
+                "bound": False,
+                "quorum_ok": False,
+                "raw_media_registry_payload_stored": False,
+                "raw_media_registry_response_payload_stored": False,
+            }
+
+        prefix = "long_term_media_renewal.refresh_window.registry_verifier"
+        if (
+            receipt.get("kind")
+            != "memory_replication_long_term_media_renewal_registry_verifier"
+        ):
+            local_errors.append(f"{prefix}.kind mismatch")
+        if receipt.get("schema_version") != MEMORY_REPLICATION_SCHEMA_VERSION:
+            local_errors.append(f"{prefix}.schema_version mismatch")
+        if (
+            receipt.get("policy_id")
+            != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID
+        ):
+            local_errors.append(f"{prefix}.policy_id mismatch")
+        self._require_non_empty_string(
+            receipt.get("verifier_receipt_id"),
+            f"{prefix}.verifier_receipt_id",
+            local_errors,
+        )
+        if receipt.get("identity_id") != identity_id:
+            local_errors.append(f"{prefix}.identity_id must match refresh window")
+        if receipt.get("source_manifest_digest") != source_manifest_digest:
+            local_errors.append(
+                f"{prefix}.source_manifest_digest must match refresh window"
+            )
+        if receipt.get("renewal_target_ids") != list(target_ids):
+            local_errors.append(f"{prefix}.renewal_target_ids mismatch")
+        if receipt.get("source_proof_digest_set") != list(proof_digest_set):
+            local_errors.append(f"{prefix}.source_proof_digest_set mismatch")
+        if receipt.get("source_readback_digest_set") != list(readback_digest_set):
+            local_errors.append(f"{prefix}.source_readback_digest_set mismatch")
+        if receipt.get("source_media_proof_set_digest") != source_media_proof_set_digest:
+            local_errors.append(f"{prefix}.source_media_proof_set_digest mismatch")
+        if receipt.get("revocation_registry_refs") != list(revocation_registry_refs):
+            local_errors.append(f"{prefix}.revocation_registry_refs mismatch")
+        if receipt.get("revocation_registry_digest_set") != list(
+            revocation_registry_digest_set
+        ):
+            local_errors.append(f"{prefix}.revocation_registry_digest_set mismatch")
+        registry_jurisdictions = self._validate_string_list(
+            receipt.get("registry_jurisdictions"),
+            f"{prefix}.registry_jurisdictions",
+            local_errors,
+            unique=True,
+            minimum=len(MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS),
+        )
+        if registry_jurisdictions != list(
+            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS
+        ):
+            local_errors.append(f"{prefix}.registry_jurisdictions mismatch")
+        registry_endpoint_refs = self._validate_string_list(
+            receipt.get("registry_endpoint_refs"),
+            f"{prefix}.registry_endpoint_refs",
+            local_errors,
+            unique=True,
+            minimum=len(MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS),
+        )
+        expected_registry_endpoint_refs = [
+            (
+                "registry://memory-replication/"
+                f"{jurisdiction.lower()}/media-renewal/status/v1"
+            )
+            for jurisdiction in MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS
+        ]
+        if registry_endpoint_refs != expected_registry_endpoint_refs:
+            local_errors.append(f"{prefix}.registry_endpoint_refs mismatch")
+
+        expected_request_payload_digest = sha256_text(
+            canonical_json(
+                {
+                    "identity_id": identity_id,
+                    "source_manifest_digest": source_manifest_digest,
+                    "renewal_target_ids": list(target_ids),
+                    "source_media_proof_set_digest": source_media_proof_set_digest,
+                    "revocation_registry_refs": list(revocation_registry_refs),
+                    "registry_endpoint_refs": expected_registry_endpoint_refs,
+                }
+            )
+        )
+        self._require_digest(
+            receipt.get("request_payload_digest"),
+            f"{prefix}.request_payload_digest",
+            local_errors,
+        )
+        if receipt.get("request_payload_digest") != expected_request_payload_digest:
+            local_errors.append(f"{prefix}.request_payload_digest mismatch")
+        if receipt.get("response_payload_kind") != "media-renewal-registry-status-response":
+            local_errors.append(f"{prefix}.response_payload_kind mismatch")
+        if (
+            receipt.get("response_timeout_ms")
+            != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_RESPONSE_TIMEOUT_MS
+        ):
+            local_errors.append(f"{prefix}.response_timeout_ms mismatch")
+
+        expected_response_digest_set = []
+        expected_response_signature_digest_set = []
+        for jurisdiction, endpoint_ref in zip(
+            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS,
+            expected_registry_endpoint_refs,
+        ):
+            response_digest = sha256_text(
+                canonical_json(
+                    {
+                        "jurisdiction": jurisdiction,
+                        "registry_endpoint_ref": endpoint_ref,
+                        "request_payload_digest": expected_request_payload_digest,
+                        "source_manifest_digest": source_manifest_digest,
+                        "source_media_proof_set_digest": source_media_proof_set_digest,
+                        "revocation_registry_digest_set": list(
+                            revocation_registry_digest_set
+                        ),
+                        "registry_status": "current-not-revoked",
+                    }
+                )
+            )
+            expected_response_digest_set.append(response_digest)
+            expected_response_signature_digest_set.append(
+                sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "response_digest": response_digest,
+                            "signer_ref": (
+                                "signer://memory-replication/"
+                                f"{jurisdiction.lower()}/media-registry"
+                            ),
+                        }
+                    )
+                )
+            )
+        response_digest_set = self._validate_digest_list(
+            receipt.get("response_digest_set"),
+            f"{prefix}.response_digest_set",
+            local_errors,
+            minimum=len(MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS),
+        )
+        if response_digest_set != expected_response_digest_set:
+            local_errors.append(f"{prefix}.response_digest_set mismatch")
+        response_signature_digest_set = self._validate_digest_list(
+            receipt.get("response_signature_digest_set"),
+            f"{prefix}.response_signature_digest_set",
+            local_errors,
+            minimum=len(MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS),
+        )
+        if response_signature_digest_set != expected_response_signature_digest_set:
+            local_errors.append(f"{prefix}.response_signature_digest_set mismatch")
+
+        expected_registry_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "policy_id": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_VERIFIER_POLICY_ID
+                    ),
+                    "source_media_proof_set_digest": source_media_proof_set_digest,
+                    "revocation_registry_digest_set": list(
+                        revocation_registry_digest_set
+                    ),
+                    "response_digest_set": expected_response_digest_set,
+                    "response_signature_digest_set": (
+                        expected_response_signature_digest_set
+                    ),
+                    "quorum_threshold": (
+                        MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+                    ),
+                }
+            )
+        )
+        self._require_digest(
+            receipt.get("registry_quorum_digest"),
+            f"{prefix}.registry_quorum_digest",
+            local_errors,
+        )
+        if receipt.get("registry_quorum_digest") != expected_registry_quorum_digest:
+            local_errors.append(f"{prefix}.registry_quorum_digest mismatch")
+        if (
+            receipt.get("quorum_threshold")
+            != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+        ):
+            local_errors.append(f"{prefix}.quorum_threshold mismatch")
+        if receipt.get("quorum_status") != "complete":
+            local_errors.append(f"{prefix}.quorum_status must equal complete")
+        if receipt.get("registry_status") != "current-not-revoked":
+            local_errors.append(f"{prefix}.registry_status must equal current-not-revoked")
+        if receipt.get("raw_registry_payload_stored") is not False:
+            raw_media_registry_payload_stored = True
+            local_errors.append(f"{prefix}.raw_registry_payload_stored must be false")
+        if receipt.get("raw_response_payload_stored") is not False:
+            raw_media_registry_response_payload_stored = True
+            local_errors.append(f"{prefix}.raw_response_payload_stored must be false")
+        digest = receipt.get("digest")
+        self._require_digest(digest, f"{prefix}.digest", local_errors)
+        if isinstance(digest, str):
+            expected_digest = sha256_text(
+                canonical_json(
+                    _memory_replication_media_registry_verifier_digest_payload(receipt)
+                )
+            )
+            if digest != expected_digest:
+                local_errors.append(f"{prefix}.digest mismatch")
+
+        quorum_ok = (
+            len(response_digest_set)
+            >= MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+            and len(response_signature_digest_set)
+            >= MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
+            and receipt.get("quorum_status") == "complete"
+            and receipt.get("registry_status") == "current-not-revoked"
+            and not raw_media_registry_payload_stored
+            and not raw_media_registry_response_payload_stored
+            and not local_errors
+        )
+
+        errors.extend(local_errors)
+        return {
+            "bound": not local_errors,
+            "quorum_ok": quorum_ok,
+            "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
+            "raw_media_registry_response_payload_stored": (
+                raw_media_registry_response_payload_stored
+            ),
         }
 
     @staticmethod

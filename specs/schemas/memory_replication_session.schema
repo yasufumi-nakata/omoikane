@@ -5,7 +5,8 @@ description: >
   Quorum-bound MemoryCrystal replication session that fixes four-target
   placement, plaintext metadata plus encrypted payload transfer, random-block
   Merkle audit, council-escalated reconciliation, and raw-payload-redacted
-  multi-jurisdiction key succession without mutating the source manifest.
+  multi-jurisdiction key succession plus digest-only long-term media registry
+  verification without mutating the source manifest.
 type: object
 additionalProperties: false
 required:
@@ -67,10 +68,14 @@ properties:
       - key_succession_quorum_threshold_policy_id
       - long_term_media_renewal_policy_id
       - long_term_media_renewal_refresh_policy_id
+      - long_term_media_renewal_registry_verifier_policy_id
       - long_term_media_renewal_targets
       - long_term_media_renewal_refresh_interval_days
       - long_term_media_renewal_revocation_check_window_days
       - long_term_media_renewal_target_horizon_years
+      - long_term_media_renewal_registry_jurisdictions
+      - long_term_media_renewal_registry_quorum_threshold
+      - long_term_media_renewal_registry_response_timeout_ms
       - verify_policy_id
       - reconcile_policy_id
       - minimum_consensus_targets
@@ -154,6 +159,9 @@ properties:
       long_term_media_renewal_refresh_policy_id:
         type: string
         const: long-term-media-renewal-refresh-window-v1
+      long_term_media_renewal_registry_verifier_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-verifier-v1
       long_term_media_renewal_targets:
         type: array
         minItems: 2
@@ -170,6 +178,19 @@ properties:
       long_term_media_renewal_target_horizon_years:
         type: integer
         const: 1000
+      long_term_media_renewal_registry_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [JP-13, SG-01]
+      long_term_media_renewal_registry_quorum_threshold:
+        type: integer
+        const: 2
+      long_term_media_renewal_registry_response_timeout_ms:
+        type: integer
+        const: 250
       verify_policy_id:
         type: string
         const: merkle-random-block-audit-v1
@@ -616,6 +637,7 @@ $defs:
       - refresh_due_ref
       - revocation_registry_refs
       - revocation_registry_digest_set
+      - registry_verifier
       - next_required_refresh_ref
       - council_review_ref
       - guardian_attestation_ref
@@ -696,6 +718,8 @@ $defs:
         items:
           type: string
           pattern: "^[0-9a-f]{64}$"
+      registry_verifier:
+        $ref: "#/$defs/long_term_media_renewal_registry_verifier"
       next_required_refresh_ref:
         type: string
         minLength: 1
@@ -724,6 +748,158 @@ $defs:
         type: boolean
         const: false
       refresh_commit_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+  long_term_media_renewal_registry_verifier:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - schema_version
+      - policy_id
+      - verifier_receipt_id
+      - identity_id
+      - source_manifest_digest
+      - renewal_target_ids
+      - source_proof_digest_set
+      - source_readback_digest_set
+      - source_media_proof_set_digest
+      - revocation_registry_refs
+      - revocation_registry_digest_set
+      - registry_jurisdictions
+      - registry_endpoint_refs
+      - request_payload_digest
+      - response_payload_kind
+      - response_timeout_ms
+      - response_digest_set
+      - response_signature_digest_set
+      - registry_quorum_digest
+      - quorum_threshold
+      - quorum_status
+      - registry_status
+      - raw_registry_payload_stored
+      - raw_response_payload_stored
+      - digest
+    properties:
+      kind:
+        type: string
+        const: memory_replication_long_term_media_renewal_registry_verifier
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: long-term-media-renewal-registry-verifier-v1
+      verifier_receipt_id:
+        type: string
+        minLength: 1
+      identity_id:
+        type: string
+        minLength: 1
+      source_manifest_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      renewal_target_ids:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [coldstore, trustee]
+      source_proof_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      source_readback_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      source_media_proof_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      revocation_registry_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      revocation_registry_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      registry_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [JP-13, SG-01]
+      registry_endpoint_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      request_payload_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      response_payload_kind:
+        type: string
+        const: media-renewal-registry-status-response
+      response_timeout_ms:
+        type: integer
+        const: 250
+      response_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      response_signature_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      registry_quorum_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      quorum_threshold:
+        type: integer
+        const: 2
+      quorum_status:
+        type: string
+        const: complete
+      registry_status:
+        type: string
+        const: current-not-revoked
+      raw_registry_payload_stored:
+        type: boolean
+        const: false
+      raw_response_payload_stored:
+        type: boolean
+        const: false
+      digest:
         type: string
         pattern: "^[0-9a-f]{64}$"
   key_succession:

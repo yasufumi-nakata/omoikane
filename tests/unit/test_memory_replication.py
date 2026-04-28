@@ -45,6 +45,8 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(validation["long_term_media_renewal_source_proof_current"])
         self.assertTrue(validation["long_term_media_renewal_revocation_check_ok"])
         self.assertEqual(90, validation["long_term_media_renewal_revocation_check_window_days"])
+        self.assertTrue(validation["long_term_media_renewal_registry_verifier_bound"])
+        self.assertTrue(validation["long_term_media_renewal_registry_verifier_quorum_ok"])
         self.assertFalse(validation["raw_key_material_stored"])
         self.assertFalse(validation["raw_shard_material_stored"])
         self.assertFalse(validation["raw_signer_roster_payload_stored"])
@@ -54,6 +56,8 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertFalse(validation["raw_media_readback_payload_stored"])
         self.assertFalse(validation["raw_media_revocation_payload_stored"])
         self.assertFalse(validation["raw_media_refresh_payload_stored"])
+        self.assertFalse(validation["raw_media_registry_payload_stored"])
+        self.assertFalse(validation["raw_media_registry_response_payload_stored"])
         media_renewal = session["long_term_media_renewal"]
         self.assertEqual("long-term-media-renewal-proof-v1", media_renewal["policy_id"])
         self.assertEqual(["coldstore", "trustee"], media_renewal["renewal_target_ids"])
@@ -71,6 +75,18 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(refresh_window["revoked_source_fail_closed"])
         self.assertFalse(refresh_window["raw_revocation_payload_stored"])
         self.assertFalse(refresh_window["raw_refresh_payload_stored"])
+        registry_verifier = refresh_window["registry_verifier"]
+        self.assertEqual(
+            "long-term-media-renewal-registry-verifier-v1",
+            registry_verifier["policy_id"],
+        )
+        self.assertEqual(["JP-13", "SG-01"], registry_verifier["registry_jurisdictions"])
+        self.assertEqual("complete", registry_verifier["quorum_status"])
+        self.assertEqual("current-not-revoked", registry_verifier["registry_status"])
+        self.assertEqual(2, len(registry_verifier["response_digest_set"]))
+        self.assertEqual(250, registry_verifier["response_timeout_ms"])
+        self.assertFalse(registry_verifier["raw_registry_payload_stored"])
+        self.assertFalse(registry_verifier["raw_response_payload_stored"])
         signer_roster_quorum = session["key_succession"]["signer_roster_quorum"]
         self.assertEqual(
             ["JP-13", "SG-01"],
@@ -313,6 +329,61 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         self.assertTrue(
             any(
                 "raw_revocation_payload_stored" in error
+                for error in validation["errors"]
+            )
+        )
+
+    def test_validate_session_rejects_media_registry_verifier_drift(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        registry_verifier = session["long_term_media_renewal"]["refresh_window"][
+            "registry_verifier"
+        ]
+        registry_verifier["registry_status"] = "stale"
+        registry_verifier["digest"] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"][
+            "refresh_commit_digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["long_term_media_renewal_registry_verifier_bound"])
+        self.assertFalse(
+            validation["long_term_media_renewal_registry_verifier_quorum_ok"]
+        )
+        self.assertTrue(
+            any("registry_status" in error for error in validation["errors"])
+        )
+
+    def test_validate_session_rejects_raw_media_registry_payload_storage(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        registry_verifier = session["long_term_media_renewal"]["refresh_window"][
+            "registry_verifier"
+        ]
+        registry_verifier["raw_response_payload_stored"] = True
+        registry_verifier["digest"] = "0" * 64
+        session["long_term_media_renewal"]["refresh_window"][
+            "refresh_commit_digest"
+        ] = "0" * 64
+        session["long_term_media_renewal"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(
+            validation["long_term_media_renewal_registry_verifier_quorum_ok"]
+        )
+        self.assertTrue(validation["raw_media_registry_response_payload_stored"])
+        self.assertTrue(
+            any(
+                "raw_response_payload_stored" in error
                 for error in validation["errors"]
             )
         )

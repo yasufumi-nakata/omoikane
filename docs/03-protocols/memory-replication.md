@@ -62,8 +62,12 @@ reference runtime ではこの protocol を
   migration attestation digest、3650 日 refresh interval、1000 年 target horizon へ固定する。
   さらに `long-term-media-renewal-refresh-window-v1` receipt が source proof set を
   current-not-revoked status、90 日 revocation check window、次回 refresh ref、
-  stale / revoked proof fail-closed に束縛する。
-  raw media payload / raw readback payload / raw revocation payload / raw refresh payload は保存しない
+  stale / revoked proof fail-closed に束縛し、
+  `long-term-media-renewal-registry-verifier-v1` が JP-13 / SG-01 の registry response
+  digest、response signature digest、250ms timeout budget、quorum digest を
+  source proof set に束縛する。
+  raw media payload / raw readback payload / raw revocation payload / raw refresh payload /
+  raw registry payload / raw response payload は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)
