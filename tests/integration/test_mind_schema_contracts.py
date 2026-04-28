@@ -277,6 +277,47 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["care_trustee_handoff"]["self_model_writeback_allowed"])
         self.assertFalse(result["care_trustee_handoff"]["raw_trustee_payload_stored"])
 
+    def test_self_model_demo_care_trustee_registry_binding_matches_public_schema(self) -> None:
+        result = self.runtime.run_self_model_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/self_model_care_trustee_registry_binding_receipt.schema",
+            result["care_trustee_registry_binding"],
+        )
+        self.assertTrue(result["validation"]["care_trustee_registry_binding"]["ok"])
+        self.assertTrue(
+            result["validation"]["care_trustee_registry_binding"][
+                "external_registry_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["care_trustee_registry_binding"][
+                "registry_binding_digest_bound"
+            ]
+        )
+        self.assertEqual(
+            result["care_trustee_handoff"]["receipt_digest"],
+            result["care_trustee_registry_binding"]["source_handoff_receipt_digest"],
+        )
+        self.assertEqual(
+            "bound",
+            result["care_trustee_registry_binding"]["role_binding_status"],
+        )
+        self.assertEqual(
+            "current",
+            result["care_trustee_registry_binding"]["registry_status"],
+        )
+        self.assertEqual(
+            "not-revoked",
+            result["care_trustee_registry_binding"]["revocation_status"],
+        )
+        self.assertTrue(result["care_trustee_registry_binding"]["verifier_key_refs_bound"])
+        self.assertTrue(result["care_trustee_registry_binding"]["revocation_refs_bound"])
+        self.assertFalse(result["care_trustee_registry_binding"]["raw_registry_payload_stored"])
+        self.assertFalse(result["care_trustee_registry_binding"]["raw_revocation_payload_stored"])
+        self.assertFalse(result["care_trustee_registry_binding"]["os_trustee_role_allowed"])
+        self.assertFalse(result["care_trustee_registry_binding"]["self_model_writeback_allowed"])
+
     def test_self_model_demo_external_adjudication_matches_public_schema(self) -> None:
         result = self.runtime.run_self_model_demo()
 

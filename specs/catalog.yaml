@@ -802,6 +802,17 @@ entries:
     rationale: Required to serialize long-term external care-team, trustee, legal-guardian, and responsibility-boundary handoff refs without making the OS a trustee, medical authority, legal guardian, forced correction path, or raw care/legal payload store.
   - priority: P1
     kind: schema
+    file: specs/schemas/self_model_care_trustee_registry_binding_receipt.schema
+    consumers:
+      - specs/interfaces/mind.self_model.v0.idl
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - docs/07-reference-implementation/README.md
+      - evals/identity-fidelity/self_model_care_trustee_registry_binding.yaml
+      - agents/guardians/identity-guardian.yaml
+      - reference-runtime
+    rationale: Required to serialize current external registry entries, verifier key refs, and not-revoked revocation refs for care trustee handoff subjects without importing trustee, medical, legal, writeback, or raw registry authority into the OS.
+  - priority: P1
+    kind: schema
     file: specs/schemas/self_model_external_adjudication_result_receipt.schema
     consumers:
       - specs/interfaces/mind.self_model.v0.idl
@@ -909,6 +920,7 @@ entries:
       - specs/schemas/self_model_calibration_receipt.schema
       - specs/schemas/self_model_pathological_self_assessment_escalation_receipt.schema
       - specs/schemas/self_model_care_trustee_handoff_receipt.schema
+      - specs/schemas/self_model_care_trustee_registry_binding_receipt.schema
       - specs/schemas/self_model_external_adjudication_result_receipt.schema
       - specs/schemas/self_model_external_adjudication_verifier_receipt.schema
       - specs/schemas/self_model_value_generation_receipt.schema
@@ -918,7 +930,7 @@ entries:
       - specs/schemas/self_model_value_timeline_receipt.schema
       - specs/schemas/self_model_value_archive_retention_proof.schema
       - specs/schemas/self_model_value_archive_retention_refresh_receipt.schema
-    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, pathology escalation external handoff boundary, care trustee responsibility handoff boundary, external adjudication result and live verifier boundaries, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, value timeline lineage, value archive retention proof, and archive proof refresh contracts machine-readable.
+    rationale: Required to make the L2 self-model monitoring threshold, append-only observation, advisory calibration boundary, pathology escalation external handoff boundary, care trustee responsibility handoff and registry binding boundaries, external adjudication result and live verifier boundaries, self-authored value-generation freedom, autonomy-preserving witness/Council review, future-self acceptance writeback, future-self value reassessment retirement, value timeline lineage, value archive retention proof, and archive proof refresh contracts machine-readable.
   - priority: P1
     kind: idl
     file: specs/interfaces/substrate.adapter.v0.idl
@@ -3103,6 +3115,15 @@ entries:
       - specs/schemas/self_model_care_trustee_handoff_receipt.schema
       - agents/guardians/identity-guardian.yaml
     rationale: Protects long-term care/trustee handoff from becoming an OS trustee role, OS medical authority, OS legal guardianship, forced correction path, or raw trustee/care/legal payload store.
+  - priority: P1
+    kind: eval
+    file: evals/identity-fidelity/self_model_care_trustee_registry_binding.yaml
+    consumers:
+      - reference-runtime
+      - docs/02-subsystems/mind-substrate/self-model.md
+      - specs/schemas/self_model_care_trustee_registry_binding_receipt.schema
+      - agents/guardians/identity-guardian.yaml
+    rationale: Protects care trustee registry binding from accepting stale, revoked, or unverifier-bound external role entries and from becoming OS trustee, medical, legal, writeback, or raw registry payload authority.
   - priority: P1
     kind: eval
     file: evals/identity-fidelity/self_model_external_adjudication_boundary.yaml

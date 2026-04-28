@@ -73,7 +73,7 @@ class QualiaBufferTests(unittest.TestCase):
         self.assertEqual([1, 2], [tick["tick_id"] for tick in recent])
 
 
-def _build_external_adjudication_receipt(monitor: SelfModelMonitor) -> dict[str, object]:
+def _build_care_trustee_handoff_receipt(monitor: SelfModelMonitor) -> dict[str, object]:
     observation = monitor.update(
         SelfModelSnapshot(
             identity_id="id-1",
@@ -119,6 +119,11 @@ def _build_external_adjudication_receipt(monitor: SelfModelMonitor) -> dict[str,
         long_term_review_schedule_ref="schedule://self-model/care-trustee/quarterly-review/v1",
         escalation_continuity_ref="continuity://self-model/care-trustee/escalation-chain/v1",
     )
+    return handoff
+
+
+def _build_external_adjudication_receipt(monitor: SelfModelMonitor) -> dict[str, object]:
+    handoff = _build_care_trustee_handoff_receipt(monitor)
     return monitor.build_external_adjudication_result_receipt(
         handoff,
         medical_adjudication_result_refs=[
@@ -525,6 +530,134 @@ class SelfModelMonitorTests(unittest.TestCase):
 
         self.assertFalse(validation["ok"])
         self.assertIn("os_trustee_role_allowed must be false", validation["errors"])
+
+    def test_care_trustee_registry_binding_binds_external_registry(self) -> None:
+        monitor = SelfModelMonitor()
+        handoff = _build_care_trustee_handoff_receipt(monitor)
+
+        registry = monitor.build_care_trustee_registry_binding_receipt(
+            handoff,
+            registry_ref="external-care-registry://jp-13/self-model/current",
+            registry_entries=[
+                {
+                    "role": "trustee",
+                    "subject_ref": "trustee://jp-13/self-model/long-term-trustee/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/trustee/long-term-trustee"
+                    ),
+                    "verifier_key_ref": "key://jp-13/self-model/trustee/long-term-trustee",
+                    "revocation_ref": (
+                        "external-care-revocation://jp-13/trustee/long-term-trustee"
+                    ),
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "role": "care_team",
+                    "subject_ref": "care-team://jp-13/self-model/care-board/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/care-team/care-board"
+                    ),
+                    "verifier_key_ref": "key://jp-13/self-model/care-team/care-board",
+                    "revocation_ref": (
+                        "external-care-revocation://jp-13/care-team/care-board"
+                    ),
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "role": "legal_guardian",
+                    "subject_ref": "legal-guardian://jp-13/self-model/capacity-review/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/legal-guardian/capacity-review"
+                    ),
+                    "verifier_key_ref": (
+                        "key://jp-13/self-model/legal-guardian/capacity-review"
+                    ),
+                    "revocation_ref": (
+                        "external-care-revocation://jp-13/legal-guardian/capacity-review"
+                    ),
+                    "jurisdiction": "JP-13",
+                },
+            ],
+            council_resolution_ref="council://self-model/care-trustee-registry/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee-registry/no-os-authority",
+            continuity_review_ref="continuity://self-model/care-trustee-registry/chain/v1",
+        )
+        validation = monitor.validate_care_trustee_registry_binding_receipt(registry)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["external_registry_bound"])
+        self.assertTrue(validation["registry_binding_digest_bound"])
+        self.assertTrue(validation["source_handoff_bound"])
+        self.assertTrue(validation["verifier_key_refs_bound"])
+        self.assertTrue(validation["revocation_refs_bound"])
+        self.assertEqual("bound", validation["role_binding_status"])
+        self.assertEqual("current", validation["registry_status"])
+        self.assertEqual("not-revoked", validation["revocation_status"])
+        self.assertEqual(handoff["receipt_digest"], registry["source_handoff_receipt_digest"])
+        self.assertFalse(registry["raw_registry_payload_stored"])
+        self.assertFalse(registry["raw_revocation_payload_stored"])
+        self.assertFalse(registry["os_trustee_role_allowed"])
+        self.assertFalse(registry["self_model_writeback_allowed"])
+
+    def test_care_trustee_registry_binding_rejects_revoked_entry(self) -> None:
+        monitor = SelfModelMonitor()
+        handoff = _build_care_trustee_handoff_receipt(monitor)
+        registry = monitor.build_care_trustee_registry_binding_receipt(
+            handoff,
+            registry_ref="external-care-registry://jp-13/self-model/current",
+            registry_entries=[
+                {
+                    "role": "trustee",
+                    "subject_ref": "trustee://jp-13/self-model/long-term-trustee/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/trustee/long-term-trustee"
+                    ),
+                    "verifier_key_ref": "key://jp-13/self-model/trustee/long-term-trustee",
+                    "revocation_ref": (
+                        "external-care-revocation://jp-13/trustee/long-term-trustee"
+                    ),
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "role": "care_team",
+                    "subject_ref": "care-team://jp-13/self-model/care-board/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/care-team/care-board"
+                    ),
+                    "verifier_key_ref": "key://jp-13/self-model/care-team/care-board",
+                    "revocation_ref": (
+                        "external-care-revocation://jp-13/care-team/care-board"
+                    ),
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "role": "legal_guardian",
+                    "subject_ref": "legal-guardian://jp-13/self-model/capacity-review/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/legal-guardian/capacity-review"
+                    ),
+                    "verifier_key_ref": (
+                        "key://jp-13/self-model/legal-guardian/capacity-review"
+                    ),
+                    "revocation_ref": (
+                        "external-care-revocation://jp-13/legal-guardian/capacity-review"
+                    ),
+                    "jurisdiction": "JP-13",
+                },
+            ],
+            council_resolution_ref="council://self-model/care-trustee-registry/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee-registry/no-os-authority",
+            continuity_review_ref="continuity://self-model/care-trustee-registry/chain/v1",
+        )
+        tampered = copy.deepcopy(registry)
+        tampered["registry_entries"][0]["revocation_status"] = "revoked"
+
+        validation = monitor.validate_care_trustee_registry_binding_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertEqual("revoked-or-unknown", validation["revocation_status"])
+        self.assertFalse(validation["external_registry_bound"])
+        self.assertIn("registry entry digest must match registry entry payload", validation["errors"])
 
     def test_external_adjudication_result_keeps_authority_outside_os(self) -> None:
         monitor = SelfModelMonitor()

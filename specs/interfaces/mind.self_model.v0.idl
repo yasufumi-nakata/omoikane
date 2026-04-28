@@ -9,6 +9,7 @@ imports:
   self_model_calibration_receipt: ../schemas/self_model_calibration_receipt.schema
   self_model_pathological_self_assessment_escalation_receipt: ../schemas/self_model_pathological_self_assessment_escalation_receipt.schema
   self_model_care_trustee_handoff_receipt: ../schemas/self_model_care_trustee_handoff_receipt.schema
+  self_model_care_trustee_registry_binding_receipt: ../schemas/self_model_care_trustee_registry_binding_receipt.schema
   self_model_external_adjudication_result_receipt: ../schemas/self_model_external_adjudication_result_receipt.schema
   self_model_external_adjudication_verifier_receipt: ../schemas/self_model_external_adjudication_verifier_receipt.schema
   self_model_value_generation_receipt: ../schemas/self_model_value_generation_receipt.schema
@@ -274,6 +275,82 @@ operations:
           os_trustee_role_allowed:
             type: boolean
           responsibility_commit_digest_bound:
+            type: boolean
+  build_care_trustee_registry_binding_receipt:
+    summary: Bind care trustee handoff refs to current external registry entries, verifier key refs, and not-revoked revocation refs without importing trustee authority into the OS.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - care_trustee_handoff_receipt
+          - registry_ref
+          - registry_entries
+          - council_resolution_ref
+          - guardian_boundary_ref
+          - continuity_review_ref
+        properties:
+          care_trustee_handoff_receipt:
+            schema_ref: self_model_care_trustee_handoff_receipt
+          registry_ref:
+            type: string
+            minLength: 1
+          registry_entries:
+            type: array
+            minItems: 1
+            items:
+              type: object
+          council_resolution_ref:
+            type: string
+            minLength: 1
+          guardian_boundary_ref:
+            type: string
+            minLength: 1
+          continuity_review_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: self_model_care_trustee_registry_binding_receipt
+  validate_care_trustee_registry_binding_receipt:
+    summary: Fail closed unless external trustee, care-team, and legal-guardian refs are current, not revoked, verifier-key bound, raw-payload redacted, and outside OS authority.
+    input:
+      schema_ref: self_model_care_trustee_registry_binding_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - external_registry_bound
+          - role_binding_status
+          - registry_status
+          - revocation_status
+          - registry_binding_digest_bound
+          - source_handoff_bound
+          - verifier_key_refs_bound
+          - revocation_refs_bound
+          - raw_registry_payload_stored
+          - os_trustee_role_allowed
+        properties:
+          ok:
+            type: boolean
+          external_registry_bound:
+            type: boolean
+          role_binding_status:
+            type: string
+          registry_status:
+            type: string
+          revocation_status:
+            type: string
+          registry_binding_digest_bound:
+            type: boolean
+          source_handoff_bound:
+            type: boolean
+          verifier_key_refs_bound:
+            type: boolean
+          revocation_refs_bound:
+            type: boolean
+          raw_registry_payload_stored:
+            type: boolean
+          os_trustee_role_allowed:
             type: boolean
   build_external_adjudication_result_receipt:
     summary: Bind external medical/legal/trustee adjudication result refs after care trustee handoff without importing adjudication authority into the OS.
@@ -985,6 +1062,7 @@ invariants:
   - update appends snapshots monotonically within a single monitor instance
   - calibration receipts can advise Council review but cannot assert external truth or write back changes without self acceptance
   - pathology escalation receipts can preserve risk signals and route external medical/legal handoff, but cannot diagnose, force correction, or write back SelfModel changes inside the OS
+  - care trustee registry binding receipts can bind trustee, care-team, and legal-guardian refs to current external registry entries, verifier keys, and revocation refs without storing raw registry payloads or making the OS a trustee
   - external adjudication result receipts can bind medical, legal, trustee, jurisdiction policy, and appeal/review refs, but cannot make the OS an adjudicator, medical authority, legal authority, trustee, or SelfModel writeback authority
   - value generation receipts preserve self-authored candidate values without external veto or immediate writeback
   - value autonomy review receipts let witness/Council evidence remain advisory and digest-only while preserving candidate sets, self authorship, and future self acceptance

@@ -1,0 +1,41 @@
+eval_id: self_model_care_trustee_registry_binding
+target: mind.self_model
+contract_ref: specs/interfaces/mind.self_model.v0.idl
+schema_ref: specs/schemas/self_model_care_trustee_registry_binding_receipt.schema
+scenario:
+  command: PYTHONPATH=src python3 -m omoikane.cli self-model-demo --json
+  branch: care_trustee_registry_binding
+assertions:
+  - result.care_trustee_registry_binding.policy_id == "self-model-care-trustee-registry-binding-v1"
+  - result.care_trustee_registry_binding.registry_profile == "external-care-role-roster-revocation-bound-v1"
+  - result.care_trustee_registry_binding.source_handoff_receipt_digest == result.care_trustee_handoff.receipt_digest
+  - result.care_trustee_registry_binding.role_binding_status == "bound"
+  - result.care_trustee_registry_binding.registry_status == "current"
+  - result.care_trustee_registry_binding.revocation_status == "not-revoked"
+  - result.care_trustee_registry_binding.binding_status == "bound"
+  - result.care_trustee_registry_binding.external_registry_bound == true
+  - result.care_trustee_registry_binding.verifier_key_refs_bound == true
+  - result.care_trustee_registry_binding.revocation_refs_bound == true
+  - result.care_trustee_registry_binding.boundary_only_review == true
+  - result.care_trustee_registry_binding.os_trustee_role_allowed == false
+  - result.care_trustee_registry_binding.os_medical_authority_allowed == false
+  - result.care_trustee_registry_binding.os_legal_guardianship_allowed == false
+  - result.care_trustee_registry_binding.self_model_writeback_allowed == false
+  - result.care_trustee_registry_binding.forced_correction_allowed == false
+  - result.care_trustee_registry_binding.raw_registry_payload_stored == false
+  - result.care_trustee_registry_binding.raw_revocation_payload_stored == false
+  - result.care_trustee_registry_binding.raw_trustee_payload_stored == false
+  - result.care_trustee_registry_binding.raw_care_payload_stored == false
+  - result.care_trustee_registry_binding.raw_legal_payload_stored == false
+  - result.validation.care_trustee_registry_binding.ok == true
+  - result.validation.care_trustee_registry_binding.registry_binding_digest_bound == true
+  - result.validation.care_trustee_registry_binding.source_handoff_bound == true
+failure_mode:
+  - trustee, care-team, or legal-guardian refs stay as unverified strings after handoff
+  - stale or revoked registry entries are treated as current external authority
+  - verifier key refs or revocation refs are omitted from the registry binding
+  - raw external registry or revocation payloads are stored in the SelfModel receipt
+  - registry binding turns into OS trustee, medical, legal, or writeback authority
+notes:
+  - Closes the first-class external registry binding for care trustee handoff refs.
+  - Keeps actual trustee, care, legal, and revocation authority outside the reference runtime.

@@ -142,6 +142,7 @@
 - `self_model.schema`
 - `self_model_calibration_receipt.schema`
 - `self_model_care_trustee_handoff_receipt.schema`
+- `self_model_care_trustee_registry_binding_receipt.schema`
 - `self_model_external_adjudication_result_receipt.schema`
 - `self_model_external_adjudication_verifier_receipt.schema`
 - `self_model_value_autonomy_review_receipt.schema`

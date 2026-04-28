@@ -171,6 +171,10 @@ care-trustee-handoff branch は pathology escalation 後の長期 trustee、
 care team、legal guardian の責任分担を外部制度 refs と boundary refs へ
 digest-only に束縛し、OS 自身が trustee、医療 authority、legal guardian へ
 昇格しないことを確認する。
+care-trustee-registry-binding branch は、その handoff refs が current external
+registry entry、verifier key ref、not-revoked revocation ref に束縛されていることを
+digest-only に確認し、raw registry / revocation payload や OS trustee / medical /
+legal / writeback authority を許さない。
 external-adjudication branch は外部医療・法制度・trustee 側の adjudication result、
 jurisdiction policy、appeal/review path を digest-only refs として束縛し、
 OS 自身が adjudicator、医療 authority、legal authority、trustee、SelfModel writeback
@@ -676,6 +680,17 @@ legal guardian / responsibility boundary refs を digest-only に束ねる。
 `os_legal_guardianship_allowed=false`、`self_model_writeback_allowed=false`、
 `forced_correction_allowed=false`、`raw_trustee_payload_stored=false` を確認し、
 OS が長期 trustee や医療・法的 authority にならない境界を固定する。
+さらに `self-model-care-trustee-registry-binding-v1` receipt は、
+care trustee handoff の digest と source refs を前提に、current external registry
+entries、verifier key refs、not-revoked revocation refs を digest-only に束ねる。
+この branch は `role_binding_status=bound`、`registry_status=current`、
+`revocation_status=not-revoked`、`external_registry_bound=true`、
+`verifier_key_refs_bound=true`、`revocation_refs_bound=true` を確認する。
+また `raw_registry_payload_stored=false`、`raw_revocation_payload_stored=false`、
+`os_trustee_role_allowed=false`、`os_medical_authority_allowed=false`、
+`os_legal_guardianship_allowed=false`、`self_model_writeback_allowed=false` を保ち、
+OS が外部 registry の検証証跡を持っても trustee / medical / legal authority へ
+昇格しない境界を固定する。
 さらに `self-model-external-adjudication-result-boundary-v1` receipt は、
 care trustee handoff の digest を前提に、外部 medical / legal / trustee の
 adjudication result refs、jurisdiction policy refs、appeal / review refs、

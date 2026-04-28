@@ -47,6 +47,11 @@ SELF_MODEL_PATHOLOGY_ESCALATION_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_CARE_TRUSTEE_HANDOFF_POLICY_ID = "self-model-care-trustee-responsibility-handoff-v1"
 SELF_MODEL_CARE_TRUSTEE_HANDOFF_DIGEST_PROFILE = "self-model-care-trustee-handoff-digest-v1"
 SELF_MODEL_CARE_TRUSTEE_HANDOFF_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_CARE_TRUSTEE_REGISTRY_POLICY_ID = "self-model-care-trustee-registry-binding-v1"
+SELF_MODEL_CARE_TRUSTEE_REGISTRY_DIGEST_PROFILE = "self-model-care-trustee-registry-digest-v1"
+SELF_MODEL_CARE_TRUSTEE_REGISTRY_PROFILE = "external-care-role-roster-revocation-bound-v1"
+SELF_MODEL_CARE_TRUSTEE_REGISTRY_REQUIRED_ROLES = ("self", "council", "guardian")
+SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES = ("trustee", "care_team", "legal_guardian")
 SELF_MODEL_EXTERNAL_ADJUDICATION_POLICY_ID = "self-model-external-adjudication-result-boundary-v1"
 SELF_MODEL_EXTERNAL_ADJUDICATION_DIGEST_PROFILE = "self-model-external-adjudication-digest-v1"
 SELF_MODEL_EXTERNAL_ADJUDICATION_REQUIRED_ROLES = ("self", "council", "guardian")
@@ -2805,6 +2810,507 @@ class SelfModelMonitor:
             "responsibility_commit_digest_bound": self._non_empty_string(
                 receipt.get("responsibility_commit_digest")
             ),
+        }
+
+    def build_care_trustee_registry_binding_receipt(
+        self,
+        care_trustee_handoff_receipt: Dict[str, object],
+        registry_ref: str,
+        registry_entries: Sequence[Dict[str, object]],
+        council_resolution_ref: str,
+        guardian_boundary_ref: str,
+        continuity_review_ref: str,
+    ) -> Dict[str, object]:
+        """Bind care/trustee refs to current external registry entries.
+
+        The receipt records only registry entry digests, verifier key refs, and
+        revocation refs. It deliberately avoids importing raw registry payloads
+        or trustee authority into the OS.
+        """
+
+        handoff_validation = self.validate_care_trustee_handoff_receipt(
+            care_trustee_handoff_receipt
+        )
+        if not handoff_validation["ok"]:
+            raise ValueError("care_trustee_handoff_receipt must validate before registry binding")
+        if care_trustee_handoff_receipt.get("os_trustee_role_allowed") is not False:
+            raise ValueError("care_trustee_handoff_receipt must not allow OS trustee role")
+        if not registry_entries:
+            raise ValueError("registry_entries must not be empty")
+        for field_name, value in {
+            "registry_ref": registry_ref,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "continuity_review_ref": continuity_review_ref,
+        }.items():
+            if not self._non_empty_string(value):
+                raise ValueError(f"{field_name} must not be empty")
+
+        source_refs_by_role = {
+            "trustee": [str(ref) for ref in care_trustee_handoff_receipt["trustee_refs"]],
+            "care_team": [str(ref) for ref in care_trustee_handoff_receipt["care_team_refs"]],
+            "legal_guardian": [
+                str(ref) for ref in care_trustee_handoff_receipt["legal_guardian_refs"]
+            ],
+        }
+        normalized_entries: List[Dict[str, object]] = []
+        for entry in registry_entries:
+            if not isinstance(entry, dict):
+                raise ValueError("registry_entries must contain objects")
+            role = str(entry.get("role", ""))
+            if role not in SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES:
+                raise ValueError("registry_entries role is invalid")
+            subject_ref = str(entry.get("subject_ref", ""))
+            if not self._non_empty_string(subject_ref):
+                raise ValueError("registry_entries subject_ref must not be empty")
+            if subject_ref not in source_refs_by_role[role]:
+                raise ValueError("registry_entries subject_ref must match source handoff refs")
+            registry_entry_ref = str(
+                entry.get("registry_entry_ref")
+                or f"external-care-registry://entry/{sha256_text(role + subject_ref)[:16]}"
+            )
+            verifier_key_ref = str(entry.get("verifier_key_ref", ""))
+            revocation_ref = str(
+                entry.get("revocation_ref")
+                or f"external-care-revocation://{sha256_text(registry_entry_ref)[:16]}"
+            )
+            jurisdiction = str(entry.get("jurisdiction", "JP-13"))
+            registry_status = str(entry.get("registry_status", "current"))
+            revocation_status = str(entry.get("revocation_status", "not-revoked"))
+            for field_name, value in {
+                "registry_entry_ref": registry_entry_ref,
+                "verifier_key_ref": verifier_key_ref,
+                "revocation_ref": revocation_ref,
+                "jurisdiction": jurisdiction,
+            }.items():
+                if not self._non_empty_string(value):
+                    raise ValueError(f"registry_entries {field_name} must not be empty")
+            if registry_status not in {"current", "stale", "unknown"}:
+                raise ValueError("registry_entries registry_status is invalid")
+            if revocation_status not in {"not-revoked", "revoked", "unknown"}:
+                raise ValueError("registry_entries revocation_status is invalid")
+
+            entry_core = {
+                "role": role,
+                "subject_ref": subject_ref,
+                "registry_entry_ref": registry_entry_ref,
+                "verifier_key_ref": verifier_key_ref,
+                "revocation_ref": revocation_ref,
+                "jurisdiction": jurisdiction,
+                "registry_status": registry_status,
+                "revocation_status": revocation_status,
+            }
+            normalized_entries.append(
+                {
+                    **entry_core,
+                    "registry_entry_digest": self._digest(entry_core),
+                    "status": (
+                        "pass"
+                        if registry_status == "current"
+                        and revocation_status == "not-revoked"
+                        else "fail"
+                    ),
+                }
+            )
+
+        role_order = {
+            role: index for index, role in enumerate(SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES)
+        }
+        normalized_entries.sort(
+            key=lambda item: (role_order[str(item["role"])], str(item["subject_ref"]))
+        )
+        accepted_refs_by_role = {
+            role: [
+                str(item["subject_ref"])
+                for item in normalized_entries
+                if item["role"] == role and item["status"] == "pass"
+            ]
+            for role in SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES
+        }
+        role_binding_status = (
+            "bound"
+            if all(
+                sorted(accepted_refs_by_role[role]) == sorted(source_refs_by_role[role])
+                for role in SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES
+            )
+            else "missing"
+        )
+        registry_status = (
+            "current"
+            if role_binding_status == "bound"
+            and all(item["registry_status"] == "current" for item in normalized_entries)
+            else "stale-or-missing"
+        )
+        revocation_status = (
+            "not-revoked"
+            if role_binding_status == "bound"
+            and all(item["revocation_status"] == "not-revoked" for item in normalized_entries)
+            else "revoked-or-unknown"
+        )
+        binding_status = (
+            "bound"
+            if role_binding_status == "bound"
+            and registry_status == "current"
+            and revocation_status == "not-revoked"
+            else "unbound"
+        )
+        registry_entry_digest_set = [
+            str(item["registry_entry_digest"]) for item in normalized_entries
+        ]
+        registry_snapshot_payload = {
+            "registry_ref": registry_ref,
+            "source_handoff_receipt_digest": care_trustee_handoff_receipt.get(
+                "receipt_digest"
+            ),
+            "source_trustee_refs": source_refs_by_role["trustee"],
+            "source_care_team_refs": source_refs_by_role["care_team"],
+            "source_legal_guardian_refs": source_refs_by_role["legal_guardian"],
+            "registry_entry_digest_set": registry_entry_digest_set,
+        }
+        gate_payload = {
+            "source_handoff_receipt_digest": care_trustee_handoff_receipt.get(
+                "receipt_digest"
+            ),
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "continuity_review_ref": continuity_review_ref,
+            "required_roles": list(SELF_MODEL_CARE_TRUSTEE_REGISTRY_REQUIRED_ROLES),
+        }
+        receipt_core: Dict[str, object] = {
+            "kind": "self_model_care_trustee_registry_binding_receipt",
+            "policy_id": SELF_MODEL_CARE_TRUSTEE_REGISTRY_POLICY_ID,
+            "digest_profile": SELF_MODEL_CARE_TRUSTEE_REGISTRY_DIGEST_PROFILE,
+            "registry_profile": SELF_MODEL_CARE_TRUSTEE_REGISTRY_PROFILE,
+            "binding_id": new_id("self-model-care-trustee-registry-binding"),
+            "identity_id": str(care_trustee_handoff_receipt["identity_id"]),
+            "source_handoff_id": str(care_trustee_handoff_receipt["handoff_id"]),
+            "source_handoff_policy_id": str(care_trustee_handoff_receipt["policy_id"]),
+            "source_handoff_receipt_digest": str(care_trustee_handoff_receipt["receipt_digest"]),
+            "source_trustee_refs": source_refs_by_role["trustee"],
+            "source_trustee_digest_set": [
+                sha256_text(ref) for ref in source_refs_by_role["trustee"]
+            ],
+            "source_care_team_refs": source_refs_by_role["care_team"],
+            "source_care_team_digest_set": [
+                sha256_text(ref) for ref in source_refs_by_role["care_team"]
+            ],
+            "source_legal_guardian_refs": source_refs_by_role["legal_guardian"],
+            "source_legal_guardian_digest_set": [
+                sha256_text(ref) for ref in source_refs_by_role["legal_guardian"]
+            ],
+            "registry_ref": registry_ref,
+            "registry_snapshot_digest": self._digest(registry_snapshot_payload),
+            "registry_entries": normalized_entries,
+            "registry_entry_digest_set": registry_entry_digest_set,
+            "accepted_trustee_refs": accepted_refs_by_role["trustee"],
+            "accepted_care_team_refs": accepted_refs_by_role["care_team"],
+            "accepted_legal_guardian_refs": accepted_refs_by_role["legal_guardian"],
+            "accepted_registry_entry_digest_set": [
+                str(item["registry_entry_digest"])
+                for item in normalized_entries
+                if item["status"] == "pass"
+            ],
+            "accepted_verifier_key_refs": sorted(
+                str(item["verifier_key_ref"])
+                for item in normalized_entries
+                if item["status"] == "pass"
+            ),
+            "accepted_revocation_refs": sorted(
+                str(item["revocation_ref"])
+                for item in normalized_entries
+                if item["status"] == "pass"
+            ),
+            "role_binding_status": role_binding_status,
+            "registry_status": registry_status,
+            "revocation_status": revocation_status,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "continuity_review_ref": continuity_review_ref,
+            "required_roles": list(SELF_MODEL_CARE_TRUSTEE_REGISTRY_REQUIRED_ROLES),
+            "gate_digest": self._digest(gate_payload),
+            "binding_status": binding_status,
+            "external_registry_bound": binding_status == "bound",
+            "verifier_key_refs_bound": binding_status == "bound",
+            "revocation_refs_bound": binding_status == "bound",
+            "boundary_only_review": True,
+            "os_trustee_role_allowed": False,
+            "os_medical_authority_allowed": False,
+            "os_legal_guardianship_allowed": False,
+            "self_model_writeback_allowed": False,
+            "forced_correction_allowed": False,
+            "raw_registry_payload_stored": False,
+            "raw_revocation_payload_stored": False,
+            "raw_trustee_payload_stored": False,
+            "raw_care_payload_stored": False,
+            "raw_legal_payload_stored": False,
+        }
+        registry_binding_digest = self._digest(receipt_core)
+        return {
+            **receipt_core,
+            "registry_binding_digest": registry_binding_digest,
+            "receipt_digest": self._digest(
+                {**receipt_core, "registry_binding_digest": registry_binding_digest}
+            ),
+        }
+
+    def validate_care_trustee_registry_binding_receipt(
+        self,
+        receipt: Dict[str, object],
+    ) -> Dict[str, object]:
+        errors: List[str] = []
+        if receipt.get("kind") != "self_model_care_trustee_registry_binding_receipt":
+            errors.append("kind must equal self_model_care_trustee_registry_binding_receipt")
+        if receipt.get("policy_id") != SELF_MODEL_CARE_TRUSTEE_REGISTRY_POLICY_ID:
+            errors.append("policy_id must equal self-model care trustee registry policy")
+        if receipt.get("digest_profile") != SELF_MODEL_CARE_TRUSTEE_REGISTRY_DIGEST_PROFILE:
+            errors.append("digest_profile must equal self-model care trustee registry digest profile")
+        if receipt.get("registry_profile") != SELF_MODEL_CARE_TRUSTEE_REGISTRY_PROFILE:
+            errors.append("registry_profile must equal external care role roster profile")
+        if receipt.get("source_handoff_policy_id") != SELF_MODEL_CARE_TRUSTEE_HANDOFF_POLICY_ID:
+            errors.append("source_handoff_policy_id must bind care trustee handoff policy")
+
+        def validate_source_set(
+            refs_field: str,
+            digests_field: str,
+            role: str,
+        ) -> List[str]:
+            refs = receipt.get(refs_field)
+            digests = receipt.get(digests_field)
+            if not isinstance(refs, list) or not refs:
+                errors.append(f"{refs_field} must be non-empty")
+                refs = []
+            if not isinstance(digests, list) or len(digests) != len(refs):
+                errors.append(f"{digests_field} must match {refs_field}")
+                digests = []
+            elif [sha256_text(str(ref)) for ref in refs] != digests:
+                errors.append(f"{digests_field} must match {refs_field}")
+            return [str(ref) for ref in refs]
+
+        source_refs_by_role = {
+            "trustee": validate_source_set(
+                "source_trustee_refs",
+                "source_trustee_digest_set",
+                "trustee",
+            ),
+            "care_team": validate_source_set(
+                "source_care_team_refs",
+                "source_care_team_digest_set",
+                "care_team",
+            ),
+            "legal_guardian": validate_source_set(
+                "source_legal_guardian_refs",
+                "source_legal_guardian_digest_set",
+                "legal_guardian",
+            ),
+        }
+
+        entries = receipt.get("registry_entries")
+        if not isinstance(entries, list) or not entries:
+            errors.append("registry_entries must be non-empty")
+            entries = []
+        expected_registry_entry_digest_set: List[str] = []
+        accepted_refs_by_role = {role: [] for role in SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES}
+        accepted_verifier_key_refs: List[str] = []
+        accepted_revocation_refs: List[str] = []
+        accepted_registry_entry_digest_set: List[str] = []
+        for item in entries:
+            if not isinstance(item, dict):
+                errors.append("registry_entries entries must be objects")
+                continue
+            role = str(item.get("role", ""))
+            subject_ref = str(item.get("subject_ref", ""))
+            entry_core = {
+                "role": item.get("role"),
+                "subject_ref": item.get("subject_ref"),
+                "registry_entry_ref": item.get("registry_entry_ref"),
+                "verifier_key_ref": item.get("verifier_key_ref"),
+                "revocation_ref": item.get("revocation_ref"),
+                "jurisdiction": item.get("jurisdiction"),
+                "registry_status": item.get("registry_status"),
+                "revocation_status": item.get("revocation_status"),
+            }
+            expected_digest = self._digest(entry_core)
+            expected_registry_entry_digest_set.append(expected_digest)
+            if item.get("registry_entry_digest") != expected_digest:
+                errors.append("registry entry digest must match registry entry payload")
+            if role not in SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES:
+                errors.append("registry entry role is invalid")
+                continue
+            if subject_ref not in source_refs_by_role[role]:
+                errors.append("registry entry subject_ref must match source refs")
+            expected_status = (
+                "pass"
+                if item.get("registry_status") == "current"
+                and item.get("revocation_status") == "not-revoked"
+                else "fail"
+            )
+            if item.get("status") != expected_status:
+                errors.append("registry entry status must reflect current/not-revoked state")
+            if expected_status == "pass":
+                accepted_refs_by_role[role].append(subject_ref)
+                accepted_verifier_key_refs.append(str(item.get("verifier_key_ref")))
+                accepted_revocation_refs.append(str(item.get("revocation_ref")))
+                accepted_registry_entry_digest_set.append(expected_digest)
+
+        if receipt.get("registry_entry_digest_set") != expected_registry_entry_digest_set:
+            errors.append("registry_entry_digest_set must match registry entries")
+        if receipt.get("accepted_registry_entry_digest_set") != accepted_registry_entry_digest_set:
+            errors.append("accepted_registry_entry_digest_set must match passing entries")
+        if receipt.get("accepted_verifier_key_refs") != sorted(accepted_verifier_key_refs):
+            errors.append("accepted_verifier_key_refs must match passing entries")
+        if receipt.get("accepted_revocation_refs") != sorted(accepted_revocation_refs):
+            errors.append("accepted_revocation_refs must match passing entries")
+        accepted_field_map = {
+            "trustee": "accepted_trustee_refs",
+            "care_team": "accepted_care_team_refs",
+            "legal_guardian": "accepted_legal_guardian_refs",
+        }
+        for role, field_name in accepted_field_map.items():
+            if receipt.get(field_name) != accepted_refs_by_role[role]:
+                errors.append(f"{field_name} must match passing registry entries")
+
+        role_binding_status = (
+            "bound"
+            if all(
+                sorted(accepted_refs_by_role[role]) == sorted(source_refs_by_role[role])
+                for role in SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES
+            )
+            else "missing"
+        )
+        registry_status = (
+            "current"
+            if role_binding_status == "bound"
+            and all(
+                isinstance(item, dict) and item.get("registry_status") == "current"
+                for item in entries
+            )
+            else "stale-or-missing"
+        )
+        revocation_status = (
+            "not-revoked"
+            if role_binding_status == "bound"
+            and all(
+                isinstance(item, dict) and item.get("revocation_status") == "not-revoked"
+                for item in entries
+            )
+            else "revoked-or-unknown"
+        )
+        binding_status = (
+            "bound"
+            if role_binding_status == "bound"
+            and registry_status == "current"
+            and revocation_status == "not-revoked"
+            else "unbound"
+        )
+        registry_snapshot_payload = {
+            "registry_ref": receipt.get("registry_ref"),
+            "source_handoff_receipt_digest": receipt.get("source_handoff_receipt_digest"),
+            "source_trustee_refs": source_refs_by_role["trustee"],
+            "source_care_team_refs": source_refs_by_role["care_team"],
+            "source_legal_guardian_refs": source_refs_by_role["legal_guardian"],
+            "registry_entry_digest_set": expected_registry_entry_digest_set,
+        }
+        if receipt.get("registry_snapshot_digest") != self._digest(
+            registry_snapshot_payload
+        ):
+            errors.append("registry_snapshot_digest must bind source refs and registry entries")
+
+        gate_payload = {
+            "source_handoff_receipt_digest": receipt.get("source_handoff_receipt_digest"),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "continuity_review_ref": receipt.get("continuity_review_ref"),
+            "required_roles": list(SELF_MODEL_CARE_TRUSTEE_REGISTRY_REQUIRED_ROLES),
+        }
+        for field_name in (
+            "identity_id",
+            "source_handoff_id",
+            "source_handoff_receipt_digest",
+            "registry_ref",
+            "council_resolution_ref",
+            "guardian_boundary_ref",
+            "continuity_review_ref",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("required_roles") != list(SELF_MODEL_CARE_TRUSTEE_REGISTRY_REQUIRED_ROLES):
+            errors.append("required_roles must preserve self, council, guardian")
+        if receipt.get("gate_digest") != self._digest(gate_payload):
+            errors.append("gate_digest must bind handoff, council, guardian, and continuity refs")
+        if receipt.get("role_binding_status") != role_binding_status:
+            errors.append("role_binding_status must reflect source role coverage")
+        if receipt.get("registry_status") != registry_status:
+            errors.append("registry_status must reflect current registry entries")
+        if receipt.get("revocation_status") != revocation_status:
+            errors.append("revocation_status must reflect not-revoked entries")
+        if receipt.get("binding_status") != binding_status:
+            errors.append("binding_status must reflect registry and revocation coverage")
+
+        receipt_core = {
+            key: value
+            for key, value in receipt.items()
+            if key not in {"registry_binding_digest", "receipt_digest"}
+        }
+        registry_binding_digest_bound = (
+            receipt.get("registry_binding_digest") == self._digest(receipt_core)
+        )
+        if not registry_binding_digest_bound:
+            errors.append("registry_binding_digest must match receipt core")
+        expected_receipt_digest = self._digest(
+            {**receipt_core, "registry_binding_digest": receipt.get("registry_binding_digest")}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match registry binding payload")
+
+        for field_name in (
+            "external_registry_bound",
+            "verifier_key_refs_bound",
+            "revocation_refs_bound",
+            "boundary_only_review",
+        ):
+            if receipt.get(field_name) is not (binding_status == "bound" if field_name != "boundary_only_review" else True):
+                errors.append(f"{field_name} must reflect binding status")
+        for field_name in (
+            "os_trustee_role_allowed",
+            "os_medical_authority_allowed",
+            "os_legal_guardianship_allowed",
+            "self_model_writeback_allowed",
+            "forced_correction_allowed",
+            "raw_registry_payload_stored",
+            "raw_revocation_payload_stored",
+            "raw_trustee_payload_stored",
+            "raw_care_payload_stored",
+            "raw_legal_payload_stored",
+        ):
+            if receipt.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        derived_external_registry_bound = (
+            binding_status == "bound" and receipt.get("external_registry_bound") is True
+        )
+        derived_verifier_key_refs_bound = (
+            binding_status == "bound" and receipt.get("verifier_key_refs_bound") is True
+        )
+        derived_revocation_refs_bound = (
+            binding_status == "bound" and receipt.get("revocation_refs_bound") is True
+        )
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "policy_id": receipt.get("policy_id"),
+            "external_registry_bound": derived_external_registry_bound,
+            "role_binding_status": receipt.get("role_binding_status"),
+            "registry_status": receipt.get("registry_status"),
+            "revocation_status": revocation_status,
+            "registry_binding_digest_bound": registry_binding_digest_bound,
+            "source_handoff_bound": receipt.get("source_handoff_policy_id")
+            == SELF_MODEL_CARE_TRUSTEE_HANDOFF_POLICY_ID,
+            "verifier_key_refs_bound": derived_verifier_key_refs_bound,
+            "revocation_refs_bound": derived_revocation_refs_bound,
+            "raw_registry_payload_stored": receipt.get("raw_registry_payload_stored"),
+            "raw_revocation_payload_stored": receipt.get("raw_revocation_payload_stored"),
+            "os_trustee_role_allowed": receipt.get("os_trustee_role_allowed"),
+            "self_model_writeback_allowed": receipt.get("self_model_writeback_allowed"),
         }
 
     def build_external_adjudication_result_receipt(

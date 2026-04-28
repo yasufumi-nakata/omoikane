@@ -1629,6 +1629,23 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(result["care_trustee_handoff"]["os_trustee_role_allowed"])
         self.assertFalse(result["care_trustee_handoff"]["os_medical_authority_allowed"])
         self.assertFalse(result["care_trustee_handoff"]["os_legal_guardianship_allowed"])
+        self.assertTrue(result["validation"]["care_trustee_registry_binding"]["ok"])
+        self.assertTrue(
+            result["validation"]["care_trustee_registry_binding"][
+                "external_registry_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["care_trustee_registry_binding"][
+                "registry_binding_digest_bound"
+            ]
+        )
+        self.assertFalse(
+            result["care_trustee_registry_binding"]["raw_registry_payload_stored"]
+        )
+        self.assertFalse(
+            result["care_trustee_registry_binding"]["os_trustee_role_allowed"]
+        )
         self.assertTrue(result["validation"]["external_adjudication_verifier"]["ok"])
         self.assertEqual(
             "complete",

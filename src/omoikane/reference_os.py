@@ -14696,6 +14696,102 @@ json.dump(response, sys.stdout)
         care_trustee_handoff_validation = monitor.validate_care_trustee_handoff_receipt(
             care_trustee_handoff
         )
+        care_trustee_registry_binding = (
+            monitor.build_care_trustee_registry_binding_receipt(
+                care_trustee_handoff,
+                registry_ref="external-care-registry://jp-13/self-model/current",
+                registry_entries=[
+                    {
+                        "role": "trustee",
+                        "subject_ref": (
+                            "trustee://jp-13/self-model/long-term-trustee/v1"
+                        ),
+                        "registry_entry_ref": (
+                            "external-care-registry://jp-13/trustee/long-term-trustee"
+                        ),
+                        "verifier_key_ref": (
+                            "key://jp-13/self-model/trustee/long-term-trustee"
+                        ),
+                        "revocation_ref": (
+                            "external-care-revocation://jp-13/trustee/long-term-trustee"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "role": "trustee",
+                        "subject_ref": "trustee://jp-13/self-model/backup-trustee/v1",
+                        "registry_entry_ref": (
+                            "external-care-registry://jp-13/trustee/backup-trustee"
+                        ),
+                        "verifier_key_ref": (
+                            "key://jp-13/self-model/trustee/backup-trustee"
+                        ),
+                        "revocation_ref": (
+                            "external-care-revocation://jp-13/trustee/backup-trustee"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "role": "care_team",
+                        "subject_ref": "care-team://jp-13/self-model/care-board/v1",
+                        "registry_entry_ref": (
+                            "external-care-registry://jp-13/care-team/care-board"
+                        ),
+                        "verifier_key_ref": "key://jp-13/self-model/care-team/care-board",
+                        "revocation_ref": (
+                            "external-care-revocation://jp-13/care-team/care-board"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "role": "care_team",
+                        "subject_ref": (
+                            "care-team://jp-13/self-model/clinical-liaison/v1"
+                        ),
+                        "registry_entry_ref": (
+                            "external-care-registry://jp-13/care-team/clinical-liaison"
+                        ),
+                        "verifier_key_ref": (
+                            "key://jp-13/self-model/care-team/clinical-liaison"
+                        ),
+                        "revocation_ref": (
+                            "external-care-revocation://jp-13/care-team/clinical-liaison"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "role": "legal_guardian",
+                        "subject_ref": (
+                            "legal-guardian://jp-13/self-model/capacity-review/v1"
+                        ),
+                        "registry_entry_ref": (
+                            "external-care-registry://jp-13/legal-guardian/capacity-review"
+                        ),
+                        "verifier_key_ref": (
+                            "key://jp-13/self-model/legal-guardian/capacity-review"
+                        ),
+                        "revocation_ref": (
+                            "external-care-revocation://jp-13/legal-guardian/capacity-review"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                ],
+                council_resolution_ref=(
+                    "council://self-model/care-trustee-registry/boundary-only"
+                ),
+                guardian_boundary_ref=(
+                    "guardian://self-model/care-trustee-registry/no-os-authority"
+                ),
+                continuity_review_ref=(
+                    "continuity://self-model/care-trustee-registry/chain/v1"
+                ),
+            )
+        )
+        care_trustee_registry_validation = (
+            monitor.validate_care_trustee_registry_binding_receipt(
+                care_trustee_registry_binding
+            )
+        )
         external_adjudication = monitor.build_external_adjudication_result_receipt(
             care_trustee_handoff,
             medical_adjudication_result_refs=[
@@ -14974,6 +15070,18 @@ json.dump(response, sys.stdout)
                 "care_trustee_handoff_no_os_trustee_role": not care_trustee_handoff_validation[
                     "os_trustee_role_allowed"
                 ],
+                "care_trustee_registry_policy_id": care_trustee_registry_binding[
+                    "policy_id"
+                ],
+                "care_trustee_registry_receipt_digest": care_trustee_registry_binding[
+                    "receipt_digest"
+                ],
+                "care_trustee_registry_external_registry_bound": (
+                    care_trustee_registry_validation["external_registry_bound"]
+                ),
+                "care_trustee_registry_no_raw_registry_payload": not (
+                    care_trustee_registry_validation["raw_registry_payload_stored"]
+                ),
                 "external_adjudication_policy_id": external_adjudication["policy_id"],
                 "external_adjudication_receipt_digest": external_adjudication[
                     "receipt_digest"
@@ -15104,6 +15212,7 @@ json.dump(response, sys.stdout)
             "calibration": calibration,
             "pathology_escalation": pathology_escalation,
             "care_trustee_handoff": care_trustee_handoff,
+            "care_trustee_registry_binding": care_trustee_registry_binding,
             "external_adjudication": external_adjudication,
             "external_adjudication_verifier": external_adjudication_verifier,
             "value_generation": value_generation,
@@ -15125,6 +15234,7 @@ json.dump(response, sys.stdout)
                     and calibration_validation["ok"]
                     and pathology_escalation_validation["ok"]
                     and care_trustee_handoff_validation["ok"]
+                    and care_trustee_registry_validation["ok"]
                     and external_adjudication_validation["ok"]
                     and external_adjudication_verifier_validation["ok"]
                     and value_generation_validation["ok"]
@@ -15142,6 +15252,7 @@ json.dump(response, sys.stdout)
                 "calibration": calibration_validation,
                 "pathology_escalation": pathology_escalation_validation,
                 "care_trustee_handoff": care_trustee_handoff_validation,
+                "care_trustee_registry_binding": care_trustee_registry_validation,
                 "external_adjudication": external_adjudication_validation,
                 "external_adjudication_verifier": (
                     external_adjudication_verifier_validation

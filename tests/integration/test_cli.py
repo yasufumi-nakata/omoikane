@@ -1526,6 +1526,26 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["care_trustee_handoff"]["os_trustee_role_allowed"])
         self.assertFalse(result["care_trustee_handoff"]["raw_trustee_payload_stored"])
         self.assertEqual(
+            "self-model-care-trustee-registry-binding-v1",
+            result["care_trustee_registry_binding"]["policy_id"],
+        )
+        self.assertTrue(
+            result["validation"]["care_trustee_registry_binding"][
+                "external_registry_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["care_trustee_registry_binding"][
+                "registry_binding_digest_bound"
+            ]
+        )
+        self.assertFalse(
+            result["care_trustee_registry_binding"]["raw_registry_payload_stored"]
+        )
+        self.assertFalse(
+            result["care_trustee_registry_binding"]["os_trustee_role_allowed"]
+        )
+        self.assertEqual(
             "self-model-external-adjudication-live-verifier-network-v1",
             result["external_adjudication_verifier"]["policy_id"],
         )
