@@ -261,6 +261,56 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "future-work" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_non_abstract_not_implemented_runtime_stubs(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            module_path = repo_root / "src" / "omoikane" / "kernel" / "scheduler.py"
+            module_path.parent.mkdir(parents=True, exist_ok=True)
+            module_path.write_text(
+                "class Scheduler:\n"
+                "    def advance(self):\n"
+                "        raise NotImplementedError('method B execution is not implemented')\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["implementation_stub_count"])
+            self.assertEqual(
+                "src/omoikane/kernel/scheduler.py",
+                report["implementation_stub_hits"][0]["path"],
+            )
+            self.assertIn(
+                "NotImplementedError",
+                report["implementation_stub_hits"][0]["line"],
+            )
+            self.assertEqual(
+                "Scheduler.advance",
+                report["implementation_stub_hits"][0]["symbol"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "implementation-stub" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_ignores_abstract_backend_not_implemented_hooks(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            module_path = repo_root / "src" / "omoikane" / "cognitive" / "reasoning.py"
+            module_path.parent.mkdir(parents=True, exist_ok=True)
+            module_path.write_text(
+                "class ReasoningBackend:\n"
+                "    def _reason(self, request):\n"
+                "        raise NotImplementedError\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["implementation_stub_count"])
+            self.assertEqual([], report["implementation_stub_hits"])
+
     def test_scan_ignores_deferred_surface_markers(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

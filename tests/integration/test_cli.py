@@ -28,6 +28,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(0, result["inventory_drift_count"])
         self.assertEqual(0, result["catalog_coverage_gap_count"])
         self.assertEqual([], result["catalog_coverage_gap_hits"])
+        self.assertEqual(0, result["implementation_stub_count"])
+        self.assertEqual([], result["implementation_stub_hits"])
         self.assertIn("decision_log_residual_count", result)
         self.assertEqual(
             result["decision_log_residual_count"],

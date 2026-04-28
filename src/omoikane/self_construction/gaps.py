@@ -63,6 +63,8 @@ CATALOG_COVERAGE_SPECS = (
     ("specs/schemas", (".schema", ".yaml")),
 )
 EVAL_INVENTORY_GLOB = "evals/*/README.md"
+IMPLEMENTATION_STUB_GLOB = "src/omoikane/**/*.py"
+IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES = ("Backend",)
 
 
 class GapScanner:
@@ -79,6 +81,7 @@ class GapScanner:
         inventory_drift_hits = self._inventory_drift_hits(repo_root)
         catalog_coverage_hits = self._catalog_coverage_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
+        implementation_stub_hits = self._implementation_stub_hits(repo_root)
         decision_log_gap_hits = self._decision_log_gap_hits(repo_root)
         decision_log_residual_hits = [
             hit for hit in decision_log_gap_hits if hit["kind"] == "decision-log-residual"
@@ -144,6 +147,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in implementation_stub_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "implementation-stub",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in decision_log_frontier_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -187,6 +198,7 @@ class GapScanner:
             "inventory_drift_count": len(inventory_drift_hits),
             "catalog_coverage_gap_count": len(catalog_coverage_hits),
             "future_work_hit_count": len(future_work_hits),
+            "implementation_stub_count": len(implementation_stub_hits),
             "decision_log_residual_count": len(decision_log_residual_hits),
             "decision_log_frontier_count": len(decision_log_frontier_hits),
             "open_questions": open_questions,
@@ -199,6 +211,7 @@ class GapScanner:
             "inventory_drift_hits": inventory_drift_hits,
             "catalog_coverage_gap_hits": catalog_coverage_hits,
             "future_work_hits": future_work_hits,
+            "implementation_stub_hits": implementation_stub_hits,
             "decision_log_residual_hits": decision_log_residual_hits,
             "decision_log_frontier_hits": decision_log_frontier_hits,
             "prioritized_tasks": prioritized_tasks,
@@ -427,6 +440,25 @@ class GapScanner:
                 hits.append({"path": str(relative_path), "line": stripped})
         return hits
 
+    def _implementation_stub_hits(self, repo_root: Path) -> List[Dict[str, str]]:
+        """Find runtime code paths that still raise non-abstract NotImplementedError."""
+
+        hits: List[Dict[str, str]] = []
+        for path in sorted(repo_root.glob(IMPLEMENTATION_STUB_GLOB)):
+            if not path.is_file():
+                continue
+            try:
+                source = path.read_text(encoding="utf-8")
+                tree = ast.parse(source)
+            except (SyntaxError, UnicodeDecodeError):
+                continue
+            line_lookup = source.splitlines()
+            relative_path = str(path.relative_to(repo_root))
+            visitor = _ImplementationStubVisitor(relative_path, line_lookup)
+            visitor.visit(tree)
+            hits.extend(visitor.hits)
+        return hits
+
     def _decision_log_gap_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []
         seen = set()
@@ -626,3 +658,63 @@ class GapScanner:
             return False
         year, month, day = value[:4], value[5:7], value[8:10]
         return year.isdigit() and month.isdigit() and day.isdigit()
+
+
+class _ImplementationStubVisitor(ast.NodeVisitor):
+    """AST visitor that keeps intentional abstract backend hooks out of gap reports."""
+
+    def __init__(self, relative_path: str, line_lookup: List[str]) -> None:
+        self.relative_path = relative_path
+        self.line_lookup = line_lookup
+        self.class_stack: List[str] = []
+        self.function_stack: List[str] = []
+        self.hits: List[Dict[str, str]] = []
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> Any:
+        self.class_stack.append(node.name)
+        self.generic_visit(node)
+        self.class_stack.pop()
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> Any:
+        self.function_stack.append(node.name)
+        self.generic_visit(node)
+        self.function_stack.pop()
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> Any:
+        self.visit_FunctionDef(node)
+
+    def visit_Raise(self, node: ast.Raise) -> Any:
+        if not self._raises_not_implemented(node):
+            return
+        if self._is_intentional_abstract_hook():
+            return
+        line = self.line_lookup[node.lineno - 1].strip() if node.lineno <= len(self.line_lookup) else ""
+        self.hits.append(
+            {
+                "path": self.relative_path,
+                "line": line,
+                "symbol": self._current_symbol(),
+            }
+        )
+
+    @staticmethod
+    def _raises_not_implemented(node: ast.Raise) -> bool:
+        exc = node.exc
+        if isinstance(exc, ast.Call):
+            exc = exc.func
+        if isinstance(exc, ast.Name):
+            return exc.id == "NotImplementedError"
+        if isinstance(exc, ast.Attribute):
+            return exc.attr == "NotImplementedError"
+        return False
+
+    def _is_intentional_abstract_hook(self) -> bool:
+        if not self.class_stack or not self.function_stack:
+            return False
+        class_name = self.class_stack[-1]
+        function_name = self.function_stack[-1]
+        return class_name.endswith(IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES) and function_name.startswith("_")
+
+    def _current_symbol(self) -> str:
+        parts = [*self.class_stack, *self.function_stack]
+        return ".".join(parts)

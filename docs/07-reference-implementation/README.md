@@ -107,6 +107,9 @@ automation が前提にする repo-local `references/*.md` の欠落、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
 residual `future work` に加え、
+`src/omoikane/**/*.py` の非抽象 runtime path に残る
+`raise NotImplementedError` も `implementation_stub_hits` として拾う。
+`*Backend._*` の抽象 backend hook は concrete backend subclass が実装するため除外する。
 最新 decision log 日付に残る `residual gap` / `unresolved gap` の bullet も
 `decision_log_residual_hits` として JSON で列挙する。
 同じ最新日付の後続 decision log が `closes_next_gaps` で閉じた item は除外され、

@@ -3215,6 +3215,15 @@ entries:
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects generated catalog inventory receipts from missing files, duplicate catalog entries, unregistered schema/IDL contracts, and unbound inventory digests.
   - priority: P1
+    kind: eval
+    file: evals/continuity/gap_scanner_implementation_stub_detection.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/self_construction/gaps.py
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects gap-report from missing non-abstract runtime stubs that survive open-question, catalog, inventory, and decision-log scans.
+  - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_floor_receipt.schema
     consumers:

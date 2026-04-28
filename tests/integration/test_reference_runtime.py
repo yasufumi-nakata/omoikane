@@ -684,6 +684,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, report["inventory_drift_count"])
         self.assertEqual(0, report["catalog_coverage_gap_count"])
         self.assertEqual([], report["catalog_coverage_gap_hits"])
+        self.assertEqual(0, report["implementation_stub_count"])
+        self.assertEqual([], report["implementation_stub_hits"])
         self.assertIn("decision_log_residual_count", report)
         self.assertEqual(
             report["decision_log_residual_count"],

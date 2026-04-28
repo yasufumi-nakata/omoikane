@@ -404,7 +404,7 @@ class AscensionScheduler:
         handle = self._require_handle(handle_id)
         plan = self._require_plan(handle["plan_ref"])
         if plan["method"] not in SCHEDULER_EXECUTABLE_METHODS:
-            raise NotImplementedError(f"execution for method {plan['method']} is not implemented")
+            raise ValueError(f"method {plan['method']} is not executable in this reference profile")
         if handle["status"] in {"completed", "cancelled", "failed"}:
             raise ValueError(f"cannot advance schedule in status {handle['status']}")
         if handle["status"] == "paused":

@@ -1,0 +1,17 @@
+eval_id: gap_scanner_implementation_stub_detection
+target: self_construction.gap_report
+level: L5
+description: gap-report が非抽象 runtime path の NotImplementedError stub を high-priority implementation-stub task として検出し、意図的な Backend abstract hook は除外できること
+inputs:
+  - action: scan_repo
+    source_glob: src/omoikane/**/*.py
+    marker: raise NotImplementedError
+expected:
+  implementation_stub_count: 0
+  implementation_stub_hits: []
+  abstract_backend_hooks_ignored: true
+  non_abstract_not_implemented_errors_reported: true
+  prioritized_task_kind: implementation-stub
+metric: boolean
+threshold: 1.0
+ethics_check: true
