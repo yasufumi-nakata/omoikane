@@ -101,6 +101,9 @@ YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_EVENT_TYPE = (
     "yaoyorozu.agent_source_manifest.bound"
 )
 YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_SIGNATURE_ROLES = ["self", "guardian"]
+YAOYOROZU_AGENT_SOURCE_MANIFEST_PUBLIC_VERIFICATION_PROFILE = (
+    "yaoyorozu-source-manifest-public-verification-bundle-v1"
+)
 AGENT_SOURCE_DEFINITION_SCHEMA_VERSION = "1.0.0"
 AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
 AGENT_SOURCE_ALLOWED_ROLES = {"councilor", "builder", "researcher", "guardian"}
@@ -884,6 +887,61 @@ def _source_manifest_continuity_payload(binding: Mapping[str, Any]) -> Dict[str,
         "raw_continuity_event_payload_stored": binding[
             "raw_continuity_event_payload_stored"
         ],
+    }
+
+
+def _source_manifest_public_verification_bundle_core(
+    *,
+    binding: Mapping[str, Any],
+    ledger_entry: Any,
+    source_definition_digest_set_digest: str,
+    signature_digests: Mapping[str, str],
+    verifier_key_refs: Mapping[str, str],
+    public_verification_ready: bool,
+) -> Dict[str, Any]:
+    bundle_seed = {
+        "binding_id": binding["binding_id"],
+        "continuity_ledger_entry_hash": getattr(ledger_entry, "entry_hash", ""),
+        "source_manifest_digest": binding["source_manifest_digest"],
+    }
+    bundle_id = (
+        "yaoyorozu-source-manifest-public-verification-"
+        f"{sha256_text(canonical_json(bundle_seed))[:12]}"
+    )
+    return {
+        "kind": "yaoyorozu_source_manifest_public_verification_bundle",
+        "schema_version": "1.0.0",
+        "profile_id": YAOYOROZU_AGENT_SOURCE_MANIFEST_PUBLIC_VERIFICATION_PROFILE,
+        "bundle_id": bundle_id,
+        "bundle_ref": f"verification://yaoyorozu/source-manifest/{bundle_id}",
+        "binding_id": binding["binding_id"],
+        "binding_profile": binding["binding_profile"],
+        "registry_snapshot_ref": binding["registry_snapshot_ref"],
+        "registry_digest": binding["registry_digest"],
+        "policy_id": binding["policy_id"],
+        "source_root": binding["source_root"],
+        "source_digest_profile": binding["source_digest_profile"],
+        "source_definition_count": binding["source_definition_count"],
+        "source_definition_digests": list(binding["source_definition_digests"]),
+        "source_definition_digest_set_digest": source_definition_digest_set_digest,
+        "source_manifest_digest": binding["source_manifest_digest"],
+        "continuity_event_ref": binding["continuity_event_ref"],
+        "continuity_event_digest": binding["continuity_event_digest"],
+        "continuity_ledger_category": binding["continuity_ledger_category"],
+        "continuity_ledger_event_type": binding["continuity_ledger_event_type"],
+        "continuity_ledger_entry_ref": binding["continuity_ledger_entry_ref"],
+        "continuity_ledger_entry_hash": binding["continuity_ledger_entry_hash"],
+        "continuity_ledger_payload_ref": binding["continuity_ledger_payload_ref"],
+        "continuity_ledger_signature_roles": list(
+            binding["continuity_ledger_signature_roles"]
+        ),
+        "signature_digests": dict(signature_digests),
+        "verifier_key_refs": dict(verifier_key_refs),
+        "public_verification_ready": public_verification_ready,
+        "raw_source_payload_exposed": False,
+        "raw_registry_payload_exposed": False,
+        "raw_continuity_event_payload_exposed": False,
+        "raw_signature_payload_exposed": False,
     }
 
 
@@ -3198,6 +3256,70 @@ class YaoyorozuRegistryService:
         binding["validation"]["continuity_ledger_entry_digest_bound"] = entry_digest_bound
         binding["validation"]["continuity_ledger_payload_ref_bound"] = payload_ref_bound
         binding["validation"]["continuity_ledger_signature_roles_bound"] = signature_roles_bound
+        source_definition_digest_set_digest = sha256_text(
+            canonical_json({"source_definition_digests": binding["source_definition_digests"]})
+        )
+        signature_digests = {
+            role: sha256_text(str(getattr(ledger_entry, "signatures", {}).get(role, "")))
+            for role in expected_roles
+        }
+        verifier_key_refs = {
+            role: f"key://continuity-ledger/{role}/reference-verifier/v1"
+            for role in expected_roles
+        }
+        public_verification_ready = (
+            binding["validation"]["source_manifest_bound"]
+            and binding["validation"]["registry_digest_bound"]
+            and event_digest_bound
+            and entry_digest_bound
+            and payload_ref_bound
+            and signature_roles_bound
+            and all(signature_digests.values())
+        )
+        public_bundle_core = _source_manifest_public_verification_bundle_core(
+            binding=binding,
+            ledger_entry=ledger_entry,
+            source_definition_digest_set_digest=source_definition_digest_set_digest,
+            signature_digests=signature_digests,
+            verifier_key_refs=verifier_key_refs,
+            public_verification_ready=public_verification_ready,
+        )
+        public_bundle = {
+            **public_bundle_core,
+            "bundle_digest": sha256_text(canonical_json(public_bundle_core)),
+        }
+        public_bundle_bound = (
+            public_bundle["public_verification_ready"] is True
+            and public_bundle["source_definition_count"] == binding["source_definition_count"]
+            and public_bundle["source_definition_digests"] == binding["source_definition_digests"]
+            and public_bundle["source_manifest_digest"] == binding["source_manifest_digest"]
+            and public_bundle["source_definition_digest_set_digest"]
+            == source_definition_digest_set_digest
+            and public_bundle["continuity_ledger_entry_ref"]
+            == binding["continuity_ledger_entry_ref"]
+            and public_bundle["continuity_ledger_entry_hash"]
+            == binding["continuity_ledger_entry_hash"]
+            and public_bundle["continuity_ledger_payload_ref"]
+            == binding["continuity_ledger_payload_ref"]
+            and public_bundle["continuity_ledger_signature_roles"] == expected_roles
+            and public_bundle["signature_digests"] == signature_digests
+            and public_bundle["verifier_key_refs"] == verifier_key_refs
+            and public_bundle["raw_source_payload_exposed"] is False
+            and public_bundle["raw_registry_payload_exposed"] is False
+            and public_bundle["raw_continuity_event_payload_exposed"] is False
+            and public_bundle["raw_signature_payload_exposed"] is False
+        )
+        public_bundle_digest_bound = (
+            public_bundle["bundle_digest"] == sha256_text(canonical_json(public_bundle_core))
+        )
+        binding["public_verification_bundle_ref"] = public_bundle["bundle_ref"]
+        binding["public_verification_bundle_digest"] = public_bundle["bundle_digest"]
+        binding["public_verification_bundle"] = public_bundle
+        binding["validation"]["public_verification_bundle_bound"] = public_bundle_bound
+        binding["validation"]["public_verification_bundle_digest_bound"] = (
+            public_bundle_digest_bound
+        )
+        binding["validation"]["raw_signature_payload_exposed"] = False
         binding["validation"]["ok"] = (
             binding["validation"]["source_manifest_bound"]
             and binding["validation"]["registry_digest_bound"]
@@ -3205,9 +3327,12 @@ class YaoyorozuRegistryService:
             and entry_digest_bound
             and payload_ref_bound
             and signature_roles_bound
+            and public_bundle_bound
+            and public_bundle_digest_bound
             and binding["raw_source_payload_stored"] is False
             and binding["raw_registry_payload_stored"] is False
             and binding["raw_continuity_event_payload_stored"] is False
+            and public_bundle["raw_signature_payload_exposed"] is False
         )
         return binding
 

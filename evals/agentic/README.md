@@ -86,6 +86,11 @@ registry source digest manifest が dedicated `yaoyorozu-agent-source-manifest`
 ContinuityLedger entry、self+guardian 署名 role、payload ref に束縛され、
 raw source / registry / continuity event payload を保存しないこと。
 
+### Yaoyorozu Source Manifest Public Verification
+source manifest ledger binding が public verification bundle を返し、
+同じ source digest manifest、ledger entry、self+guardian signature digest、
+verifier key ref を raw payload なしで外部 reviewer へ投影できること。
+
 ### Yaoyorozu External Workspace Execution
 workspace discovery により選ばれた non-source candidate workspace へ
 profile-covered builder worker が束縛され、
@@ -178,6 +183,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `yaoyorozu_execution_chain_binding.yaml`
 - `yaoyorozu_external_workspace_execution.yaml`
 - `yaoyorozu_consensus_dispatch.yaml`
+- `yaoyorozu_source_manifest_public_verification.yaml`
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_fork_request_profile.yaml`
 - `yaoyorozu_inter_mind_negotiation_profile.yaml`

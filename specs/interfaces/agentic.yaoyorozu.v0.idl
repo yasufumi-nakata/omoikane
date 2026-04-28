@@ -10,6 +10,7 @@ imports:
   yaoyorozu_dependency_materialization_manifest: ../schemas/yaoyorozu_dependency_materialization_manifest.schema
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
   yaoyorozu_source_manifest_ledger_binding: ../schemas/yaoyorozu_source_manifest_ledger_binding.schema
+  yaoyorozu_source_manifest_public_verification_bundle: ../schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
   council_convocation_session: ../schemas/council_convocation_session.schema
   yaoyorozu_worker_dispatch_plan: ../schemas/yaoyorozu_worker_dispatch_plan.schema
   yaoyorozu_worker_dispatch_receipt: ../schemas/yaoyorozu_worker_dispatch_receipt.schema
@@ -109,6 +110,8 @@ operations:
       - continuity_event_digest must be derived from the digest-only event payload
       - ContinuityLedger category must be yaoyorozu-agent-source-manifest
       - ledger entry must be signed by self and guardian roles
+      - public verification bundle must bind the same source manifest digest, ledger entry ref/hash/payload ref, self+guardian signature digests, and verifier key refs
+      - public verification bundle must expose no raw source, registry, continuity event, or signature payload
       - raw_source_payload_stored, raw_registry_payload_stored, and raw_continuity_event_payload_stored must remain false
   prepare_council_convocation:
     summary: >

@@ -51,6 +51,7 @@ capabilities:
   - yaoyorozu.agent-source.research-evidence-scope.attest
   - yaoyorozu.agent-source.digest-manifest.attest
   - yaoyorozu.agent-source.manifest-ledger-binding.attest
+  - yaoyorozu.agent-source.manifest-public-verification.attest
   - yaoyorozu.builder-coverage.target-path-binding.attest
   - wms.time-rate-deviation.attest
   - wms.time-rate-attestation-transport.attest
@@ -82,9 +83,11 @@ oversight_scope_refs:
   - docs/02-subsystems/interface/wms-spec.md
   - docs/02-subsystems/agentic/yaoyorozu-roster.md
   - specs/schemas/gap_report.schema
+  - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
   - evals/continuity/gap_report_scan_receipt.yaml
   - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
   - evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
+  - evals/agentic/yaoyorozu_source_manifest_public_verification.yaml
 attestation_policy_ref: agents/guardians/integrity-guardian.policy.md
 ethics_constraints: ['ALL']
 prompt_or_policy_ref: agents/guardians/integrity-guardian.policy.md
@@ -126,6 +129,7 @@ when_to_invoke: |
   - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu registry snapshot が raw agents/**/*.yaml source set を digest-only manifest に束縛し、raw source payload を保存していないことを検証する時
   - Yaoyorozu source manifest が dedicated ContinuityLedger entry ref / hash / payload ref と self+guardian 署名 role に束縛され、raw source / registry / continuity event payload を保存していないことを検証する時
+  - Yaoyorozu source manifest public verification bundle が source digest manifest、ledger entry、self+guardian signature digest、verifier key refs を raw payload なしで束縛していることを検証する時
   - Yaoyorozu builder handoff が coverage area ごとの fixed target path refs を selected builder の build_surface_refs に束縛していることを検証する時
   - WMS shared reality の requested time_rate deviation が fixed-time-rate private escape evidence に束縛され、WorldState.time_rate が変更されていないことを検証する時
   - WMS shared reality の requested time_rate deviation が participant subjective-time IMC attestation receipt set に束縛されていることを検証する時

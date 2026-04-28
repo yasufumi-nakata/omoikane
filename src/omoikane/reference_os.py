@@ -4299,10 +4299,30 @@ json.dump(response, sys.stdout)
                         "continuity_ledger_signature_roles_bound"
                     ]
                 ),
+                "source_manifest_public_verification_ready": (
+                    source_manifest_ledger_binding["public_verification_bundle"][
+                        "public_verification_ready"
+                    ]
+                ),
+                "source_manifest_public_verification_bundle_bound": (
+                    source_manifest_ledger_binding["validation"][
+                        "public_verification_bundle_bound"
+                    ]
+                ),
+                "source_manifest_public_verification_bundle_digest_bound": (
+                    source_manifest_ledger_binding["validation"][
+                        "public_verification_bundle_digest_bound"
+                    ]
+                ),
                 "raw_source_payload_stored": registry_snapshot["raw_source_payload_stored"],
                 "raw_registry_payload_stored": source_manifest_ledger_binding[
                     "raw_registry_payload_stored"
                 ],
+                "raw_signature_payload_exposed": (
+                    source_manifest_ledger_binding["public_verification_bundle"][
+                        "raw_signature_payload_exposed"
+                    ]
+                ),
                 "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
                 "weighted_vote_ready_count": registry_snapshot["selection_ready_counts"][
                     "weighted_vote_ready"

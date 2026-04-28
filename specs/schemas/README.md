@@ -213,6 +213,8 @@
   - raw `agents/**/*.yaml` の source_ref / agent_id / role / sha256 / byte_length manifest と source manifest digest を保持し、raw source payload 非保存を検証する
 - `yaoyorozu_source_manifest_ledger_binding.schema`
   - Yaoyorozu source manifest digest set を yaoyorozu-agent-source-manifest ContinuityLedger entry、self+guardian 署名 role、payload ref に束縛し、raw source / registry / continuity event payload 非保存を検証する
+- `yaoyorozu_source_manifest_public_verification_bundle.schema`
+  - Yaoyorozu source manifest ledger binding を external reviewer 向けに公開検証できる digest-only bundle として投影し、signature digest / verifier key ref を raw signature payload なしで束縛する
 
 ## 次段階
 

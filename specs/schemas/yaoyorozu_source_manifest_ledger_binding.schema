@@ -27,6 +27,9 @@ required:
   - continuity_ledger_entry_ref
   - continuity_ledger_entry_hash
   - continuity_ledger_payload_ref
+  - public_verification_bundle_ref
+  - public_verification_bundle_digest
+  - public_verification_bundle
   - raw_source_payload_stored
   - raw_registry_payload_stored
   - raw_continuity_event_payload_stored
@@ -123,6 +126,14 @@ properties:
   continuity_ledger_payload_ref:
     type: string
     pattern: "^cas://sha256/[a-f0-9]{64}$"
+  public_verification_bundle_ref:
+    type: string
+    pattern: "^verification://yaoyorozu/source-manifest/yaoyorozu-source-manifest-public-verification-[a-f0-9]{12}$"
+  public_verification_bundle_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  public_verification_bundle:
+    $ref: "yaoyorozu_source_manifest_public_verification_bundle.schema"
   raw_source_payload_stored:
     const: false
   raw_registry_payload_stored:
@@ -142,9 +153,12 @@ properties:
       - continuity_ledger_entry_digest_bound
       - continuity_ledger_payload_ref_bound
       - continuity_ledger_signature_roles_bound
+      - public_verification_bundle_bound
+      - public_verification_bundle_digest_bound
       - raw_source_payload_stored
       - raw_registry_payload_stored
       - raw_continuity_event_payload_stored
+      - raw_signature_payload_exposed
     properties:
       ok:
         const: true
@@ -164,11 +178,17 @@ properties:
         const: true
       continuity_ledger_signature_roles_bound:
         const: true
+      public_verification_bundle_bound:
+        const: true
+      public_verification_bundle_digest_bound:
+        const: true
       raw_source_payload_stored:
         const: false
       raw_registry_payload_stored:
         const: false
       raw_continuity_event_payload_stored:
+        const: false
+      raw_signature_payload_exposed:
         const: false
 examples:
   - kind: yaoyorozu_source_manifest_ledger_binding
@@ -200,6 +220,52 @@ examples:
     continuity_ledger_entry_ref: ledger://continuity-ledger/4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     continuity_ledger_entry_hash: 4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     continuity_ledger_payload_ref: cas://sha256/5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    public_verification_bundle_ref: verification://yaoyorozu/source-manifest/yaoyorozu-source-manifest-public-verification-0123456789ab
+    public_verification_bundle_digest: 9123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    public_verification_bundle:
+      kind: yaoyorozu_source_manifest_public_verification_bundle
+      schema_version: "1.0.0"
+      profile_id: yaoyorozu-source-manifest-public-verification-bundle-v1
+      bundle_id: yaoyorozu-source-manifest-public-verification-0123456789ab
+      bundle_ref: verification://yaoyorozu/source-manifest/yaoyorozu-source-manifest-public-verification-0123456789ab
+      binding_id: yaoyorozu-source-manifest-0123456789ab
+      binding_profile: yaoyorozu-agent-source-manifest-continuity-ledger-binding-v1
+      registry_snapshot_ref: registry://yaoyorozu-registry-0123456789ab
+      registry_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      policy_id: repo-local-yaoyorozu-registry-v1
+      source_root: agents
+      source_digest_profile: repo-local-agent-source-digest-manifest-v1
+      source_definition_count: 1
+      source_definition_digests:
+        - source_ref: agents/guardians/integrity-guardian.yaml
+          agent_id: integrity-guardian
+          role: guardian
+          sha256: 1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          byte_length: 768
+      source_definition_digest_set_digest: 2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      source_manifest_digest: 2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_event_ref: ledger://yaoyorozu/source-manifest/yaoyorozu-source-manifest-0123456789ab
+      continuity_event_digest: 3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_ledger_category: yaoyorozu-agent-source-manifest
+      continuity_ledger_event_type: yaoyorozu.agent_source_manifest.bound
+      continuity_ledger_entry_ref: ledger://continuity-ledger/4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_ledger_entry_hash: 4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_ledger_payload_ref: cas://sha256/5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_ledger_signature_roles:
+        - self
+        - guardian
+      signature_digests:
+        self: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        guardian: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      verifier_key_refs:
+        self: key://continuity-ledger/self/reference-verifier/v1
+        guardian: key://continuity-ledger/guardian/reference-verifier/v1
+      public_verification_ready: true
+      raw_source_payload_exposed: false
+      raw_registry_payload_exposed: false
+      raw_continuity_event_payload_exposed: false
+      raw_signature_payload_exposed: false
+      bundle_digest: 9123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     raw_source_payload_stored: false
     raw_registry_payload_stored: false
     raw_continuity_event_payload_stored: false
@@ -213,6 +279,9 @@ examples:
       continuity_ledger_entry_digest_bound: true
       continuity_ledger_payload_ref_bound: true
       continuity_ledger_signature_roles_bound: true
+      public_verification_bundle_bound: true
+      public_verification_bundle_digest_bound: true
       raw_source_payload_stored: false
       raw_registry_payload_stored: false
       raw_continuity_event_payload_stored: false
+      raw_signature_payload_exposed: false

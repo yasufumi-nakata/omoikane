@@ -4108,9 +4108,54 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             result["registry"]["source_manifest_digest"],
             source_manifest_binding["source_manifest_digest"],
         )
+        public_bundle = source_manifest_binding["public_verification_bundle"]
+        self.assertTrue(public_bundle["public_verification_ready"])
+        self.assertTrue(source_manifest_binding["validation"]["public_verification_bundle_bound"])
+        self.assertTrue(
+            source_manifest_binding["validation"]["public_verification_bundle_digest_bound"]
+        )
+        self.assertEqual(
+            source_manifest_binding["public_verification_bundle_ref"],
+            public_bundle["bundle_ref"],
+        )
+        self.assertEqual(
+            source_manifest_binding["public_verification_bundle_digest"],
+            public_bundle["bundle_digest"],
+        )
+        self.assertEqual(
+            source_manifest_binding["source_manifest_digest"],
+            public_bundle["source_manifest_digest"],
+        )
+        self.assertEqual(result["registry"]["registry_digest"], public_bundle["registry_digest"])
+        self.assertEqual(
+            result["registry"]["source_manifest_digest"],
+            public_bundle["source_manifest_digest"],
+        )
+        self.assertEqual(
+            source_manifest_binding["source_definition_digests"],
+            public_bundle["source_definition_digests"],
+        )
+        self.assertEqual(
+            source_manifest_binding["continuity_ledger_entry_ref"],
+            public_bundle["continuity_ledger_entry_ref"],
+        )
+        self.assertEqual(["self", "guardian"], public_bundle["continuity_ledger_signature_roles"])
+        self.assertEqual({"self", "guardian"}, set(public_bundle["signature_digests"]))
+        self.assertEqual(
+            "key://continuity-ledger/self/reference-verifier/v1",
+            public_bundle["verifier_key_refs"]["self"],
+        )
+        self.assertEqual(
+            "key://continuity-ledger/guardian/reference-verifier/v1",
+            public_bundle["verifier_key_refs"]["guardian"],
+        )
         self.assertFalse(source_manifest_binding["raw_source_payload_stored"])
         self.assertFalse(source_manifest_binding["raw_registry_payload_stored"])
         self.assertFalse(source_manifest_binding["raw_continuity_event_payload_stored"])
+        self.assertFalse(public_bundle["raw_source_payload_exposed"])
+        self.assertFalse(public_bundle["raw_registry_payload_exposed"])
+        self.assertFalse(public_bundle["raw_continuity_event_payload_exposed"])
+        self.assertFalse(public_bundle["raw_signature_payload_exposed"])
         self.assertEqual(
             1,
             result["ledger_verification"]["category_counts"][

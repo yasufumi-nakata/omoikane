@@ -19,6 +19,8 @@ agents/
 [`specs/schemas/agent_source_definition.schema`](../specs/schemas/agent_source_definition.schema)
 に従い、Yaoyorozu registry materialization 前に必須 field と repo-local ref が検証される。
 registry snapshot には raw YAML 本文ではなく、各 source definition の digest manifest だけを保持する。
+同じ source manifest は ContinuityLedger entry と public verification bundle に束縛され、
+raw source / registry / continuity event / signature payload を公開しない。
 Builder の `build_surface_refs` は convocation 時に coverage area ごとの fixed target path refs を覆う必要がある。
 
 ```yaml

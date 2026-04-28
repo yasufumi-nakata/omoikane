@@ -37,7 +37,9 @@
   `yaoyorozu_workspace_discovery` として machine-readable に固定したうえで、
   repo-local `agents/` から trust-bound registry snapshot と
   self+guardian 署名付き `yaoyorozu-agent-source-manifest`
-  ContinuityLedger binding を materialize し、
+  ContinuityLedger binding、および raw source / registry / continuity event /
+  signature payload を出さずに source digest manifest と ledger entry を検証できる
+  public verification bundle を materialize し、
   `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` / `inter-mind-negotiation-v1` の
   Council convocation / builder handoff plan を materialize し、
   convocation 側でも `workspace_discovery_binding` により accepted workspace set と profile policy を再束縛し、

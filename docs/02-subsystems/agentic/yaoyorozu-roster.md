@@ -84,6 +84,8 @@ repo-local `agents/` をそのまま sync し、
 trust-bound registry snapshot、bounded convocation plan、
 `yaoyorozu-agent-source-manifest` ContinuityLedger entry への
 self+guardian 署名付き source manifest binding、
+同じ source manifest binding を raw source / registry / continuity event / signature payload
+なしで検証できる `yaoyorozu-source-manifest-public-verification-bundle-v1`、
 `self-modify-patch-v1` と `memory-edit-v1` と `fork-request-v1` と `inter-mind-negotiation-v1` を切り替え可能な
 bounded proposal profile catalog、および
 `self-modify-patch-v1` では 4 coverage、

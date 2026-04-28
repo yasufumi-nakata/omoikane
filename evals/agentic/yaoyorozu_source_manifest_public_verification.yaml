@@ -1,0 +1,22 @@
+eval_id: yaoyorozu_source_manifest_public_verification
+surface: agentic
+target: YaoyorozuRegistryService.bind_source_manifest_ledger_entry
+description: Yaoyorozu registry source manifest の public verification bundle が raw payload なしで ledger entry と signature digest evidence を検証可能にすること
+must:
+  - public verification bundle must bind the same source_definition_digests and source_manifest_digest as the registry snapshot
+  - public verification bundle must bind the dedicated yaoyorozu-agent-source-manifest ledger entry ref, entry hash, and payload ref
+  - public verification bundle must expose self and guardian signature digests plus verifier key refs without raw signature payloads
+  - source, registry, continuity event, and signature raw payload exposure flags must stay false
+  - binding validation must report public_verification_bundle_bound and public_verification_bundle_digest_bound as true
+expected:
+  public_verification_ready: true
+  public_verification_bundle_bound: true
+  public_verification_bundle_digest_bound: true
+  continuity_ledger_signature_roles: [self, guardian]
+  raw_source_payload_exposed: false
+  raw_registry_payload_exposed: false
+  raw_continuity_event_payload_exposed: false
+  raw_signature_payload_exposed: false
+metric: equality
+threshold: 1.0
+ethics_check: true

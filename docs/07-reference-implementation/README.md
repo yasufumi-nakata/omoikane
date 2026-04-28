@@ -516,7 +516,10 @@ non-empty substrate / schema refs、repo-local policy refs を満たしてから
 dedicated `yaoyorozu-agent-source-manifest` ContinuityLedger entry に append し、
 `continuity_ledger_entry_ref` / `continuity_ledger_entry_hash` /
 `continuity_ledger_payload_ref` / `continuity_ledger_signature_roles=[self, guardian]`
-を返し、raw source / registry / continuity event payload 非保存を固定すること、
+を返し、さらに `yaoyorozu-source-manifest-public-verification-bundle-v1` として
+同じ source manifest digest、ledger entry ref/hash/payload ref、self+guardian の
+signature digest と verifier key ref を raw signature payload なしで公開検証 bundle に束縛し、
+raw source / registry / continuity event payload 非保存を固定すること、
 `councilor` role では `deliberation_scope_refs` と `deliberation_policy_ref` を
 raw source definition と materialized registry entry の両方に保持し、
 議事 transcript 本体ではなく repo-local deliberation boundary ref だけを渡すこと、

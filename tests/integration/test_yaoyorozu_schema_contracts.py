@@ -55,7 +55,21 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/yaoyorozu_source_manifest_ledger_binding.schema",
             result["source_manifest_ledger_binding"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema",
+            result["source_manifest_ledger_binding"]["public_verification_bundle"],
+        )
         self.assertTrue(result["source_manifest_ledger_binding"]["validation"]["ok"])
+        self.assertTrue(
+            result["source_manifest_ledger_binding"]["validation"][
+                "public_verification_bundle_bound"
+            ]
+        )
+        self.assertTrue(
+            result["source_manifest_ledger_binding"]["validation"][
+                "public_verification_bundle_digest_bound"
+            ]
+        )
         self.assertEqual(
             "yaoyorozu-agent-source-manifest",
             result["source_manifest_ledger_binding"]["continuity_ledger_category"],
@@ -64,6 +78,30 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             ["self", "guardian"],
             result["source_manifest_ledger_binding"]["continuity_ledger_signature_roles"],
         )
+        public_bundle = result["source_manifest_ledger_binding"]["public_verification_bundle"]
+        self.assertTrue(public_bundle["public_verification_ready"])
+        self.assertEqual(
+            result["source_manifest_ledger_binding"]["public_verification_bundle_ref"],
+            public_bundle["bundle_ref"],
+        )
+        self.assertEqual(
+            result["source_manifest_ledger_binding"]["public_verification_bundle_digest"],
+            public_bundle["bundle_digest"],
+        )
+        self.assertEqual(
+            result["registry"]["registry_digest"],
+            public_bundle["registry_digest"],
+        )
+        self.assertEqual(
+            result["registry"]["source_manifest_digest"],
+            public_bundle["source_manifest_digest"],
+        )
+        self.assertEqual(["self", "guardian"], public_bundle["continuity_ledger_signature_roles"])
+        self.assertEqual({"self", "guardian"}, set(public_bundle["signature_digests"]))
+        self.assertFalse(public_bundle["raw_source_payload_exposed"])
+        self.assertFalse(public_bundle["raw_registry_payload_exposed"])
+        self.assertFalse(public_bundle["raw_continuity_event_payload_exposed"])
+        self.assertFalse(public_bundle["raw_signature_payload_exposed"])
         self.assertFalse(result["source_manifest_ledger_binding"]["raw_registry_payload_stored"])
         researcher_entries = [
             entry for entry in result["registry"]["entries"] if entry["role"] == "researcher"
