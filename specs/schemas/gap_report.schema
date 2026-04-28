@@ -161,10 +161,15 @@ properties:
       - scanned_surfaces
       - scan_surface_digests
       - surface_manifest_digest
+      - continuity_event_ref
+      - continuity_event_digest
+      - continuity_ledger_category
+      - continuity_ledger_binding_profile
       - counts
       - all_zero
       - report_digest
       - raw_report_payload_stored
+      - raw_continuity_event_payload_stored
       - validation
     properties:
       kind:
@@ -196,6 +201,16 @@ properties:
       surface_manifest_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
+      continuity_event_ref:
+        type: string
+        pattern: "^ledger://selfctor/gap-report-scan/gap-report-scan-[a-f0-9]{12}$"
+      continuity_event_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      continuity_ledger_category:
+        const: selfctor-gap-report-scan
+      continuity_ledger_binding_profile:
+        const: gap-report-scan-continuity-ledger-binding-v1
       counts:
         type: object
         additionalProperties: false
@@ -260,6 +275,8 @@ properties:
         pattern: "^[a-f0-9]{64}$"
       raw_report_payload_stored:
         const: false
+      raw_continuity_event_payload_stored:
+        const: false
       validation:
         type: object
         additionalProperties: false
@@ -269,9 +286,12 @@ properties:
           - report_digest_bound
           - scan_surface_digests_bound
           - surface_manifest_digest_bound
+          - continuity_ledger_bound
+          - continuity_event_digest_bound
           - prioritized_tasks_empty_when_all_zero
           - raw_report_payload_stored
           - raw_surface_payload_stored
+          - raw_continuity_event_payload_stored
         properties:
           ok:
             type: boolean
@@ -283,11 +303,17 @@ properties:
             type: boolean
           surface_manifest_digest_bound:
             type: boolean
+          continuity_ledger_bound:
+            type: boolean
+          continuity_event_digest_bound:
+            type: boolean
           prioritized_tasks_empty_when_all_zero:
             type: boolean
           raw_report_payload_stored:
             const: false
           raw_surface_payload_stored:
+            const: false
+          raw_continuity_event_payload_stored:
             const: false
 $defs:
   surface_digest:
@@ -381,6 +407,10 @@ examples:
           sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
           byte_length: 16
       surface_manifest_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_event_ref: ledger://selfctor/gap-report-scan/gap-report-scan-0123456789ab
+      continuity_event_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_ledger_category: selfctor-gap-report-scan
+      continuity_ledger_binding_profile: gap-report-scan-continuity-ledger-binding-v1
       counts:
         open_question_count: 0
         missing_expected_file_count: 0
@@ -398,12 +428,16 @@ examples:
       all_zero: true
       report_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       raw_report_payload_stored: false
+      raw_continuity_event_payload_stored: false
       validation:
         ok: true
         counts_match_report: true
         report_digest_bound: true
         scan_surface_digests_bound: true
         surface_manifest_digest_bound: true
+        continuity_ledger_bound: true
+        continuity_event_digest_bound: true
         prioritized_tasks_empty_when_all_zero: true
         raw_report_payload_stored: false
         raw_surface_payload_stored: false
+        raw_continuity_event_payload_stored: false

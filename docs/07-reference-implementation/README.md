@@ -121,6 +121,10 @@ counts、prioritized task count、scan surface、report digest、
 truth-source ごとの digest-only `scan_surface_digests` / `surface_manifest_digest`、
 raw report / raw surface payload 非保存を
 `gap_report.schema` で machine-checkable に固定する。
+さらに scan receipt は `gap-report-scan-continuity-ledger-binding-v1` として
+`continuity_event_ref` / `continuity_event_digest` を返し、report digest と
+surface manifest digest を continuity ledger 用 evidence に束縛する。
+raw continuity event payload は保存しない。
 
 
 `identity-demo` は L1 IdentityRegistry の reference contract

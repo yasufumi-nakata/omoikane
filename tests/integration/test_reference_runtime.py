@@ -701,7 +701,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(report["scan_receipt"]["raw_report_payload_stored"])
         self.assertTrue(report["scan_receipt"]["validation"]["scan_surface_digests_bound"])
         self.assertTrue(report["scan_receipt"]["validation"]["surface_manifest_digest_bound"])
+        self.assertTrue(report["scan_receipt"]["validation"]["continuity_ledger_bound"])
+        self.assertTrue(
+            report["scan_receipt"]["validation"]["continuity_event_digest_bound"]
+        )
         self.assertFalse(report["scan_receipt"]["validation"]["raw_surface_payload_stored"])
+        self.assertFalse(report["scan_receipt"]["raw_continuity_event_payload_stored"])
+        self.assertFalse(
+            report["scan_receipt"]["validation"][
+                "raw_continuity_event_payload_stored"
+            ]
+        )
         self.assertTrue(
             any(
                 entry["path"] == "meta/open-questions.md"

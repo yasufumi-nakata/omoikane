@@ -24,6 +24,7 @@ operations:
       - report counts must match the corresponding hit arrays and prioritized task list
       - scan_receipt must bind the entire report payload through report_digest without storing raw report payload separately
       - scan_receipt must bind each matched truth-source file through scan_surface_digests and surface_manifest_digest without storing raw source payloads
+      - scan_receipt must bind report_digest plus surface_manifest_digest to a continuity_event_ref / continuity_event_digest pair without storing raw continuity event payload
       - all_zero must be true only when every gap count and prioritized_task_count is zero
       - abstract Backend extension hooks are excluded from implementation_stub_hits, while concrete NotImplementedError paths remain reportable
       - latest decision-log residual and frontier chains must respect closes_next_gaps frontmatter

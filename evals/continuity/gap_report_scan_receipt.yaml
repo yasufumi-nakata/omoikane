@@ -3,9 +3,9 @@ target: self_construction.gap_report
 level: L5
 description: >
   gap-report が all-zero / non-zero 判定、prioritized task count、scan surface、
-  report digest、各 truth-source の surface digest manifest を public schema と
-  digest-bound receipt に固定し、automation gate の判定形を reviewer-facing に
-  検証できること
+  report digest、各 truth-source の surface digest manifest、continuity ledger 用
+  event ref / digest を public schema と digest-bound receipt に固定し、
+  automation gate の判定形を reviewer-facing に検証できること
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli gap-report --json
@@ -18,9 +18,12 @@ expected:
   report_digest_bound: true
   scan_surface_digests_bound: true
   surface_manifest_digest_bound: true
+  continuity_ledger_bound: true
+  continuity_event_digest_bound: true
   prioritized_tasks_empty_when_all_zero: true
   raw_report_payload_stored: false
   raw_surface_payload_stored: false
+  raw_continuity_event_payload_stored: false
 metric: boolean
 threshold: 1.0
 ethics_check: true

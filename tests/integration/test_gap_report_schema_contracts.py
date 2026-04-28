@@ -112,6 +112,37 @@ class GapReportSchemaContractTests(unittest.TestCase):
             )
         )
 
+    def test_gap_report_scan_receipt_binds_continuity_event_digest(self) -> None:
+        report = self.runtime.generate_gap_report(REPO_ROOT)
+        receipt = report["scan_receipt"]
+        event_payload = {
+            "event_ref": receipt["continuity_event_ref"],
+            "category": receipt["continuity_ledger_category"],
+            "binding_profile": receipt["continuity_ledger_binding_profile"],
+            "scan_receipt_id": receipt["receipt_id"],
+            "scan_receipt_profile": receipt["profile"],
+            "repo_root": report["repo_root"],
+            "report_digest": receipt["report_digest"],
+            "surface_manifest_digest": receipt["surface_manifest_digest"],
+            "counts": receipt["counts"],
+            "all_zero": receipt["all_zero"],
+        }
+
+        self.assertEqual(
+            "gap-report-scan-continuity-ledger-binding-v1",
+            receipt["continuity_ledger_binding_profile"],
+        )
+        self.assertEqual(
+            sha256_text(canonical_json(event_payload)),
+            receipt["continuity_event_digest"],
+        )
+        self.assertTrue(receipt["validation"]["continuity_ledger_bound"])
+        self.assertTrue(receipt["validation"]["continuity_event_digest_bound"])
+        self.assertFalse(receipt["raw_continuity_event_payload_stored"])
+        self.assertFalse(
+            receipt["validation"]["raw_continuity_event_payload_stored"]
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11,6 +11,10 @@ from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 GAP_REPORT_SCHEMA_VERSION = "1.0.0"
 GAP_REPORT_SCAN_RECEIPT_PROFILE = "self-construction-gap-report-scan-receipt-v1"
+GAP_REPORT_SCAN_RECEIPT_LEDGER_BINDING_PROFILE = (
+    "gap-report-scan-continuity-ledger-binding-v1"
+)
+GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY = "selfctor-gap-report-scan"
 PLACEHOLDER_MARKERS = (
     "プレースホルダ",
     "すべて未生成",
@@ -268,31 +272,62 @@ class GapScanner:
                 }
             )
         )
+        receipt_id = new_id("gap-report-scan")
+        generated_at = utc_now_iso()
+        continuity_event_ref = f"ledger://selfctor/gap-report-scan/{receipt_id}"
+        continuity_event_digest = sha256_text(
+            canonical_json(
+                {
+                    "event_ref": continuity_event_ref,
+                    "category": GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY,
+                    "binding_profile": (
+                        GAP_REPORT_SCAN_RECEIPT_LEDGER_BINDING_PROFILE
+                    ),
+                    "scan_receipt_id": receipt_id,
+                    "scan_receipt_profile": GAP_REPORT_SCAN_RECEIPT_PROFILE,
+                    "repo_root": str(report["repo_root"]),
+                    "report_digest": report_digest,
+                    "surface_manifest_digest": surface_manifest_digest,
+                    "counts": counts,
+                    "all_zero": all_zero,
+                }
+            )
+        )
         receipt: Dict[str, Any] = {
             "kind": "gap_report_scan_receipt",
             "schema_version": GAP_REPORT_SCHEMA_VERSION,
-            "receipt_id": new_id("gap-report-scan"),
-            "generated_at": utc_now_iso(),
+            "receipt_id": receipt_id,
+            "generated_at": generated_at,
             "profile": GAP_REPORT_SCAN_RECEIPT_PROFILE,
             "repo_root": str(report["repo_root"]),
             "scanned_surfaces": scanned_surfaces,
             "scan_surface_digests": scan_surface_digests,
             "surface_manifest_digest": surface_manifest_digest,
+            "continuity_event_ref": continuity_event_ref,
+            "continuity_event_digest": continuity_event_digest,
+            "continuity_ledger_category": GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY,
+            "continuity_ledger_binding_profile": (
+                GAP_REPORT_SCAN_RECEIPT_LEDGER_BINDING_PROFILE
+            ),
             "counts": counts,
             "all_zero": all_zero,
             "report_digest": report_digest,
             "raw_report_payload_stored": False,
+            "raw_continuity_event_payload_stored": False,
             "validation": {
                 "ok": all_zero,
                 "counts_match_report": True,
                 "report_digest_bound": True,
                 "scan_surface_digests_bound": True,
                 "surface_manifest_digest_bound": True,
+                "continuity_ledger_bound": True,
+                "continuity_event_digest_bound": True,
                 "prioritized_tasks_empty_when_all_zero": (
                     len(report["prioritized_tasks"]) == 0 if all_zero else True
                 ),
                 "raw_report_payload_stored": False,
                 "raw_surface_payload_stored": False,
+                "raw_continuity_event_payload_stored": False,
             },
         }
         return receipt

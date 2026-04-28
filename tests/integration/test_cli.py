@@ -50,7 +50,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["scan_receipt"]["raw_report_payload_stored"])
         self.assertTrue(result["scan_receipt"]["validation"]["scan_surface_digests_bound"])
         self.assertTrue(result["scan_receipt"]["validation"]["surface_manifest_digest_bound"])
+        self.assertTrue(result["scan_receipt"]["validation"]["continuity_ledger_bound"])
+        self.assertTrue(
+            result["scan_receipt"]["validation"]["continuity_event_digest_bound"]
+        )
         self.assertFalse(result["scan_receipt"]["validation"]["raw_surface_payload_stored"])
+        self.assertFalse(result["scan_receipt"]["raw_continuity_event_payload_stored"])
+        self.assertFalse(
+            result["scan_receipt"]["validation"]["raw_continuity_event_payload_stored"]
+        )
         self.assertTrue(
             any(
                 entry["path"] == "meta/open-questions.md"
