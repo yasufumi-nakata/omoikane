@@ -38,6 +38,7 @@
 - `continuity_public_verification_bundle.schema`
 - `council_argument.yaml`
 - `council_convocation_session.schema`
+  - selected Councilor / Guardian / Builder の registry scope refs と policy ref を registry selection scope binding profile として保持し、raw scope payload 非保存を検証する
 - `council_input.yaml`
 - `council_output.yaml`
 - `council_session_policy.schema`

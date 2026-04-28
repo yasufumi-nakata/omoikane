@@ -113,6 +113,11 @@ Councilor role は registry materialization 前に `deliberation_scope_refs` と
 docs / specs / evals / agents / meta surface と deliberation policy ref を
 `agent_registry_entry` に保存し、role 名だけではなく、どの設計境界について
 発言・記録・反対・倫理判断を行うのかを reviewer-facing に確認できるようにする。
+Council convocation は選定された speaker / recorder の `role_scope_kind=deliberation`、
+guardian liaison の `role_scope_kind=oversight`、profile-specific council panel の
+role-specific scope、builder handoff の `role_scope_kind=build-surface` と、それぞれの
+scope refs / policy ref を `registry-selection-scope-binding-v1` として same-session artifact に再束縛する。
+raw deliberation transcript、raw audit payload、raw build payload は selection artifact に保存しない。
 
 Researcher role は registry materialization 前に `research_domain_refs` と
 `evidence_policy_ref` を必須とする。Yaoyorozu registry は raw research payload を

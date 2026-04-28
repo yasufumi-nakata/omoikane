@@ -69,6 +69,11 @@ repo-local `agents/` から選んだ builder handoff が
 selected proposal profile の required coverage へだけ分解され、
 actual subprocess worker receipt として machine-checkable に実行されること。
 
+### Yaoyorozu Council Convocation
+registry entry 由来の Councilor deliberation scope、Guardian oversight scope、
+Builder build surface scope が convocation selection に再束縛され、
+raw transcript / audit / build payload を保存せず policy refs だけで監査できること。
+
 ### Yaoyorozu Agent Source Definition Contract
 raw `agents/**/*.yaml` が non-empty substrate / schema refs / policy refs を持ち、
 registry materialization 前に schema-bound contract として reject されること。

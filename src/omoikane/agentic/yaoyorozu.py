@@ -90,6 +90,7 @@ YAOYOROZU_WORKSPACE_GUARDIAN_GATE_PROFILE = (
 YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE = (
     "human-oversight-channel-preseed-attestation-v1"
 )
+YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE = "registry-selection-scope-binding-v1"
 AGENT_SOURCE_DEFINITION_SCHEMA_VERSION = "1.0.0"
 AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
 AGENT_SOURCE_ALLOWED_ROLES = {"councilor", "builder", "researcher", "guardian"}
@@ -3155,6 +3156,12 @@ class YaoyorozuRegistryService:
                 "selected_agent_id": "self-liaison://primary",
                 "display_name": "SelfLiaison",
                 "source_ref": target_identity_ref,
+                "selected_role": "self-liaison",
+                "role_scope_kind": "identity-liaison",
+                "role_scope_refs": [target_identity_ref],
+                "role_policy_ref": "policy://yaoyorozu/self-liaison-explicit-veto/v1",
+                "selection_scope_binding_profile": YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE,
+                "raw_role_scope_payload_stored": False,
                 "status": "selected",
                 "trust_score": 1.0,
                 "invite_eligible": True,
@@ -3187,6 +3194,23 @@ class YaoyorozuRegistryService:
             if str(spec["coverage_area"]) in dispatch_builder_coverage
         ]
 
+        standing_role_scope_binding_ok = (
+            self._selection_scope_bound(standing_roles["speaker"], "deliberation")
+            and self._selection_scope_bound(standing_roles["recorder"], "deliberation")
+            and self._selection_scope_bound(standing_roles["guardian_liaison"], "oversight")
+            and self._selection_scope_bound(standing_roles["self_liaison"], "identity-liaison")
+        )
+        council_panel_scope_binding_ok = all(
+            self._selection_has_registry_scope(
+                selection,
+                ("deliberation", "oversight", "research-evidence"),
+            )
+            for selection in council_panel
+        )
+        builder_handoff_scope_binding_ok = all(
+            self._builder_selection_scope_bound(selection)
+            for selection in builder_handoff
+        )
         missing_council_roles = [
             selection["role_id"] for selection in council_panel if selection["status"] != "selected"
         ]
@@ -3224,11 +3248,20 @@ class YaoyorozuRegistryService:
             "workspace_profile_policy_ready": workspace_profile_policy_ready,
             "workspace_execution_bound": workspace_execution_binding is not None,
             "workspace_execution_policy_ready": workspace_execution_policy_ready,
+            "standing_role_scope_binding_ok": standing_role_scope_binding_ok,
+            "council_panel_scope_binding_ok": council_panel_scope_binding_ok,
+            "builder_handoff_scope_binding_ok": builder_handoff_scope_binding_ok,
+            "raw_selection_scope_payload_stored": False,
         }
         validation["ok"] = all(
             value
             for key, value in validation.items()
-            if key not in {"workspace_discovery_bound", "workspace_execution_bound"}
+            if key
+            not in {
+                "workspace_discovery_bound",
+                "workspace_execution_bound",
+                "raw_selection_scope_payload_stored",
+            }
         )
         session_body = {
             "registry_snapshot_ref": (
@@ -7293,6 +7326,88 @@ class YaoyorozuRegistryService:
             per_domain={default_domain: initial_score},
         )
 
+    @staticmethod
+    def _entry_scope_binding(
+        entry: YaoyorozuRegistryEntry,
+    ) -> Dict[str, Any]:
+        if entry.role == "councilor":
+            return {
+                "role_scope_kind": "deliberation",
+                "role_scope_refs": list(entry.deliberation_scope_refs),
+                "role_policy_ref": entry.deliberation_policy_ref,
+            }
+        if entry.role == "builder":
+            return {
+                "role_scope_kind": "build-surface",
+                "role_scope_refs": list(entry.build_surface_refs),
+                "role_policy_ref": entry.execution_policy_ref,
+            }
+        if entry.role == "researcher":
+            return {
+                "role_scope_kind": "research-evidence",
+                "role_scope_refs": list(entry.research_domain_refs),
+                "role_policy_ref": entry.evidence_policy_ref,
+            }
+        if entry.role == "guardian":
+            return {
+                "role_scope_kind": "oversight",
+                "role_scope_refs": list(entry.oversight_scope_refs),
+                "role_policy_ref": entry.attestation_policy_ref,
+            }
+        return {
+            "role_scope_kind": "unbound",
+            "role_scope_refs": [],
+            "role_policy_ref": "",
+        }
+
+    @staticmethod
+    def _selection_scope_bound(
+        selection: Mapping[str, Any],
+        expected_kind: str,
+    ) -> bool:
+        if selection.get("status") != "selected":
+            return False
+        return (
+            selection.get("role_scope_kind") == expected_kind
+            and bool(selection.get("role_scope_refs"))
+            and bool(selection.get("role_policy_ref"))
+            and selection.get("selection_scope_binding_profile")
+            == YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE
+            and selection.get("raw_role_scope_payload_stored") is False
+        )
+
+    @staticmethod
+    def _selection_has_registry_scope(
+        selection: Mapping[str, Any],
+        allowed_kinds: Sequence[str],
+    ) -> bool:
+        if selection.get("status") != "selected":
+            return False
+        return (
+            selection.get("role_scope_kind") in set(allowed_kinds)
+            and bool(selection.get("role_scope_refs"))
+            and bool(selection.get("role_policy_ref"))
+            and selection.get("selection_scope_binding_profile")
+            == YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE
+            and selection.get("raw_role_scope_payload_stored") is False
+        )
+
+    @classmethod
+    def _builder_selection_scope_bound(cls, selection: Mapping[str, Any]) -> bool:
+        if not cls._selection_scope_bound(selection, "build-surface"):
+            return False
+        coverage_area = str(selection.get("coverage_area", "")).strip()
+        expected_prefixes = {
+            "runtime": ("src/", "tests/"),
+            "schema": ("specs/",),
+            "eval": ("evals/", "tests/"),
+            "docs": ("docs/", "agents/", "meta/"),
+        }.get(coverage_area, ())
+        refs = [str(ref) for ref in selection.get("role_scope_refs", [])]
+        return bool(expected_prefixes) and any(
+            ref.startswith(expected_prefixes) for ref in refs
+        )
+
     def _select_named_agent(
         self,
         *,
@@ -7320,6 +7435,7 @@ class YaoyorozuRegistryService:
                 trust_snapshot["eligibility"]["apply_to_runtime"]
                 and trust_snapshot["global_score"] >= max(entry.trust_floor, self._policy.apply_floor)
             )
+            scope_binding = self._entry_scope_binding(entry)
             selected_ok = {
                 "invite_to_council": invite_eligible,
                 "count_for_weighted_vote": weighted_vote_eligible,
@@ -7331,6 +7447,12 @@ class YaoyorozuRegistryService:
                     "agent_id": agent_id,
                     "display_name": entry.display_name,
                     "source_ref": entry.source_ref,
+                    "selected_role": entry.role,
+                    "role_scope_kind": scope_binding["role_scope_kind"],
+                    "role_scope_refs": scope_binding["role_scope_refs"],
+                    "role_policy_ref": scope_binding["role_policy_ref"],
+                    "selection_scope_binding_profile": YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE,
+                    "raw_role_scope_payload_stored": False,
                     "trust_score": round(trust_snapshot["global_score"], 3),
                     "invite_eligible": invite_eligible,
                     "weighted_vote_eligible": weighted_vote_eligible,
@@ -7351,6 +7473,16 @@ class YaoyorozuRegistryService:
             "selected_agent_id": selected["agent_id"] if selected and selected["selected_ok"] else "",
             "display_name": selected["display_name"] if selected else "",
             "source_ref": selected["source_ref"] if selected else "",
+            "selected_role": selected["selected_role"] if selected else "",
+            "role_scope_kind": selected["role_scope_kind"] if selected else "unbound",
+            "role_scope_refs": list(selected["role_scope_refs"]) if selected else [],
+            "role_policy_ref": selected["role_policy_ref"] if selected else "",
+            "selection_scope_binding_profile": (
+                selected["selection_scope_binding_profile"]
+                if selected
+                else YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE
+            ),
+            "raw_role_scope_payload_stored": False,
             "status": "selected" if selected and selected["selected_ok"] else ("blocked" if ranked else "missing"),
             "trust_score": selected["trust_score"] if selected else 0.0,
             "invite_eligible": selected["invite_eligible"] if selected else False,

@@ -4278,6 +4278,18 @@ json.dump(response, sys.stdout)
                 "builder_profile_policy_ready": convocation["validation"][
                     "builder_profile_policy_ready"
                 ],
+                "standing_role_scope_binding_ok": convocation["validation"][
+                    "standing_role_scope_binding_ok"
+                ],
+                "council_panel_scope_binding_ok": convocation["validation"][
+                    "council_panel_scope_binding_ok"
+                ],
+                "builder_handoff_scope_binding_ok": convocation["validation"][
+                    "builder_handoff_scope_binding_ok"
+                ],
+                "raw_selection_scope_payload_stored": convocation["validation"][
+                    "raw_selection_scope_payload_stored"
+                ],
                 "workspace_discovery_bound": convocation["validation"][
                     "workspace_discovery_bound"
                 ],

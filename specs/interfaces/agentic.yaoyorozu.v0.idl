@@ -132,6 +132,7 @@ operations:
       - standing roles must include speaker, recorder, guardian_liaison, and self_liaison
       - when workspace_discovery is bound, its proposal_profile and profile policy must match the selected convocation profile
       - council panel must satisfy weighted vote quorum before emit_build_request
+      - selected Councilor, Guardian, and Builder entries must carry registry-selection-scope-binding-v1 scope refs and policy refs without raw deliberation, audit, or build payloads
       - proposal_profile must fix the required and optional builder coverage policy surfaced by the convocation artifact
       - requested_optional_builder_coverage_areas, when present, must stay within the selected profile's optional coverage and become first-class dispatch_builder_coverage_areas
   prepare_worker_dispatch:

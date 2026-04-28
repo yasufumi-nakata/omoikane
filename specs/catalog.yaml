@@ -2614,7 +2614,7 @@ entries:
       - docs/02-subsystems/agentic/council-composition.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to bind standing roles, council panel selection, builder handoff coverage, and the selected workspace-discovery policy into one deterministic convocation artifact.
+    rationale: Required to bind standing roles, council panel selection, registry-derived role scope refs / policy refs, builder handoff coverage, and the selected workspace-discovery policy into one deterministic convocation artifact.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_worker_dispatch_plan.schema
@@ -2707,7 +2707,7 @@ entries:
       - docs/04-ai-governance/subagent-roster.md
       - docs/07-reference-implementation/README.md
       - reference-runtime
-    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation, same-session ConsensusBus/TaskGraph/build_request handoff binding, reviewer-facing execution-chain binding, and same-host worker dispatch with module-origin proof machine-readable across docs and runtime.
+    rationale: Required to make repo-local registry sync, proposal-profile-aware workspace review policy, bounded Council convocation with selection-scope binding, same-session ConsensusBus/TaskGraph/build_request handoff binding, reviewer-facing execution-chain binding, and same-host worker dispatch with module-origin proof machine-readable across docs and runtime.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_workspace_discovery.yaml
@@ -2721,7 +2721,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects standing role readiness, weighted vote quorum, builder handoff coverage, and workspace-discovery policy binding for self-modify convocation.
+    rationale: Protects standing role readiness, registry-derived selection scope binding, weighted vote quorum, builder handoff coverage, and workspace-discovery policy binding for self-modify convocation.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_memory_edit_profile.yaml

@@ -106,6 +106,25 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/council_convocation_session.schema",
             result["convocation"],
         )
+        self.assertTrue(result["convocation"]["validation"]["standing_role_scope_binding_ok"])
+        self.assertTrue(result["convocation"]["validation"]["council_panel_scope_binding_ok"])
+        self.assertTrue(result["convocation"]["validation"]["builder_handoff_scope_binding_ok"])
+        self.assertFalse(result["convocation"]["validation"]["raw_selection_scope_payload_stored"])
+        self.assertEqual(
+            "oversight",
+            result["convocation"]["standing_roles"]["guardian_liaison"]["role_scope_kind"],
+        )
+        self.assertEqual(
+            "deliberation",
+            result["convocation"]["council_panel"][0]["role_scope_kind"],
+        )
+        self.assertEqual(
+            "build-surface",
+            result["convocation"]["builder_handoff"][0]["role_scope_kind"],
+        )
+        self.assertFalse(
+            result["convocation"]["builder_handoff"][0]["raw_role_scope_payload_stored"]
+        )
 
     def test_worker_dispatch_plan_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()

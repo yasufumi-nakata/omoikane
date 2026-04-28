@@ -12,6 +12,10 @@ expected:
   weighted_vote_quorum_ready: true
   builder_handoff_coverage_ok: true
   builder_profile_policy_ready: true
+  standing_role_scope_binding_ok: true
+  council_panel_scope_binding_ok: true
+  builder_handoff_scope_binding_ok: true
+  raw_selection_scope_payload_stored: false
   workspace_discovery_bound: true
   workspace_profile_policy_ready: true
   required_builder_coverage_areas:

@@ -3364,8 +3364,31 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(session["validation"]["standing_roles_ready"])
         self.assertTrue(session["validation"]["council_role_coverage_ok"])
         self.assertTrue(session["validation"]["builder_handoff_coverage_ok"])
+        self.assertTrue(session["validation"]["standing_role_scope_binding_ok"])
+        self.assertTrue(session["validation"]["council_panel_scope_binding_ok"])
+        self.assertTrue(session["validation"]["builder_handoff_scope_binding_ok"])
+        self.assertFalse(session["validation"]["raw_selection_scope_payload_stored"])
         self.assertEqual(4, session["selection_summary"]["selected_builder_coverage_count"])
         self.assertEqual("selected", session["standing_roles"]["guardian_liaison"]["status"])
+        self.assertEqual(
+            "oversight",
+            session["standing_roles"]["guardian_liaison"]["role_scope_kind"],
+        )
+        self.assertIn(
+            "evals/agentic/yaoyorozu_agent_source_definition_contract.yaml",
+            session["standing_roles"]["guardian_liaison"]["role_scope_refs"],
+        )
+        self.assertEqual(
+            "registry-selection-scope-binding-v1",
+            session["council_panel"][0]["selection_scope_binding_profile"],
+        )
+        self.assertEqual("deliberation", session["council_panel"][0]["role_scope_kind"])
+        self.assertIn(
+            "docs/07-reference-implementation/README.md",
+            session["council_panel"][0]["role_scope_refs"],
+        )
+        self.assertEqual("build-surface", session["builder_handoff"][0]["role_scope_kind"])
+        self.assertIn("src/omoikane/", session["builder_handoff"][0]["role_scope_refs"])
         self.assertEqual("self-modify-patch-v1", session["proposal_profile"])
 
     def test_prepare_memory_edit_convocation_selects_memory_sensitive_roles(self) -> None:

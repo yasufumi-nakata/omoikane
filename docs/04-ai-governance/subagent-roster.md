@@ -84,6 +84,10 @@ Guardian role 自体も `oversight_scope_refs` と `attestation_policy_ref` を
 registry entry に保持し、Ethics / Identity / Integrity の各 Guardian が
 どの docs / specs / evals / agents / meta surface を監査するかを
 Council handoff 前に確認できる。
+convocation artifact は、registry entry 由来の `deliberation` / `oversight` /
+`build-surface` scope refs と policy ref を各 selection に再束縛し、
+`raw_role_scope_payload_stored=false` を明示するため、Council session 側だけを見ても
+選定理由と監査境界を追える。
 同じ demo は `--proposal-profile memory-edit-v1` により
 reversible memory-edit 向け convocation / dispatch へ切り替えられる。
 さらに `--proposal-profile fork-request-v1` により

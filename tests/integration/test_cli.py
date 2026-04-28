@@ -2552,6 +2552,14 @@ class CliIntegrationTests(unittest.TestCase):
             "selected",
             result["convocation"]["standing_roles"]["guardian_liaison"]["status"],
         )
+        self.assertTrue(result["validation"]["standing_role_scope_binding_ok"])
+        self.assertTrue(result["validation"]["council_panel_scope_binding_ok"])
+        self.assertTrue(result["validation"]["builder_handoff_scope_binding_ok"])
+        self.assertFalse(result["validation"]["raw_selection_scope_payload_stored"])
+        self.assertEqual(
+            "registry-selection-scope-binding-v1",
+            result["convocation"]["builder_handoff"][0]["selection_scope_binding_profile"],
+        )
         self.assertGreaterEqual(result["registry"]["entry_count"], 10)
         self.assertEqual(4, result["validation"]["dispatch_success_count"])
         self.assertEqual(7, result["validation"]["consensus_message_count"])

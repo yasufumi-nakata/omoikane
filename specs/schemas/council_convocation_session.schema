@@ -398,6 +398,10 @@ properties:
       - workspace_profile_policy_ready
       - workspace_execution_bound
       - workspace_execution_policy_ready
+      - standing_role_scope_binding_ok
+      - council_panel_scope_binding_ok
+      - builder_handoff_scope_binding_ok
+      - raw_selection_scope_payload_stored
       - ok
     properties:
       standing_roles_ready:
@@ -422,6 +426,14 @@ properties:
         type: boolean
       workspace_execution_policy_ready:
         type: boolean
+      standing_role_scope_binding_ok:
+        type: boolean
+      council_panel_scope_binding_ok:
+        type: boolean
+      builder_handoff_scope_binding_ok:
+        type: boolean
+      raw_selection_scope_payload_stored:
+        const: false
       ok:
         type: boolean
 $defs:
@@ -434,6 +446,12 @@ $defs:
       - selected_agent_id
       - display_name
       - source_ref
+      - selected_role
+      - role_scope_kind
+      - role_scope_refs
+      - role_policy_ref
+      - selection_scope_binding_profile
+      - raw_role_scope_payload_stored
       - status
       - trust_score
       - invite_eligible
@@ -455,6 +473,28 @@ $defs:
         type: string
       source_ref:
         type: string
+      selected_role:
+        type: string
+      role_scope_kind:
+        type: string
+        enum:
+          - deliberation
+          - build-surface
+          - research-evidence
+          - oversight
+          - identity-liaison
+          - unbound
+      role_scope_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      role_policy_ref:
+        type: string
+      selection_scope_binding_profile:
+        const: registry-selection-scope-binding-v1
+      raw_role_scope_payload_stored:
+        const: false
       status:
         type: string
         enum:
@@ -490,6 +530,12 @@ $defs:
       - selected_agent_id
       - display_name
       - source_ref
+      - selected_role
+      - role_scope_kind
+      - role_scope_refs
+      - role_policy_ref
+      - selection_scope_binding_profile
+      - raw_role_scope_payload_stored
       - status
       - trust_score
       - invite_eligible
@@ -512,6 +558,28 @@ $defs:
         type: string
       source_ref:
         type: string
+      selected_role:
+        type: string
+      role_scope_kind:
+        type: string
+        enum:
+          - deliberation
+          - build-surface
+          - research-evidence
+          - oversight
+          - identity-liaison
+          - unbound
+      role_scope_refs:
+        type: array
+        items:
+          type: string
+          minLength: 1
+      role_policy_ref:
+        type: string
+      selection_scope_binding_profile:
+        const: registry-selection-scope-binding-v1
+      raw_role_scope_payload_stored:
+        const: false
       status:
         type: string
         enum:
@@ -564,6 +632,15 @@ examples:
         selected_agent_id: design-architect
         display_name: DesignArchitect
         source_ref: agents/councilors/design-architect.yaml
+        selected_role: councilor
+        role_scope_kind: deliberation
+        role_scope_refs:
+          - docs/01-architecture/overview.md
+          - docs/07-reference-implementation/README.md
+          - specs/catalog.yaml
+        role_policy_ref: agents/councilors/design-architect.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.72
         invite_eligible: true
@@ -579,6 +656,15 @@ examples:
         selected_agent_id: memory-archivist
         display_name: MemoryArchivist
         source_ref: agents/councilors/memory-archivist.yaml
+        selected_role: councilor
+        role_scope_kind: deliberation
+        role_scope_refs:
+          - meta/decision-log/README.md
+          - docs/07-reference-implementation/README.md
+          - specs/schemas/continuity_log_entry.schema
+        role_policy_ref: agents/councilors/memory-archivist.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.66
         invite_eligible: true
@@ -594,6 +680,15 @@ examples:
         selected_agent_id: integrity-guardian
         display_name: IntegrityGuardian
         source_ref: agents/guardians/integrity-guardian.yaml
+        selected_role: guardian
+        role_scope_kind: oversight
+        role_scope_refs:
+          - docs/02-subsystems/kernel/continuity-ledger.md
+          - docs/02-subsystems/agentic/yaoyorozu-roster.md
+          - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+        role_policy_ref: agents/guardians/integrity-guardian.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.99
         invite_eligible: true
@@ -609,6 +704,13 @@ examples:
         selected_agent_id: self-liaison://primary
         display_name: SelfLiaison
         source_ref: identity://primary
+        selected_role: self-liaison
+        role_scope_kind: identity-liaison
+        role_scope_refs:
+          - identity://primary
+        role_policy_ref: policy://yaoyorozu/self-liaison-explicit-veto/v1
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 1.0
         invite_eligible: true
@@ -624,6 +726,15 @@ examples:
         selected_agent_id: design-architect
         display_name: DesignArchitect
         source_ref: agents/councilors/design-architect.yaml
+        selected_role: councilor
+        role_scope_kind: deliberation
+        role_scope_refs:
+          - docs/01-architecture/overview.md
+          - docs/07-reference-implementation/README.md
+          - specs/catalog.yaml
+        role_policy_ref: agents/councilors/design-architect.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.72
         invite_eligible: true
@@ -638,6 +749,15 @@ examples:
         selected_agent_id: change-advocate
         display_name: ChangeAdvocate
         source_ref: agents/councilors/change-advocate.yaml
+        selected_role: councilor
+        role_scope_kind: deliberation
+        role_scope_refs:
+          - docs/04-ai-governance/self-modification.md
+          - docs/07-reference-implementation/README.md
+          - meta/decision-log/README.md
+        role_policy_ref: agents/councilors/change-advocate.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.68
         invite_eligible: true
@@ -652,6 +772,15 @@ examples:
         selected_agent_id: conservatism-advocate
         display_name: ConservatismAdvocate
         source_ref: agents/councilors/conservatism-advocate.yaml
+        selected_role: councilor
+        role_scope_kind: deliberation
+        role_scope_refs:
+          - docs/01-architecture/failure-modes.md
+          - docs/04-ai-governance/self-modification.md
+          - meta/decision-log/README.md
+        role_policy_ref: agents/councilors/conservatism-advocate.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.69
         invite_eligible: true
@@ -666,6 +795,16 @@ examples:
         selected_agent_id: ethics-committee
         display_name: EthicsCommittee
         source_ref: agents/councilors/ethics-committee.yaml
+        selected_role: councilor
+        role_scope_kind: deliberation
+        role_scope_refs:
+          - docs/00-philosophy/ethics.md
+          - docs/04-ai-governance/amendment-protocol.md
+          - specs/schemas/ethics_query.yaml
+          - specs/schemas/ethics_decision.yaml
+        role_policy_ref: agents/councilors/ethics-committee.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.82
         invite_eligible: true
@@ -681,6 +820,17 @@ examples:
         selected_agent_id: codex-builder
         display_name: CodexBuilder
         source_ref: agents/builders/codex-builder.yaml
+        selected_role: builder
+        role_scope_kind: build-surface
+        role_scope_refs:
+          - src/omoikane/
+          - tests/
+          - specs/
+          - evals/
+          - docs/
+        role_policy_ref: agents/builders/codex-builder.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.9
         invite_eligible: true
@@ -696,6 +846,16 @@ examples:
         selected_agent_id: schema-builder
         display_name: SchemaBuilder
         source_ref: agents/builders/schema-builder.yaml
+        selected_role: builder
+        role_scope_kind: build-surface
+        role_scope_refs:
+          - specs/interfaces/
+          - specs/schemas/
+          - tests/integration/
+          - evals/
+        role_policy_ref: agents/builders/codex-builder.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.84
         invite_eligible: true
@@ -711,6 +871,16 @@ examples:
         selected_agent_id: eval-builder
         display_name: EvalBuilder
         source_ref: agents/builders/eval-builder.yaml
+        selected_role: builder
+        role_scope_kind: build-surface
+        role_scope_refs:
+          - evals/
+          - tests/
+          - src/omoikane/
+          - specs/schemas/
+        role_policy_ref: agents/builders/codex-builder.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.85
         invite_eligible: true
@@ -726,6 +896,18 @@ examples:
         selected_agent_id: doc-sync-builder
         display_name: DocSyncBuilder
         source_ref: agents/builders/doc-sync-builder.yaml
+        selected_role: builder
+        role_scope_kind: build-surface
+        role_scope_refs:
+          - docs/
+          - src/omoikane/
+          - specs/
+          - evals/
+          - agents/
+          - meta/decision-log/
+        role_policy_ref: agents/builders/codex-builder.policy.md
+        selection_scope_binding_profile: registry-selection-scope-binding-v1
+        raw_role_scope_payload_stored: false
         status: selected
         trust_score: 0.83
         invite_eligible: true
@@ -757,4 +939,10 @@ examples:
       builder_profile_policy_ready: true
       workspace_discovery_bound: true
       workspace_profile_policy_ready: true
+      workspace_execution_bound: true
+      workspace_execution_policy_ready: true
+      standing_role_scope_binding_ok: true
+      council_panel_scope_binding_ok: true
+      builder_handoff_scope_binding_ok: true
+      raw_selection_scope_payload_stored: false
       ok: true

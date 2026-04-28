@@ -520,6 +520,15 @@ coverage label だけではなく repo-local write/eval/schema/doc surface と
 両方に保持し、Ethics / Identity / Integrity Guardian が監査する
 docs / specs / evals / agents / meta surface と attestation policy boundary を
 能力名とは別に reviewer-facing へ露出できること、
+convocation selection は registry entry 由来の scope を
+`registry-selection-scope-binding-v1` として再束縛し、
+speaker / recorder には `role_scope_kind=deliberation`、
+guardian liaison には `role_scope_kind=oversight`、
+profile-specific council panel には selected agent の role に応じた
+`deliberation` / `oversight` / `research-evidence` scope を持たせ、
+builder handoff には `role_scope_kind=build-surface` を持たせ、
+`raw_role_scope_payload_stored=false` のまま scope refs / policy ref だけを
+same-session Council artifact に残すこと、
 `Speaker` / `Recorder` / `GuardianLiaison` / `SelfLiaison` の standing role、
 `self-modify-patch-v1` の `DesignAuditor` / `ChangeAdvocate` /
 `ConservatismAdvocate` / `EthicsCommittee` panel と、
