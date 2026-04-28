@@ -62,6 +62,15 @@ properties:
   evidence_policy_ref:
     type: string
     pattern: "^(agents|docs|research)/"
+  build_surface_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(src|tests|specs|evals|docs|agents|meta|research)/"
+  execution_policy_ref:
+    type: string
+    pattern: "^(agents|docs|specs|evals|meta)/"
   ethics_constraints:
     type: array
     items:
@@ -87,6 +96,16 @@ allOf:
       required:
         - research_domain_refs
         - evidence_policy_ref
+  - if:
+      properties:
+        role:
+          const: builder
+      required:
+        - role
+    then:
+      required:
+        - build_surface_refs
+        - execution_policy_ref
 examples:
   - name: design-architect
     role: councilor
@@ -104,6 +123,29 @@ examples:
     prompt_or_policy_ref: agents/councilors/design-architect.policy.md
     when_to_invoke: design documents need cross-reference review
     when_not_to_invoke: direct typo-only edits
+  - name: codex-builder
+    role: builder
+    version: 0.1.0
+    capabilities:
+      - code.generate
+      - code.test
+    trust_floor: 0.5
+    substrate_requirements:
+      - classical_silicon
+    input_schema_ref: specs/schemas/build_request.yaml
+    output_schema_ref: specs/schemas/build_artifact.yaml
+    build_surface_refs:
+      - src/omoikane/
+      - tests/
+      - specs/
+      - evals/
+      - docs/
+    execution_policy_ref: agents/builders/codex-builder.policy.md
+    ethics_constraints:
+      - A1-continuity
+    prompt_or_policy_ref: agents/builders/codex-builder.policy.md
+    when_to_invoke: reference runtime changes need a patch
+    when_not_to_invoke: docs-only updates are sufficient
   - name: neuroscience-scout
     role: researcher
     version: 0.1.0

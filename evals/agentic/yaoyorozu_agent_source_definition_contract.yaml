@@ -9,10 +9,14 @@ must:
   - registry entries preserve non-empty substrate and schema refs after materialization
   - researcher source definitions must bind non-empty research_domain_refs and evidence_policy_ref before registry materialization
   - researcher registry entries preserve digest-safe research domain and evidence policy refs without storing raw research payloads
+  - builder source definitions must bind non-empty build_surface_refs and execution_policy_ref before registry materialization
+  - builder registry entries preserve repo-local build surface and execution policy refs before any handoff
 expected:
   agent_source_definition_schema_bound: true
   missing_schema_ref_rejected: true
   empty_substrate_rejected: true
   researcher_domain_refs_required: true
   researcher_evidence_policy_ref_required: true
+  builder_surface_refs_required: true
+  builder_execution_policy_ref_required: true
   registry_entries_non_empty_contract: true

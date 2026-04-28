@@ -5,7 +5,9 @@
 - `affect_state.schema`
 - `affect_transition.schema`
 - `agent_registry_entry.schema`
+  - researcher evidence scope と builder build surface scope を role-specific required fields として保持する
 - `agent_source_definition.schema`
+  - raw `agents/**/*.yaml` で researcher evidence scope と builder build surface scope を materialization 前に検証する
 - `amendment_decision.schema`
 - `amendment_proposal.schema`
 - `ascension_plan.schema`

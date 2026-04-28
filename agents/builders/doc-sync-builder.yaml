@@ -9,6 +9,14 @@ trust_floor: 0.6
 substrate_requirements: ['classical_silicon']
 input_schema_ref: specs/schemas/design_delta_manifest.schema
 output_schema_ref: specs/schemas/build_request.yaml
+build_surface_refs:
+  - docs/
+  - src/omoikane/
+  - specs/
+  - evals/
+  - agents/
+  - meta/decision-log/
+execution_policy_ref: agents/builders/codex-builder.policy.md
 ethics_constraints: []
 prompt_or_policy_ref: agents/builders/codex-builder.policy.md
 when_to_invoke: |

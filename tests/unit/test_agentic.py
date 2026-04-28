@@ -2906,6 +2906,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                     entry["evidence_policy_ref"],
                     {entry["prompt_or_policy_ref"], "agents/researchers/consciousness-theorist.policy.md"},
                 )
+            if entry["role"] == "builder":
+                self.assertTrue(entry["build_surface_refs"], entry["agent_id"])
+                self.assertTrue(entry["execution_policy_ref"], entry["agent_id"])
+                self.assertIn(entry["execution_policy_ref"], {entry["prompt_or_policy_ref"]})
 
     def test_sync_rejects_agent_source_definition_missing_schema_refs(self) -> None:
         service = YaoyorozuRegistryService()
@@ -2944,6 +2948,51 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(ValueError, "input_schema_ref must be a non-empty string"):
+                service.sync_from_agents_directory(repo_root / "agents")
+
+    def test_sync_rejects_builder_without_surface_refs(self) -> None:
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-builder-source-") as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "agents" / "builders").mkdir(parents=True)
+            (repo_root / "agents" / "builders" / "codex-builder.policy.md").write_text(
+                "# policy\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas").mkdir(parents=True)
+            (repo_root / "specs" / "schemas" / "build_request.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas" / "build_artifact.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            self._write_workspace_agent(
+                repo_root,
+                "agents/builders/incomplete-builder.yaml",
+                (
+                    "name: incomplete-builder\n"
+                    "role: builder\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - code.generate\n"
+                    "trust_floor: 0.5\n"
+                    "substrate_requirements: ['classical_silicon']\n"
+                    "input_schema_ref: specs/schemas/build_request.yaml\n"
+                    "output_schema_ref: specs/schemas/build_artifact.yaml\n"
+                    "execution_policy_ref: agents/builders/codex-builder.policy.md\n"
+                    "ethics_constraints: []\n"
+                    "prompt_or_policy_ref: agents/builders/codex-builder.policy.md\n"
+                    "when_to_invoke: |\n"
+                    "  - test\n"
+                    "when_not_to_invoke: |\n"
+                    "  - never\n"
+                ),
+            )
+
+            with self.assertRaisesRegex(ValueError, "build_surface_refs must contain"):
                 service.sync_from_agents_directory(repo_root / "agents")
 
     def test_sync_rejects_researcher_without_domain_refs(self) -> None:

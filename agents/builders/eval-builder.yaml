@@ -8,6 +8,12 @@ trust_floor: 0.5
 substrate_requirements: ['classical_silicon']
 input_schema_ref: specs/schemas/build_request.yaml
 output_schema_ref: specs/schemas/build_artifact.yaml
+build_surface_refs:
+  - evals/
+  - tests/
+  - src/omoikane/
+  - specs/schemas/
+execution_policy_ref: agents/builders/codex-builder.policy.md
 ethics_constraints:
   - sandboxed-only
 prompt_or_policy_ref: agents/builders/codex-builder.policy.md

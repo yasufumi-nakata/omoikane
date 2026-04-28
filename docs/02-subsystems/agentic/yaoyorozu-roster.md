@@ -113,6 +113,12 @@ Researcher role は registry materialization 前に `research_domain_refs` と
 保持せず、docs / research / agents 配下の境界 ref だけを
 `agent_registry_entry` に保存して、Council が研究補助 agent の evidence scope を
 reviewer-facing に確認できるようにする。
+
+Builder role は registry materialization 前に `build_surface_refs` と
+`execution_policy_ref` を必須とする。Yaoyorozu registry は builder が触れる
+repo-local surface と実行 policy ref を `agent_registry_entry` に保存し、
+coverage label だけではなく、docs / specs / evals / tests / runtime のどの
+境界で作業する builder なのかを same-session handoff 前に監査できるようにする。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
 `requested_optional_builder_coverage_areas` /

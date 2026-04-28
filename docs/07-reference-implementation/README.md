@@ -504,6 +504,10 @@ non-empty substrate / schema refs、repo-local policy refs を満たしてから
 さらに `researcher` role では `research_domain_refs` と `evidence_policy_ref` を
 raw source definition と materialized registry entry の両方に保持し、
 research payload 本体ではなく repo-local evidence boundary ref だけを渡すこと、
+`builder` role では `build_surface_refs` と `execution_policy_ref` を
+raw source definition と materialized registry entry の両方に保持し、
+coverage label だけではなく repo-local write/eval/schema/doc surface と
+実行 policy boundary を same-session handoff 前に監査できること、
 `Speaker` / `Recorder` / `GuardianLiaison` / `SelfLiaison` の standing role、
 `self-modify-patch-v1` の `DesignAuditor` / `ChangeAdvocate` /
 `ConservatismAdvocate` / `EthicsCommittee` panel と、

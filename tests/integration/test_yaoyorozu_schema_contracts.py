@@ -58,6 +58,13 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         for entry in researcher_entries:
             self.assertTrue(entry["research_domain_refs"], entry["agent_id"])
             self.assertTrue(entry["evidence_policy_ref"], entry["agent_id"])
+        builder_entries = [
+            entry for entry in result["registry"]["entries"] if entry["role"] == "builder"
+        ]
+        self.assertTrue(builder_entries)
+        for entry in builder_entries:
+            self.assertTrue(entry["build_surface_refs"], entry["agent_id"])
+            self.assertTrue(entry["execution_policy_ref"], entry["agent_id"])
 
     def test_repo_agent_sources_match_public_schema(self) -> None:
         schema = _load_schema("specs/schemas/agent_source_definition.schema")

@@ -2540,7 +2540,7 @@ entries:
       - specs/schemas/yaoyorozu_registry_snapshot.schema
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - reference-runtime
-    rationale: Required to serialize one repo-local agent definition together with its trust-bound eligibility state, including researcher-only domain and evidence policy refs when role=researcher.
+    rationale: Required to serialize one repo-local agent definition together with its trust-bound eligibility state, including researcher-only domain/evidence refs and builder-only build surface/execution policy refs.
   - priority: P1
     kind: schema
     file: specs/schemas/agent_source_definition.schema
@@ -2552,7 +2552,7 @@ entries:
       - docs/07-reference-implementation/README.md
       - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
       - reference-runtime
-    rationale: Required to validate raw repo-local agents/*.yaml definitions before Yaoyorozu registry materialization, preventing empty substrate/schema refs and researcher domain/evidence policy refs from being silently rounded into registry entries.
+    rationale: Required to validate raw repo-local agents/*.yaml definitions before Yaoyorozu registry materialization, preventing empty substrate/schema refs, researcher domain/evidence policy refs, and builder build surface/execution policy refs from being silently rounded into registry entries.
   - priority: P1
     kind: schema
     file: specs/schemas/yaoyorozu_workspace_discovery.schema
@@ -2746,7 +2746,7 @@ entries:
       - specs/schemas/agent_registry_entry.schema
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects schema-bound raw agent definition validation before registry materialization, including non-empty substrate requirements, schema refs, and researcher evidence-scope refs.
+    rationale: Protects schema-bound raw agent definition validation before registry materialization, including non-empty substrate requirements, schema refs, researcher evidence-scope refs, and builder surface/execution policy refs.
   - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_external_workspace_execution.yaml
