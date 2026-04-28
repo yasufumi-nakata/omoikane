@@ -107,6 +107,12 @@ worker を実行し、
 `materialized-dependency-module-origin-v1` の `worker_module_origin` で
 実際の `omoikane.agentic.local_worker_stub` import 元ファイルと digest が
 source checkout fallback 無しの materialized dependency snapshot 配下であることまで束縛する。
+
+Researcher role は registry materialization 前に `research_domain_refs` と
+`evidence_policy_ref` を必須とする。Yaoyorozu registry は raw research payload を
+保持せず、docs / research / agents 配下の境界 ref だけを
+`agent_registry_entry` に保存して、Council が研究補助 agent の evidence scope を
+reviewer-facing に確認できるようにする。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
 `requested_optional_builder_coverage_areas` /

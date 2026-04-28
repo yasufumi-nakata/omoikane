@@ -107,6 +107,12 @@ AGENT_SOURCE_REQUIRED_LIST_FIELDS = (
     "capabilities",
     "substrate_requirements",
 )
+AGENT_SOURCE_RESEARCHER_REQUIRED_LIST_FIELDS = (
+    "research_domain_refs",
+)
+AGENT_SOURCE_RESEARCHER_REQUIRED_STRING_FIELDS = (
+    "evidence_policy_ref",
+)
 YAOYOROZU_WORKSPACE_GUARDIAN_ROLE = "integrity"
 YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY = "attest"
 YAOYOROZU_WORKSPACE_GUARDIAN_REQUIRED_BEFORE = [
@@ -497,6 +503,20 @@ def _validate_agent_source_definition(
         ref = str(data.get(ref_field, "")).strip()
         if ref and ref.startswith(("agents/", "specs/")) and not (repo_root / ref).is_file():
             errors.append(f"{ref_field} must reference an existing repo file: {ref}")
+
+    if role == "researcher":
+        for field_name in AGENT_SOURCE_RESEARCHER_REQUIRED_LIST_FIELDS:
+            values = _normalize_string_list(data.get(field_name, []))
+            if not values:
+                errors.append(f"{field_name} must contain at least one non-empty item")
+        for field_name in AGENT_SOURCE_RESEARCHER_REQUIRED_STRING_FIELDS:
+            value = data.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{field_name} must be a non-empty string")
+                continue
+            ref = value.strip()
+            if ref.startswith(("agents/", "docs/", "research/")) and not (repo_root / ref).is_file():
+                errors.append(f"{field_name} must reference an existing repo file: {ref}")
 
     source_ref = str(path.relative_to(repo_root)) if path.is_relative_to(repo_root) else str(path)
     if not source_ref.startswith("agents/"):
@@ -960,9 +980,11 @@ class YaoyorozuRegistryEntry:
     output_schema_ref: str = ""
     ethics_constraints: List[str] = field(default_factory=list)
     prompt_or_policy_ref: str = ""
+    research_domain_refs: List[str] = field(default_factory=list)
+    evidence_policy_ref: str = ""
 
     def to_dict(self, trust_snapshot: Mapping[str, Any]) -> Dict[str, Any]:
-        return {
+        entry = {
             "kind": "agent_registry_entry",
             "schema_version": "1.0.0",
             "agent_id": self.agent_id,
@@ -978,6 +1000,10 @@ class YaoyorozuRegistryEntry:
             "prompt_or_policy_ref": self.prompt_or_policy_ref,
             "trust_snapshot": dict(trust_snapshot),
         }
+        if self.role == "researcher":
+            entry["research_domain_refs"] = list(self.research_domain_refs)
+            entry["evidence_policy_ref"] = self.evidence_policy_ref
+        return entry
 
 
 @dataclass(frozen=True)
@@ -2801,6 +2827,10 @@ class YaoyorozuRegistryService:
                 output_schema_ref=str(parsed.get("output_schema_ref", "")).strip(),
                 ethics_constraints=_normalize_string_list(parsed.get("ethics_constraints", [])),
                 prompt_or_policy_ref=str(parsed.get("prompt_or_policy_ref", "")).strip(),
+                research_domain_refs=_normalize_string_list(
+                    parsed.get("research_domain_refs", [])
+                ),
+                evidence_policy_ref=str(parsed.get("evidence_policy_ref", "")).strip(),
             )
             self._entries[agent_id] = entry
             self._ensure_trust_seed(entry)

@@ -10,6 +10,10 @@ trust_floor: 0.4
 substrate_requirements: ['any']
 input_schema_ref: specs/schemas/guardian_jurisdiction_evidence_bundle.schema
 output_schema_ref: specs/schemas/guardian_jurisdiction_legal_execution.schema
+research_domain_refs:
+  - docs/05-research-frontiers/legal-personhood.md
+  - docs/05-research-frontiers/governance.md
+evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
 ethics_constraints: []
 prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
 when_to_invoke: |

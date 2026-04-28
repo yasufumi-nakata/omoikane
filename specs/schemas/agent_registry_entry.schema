@@ -63,6 +63,15 @@ properties:
   output_schema_ref:
     type: string
     minLength: 1
+  research_domain_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|research)/"
+  evidence_policy_ref:
+    type: string
+    pattern: "^(agents|docs|research)/"
   ethics_constraints:
     type: array
     items:
@@ -73,6 +82,17 @@ properties:
     minLength: 1
   trust_snapshot:
     $ref: trust_snapshot.schema
+allOf:
+  - if:
+      properties:
+        role:
+          const: researcher
+      required:
+        - role
+    then:
+      required:
+        - research_domain_refs
+        - evidence_policy_ref
 examples:
   - kind: agent_registry_entry
     schema_version: 1.0.0

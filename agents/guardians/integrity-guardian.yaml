@@ -46,6 +46,7 @@ capabilities:
   - catalog.inventory.attest
   - gap-report.implementation-stub.attest
   - gap-report.scan-receipt.attest
+  - yaoyorozu.agent-source.research-evidence-scope.attest
   - wms.time-rate-deviation.attest
   - wms.time-rate-attestation-transport.attest
   - wms.distributed-approval-fanout.attest
@@ -104,6 +105,7 @@ when_to_invoke: |
   - release manifest の catalog inventory receipt が catalog entries、実装済み schema/IDL coverage、欠落・重複ゼロ、inventory digest に束縛されていることを検証する時
   - gap-report が非抽象 runtime path に残る `NotImplementedError` stub を `implementation_stub_hits` として検出し、Backend 抽象 hook だけを除外していることを検証する時
   - gap-report の scan_receipt が all-zero 判定、prioritized task count、scan surface、report digest、surface digest manifest、raw report / raw surface payload 非保存に束縛されていることを検証する時
+  - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時
   - WMS shared reality の requested time_rate deviation が fixed-time-rate private escape evidence に束縛され、WorldState.time_rate が変更されていないことを検証する時
   - WMS shared reality の requested time_rate deviation が participant subjective-time IMC attestation receipt set に束縛されていることを検証する時
   - WMS shared reality の complete approval collection が Federation distributed transport fan-out receipt に束縛されていることを検証する時

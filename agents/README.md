@@ -28,6 +28,8 @@ trust_floor: <0.0-1.0>
 substrate_requirements: [<id> | 'any']
 input_schema_ref: <specs/...>
 output_schema_ref: <specs/...>
+research_domain_refs: [<docs/...> | <research/...>]  # researcher のみ必須
+evidence_policy_ref: <agents/... | docs/... | research/...>  # researcher のみ必須
 ethics_constraints: [<rule_id>]
 prompt_or_policy_ref: <agents/.../policy.md>
 when_to_invoke: |

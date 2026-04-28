@@ -53,6 +53,15 @@ properties:
   output_schema_ref:
     type: string
     pattern: "^specs/"
+  research_domain_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|research)/"
+  evidence_policy_ref:
+    type: string
+    pattern: "^(agents|docs|research)/"
   ethics_constraints:
     type: array
     items:
@@ -67,6 +76,17 @@ properties:
   when_not_to_invoke:
     type: string
     minLength: 1
+allOf:
+  - if:
+      properties:
+        role:
+          const: researcher
+      required:
+        - role
+    then:
+      required:
+        - research_domain_refs
+        - evidence_policy_ref
 examples:
   - name: design-architect
     role: councilor
@@ -84,3 +104,20 @@ examples:
     prompt_or_policy_ref: agents/councilors/design-architect.policy.md
     when_to_invoke: design documents need cross-reference review
     when_not_to_invoke: direct typo-only edits
+  - name: neuroscience-scout
+    role: researcher
+    version: 0.1.0
+    capabilities:
+      - literature.survey
+    trust_floor: 0.4
+    substrate_requirements:
+      - any
+    input_schema_ref: specs/schemas/council_input.yaml
+    output_schema_ref: specs/schemas/council_output.yaml
+    research_domain_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
+    ethics_constraints: []
+    prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
+    when_to_invoke: scanning progress needs literature review
+    when_not_to_invoke: design decisions

@@ -8,6 +8,10 @@ trust_floor: 0.4
 substrate_requirements: ['any']
 input_schema_ref: specs/schemas/council_input.yaml
 output_schema_ref: specs/schemas/council_output.yaml
+research_domain_refs:
+  - research/experiments/README.md
+  - docs/05-research-frontiers/README.md
+evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
 ethics_constraints:
   - human-subject-review
 prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md

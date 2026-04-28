@@ -77,8 +77,10 @@ operations:
     guarantees:
       - synced entries must remain bound to repo-local agents/ definitions
       - raw agent definitions must satisfy agent_source_definition before registry materialization
+      - researcher definitions must bind non-empty research_domain_refs and evidence_policy_ref before registry materialization
       - every entry must carry a trust_snapshot and trust_floor
       - role_index and capability_index must remain machine-readable
+      - researcher registry entries must preserve research domain refs and evidence policy refs without storing raw research payloads
   prepare_council_convocation:
     summary: >
       Derive one deterministic Council convocation and builder handoff plan from the synced registry,
