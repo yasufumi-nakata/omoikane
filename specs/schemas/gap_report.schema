@@ -1,0 +1,361 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/gap_report.schema"
+title: GapReport
+description: >
+  Public self-construction gap report emitted by `omoikane.cli gap-report`,
+  including a digest-bound scan receipt for automation gating.
+type: object
+additionalProperties: false
+required:
+  - repo_root
+  - open_question_count
+  - missing_expected_file_count
+  - missing_required_reference_file_count
+  - empty_eval_surface_count
+  - placeholder_hit_count
+  - inventory_drift_count
+  - catalog_coverage_gap_count
+  - future_work_hit_count
+  - implementation_stub_count
+  - decision_log_residual_count
+  - decision_log_frontier_count
+  - open_questions
+  - missing_expected_files
+  - missing_required_reference_files
+  - empty_eval_surfaces
+  - catalog_pending_count
+  - catalog_pending_files
+  - placeholder_hits
+  - inventory_drift_hits
+  - catalog_coverage_gap_hits
+  - future_work_hits
+  - implementation_stub_hits
+  - decision_log_residual_hits
+  - decision_log_frontier_hits
+  - prioritized_tasks
+  - scan_receipt
+properties:
+  repo_root:
+    type: string
+    minLength: 1
+  open_question_count:
+    type: integer
+    minimum: 0
+  missing_expected_file_count:
+    type: integer
+    minimum: 0
+  missing_required_reference_file_count:
+    type: integer
+    minimum: 0
+  empty_eval_surface_count:
+    type: integer
+    minimum: 0
+  placeholder_hit_count:
+    type: integer
+    minimum: 0
+  inventory_drift_count:
+    type: integer
+    minimum: 0
+  catalog_coverage_gap_count:
+    type: integer
+    minimum: 0
+  future_work_hit_count:
+    type: integer
+    minimum: 0
+  implementation_stub_count:
+    type: integer
+    minimum: 0
+  decision_log_residual_count:
+    type: integer
+    minimum: 0
+  decision_log_frontier_count:
+    type: integer
+    minimum: 0
+  open_questions:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  missing_expected_files:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  missing_required_reference_files:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  empty_eval_surfaces:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  catalog_pending_count:
+    type: integer
+    minimum: 0
+  catalog_pending_files:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  placeholder_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  inventory_drift_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  catalog_coverage_gap_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  future_work_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  implementation_stub_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  decision_log_residual_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  decision_log_frontier_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  prioritized_tasks:
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - priority
+        - kind
+        - summary
+      properties:
+        priority:
+          type: string
+          enum:
+            - high
+            - medium
+        kind:
+          type: string
+          minLength: 1
+        summary:
+          type: string
+          minLength: 1
+  scan_receipt:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - schema_version
+      - receipt_id
+      - generated_at
+      - profile
+      - repo_root
+      - scanned_surfaces
+      - counts
+      - all_zero
+      - report_digest
+      - raw_report_payload_stored
+      - validation
+    properties:
+      kind:
+        const: gap_report_scan_receipt
+      schema_version:
+        type: string
+        pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+      receipt_id:
+        type: string
+        pattern: "^gap-report-scan-[a-f0-9]{12}$"
+      generated_at:
+        type: string
+        format: date-time
+      profile:
+        const: self-construction-gap-report-scan-receipt-v1
+      repo_root:
+        type: string
+        minLength: 1
+      scanned_surfaces:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      counts:
+        type: object
+        additionalProperties: false
+        required:
+          - open_question_count
+          - missing_expected_file_count
+          - missing_required_reference_file_count
+          - empty_eval_surface_count
+          - placeholder_hit_count
+          - inventory_drift_count
+          - catalog_coverage_gap_count
+          - future_work_hit_count
+          - implementation_stub_count
+          - decision_log_residual_count
+          - decision_log_frontier_count
+          - catalog_pending_count
+          - prioritized_task_count
+        properties:
+          open_question_count:
+            type: integer
+            minimum: 0
+          missing_expected_file_count:
+            type: integer
+            minimum: 0
+          missing_required_reference_file_count:
+            type: integer
+            minimum: 0
+          empty_eval_surface_count:
+            type: integer
+            minimum: 0
+          placeholder_hit_count:
+            type: integer
+            minimum: 0
+          inventory_drift_count:
+            type: integer
+            minimum: 0
+          catalog_coverage_gap_count:
+            type: integer
+            minimum: 0
+          future_work_hit_count:
+            type: integer
+            minimum: 0
+          implementation_stub_count:
+            type: integer
+            minimum: 0
+          decision_log_residual_count:
+            type: integer
+            minimum: 0
+          decision_log_frontier_count:
+            type: integer
+            minimum: 0
+          catalog_pending_count:
+            type: integer
+            minimum: 0
+          prioritized_task_count:
+            type: integer
+            minimum: 0
+      all_zero:
+        type: boolean
+      report_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      raw_report_payload_stored:
+        const: false
+      validation:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - counts_match_report
+          - report_digest_bound
+          - prioritized_tasks_empty_when_all_zero
+          - raw_report_payload_stored
+        properties:
+          ok:
+            type: boolean
+          counts_match_report:
+            type: boolean
+          report_digest_bound:
+            type: boolean
+          prioritized_tasks_empty_when_all_zero:
+            type: boolean
+          raw_report_payload_stored:
+            const: false
+$defs:
+  gap_hit:
+    type: object
+    additionalProperties: false
+    required:
+      - path
+      - line
+    properties:
+      path:
+        type: string
+        minLength: 1
+      line:
+        type: string
+        minLength: 1
+      kind:
+        type: string
+        minLength: 1
+      decision_date:
+        type: string
+        pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+      next_gap_ref:
+        type: string
+        minLength: 1
+      missing_catalog_file:
+        type: string
+        minLength: 1
+      symbol:
+        type: string
+        minLength: 1
+examples:
+  - repo_root: /repo
+    open_question_count: 0
+    missing_expected_file_count: 0
+    missing_required_reference_file_count: 0
+    empty_eval_surface_count: 0
+    placeholder_hit_count: 0
+    inventory_drift_count: 0
+    catalog_coverage_gap_count: 0
+    future_work_hit_count: 0
+    implementation_stub_count: 0
+    decision_log_residual_count: 0
+    decision_log_frontier_count: 0
+    open_questions: []
+    missing_expected_files: []
+    missing_required_reference_files: []
+    empty_eval_surfaces: []
+    catalog_pending_count: 0
+    catalog_pending_files: []
+    placeholder_hits: []
+    inventory_drift_hits: []
+    catalog_coverage_gap_hits: []
+    future_work_hits: []
+    implementation_stub_hits: []
+    decision_log_residual_hits: []
+    decision_log_frontier_hits: []
+    prioritized_tasks: []
+    scan_receipt:
+      kind: gap_report_scan_receipt
+      schema_version: 1.0.0
+      receipt_id: gap-report-scan-0123456789ab
+      generated_at: "2026-04-28T09:00:00+00:00"
+      profile: self-construction-gap-report-scan-receipt-v1
+      repo_root: /repo
+      scanned_surfaces:
+        - meta/open-questions.md
+      counts:
+        open_question_count: 0
+        missing_expected_file_count: 0
+        missing_required_reference_file_count: 0
+        empty_eval_surface_count: 0
+        placeholder_hit_count: 0
+        inventory_drift_count: 0
+        catalog_coverage_gap_count: 0
+        future_work_hit_count: 0
+        implementation_stub_count: 0
+        decision_log_residual_count: 0
+        decision_log_frontier_count: 0
+        catalog_pending_count: 0
+        prioritized_task_count: 0
+      all_zero: true
+      report_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      raw_report_payload_stored: false
+      validation:
+        ok: true
+        counts_match_report: true
+        report_digest_bound: true
+        prioritized_tasks_empty_when_all_zero: true
+        raw_report_payload_stored: false

@@ -4,6 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from omoikane.common import canonical_json, sha256_text
 from omoikane.self_construction.gaps import GapScanner
 
 
@@ -24,6 +25,48 @@ class GapScannerTests(unittest.TestCase):
             self.assertTrue(
                 any(task["kind"] == "missing-reference-file" for task in report["prioritized_tasks"])
             )
+
+    def test_scan_receipt_binds_all_zero_report_digest(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+
+            report = GapScanner().scan(repo_root)
+
+            receipt = report["scan_receipt"]
+            self.assertEqual("gap_report_scan_receipt", receipt["kind"])
+            self.assertEqual(
+                "self-construction-gap-report-scan-receipt-v1",
+                receipt["profile"],
+            )
+            self.assertTrue(receipt["all_zero"])
+            self.assertTrue(receipt["validation"]["ok"])
+            self.assertFalse(receipt["raw_report_payload_stored"])
+            self.assertEqual(0, receipt["counts"]["prioritized_task_count"])
+            digest_payload = {
+                key: value for key, value in report.items() if key != "scan_receipt"
+            }
+            self.assertEqual(
+                sha256_text(canonical_json(digest_payload)),
+                receipt["report_digest"],
+            )
+
+    def test_scan_receipt_marks_non_zero_gap_report(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "references" / "verification-checklist.md").unlink()
+
+            report = GapScanner().scan(repo_root)
+
+            receipt = report["scan_receipt"]
+            self.assertFalse(receipt["all_zero"])
+            self.assertFalse(receipt["validation"]["ok"])
+            self.assertEqual(
+                1,
+                receipt["counts"]["missing_required_reference_file_count"],
+            )
+            self.assertEqual(1, receipt["counts"]["prioritized_task_count"])
 
     def test_scan_reports_empty_eval_surface(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

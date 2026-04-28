@@ -84,6 +84,7 @@
 - `ewa_stop_signal_adapter_receipt.schema`
 - `ewa_stop_signal_path.schema`
 - `external_actuation_authorization.schema`
+- `gap_report.schema`
 - `governance_artifact_sync.schema`
 - `governance_verifier_connectivity_receipt.schema`
 - `governance_verifier_roster.schema`

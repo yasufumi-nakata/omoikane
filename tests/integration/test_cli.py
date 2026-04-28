@@ -40,6 +40,14 @@ class CliIntegrationTests(unittest.TestCase):
             result["decision_log_frontier_count"],
             len(result["decision_log_frontier_hits"]),
         )
+        self.assertEqual(
+            "self-construction-gap-report-scan-receipt-v1",
+            result["scan_receipt"]["profile"],
+        )
+        self.assertTrue(result["scan_receipt"]["all_zero"])
+        self.assertTrue(result["scan_receipt"]["validation"]["ok"])
+        self.assertEqual(0, result["scan_receipt"]["counts"]["prioritized_task_count"])
+        self.assertFalse(result["scan_receipt"]["raw_report_payload_stored"])
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()

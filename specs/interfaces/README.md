@@ -48,6 +48,7 @@
 - `selfctor.design_reader.v0.idl`
 - `selfctor.diff_eval.v0.idl`
 - `selfctor.enactment.v0.idl`
+- `selfctor.gap_report.v0.idl`
 - `selfctor.patch_generator.v0.idl`
 - `selfctor.rollback.v0.idl`
 - `selfctor.rollout.v0.idl`

@@ -152,6 +152,7 @@ rollback-approved へ到達するか。
 - `diff_evaluator_direct_contract.yaml`
 - `differential_eval_execution_binding.yaml`
 - `episodic_stream_handoff.yaml`
+- `gap_report_scan_receipt.yaml`
 - `gap_scanner_implementation_stub_detection.yaml`
 - `ledger_integrity.yaml`
 - `memory_crystal_compaction.yaml`

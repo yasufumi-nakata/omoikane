@@ -6,7 +6,11 @@ import ast
 from pathlib import Path
 from typing import Any, Dict, List
 
+from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
+
+GAP_REPORT_SCHEMA_VERSION = "1.0.0"
+GAP_REPORT_SCAN_RECEIPT_PROFILE = "self-construction-gap-report-scan-receipt-v1"
 PLACEHOLDER_MARKERS = (
     "プレースホルダ",
     "すべて未生成",
@@ -188,7 +192,7 @@ class GapScanner:
                 }
             )
 
-        return {
+        report = {
             "repo_root": str(repo_root),
             "open_question_count": len(open_questions),
             "missing_expected_file_count": len(missing_specs),
@@ -215,6 +219,73 @@ class GapScanner:
             "decision_log_residual_hits": decision_log_residual_hits,
             "decision_log_frontier_hits": decision_log_frontier_hits,
             "prioritized_tasks": prioritized_tasks,
+        }
+        report["scan_receipt"] = self._build_scan_receipt(report)
+        return report
+
+    def _build_scan_receipt(self, report: Dict[str, Any]) -> Dict[str, Any]:
+        counts = {
+            "open_question_count": int(report["open_question_count"]),
+            "missing_expected_file_count": int(report["missing_expected_file_count"]),
+            "missing_required_reference_file_count": int(
+                report["missing_required_reference_file_count"]
+            ),
+            "empty_eval_surface_count": int(report["empty_eval_surface_count"]),
+            "placeholder_hit_count": int(report["placeholder_hit_count"]),
+            "inventory_drift_count": int(report["inventory_drift_count"]),
+            "catalog_coverage_gap_count": int(report["catalog_coverage_gap_count"]),
+            "future_work_hit_count": int(report["future_work_hit_count"]),
+            "implementation_stub_count": int(report["implementation_stub_count"]),
+            "decision_log_residual_count": int(report["decision_log_residual_count"]),
+            "decision_log_frontier_count": int(report["decision_log_frontier_count"]),
+            "catalog_pending_count": int(report["catalog_pending_count"]),
+            "prioritized_task_count": len(report["prioritized_tasks"]),
+        }
+        all_zero = all(value == 0 for value in counts.values())
+        report_digest = sha256_text(canonical_json(self._report_digest_payload(report)))
+        receipt: Dict[str, Any] = {
+            "kind": "gap_report_scan_receipt",
+            "schema_version": GAP_REPORT_SCHEMA_VERSION,
+            "receipt_id": new_id("gap-report-scan"),
+            "generated_at": utc_now_iso(),
+            "profile": GAP_REPORT_SCAN_RECEIPT_PROFILE,
+            "repo_root": str(report["repo_root"]),
+            "scanned_surfaces": [
+                "meta/open-questions.md",
+                "references/*.md",
+                "specs/catalog.yaml",
+                "specs/interfaces/README.md",
+                "specs/schemas/README.md",
+                "evals/*/README.md",
+                "README.md",
+                "docs/07-reference-implementation/README.md",
+                "specs/interfaces/**/*.idl",
+                "specs/schemas/README.md",
+                "src/omoikane/**/*.py",
+                "meta/decision-log/*.md",
+            ],
+            "counts": counts,
+            "all_zero": all_zero,
+            "report_digest": report_digest,
+            "raw_report_payload_stored": False,
+            "validation": {
+                "ok": all_zero,
+                "counts_match_report": True,
+                "report_digest_bound": True,
+                "prioritized_tasks_empty_when_all_zero": (
+                    len(report["prioritized_tasks"]) == 0 if all_zero else True
+                ),
+                "raw_report_payload_stored": False,
+            },
+        }
+        return receipt
+
+    @staticmethod
+    def _report_digest_payload(report: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            key: value
+            for key, value in report.items()
+            if key != "scan_receipt"
         }
 
     @staticmethod

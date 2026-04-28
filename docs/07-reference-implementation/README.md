@@ -116,6 +116,9 @@ residual `future work` に加え、
 `next-stage frontier` bullet は `decision_log_frontier_hits` として別枠で surfacing する。
 decision log 側で append-only に gap chain を保つ時は、
 frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
+同じ report は `self-construction-gap-report-scan-receipt-v1` の `scan_receipt` を返し、
+counts、prioritized task count、scan surface、report digest、raw report payload 非保存を
+`gap_report.schema` で machine-checkable に固定する。
 
 
 `identity-demo` は L1 IdentityRegistry の reference contract

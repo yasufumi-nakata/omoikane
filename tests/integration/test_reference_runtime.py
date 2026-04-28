@@ -691,6 +691,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
             report["decision_log_residual_count"],
             len(report["decision_log_residual_hits"]),
         )
+        self.assertEqual(
+            "self-construction-gap-report-scan-receipt-v1",
+            report["scan_receipt"]["profile"],
+        )
+        self.assertTrue(report["scan_receipt"]["all_zero"])
+        self.assertTrue(report["scan_receipt"]["validation"]["ok"])
+        self.assertEqual(0, report["scan_receipt"]["counts"]["prioritized_task_count"])
+        self.assertFalse(report["scan_receipt"]["raw_report_payload_stored"])
         self.assertIn("decision_log_frontier_count", report)
         self.assertEqual(
             report["decision_log_frontier_count"],
