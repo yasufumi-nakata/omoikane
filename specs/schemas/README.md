@@ -211,6 +211,8 @@
 - `yaoyorozu_worker_workspace_delta_receipt.schema`
 - `yaoyorozu_registry_snapshot.schema`
   - raw `agents/**/*.yaml` の source_ref / agent_id / role / sha256 / byte_length manifest と source manifest digest を保持し、raw source payload 非保存を検証する
+- `yaoyorozu_source_manifest_ledger_binding.schema`
+  - Yaoyorozu source manifest digest set を yaoyorozu-agent-source-manifest ContinuityLedger entry、self+guardian 署名 role、payload ref に束縛し、raw source / registry / continuity event payload 非保存を検証する
 
 ## 次段階
 

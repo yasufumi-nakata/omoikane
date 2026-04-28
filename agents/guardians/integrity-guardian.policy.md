@@ -8,7 +8,7 @@ ContinuityLedger、build artifact、workspace seed、registry snapshot、externa
 
 - append-only ledger、digest-bound report、schema-bound artifact、worker delta、public verification bundle を確認する
 - external workspace seed / execution root / dependency materialization の前に HumanOversightChannel-bound gate を要求する
-- Yaoyorozu registry snapshot では raw agent source set の digest manifest と builder coverage target path binding を確認する
+- Yaoyorozu registry snapshot では raw agent source set の digest manifest、dedicated ContinuityLedger binding、builder coverage target path binding を確認する
 - 監査対象は repo-local ref と digest evidence に限定し、raw build transcript、raw registry payload、raw packet body を保持しない
 
 ## 権限

@@ -93,6 +93,14 @@ YAOYOROZU_WORKSPACE_GUARDIAN_OVERSIGHT_BINDING_PROFILE = (
 YAOYOROZU_SELECTION_SCOPE_BINDING_PROFILE = "registry-selection-scope-binding-v1"
 YAOYOROZU_COVERAGE_SCOPE_BINDING_PROFILE = "coverage-area-target-path-binding-v1"
 YAOYOROZU_AGENT_SOURCE_DIGEST_PROFILE = "repo-local-agent-source-digest-manifest-v1"
+YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_BINDING_PROFILE = (
+    "yaoyorozu-agent-source-manifest-continuity-ledger-binding-v1"
+)
+YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_CATEGORY = "yaoyorozu-agent-source-manifest"
+YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_EVENT_TYPE = (
+    "yaoyorozu.agent_source_manifest.bound"
+)
+YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_SIGNATURE_ROLES = ["self", "guardian"]
 AGENT_SOURCE_DEFINITION_SCHEMA_VERSION = "1.0.0"
 AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
 AGENT_SOURCE_ALLOWED_ROLES = {"councilor", "builder", "researcher", "guardian"}
@@ -853,6 +861,29 @@ def _workspace_summary_digest_payload(summary: Mapping[str, Any]) -> Dict[str, A
         "missing_coverage_areas": summary["missing_coverage_areas"],
         "proposal_profiles": summary["proposal_profiles"],
         "validation": summary["validation"],
+    }
+
+
+def _source_manifest_continuity_payload(binding: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "event_ref": binding["continuity_event_ref"],
+        "category": binding["continuity_ledger_category"],
+        "event_type": binding["continuity_ledger_event_type"],
+        "binding_profile": binding["binding_profile"],
+        "binding_id": binding["binding_id"],
+        "registry_snapshot_ref": binding["registry_snapshot_ref"],
+        "registry_digest": binding["registry_digest"],
+        "policy_id": binding["policy_id"],
+        "source_root": binding["source_root"],
+        "source_digest_profile": binding["source_digest_profile"],
+        "source_definition_count": binding["source_definition_count"],
+        "source_definition_digests": binding["source_definition_digests"],
+        "source_manifest_digest": binding["source_manifest_digest"],
+        "raw_source_payload_stored": binding["raw_source_payload_stored"],
+        "raw_registry_payload_stored": binding["raw_registry_payload_stored"],
+        "raw_continuity_event_payload_stored": binding[
+            "raw_continuity_event_payload_stored"
+        ],
     }
 
 
@@ -3058,6 +3089,127 @@ class YaoyorozuRegistryService:
             "registry_digest": sha256_text(canonical_json(snapshot_body)),
             **snapshot_body,
         }
+
+    def build_source_manifest_ledger_binding(
+        self,
+        registry_snapshot: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Build a digest-only receipt for appending the source manifest to ContinuityLedger."""
+        source_definition_digests = list(registry_snapshot.get("source_definition_digests", []))
+        source_manifest_digest = str(registry_snapshot.get("source_manifest_digest", "")).strip()
+        expected_manifest_digest = sha256_text(
+            canonical_json({"source_definition_digests": source_definition_digests})
+        )
+        source_manifest_bound = (
+            bool(source_definition_digests)
+            and source_manifest_digest == expected_manifest_digest
+            and registry_snapshot.get("source_definition_count") == len(source_definition_digests)
+            and registry_snapshot.get("raw_source_payload_stored") is False
+        )
+        binding_id = new_id("yaoyorozu-source-manifest")
+        binding: Dict[str, Any] = {
+            "kind": "yaoyorozu_source_manifest_ledger_binding",
+            "schema_version": "1.0.0",
+            "binding_id": binding_id,
+            "recorded_at": utc_now_iso(),
+            "binding_profile": YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_BINDING_PROFILE,
+            "registry_snapshot_ref": f"registry://{registry_snapshot['registry_id']}",
+            "registry_digest": str(registry_snapshot.get("registry_digest", "")),
+            "policy_id": str(registry_snapshot.get("policy_id", "")),
+            "source_root": str(registry_snapshot.get("source_root", "")),
+            "source_digest_profile": str(registry_snapshot.get("source_digest_profile", "")),
+            "source_definition_count": int(registry_snapshot.get("source_definition_count", 0)),
+            "source_definition_digests": source_definition_digests,
+            "source_manifest_digest": source_manifest_digest,
+            "continuity_event_ref": f"ledger://yaoyorozu/source-manifest/{binding_id}",
+            "continuity_event_digest": "",
+            "continuity_ledger_category": YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_CATEGORY,
+            "continuity_ledger_event_type": YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_EVENT_TYPE,
+            "continuity_ledger_signature_roles": list(
+                YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_SIGNATURE_ROLES
+            ),
+            "continuity_ledger_appended": False,
+            "continuity_ledger_entry_ref": None,
+            "continuity_ledger_entry_hash": None,
+            "continuity_ledger_payload_ref": None,
+            "raw_source_payload_stored": False,
+            "raw_registry_payload_stored": False,
+            "raw_continuity_event_payload_stored": False,
+            "validation": {
+                "ok": False,
+                "source_manifest_bound": source_manifest_bound,
+                "source_manifest_digest_bound": source_manifest_bound,
+                "registry_digest_bound": bool(registry_snapshot.get("registry_digest")),
+                "continuity_event_digest_bound": False,
+                "continuity_ledger_entry_appended": False,
+                "continuity_ledger_entry_digest_bound": False,
+                "continuity_ledger_payload_ref_bound": False,
+                "continuity_ledger_signature_roles_bound": False,
+                "raw_source_payload_stored": False,
+                "raw_registry_payload_stored": False,
+                "raw_continuity_event_payload_stored": False,
+            },
+        }
+        binding["continuity_event_digest"] = sha256_text(
+            canonical_json(_source_manifest_continuity_payload(binding))
+        )
+        binding["validation"]["continuity_event_digest_bound"] = bool(
+            binding["continuity_event_digest"]
+        )
+        return binding
+
+    def source_manifest_continuity_event_payload(
+        self,
+        binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Return the digest-only source manifest payload for ContinuityLedger append."""
+        return _source_manifest_continuity_payload(binding)
+
+    def bind_source_manifest_ledger_entry(
+        self,
+        binding: Dict[str, Any],
+        ledger_entry: Any,
+    ) -> Dict[str, Any]:
+        """Attach a real ContinuityLedger entry to one source manifest binding receipt."""
+        expected_payload = self.source_manifest_continuity_event_payload(binding)
+        event_digest_bound = str(binding.get("continuity_event_digest", "")) == sha256_text(
+            canonical_json(expected_payload)
+        )
+        expected_payload_ref = f"cas://sha256/{sha256_text(canonical_json(expected_payload))}"
+        expected_roles = list(YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_SIGNATURE_ROLES)
+        observed_roles = list(getattr(ledger_entry, "signatures", {}).keys())
+        entry_digest_bound = (
+            getattr(ledger_entry, "payload", None) == expected_payload
+            and getattr(ledger_entry, "category", None)
+            == YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_CATEGORY
+            and getattr(ledger_entry, "event_type", None)
+            == YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_EVENT_TYPE
+            and getattr(ledger_entry, "layer", None) == "L4"
+        )
+        payload_ref_bound = getattr(ledger_entry, "payload_ref", None) == expected_payload_ref
+        signature_roles_bound = observed_roles == expected_roles
+
+        binding["continuity_ledger_appended"] = True
+        binding["continuity_ledger_entry_ref"] = f"ledger://continuity-ledger/{ledger_entry.entry_id}"
+        binding["continuity_ledger_entry_hash"] = ledger_entry.entry_hash
+        binding["continuity_ledger_payload_ref"] = ledger_entry.payload_ref
+        binding["validation"]["continuity_ledger_entry_appended"] = True
+        binding["validation"]["continuity_event_digest_bound"] = event_digest_bound
+        binding["validation"]["continuity_ledger_entry_digest_bound"] = entry_digest_bound
+        binding["validation"]["continuity_ledger_payload_ref_bound"] = payload_ref_bound
+        binding["validation"]["continuity_ledger_signature_roles_bound"] = signature_roles_bound
+        binding["validation"]["ok"] = (
+            binding["validation"]["source_manifest_bound"]
+            and binding["validation"]["registry_digest_bound"]
+            and event_digest_bound
+            and entry_digest_bound
+            and payload_ref_bound
+            and signature_roles_bound
+            and binding["raw_source_payload_stored"] is False
+            and binding["raw_registry_payload_stored"] is False
+            and binding["raw_continuity_event_payload_stored"] is False
+        )
+        return binding
 
     def prepare_council_convocation(
         self,

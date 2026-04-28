@@ -3389,5 +3389,23 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/ethics-guardian.yaml
     rationale: Protects shared-fabric AP-1 behavior by requiring deterministic member shortfall derivation, broker standby signal binding, and raw capacity payload redaction.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_source_manifest_ledger_binding.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - reference-runtime
+      - evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+    rationale: Required to serialize digest-only ContinuityLedger binding receipts that attach the Yaoyorozu source manifest to a self+guardian signed ledger entry without storing raw source or registry payloads.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects Yaoyorozu registry provenance by requiring the source manifest digest set, ledger entry hash, payload ref, and self+guardian signature roles to remain bound.
 next_priority:
   # Future automation can append the next missing contract here.

@@ -4089,6 +4089,34 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         result = OmoikaneReferenceOS().run_yaoyorozu_demo()
         source_src_root = str(Path(__file__).resolve().parents[2] / "src")
 
+        source_manifest_binding = result["source_manifest_ledger_binding"]
+        self.assertTrue(source_manifest_binding["validation"]["ok"])
+        self.assertTrue(source_manifest_binding["continuity_ledger_appended"])
+        self.assertEqual(
+            "yaoyorozu-agent-source-manifest-continuity-ledger-binding-v1",
+            source_manifest_binding["binding_profile"],
+        )
+        self.assertEqual(
+            "yaoyorozu-agent-source-manifest",
+            source_manifest_binding["continuity_ledger_category"],
+        )
+        self.assertEqual(
+            ["self", "guardian"],
+            source_manifest_binding["continuity_ledger_signature_roles"],
+        )
+        self.assertEqual(
+            result["registry"]["source_manifest_digest"],
+            source_manifest_binding["source_manifest_digest"],
+        )
+        self.assertFalse(source_manifest_binding["raw_source_payload_stored"])
+        self.assertFalse(source_manifest_binding["raw_registry_payload_stored"])
+        self.assertFalse(source_manifest_binding["raw_continuity_event_payload_stored"])
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "yaoyorozu-agent-source-manifest"
+            ],
+        )
         self.assertTrue(result["convocation"]["validation"]["workspace_execution_bound"])
         self.assertTrue(result["convocation"]["validation"]["workspace_execution_policy_ready"])
         self.assertTrue(result["dispatch_plan"]["validation"]["workspace_execution_bound"])

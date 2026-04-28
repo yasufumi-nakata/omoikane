@@ -81,6 +81,11 @@ registry snapshot は同じ raw source set を digest-only manifest に束縛し
 builder handoff は coverage area ごとの fixed target path refs が selected builder の
 build surface refs に覆われていることを検証する。
 
+### Yaoyorozu Source Manifest Ledger Binding
+registry source digest manifest が dedicated `yaoyorozu-agent-source-manifest`
+ContinuityLedger entry、self+guardian 署名 role、payload ref に束縛され、
+raw source / registry / continuity event payload を保存しないこと。
+
 ### Yaoyorozu External Workspace Execution
 workspace discovery により選ばれた non-source candidate workspace へ
 profile-covered builder worker が束縛され、
@@ -182,5 +187,6 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `yaoyorozu_worker_delta_receipt.yaml`
 - `yaoyorozu_memory_edit_profile.yaml`
 - `yaoyorozu_fork_request_optional_eval_dispatch.yaml`
+- `yaoyorozu_source_manifest_ledger_binding.yaml`
 - `yaoyorozu_task_graph_binding.yaml`
 - `yaoyorozu_workspace_discovery.yaml`

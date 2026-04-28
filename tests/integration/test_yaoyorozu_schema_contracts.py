@@ -51,6 +51,20 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/yaoyorozu_registry_snapshot.schema",
             result["registry"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_source_manifest_ledger_binding.schema",
+            result["source_manifest_ledger_binding"],
+        )
+        self.assertTrue(result["source_manifest_ledger_binding"]["validation"]["ok"])
+        self.assertEqual(
+            "yaoyorozu-agent-source-manifest",
+            result["source_manifest_ledger_binding"]["continuity_ledger_category"],
+        )
+        self.assertEqual(
+            ["self", "guardian"],
+            result["source_manifest_ledger_binding"]["continuity_ledger_signature_roles"],
+        )
+        self.assertFalse(result["source_manifest_ledger_binding"]["raw_registry_payload_stored"])
         researcher_entries = [
             entry for entry in result["registry"]["entries"] if entry["role"] == "researcher"
         ]

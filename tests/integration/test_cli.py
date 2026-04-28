@@ -2562,7 +2562,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("self-modify-patch-v1", result["validation"]["proposal_profile"])
         self.assertTrue(result["validation"]["workspace_discovery_ok"])
         self.assertTrue(result["validation"]["registry_source_digest_manifest_bound"])
+        self.assertTrue(result["validation"]["source_manifest_ledger_binding_ok"])
+        self.assertTrue(result["validation"]["source_manifest_ledger_entry_appended"])
+        self.assertTrue(result["validation"]["source_manifest_ledger_signature_roles_bound"])
         self.assertFalse(result["validation"]["raw_source_payload_stored"])
+        self.assertFalse(result["validation"]["raw_registry_payload_stored"])
         self.assertTrue(result["validation"]["workspace_review_budget_respected"])
         self.assertEqual(3, result["validation"]["profile_workspace_review_budget"])
         self.assertEqual(

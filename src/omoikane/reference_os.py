@@ -3878,6 +3878,9 @@ json.dump(response, sys.stdout)
             workspace_discovery
         )
         registry_snapshot = self.yaoyorozu.sync_from_agents_directory(self.repo_root / "agents")
+        source_manifest_ledger_binding = self.yaoyorozu.build_source_manifest_ledger_binding(
+            registry_snapshot
+        )
         convocation = self.yaoyorozu.prepare_council_convocation(
             proposal_profile=proposal_profile,
             session_mode="standard",
@@ -4023,6 +4026,24 @@ json.dump(response, sys.stdout)
             category="yaoyorozu",
             layer="L4",
             substrate="classical-silicon",
+        )
+        source_manifest_ledger_entry = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type=source_manifest_ledger_binding["continuity_ledger_event_type"],
+            payload=self.yaoyorozu.source_manifest_continuity_event_payload(
+                source_manifest_ledger_binding
+            ),
+            actor="IntegrityGuardian",
+            category=source_manifest_ledger_binding["continuity_ledger_category"],
+            layer="L4",
+            signature_roles=source_manifest_ledger_binding[
+                "continuity_ledger_signature_roles"
+            ],
+            substrate="classical-silicon",
+        )
+        source_manifest_ledger_binding = self.yaoyorozu.bind_source_manifest_ledger_entry(
+            source_manifest_ledger_binding,
+            source_manifest_ledger_entry,
         )
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -4235,6 +4256,7 @@ json.dump(response, sys.stdout)
             "policy": self.yaoyorozu.policy_snapshot(),
             "workspace_discovery": workspace_discovery,
             "registry": registry_snapshot,
+            "source_manifest_ledger_binding": source_manifest_ledger_binding,
             "convocation": convocation,
             "dispatch_plan": dispatch_plan,
             "dispatch_receipt": dispatch_receipt,
@@ -4266,7 +4288,21 @@ json.dump(response, sys.stdout)
                 ],
                 "registry_entry_count": registry_snapshot["entry_count"],
                 "registry_source_digest_manifest_bound": registry_source_digest_manifest_bound,
+                "source_manifest_ledger_binding_ok": source_manifest_ledger_binding[
+                    "validation"
+                ]["ok"],
+                "source_manifest_ledger_entry_appended": source_manifest_ledger_binding[
+                    "validation"
+                ]["continuity_ledger_entry_appended"],
+                "source_manifest_ledger_signature_roles_bound": (
+                    source_manifest_ledger_binding["validation"][
+                        "continuity_ledger_signature_roles_bound"
+                    ]
+                ),
                 "raw_source_payload_stored": registry_snapshot["raw_source_payload_stored"],
+                "raw_registry_payload_stored": source_manifest_ledger_binding[
+                    "raw_registry_payload_stored"
+                ],
                 "invite_ready_count": registry_snapshot["selection_ready_counts"]["invite_ready"],
                 "weighted_vote_ready_count": registry_snapshot["selection_ready_counts"][
                     "weighted_vote_ready"
@@ -4508,6 +4544,7 @@ json.dump(response, sys.stdout)
                     and build_request_binding_validation["ok"]
                     and execution_chain_validation["ok"]
                     and registry_source_digest_manifest_bound
+                    and source_manifest_ledger_binding["validation"]["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),
             },

@@ -82,6 +82,8 @@ source workspace に加えて bounded same-host local candidate workspace catalo
 という proposal-profile-bound workspace review policy を返し、
 repo-local `agents/` をそのまま sync し、
 trust-bound registry snapshot、bounded convocation plan、
+`yaoyorozu-agent-source-manifest` ContinuityLedger entry への
+self+guardian 署名付き source manifest binding、
 `self-modify-patch-v1` と `memory-edit-v1` と `fork-request-v1` と `inter-mind-negotiation-v1` を切り替え可能な
 bounded proposal profile catalog、および
 `self-modify-patch-v1` では 4 coverage、

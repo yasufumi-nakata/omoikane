@@ -36,6 +36,8 @@
   `inter-mind-negotiation-v1` では `runtime/schema/eval/docs` required という cross-workspace coverage policy を
   `yaoyorozu_workspace_discovery` として machine-readable に固定したうえで、
   repo-local `agents/` から trust-bound registry snapshot と
+  self+guardian 署名付き `yaoyorozu-agent-source-manifest`
+  ContinuityLedger binding を materialize し、
   `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` / `inter-mind-negotiation-v1` の
   Council convocation / builder handoff plan を materialize し、
   convocation 側でも `workspace_discovery_binding` により accepted workspace set と profile policy を再束縛し、
@@ -149,3 +151,4 @@ CouncilMessage:
 - [yaoyorozu-roster.md](yaoyorozu-roster.md) ── 標準 Agent ロスタ
 - [trust-management.md](trust-management.md) ── Agent 信頼スコア
 # workspace-enacted: patch-1f3d61f787a9 target=docs/02-subsystems/agentic/README.md
+# workspace-enacted: patch-3458c4abda70 target=docs/02-subsystems/agentic/README.md

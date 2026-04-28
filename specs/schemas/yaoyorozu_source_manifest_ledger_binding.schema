@@ -1,0 +1,218 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_source_manifest_ledger_binding.schema"
+title: YaoyorozuSourceManifestLedgerBinding
+description: Digest-only ContinuityLedger binding for the repo-local Yaoyorozu agent source manifest.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - binding_id
+  - recorded_at
+  - binding_profile
+  - registry_snapshot_ref
+  - registry_digest
+  - policy_id
+  - source_root
+  - source_digest_profile
+  - source_definition_count
+  - source_definition_digests
+  - source_manifest_digest
+  - continuity_event_ref
+  - continuity_event_digest
+  - continuity_ledger_category
+  - continuity_ledger_event_type
+  - continuity_ledger_signature_roles
+  - continuity_ledger_appended
+  - continuity_ledger_entry_ref
+  - continuity_ledger_entry_hash
+  - continuity_ledger_payload_ref
+  - raw_source_payload_stored
+  - raw_registry_payload_stored
+  - raw_continuity_event_payload_stored
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_source_manifest_ledger_binding
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  binding_id:
+    type: string
+    pattern: "^yaoyorozu-source-manifest-[a-f0-9]{12}$"
+  recorded_at:
+    type: string
+    format: date-time
+  binding_profile:
+    const: yaoyorozu-agent-source-manifest-continuity-ledger-binding-v1
+  registry_snapshot_ref:
+    type: string
+    pattern: "^registry://yaoyorozu-registry-[a-f0-9]{12}$"
+  registry_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  policy_id:
+    const: repo-local-yaoyorozu-registry-v1
+  source_root:
+    const: agents
+  source_digest_profile:
+    const: repo-local-agent-source-digest-manifest-v1
+  source_definition_count:
+    type: integer
+    minimum: 1
+  source_definition_digests:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - source_ref
+        - agent_id
+        - role
+        - sha256
+        - byte_length
+      properties:
+        source_ref:
+          type: string
+          pattern: "^agents/"
+        agent_id:
+          type: string
+          minLength: 1
+        role:
+          type: string
+          enum:
+            - councilor
+            - builder
+            - researcher
+            - guardian
+        sha256:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        byte_length:
+          type: integer
+          minimum: 1
+  source_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  continuity_event_ref:
+    type: string
+    pattern: "^ledger://yaoyorozu/source-manifest/yaoyorozu-source-manifest-[a-f0-9]{12}$"
+  continuity_event_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  continuity_ledger_category:
+    const: yaoyorozu-agent-source-manifest
+  continuity_ledger_event_type:
+    const: yaoyorozu.agent_source_manifest.bound
+  continuity_ledger_signature_roles:
+    type: array
+    minItems: 2
+    maxItems: 2
+    prefixItems:
+      - const: self
+      - const: guardian
+  continuity_ledger_appended:
+    const: true
+  continuity_ledger_entry_ref:
+    type: string
+    pattern: "^ledger://continuity-ledger/[a-f0-9]{64}$"
+  continuity_ledger_entry_hash:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  continuity_ledger_payload_ref:
+    type: string
+    pattern: "^cas://sha256/[a-f0-9]{64}$"
+  raw_source_payload_stored:
+    const: false
+  raw_registry_payload_stored:
+    const: false
+  raw_continuity_event_payload_stored:
+    const: false
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - ok
+      - source_manifest_bound
+      - source_manifest_digest_bound
+      - registry_digest_bound
+      - continuity_event_digest_bound
+      - continuity_ledger_entry_appended
+      - continuity_ledger_entry_digest_bound
+      - continuity_ledger_payload_ref_bound
+      - continuity_ledger_signature_roles_bound
+      - raw_source_payload_stored
+      - raw_registry_payload_stored
+      - raw_continuity_event_payload_stored
+    properties:
+      ok:
+        const: true
+      source_manifest_bound:
+        const: true
+      source_manifest_digest_bound:
+        const: true
+      registry_digest_bound:
+        const: true
+      continuity_event_digest_bound:
+        const: true
+      continuity_ledger_entry_appended:
+        const: true
+      continuity_ledger_entry_digest_bound:
+        const: true
+      continuity_ledger_payload_ref_bound:
+        const: true
+      continuity_ledger_signature_roles_bound:
+        const: true
+      raw_source_payload_stored:
+        const: false
+      raw_registry_payload_stored:
+        const: false
+      raw_continuity_event_payload_stored:
+        const: false
+examples:
+  - kind: yaoyorozu_source_manifest_ledger_binding
+    schema_version: 1.0.0
+    binding_id: yaoyorozu-source-manifest-0123456789ab
+    recorded_at: "2026-04-29T00:00:00+00:00"
+    binding_profile: yaoyorozu-agent-source-manifest-continuity-ledger-binding-v1
+    registry_snapshot_ref: registry://yaoyorozu-registry-0123456789ab
+    registry_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    policy_id: repo-local-yaoyorozu-registry-v1
+    source_root: agents
+    source_digest_profile: repo-local-agent-source-digest-manifest-v1
+    source_definition_count: 1
+    source_definition_digests:
+      - source_ref: agents/guardians/integrity-guardian.yaml
+        agent_id: integrity-guardian
+        role: guardian
+        sha256: 1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        byte_length: 768
+    source_manifest_digest: 2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    continuity_event_ref: ledger://yaoyorozu/source-manifest/yaoyorozu-source-manifest-0123456789ab
+    continuity_event_digest: 3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    continuity_ledger_category: yaoyorozu-agent-source-manifest
+    continuity_ledger_event_type: yaoyorozu.agent_source_manifest.bound
+    continuity_ledger_signature_roles:
+      - self
+      - guardian
+    continuity_ledger_appended: true
+    continuity_ledger_entry_ref: ledger://continuity-ledger/4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    continuity_ledger_entry_hash: 4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    continuity_ledger_payload_ref: cas://sha256/5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    raw_source_payload_stored: false
+    raw_registry_payload_stored: false
+    raw_continuity_event_payload_stored: false
+    validation:
+      ok: true
+      source_manifest_bound: true
+      source_manifest_digest_bound: true
+      registry_digest_bound: true
+      continuity_event_digest_bound: true
+      continuity_ledger_entry_appended: true
+      continuity_ledger_entry_digest_bound: true
+      continuity_ledger_payload_ref_bound: true
+      continuity_ledger_signature_roles_bound: true
+      raw_source_payload_stored: false
+      raw_registry_payload_stored: false
+      raw_continuity_event_payload_stored: false

@@ -50,6 +50,7 @@
 reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo --json`
 により、この roster が bounded same-host local workspace catalog
 (`yaoyorozu_workspace_discovery`) と trust-bound registry snapshot と
+self+guardian 署名付き source manifest ContinuityLedger binding と
 `self-modify-patch-v1` 向け Council / builder handoff plan に materialize され、
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required、
 `fork-request-v1` では `runtime+schema+docs` required、

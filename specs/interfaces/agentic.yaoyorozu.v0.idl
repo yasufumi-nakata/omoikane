@@ -2,13 +2,14 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus bounded same-host workspace discovery, Guardian-gated external workspace seeding and dependency materialization, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
+summary: Repo-local agent registry sync plus digest-only source manifest ContinuityLedger binding, bounded same-host workspace discovery, Guardian-gated external workspace seeding and dependency materialization, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
 imports:
   agent_source_definition: ../schemas/agent_source_definition.schema
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_workspace_guardian_preseed_gate: ../schemas/yaoyorozu_workspace_guardian_preseed_gate.schema
   yaoyorozu_dependency_materialization_manifest: ../schemas/yaoyorozu_dependency_materialization_manifest.schema
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
+  yaoyorozu_source_manifest_ledger_binding: ../schemas/yaoyorozu_source_manifest_ledger_binding.schema
   council_convocation_session: ../schemas/council_convocation_session.schema
   yaoyorozu_worker_dispatch_plan: ../schemas/yaoyorozu_worker_dispatch_plan.schema
   yaoyorozu_worker_dispatch_receipt: ../schemas/yaoyorozu_worker_dispatch_receipt.schema
@@ -89,6 +90,26 @@ operations:
       - researcher registry entries must preserve research domain refs and evidence policy refs without storing raw research payloads
       - builder registry entries must preserve repo-local build surface refs and execution policy refs before handoff
       - guardian registry entries must preserve reviewer-facing oversight scope refs and attestation policy refs without storing raw audit payloads
+  bind_source_manifest_ledger_entry:
+    summary: >
+      Bind one registry source digest manifest to a self+guardian signed ContinuityLedger entry
+      without storing raw agent source definitions or the raw registry payload.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - registry_snapshot
+        properties:
+          registry_snapshot:
+            schema_ref: yaoyorozu_registry_snapshot
+    output:
+      schema_ref: yaoyorozu_source_manifest_ledger_binding
+    guarantees:
+      - source_definition_digests must remain ordered and match source_manifest_digest
+      - continuity_event_digest must be derived from the digest-only event payload
+      - ContinuityLedger category must be yaoyorozu-agent-source-manifest
+      - ledger entry must be signed by self and guardian roles
+      - raw_source_payload_stored, raw_registry_payload_stored, and raw_continuity_event_payload_stored must remain false
   prepare_council_convocation:
     summary: >
       Derive one deterministic Council convocation and builder handoff plan from the synced registry,
