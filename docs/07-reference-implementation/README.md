@@ -803,8 +803,9 @@ renewed media proof、readback digest、3650 日 refresh interval、1000 年 tar
 `long-term-media-renewal-registry-verifier-v1` による JP-13 / SG-01 registry response
 digest、response signature digest、250ms timeout budget、quorum digest、
 `long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` による registry
-endpoint certificate fingerprint、certificate chain digest、OCSP / revocation digest、
-renewal event、previous certificate retirement digest、
+endpoint certificate fingerprint、3-generation certificate chain digest、OCSP /
+revocation digest、renewal event、jurisdiction ごとの 2 本の previous certificate
+retirement digest、
 `long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1` /
 `long-term-media-renewal-registry-endpoint-certificate-ct-log-quorum-v1` /
 `long-term-media-renewal-registry-endpoint-certificate-sct-policy-authority-v1`

@@ -11778,6 +11778,9 @@ json.dump(response, sys.stdout)
                 ]["refresh_window"]["registry_verifier"]["endpoint_certificate_lifecycle"][
                     "digest"
                 ],
+                "long_term_media_renewal_registry_endpoint_certificate_chain_generation_count": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_chain_generation_count"
+                ],
                 "long_term_media_renewal_targets": replication_validation[
                     "long_term_media_renewal_targets"
                 ],
@@ -11908,6 +11911,9 @@ json.dump(response, sys.stdout)
                 ],
                 "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound": replication_validation[
                     "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_chain_generation_count": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_chain_generation_count"
                 ],
                 "raw_signer_roster_payload_stored": replication_validation[
                     "raw_signer_roster_payload_stored"

@@ -95,7 +95,7 @@ MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_JURISDICTIONS = (
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD = 2
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_RESPONSE_TIMEOUT_MS = 250
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_FRESHNESS_WINDOW_DAYS = 90
-MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS = 2
+MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS = 3
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CT_LOG_QUORUM_REQUIRED_LOG_COUNT = 2
 MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_SCT_TIMESTAMP_WINDOW_SECONDS = 86400
 MEMORY_REPLICATION_KEY_SUCCESSION_SIGNER_ROSTER_THRESHOLD = 2
@@ -1904,6 +1904,11 @@ class MemoryReplicationService:
             "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound": (
                 long_term_media_renewal_validation[
                     "registry_endpoint_certificate_sct_policy_authority_bound"
+                ]
+            ),
+            "long_term_media_renewal_registry_endpoint_certificate_chain_generation_count": (
+                long_term_media_renewal_validation[
+                    "registry_endpoint_certificate_chain_generation_count"
                 ]
             ),
             "raw_key_material_stored": key_succession_validation[
@@ -3724,19 +3729,6 @@ class MemoryReplicationService:
                 "certificate-authority://memory-replication/"
                 f"{jurisdiction_key}/media-registry"
             )
-            certificate_chain_digest = sha256_text(
-                canonical_json(
-                    {
-                        "jurisdiction": jurisdiction,
-                        "certificate_ref": certificate_ref,
-                        "certificate_fingerprint": certificate_fingerprint,
-                        "authority_ref": authority_ref,
-                        "chain_generations": (
-                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS
-                        ),
-                    }
-                )
-            )
             revocation_ref = (
                 "certificate-revocation://memory-replication/"
                 f"{jurisdiction_key}/media-registry-endpoint/current"
@@ -3784,30 +3776,66 @@ class MemoryReplicationService:
                     }
                 )
             )
-            previous_certificate_ref = (
-                "certificate://memory-replication/"
-                f"{jurisdiction_key}/media-registry-endpoint/previous"
-            )
-            previous_certificate_fingerprint = sha256_text(
-                canonical_json(
-                    {
-                        "jurisdiction": jurisdiction,
-                        "certificate_ref": previous_certificate_ref,
-                        "successor_certificate_fingerprint": certificate_fingerprint,
-                        "epoch": "previous",
-                    }
+            endpoint_previous_certificate_refs = []
+            endpoint_previous_certificate_fingerprints = []
+            endpoint_previous_retirement_digests = []
+            successor_certificate_ref = certificate_ref
+            successor_certificate_fingerprint = certificate_fingerprint
+            for generation_index in range(
+                1,
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS,
+            ):
+                generation_label = (
+                    "previous" if generation_index == 1 else f"previous-{generation_index}"
                 )
-            )
-            previous_retirement_digest = sha256_text(
+                previous_certificate_ref = (
+                    "certificate://memory-replication/"
+                    f"{jurisdiction_key}/media-registry-endpoint/{generation_label}"
+                )
+                previous_certificate_fingerprint = sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "certificate_ref": previous_certificate_ref,
+                            "successor_certificate_fingerprint": successor_certificate_fingerprint,
+                            "epoch": generation_label,
+                        }
+                    )
+                )
+                previous_retirement_digest = sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "previous_certificate_ref": previous_certificate_ref,
+                            "previous_certificate_fingerprint": (
+                                previous_certificate_fingerprint
+                            ),
+                            "successor_certificate_ref": successor_certificate_ref,
+                            "successor_certificate_fingerprint": successor_certificate_fingerprint,
+                            "status": "retired-after-successor-active",
+                        }
+                    )
+                )
+                endpoint_previous_certificate_refs.append(previous_certificate_ref)
+                endpoint_previous_certificate_fingerprints.append(
+                    previous_certificate_fingerprint
+                )
+                endpoint_previous_retirement_digests.append(previous_retirement_digest)
+                successor_certificate_ref = previous_certificate_ref
+                successor_certificate_fingerprint = previous_certificate_fingerprint
+            certificate_chain_digest = sha256_text(
                 canonical_json(
                     {
                         "jurisdiction": jurisdiction,
-                        "previous_certificate_ref": previous_certificate_ref,
-                        "previous_certificate_fingerprint": (
-                            previous_certificate_fingerprint
+                        "certificate_ref": certificate_ref,
+                        "certificate_fingerprint": certificate_fingerprint,
+                        "authority_ref": authority_ref,
+                        "previous_certificate_fingerprints": (
+                            endpoint_previous_certificate_fingerprints
                         ),
-                        "successor_certificate_ref": certificate_ref,
-                        "status": "retired-after-successor-active",
+                        "chain_generations": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS
+                        ),
                     }
                 )
             )
@@ -3858,7 +3886,9 @@ class MemoryReplicationService:
                         "ct_log_inclusion_proof_digest": (
                             endpoint_ct_log_inclusion_digests[0]
                         ),
-                        "previous_retirement_digest": previous_retirement_digest,
+                        "previous_retirement_digest_set": (
+                            endpoint_previous_retirement_digests
+                        ),
                         "status": "current",
                     }
                 )
@@ -3973,9 +4003,11 @@ class MemoryReplicationService:
             ocsp_response_digest_set.append(ocsp_response_digest)
             renewal_event_refs.append(renewal_event_ref)
             renewal_event_digest_set.append(renewal_event_digest)
-            previous_certificate_refs.append(previous_certificate_ref)
-            previous_certificate_fingerprints.append(previous_certificate_fingerprint)
-            previous_retirement_digest_set.append(previous_retirement_digest)
+            previous_certificate_refs.extend(endpoint_previous_certificate_refs)
+            previous_certificate_fingerprints.extend(
+                endpoint_previous_certificate_fingerprints
+            )
+            previous_retirement_digest_set.extend(endpoint_previous_retirement_digests)
             ct_log_refs.append(endpoint_ct_log_refs)
             ct_log_leaf_digest_set.append(ct_log_leaf_digest)
             ct_log_inclusion_proof_digest_set.append(
@@ -4195,6 +4227,7 @@ class MemoryReplicationService:
             "registry_endpoint_certificate_ct_log_bound": False,
             "registry_endpoint_certificate_ct_log_quorum_ok": False,
             "registry_endpoint_certificate_sct_policy_authority_bound": False,
+            "registry_endpoint_certificate_chain_generation_count": 0,
             "raw_media_revocation_payload_stored": False,
             "raw_media_refresh_payload_stored": False,
             "raw_media_registry_payload_stored": False,
@@ -4225,6 +4258,7 @@ class MemoryReplicationService:
                 "registry_endpoint_certificate_ct_log_bound": False,
                 "registry_endpoint_certificate_ct_log_quorum_ok": False,
                 "registry_endpoint_certificate_sct_policy_authority_bound": False,
+                "registry_endpoint_certificate_chain_generation_count": 0,
                 "raw_media_payload_stored": False,
                 "raw_media_readback_payload_stored": False,
                 "raw_media_revocation_payload_stored": False,
@@ -4469,6 +4503,9 @@ class MemoryReplicationService:
                 "raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored"
             ]
         )
+        registry_endpoint_certificate_chain_generation_count = refresh_window_validation[
+            "registry_endpoint_certificate_chain_generation_count"
+        ]
         self._require_non_empty_string(
             receipt.get("council_review_ref"),
             "long_term_media_renewal.council_review_ref",
@@ -4517,6 +4554,8 @@ class MemoryReplicationService:
             and not raw_media_registry_endpoint_certificate_lifecycle_payload_stored
             and not raw_media_registry_endpoint_certificate_ct_log_payload_stored
             and not raw_media_registry_endpoint_certificate_sct_policy_authority_payload_stored
+            and registry_endpoint_certificate_chain_generation_count
+            == MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS
             and not local_errors
         )
 
@@ -4562,6 +4601,9 @@ class MemoryReplicationService:
                 refresh_window_validation[
                     "registry_endpoint_certificate_sct_policy_authority_bound"
                 ]
+            ),
+            "registry_endpoint_certificate_chain_generation_count": (
+                registry_endpoint_certificate_chain_generation_count
             ),
             "raw_media_payload_stored": raw_media_payload_stored,
             "raw_media_readback_payload_stored": raw_media_readback_payload_stored,
@@ -4619,6 +4661,7 @@ class MemoryReplicationService:
         registry_endpoint_certificate_ct_log_bound = False
         registry_endpoint_certificate_ct_log_quorum_ok = False
         registry_endpoint_certificate_sct_policy_authority_bound = False
+        registry_endpoint_certificate_chain_generation_count = 0
         if not isinstance(receipt, dict):
             errors.append("long_term_media_renewal.refresh_window must be an object")
             return {
@@ -4634,6 +4677,7 @@ class MemoryReplicationService:
                 "registry_endpoint_certificate_ct_log_bound": False,
                 "registry_endpoint_certificate_ct_log_quorum_ok": False,
                 "registry_endpoint_certificate_sct_policy_authority_bound": False,
+                "registry_endpoint_certificate_chain_generation_count": 0,
                 "raw_media_revocation_payload_stored": False,
                 "raw_media_refresh_payload_stored": False,
                 "raw_media_registry_payload_stored": False,
@@ -4781,6 +4825,11 @@ class MemoryReplicationService:
                 "endpoint_certificate_sct_policy_authority_bound"
             ]
         )
+        registry_endpoint_certificate_chain_generation_count = (
+            registry_verifier_validation[
+                "endpoint_certificate_chain_generation_count"
+            ]
+        )
         raw_media_registry_payload_stored = registry_verifier_validation[
             "raw_media_registry_payload_stored"
         ]
@@ -4890,6 +4939,9 @@ class MemoryReplicationService:
             "registry_endpoint_certificate_sct_policy_authority_bound": (
                 registry_endpoint_certificate_sct_policy_authority_bound
             ),
+            "registry_endpoint_certificate_chain_generation_count": (
+                registry_endpoint_certificate_chain_generation_count
+            ),
             "raw_media_revocation_payload_stored": raw_media_revocation_payload_stored,
             "raw_media_refresh_payload_stored": raw_media_refresh_payload_stored,
             "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
@@ -4946,6 +4998,7 @@ class MemoryReplicationService:
                 "endpoint_certificate_ct_log_bound": False,
                 "endpoint_certificate_ct_log_quorum_ok": False,
                 "endpoint_certificate_sct_policy_authority_bound": False,
+                "endpoint_certificate_chain_generation_count": 0,
                 "raw_media_registry_payload_stored": False,
                 "raw_media_registry_response_payload_stored": False,
                 "raw_media_registry_endpoint_certificate_payload_stored": False,
@@ -5240,6 +5293,9 @@ class MemoryReplicationService:
                     "sct_policy_authority_bound"
                 ]
             ),
+            "endpoint_certificate_chain_generation_count": (
+                endpoint_certificate_lifecycle_validation["chain_generation_count"]
+            ),
             "raw_media_registry_payload_stored": raw_media_registry_payload_stored,
             "raw_media_registry_response_payload_stored": (
                 raw_media_registry_response_payload_stored
@@ -5296,6 +5352,7 @@ class MemoryReplicationService:
                 "ct_log_bound": False,
                 "ct_log_quorum_ok": False,
                 "sct_policy_authority_bound": False,
+                "chain_generation_count": 0,
                 "raw_certificate_payload_stored": False,
                 "raw_certificate_freshness_payload_stored": False,
                 "raw_certificate_lifecycle_payload_stored": False,
@@ -5402,19 +5459,6 @@ class MemoryReplicationService:
                 "certificate-authority://memory-replication/"
                 f"{jurisdiction_key}/media-registry"
             )
-            certificate_chain_digest = sha256_text(
-                canonical_json(
-                    {
-                        "jurisdiction": jurisdiction,
-                        "certificate_ref": certificate_ref,
-                        "certificate_fingerprint": certificate_fingerprint,
-                        "authority_ref": authority_ref,
-                        "chain_generations": (
-                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS
-                        ),
-                    }
-                )
-            )
             revocation_ref = (
                 "certificate-revocation://memory-replication/"
                 f"{jurisdiction_key}/media-registry-endpoint/current"
@@ -5462,30 +5506,66 @@ class MemoryReplicationService:
                     }
                 )
             )
-            previous_certificate_ref = (
-                "certificate://memory-replication/"
-                f"{jurisdiction_key}/media-registry-endpoint/previous"
-            )
-            previous_certificate_fingerprint = sha256_text(
-                canonical_json(
-                    {
-                        "jurisdiction": jurisdiction,
-                        "certificate_ref": previous_certificate_ref,
-                        "successor_certificate_fingerprint": certificate_fingerprint,
-                        "epoch": "previous",
-                    }
+            endpoint_previous_certificate_refs = []
+            endpoint_previous_certificate_fingerprints = []
+            endpoint_previous_retirement_digests = []
+            successor_certificate_ref = certificate_ref
+            successor_certificate_fingerprint = certificate_fingerprint
+            for generation_index in range(
+                1,
+                MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS,
+            ):
+                generation_label = (
+                    "previous" if generation_index == 1 else f"previous-{generation_index}"
                 )
-            )
-            previous_retirement_digest = sha256_text(
+                previous_certificate_ref = (
+                    "certificate://memory-replication/"
+                    f"{jurisdiction_key}/media-registry-endpoint/{generation_label}"
+                )
+                previous_certificate_fingerprint = sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "certificate_ref": previous_certificate_ref,
+                            "successor_certificate_fingerprint": successor_certificate_fingerprint,
+                            "epoch": generation_label,
+                        }
+                    )
+                )
+                previous_retirement_digest = sha256_text(
+                    canonical_json(
+                        {
+                            "jurisdiction": jurisdiction,
+                            "previous_certificate_ref": previous_certificate_ref,
+                            "previous_certificate_fingerprint": (
+                                previous_certificate_fingerprint
+                            ),
+                            "successor_certificate_ref": successor_certificate_ref,
+                            "successor_certificate_fingerprint": successor_certificate_fingerprint,
+                            "status": "retired-after-successor-active",
+                        }
+                    )
+                )
+                endpoint_previous_certificate_refs.append(previous_certificate_ref)
+                endpoint_previous_certificate_fingerprints.append(
+                    previous_certificate_fingerprint
+                )
+                endpoint_previous_retirement_digests.append(previous_retirement_digest)
+                successor_certificate_ref = previous_certificate_ref
+                successor_certificate_fingerprint = previous_certificate_fingerprint
+            certificate_chain_digest = sha256_text(
                 canonical_json(
                     {
                         "jurisdiction": jurisdiction,
-                        "previous_certificate_ref": previous_certificate_ref,
-                        "previous_certificate_fingerprint": (
-                            previous_certificate_fingerprint
+                        "certificate_ref": certificate_ref,
+                        "certificate_fingerprint": certificate_fingerprint,
+                        "authority_ref": authority_ref,
+                        "previous_certificate_fingerprints": (
+                            endpoint_previous_certificate_fingerprints
                         ),
-                        "successor_certificate_ref": certificate_ref,
-                        "status": "retired-after-successor-active",
+                        "chain_generations": (
+                            MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS
+                        ),
                     }
                 )
             )
@@ -5536,7 +5616,9 @@ class MemoryReplicationService:
                         "ct_log_inclusion_proof_digest": (
                             endpoint_ct_log_inclusion_digests[0]
                         ),
-                        "previous_retirement_digest": previous_retirement_digest,
+                        "previous_retirement_digest_set": (
+                            endpoint_previous_retirement_digests
+                        ),
                         "status": "current",
                     }
                 )
@@ -5653,11 +5735,13 @@ class MemoryReplicationService:
             expected_ocsp_response_digest_set.append(ocsp_response_digest)
             expected_renewal_event_refs.append(renewal_event_ref)
             expected_renewal_event_digest_set.append(renewal_event_digest)
-            expected_previous_certificate_refs.append(previous_certificate_ref)
-            expected_previous_certificate_fingerprints.append(
-                previous_certificate_fingerprint
+            expected_previous_certificate_refs.extend(endpoint_previous_certificate_refs)
+            expected_previous_certificate_fingerprints.extend(
+                endpoint_previous_certificate_fingerprints
             )
-            expected_previous_retirement_digest_set.append(previous_retirement_digest)
+            expected_previous_retirement_digest_set.extend(
+                endpoint_previous_retirement_digests
+            )
             expected_ct_log_refs.append(endpoint_ct_log_refs)
             expected_ct_log_leaf_digest_set.append(ct_log_leaf_digest)
             expected_ct_log_inclusion_proof_digest_set.append(
@@ -5856,6 +5940,11 @@ class MemoryReplicationService:
             != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_ENDPOINT_CERTIFICATE_CHAIN_GENERATIONS
         ):
             local_errors.append(f"{prefix}.certificate_lifecycle_generation_count mismatch")
+        chain_generation_count = (
+            receipt.get("certificate_lifecycle_generation_count")
+            if isinstance(receipt.get("certificate_lifecycle_generation_count"), int)
+            else 0
+        )
         if (
             receipt.get("quorum_threshold")
             != MEMORY_REPLICATION_MEDIA_RENEWAL_REGISTRY_QUORUM_THRESHOLD
@@ -5975,6 +6064,7 @@ class MemoryReplicationService:
             "ct_log_bound": ct_log_bound,
             "ct_log_quorum_ok": ct_log_quorum_ok,
             "sct_policy_authority_bound": sct_policy_authority_bound,
+            "chain_generation_count": chain_generation_count,
             "raw_certificate_payload_stored": raw_certificate_payload_stored,
             "raw_certificate_freshness_payload_stored": (
                 raw_certificate_freshness_payload_stored

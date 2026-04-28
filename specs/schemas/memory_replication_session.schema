@@ -217,7 +217,7 @@ properties:
         const: 90
       long_term_media_renewal_registry_endpoint_certificate_chain_generations:
         type: integer
-        const: 2
+        const: 3
       long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_required_log_count:
         type: integer
         const: 2
@@ -1150,24 +1150,24 @@ $defs:
           pattern: "^[0-9a-f]{64}$"
       previous_certificate_refs:
         type: array
-        minItems: 2
-        maxItems: 2
+        minItems: 4
+        maxItems: 4
         uniqueItems: true
         items:
           type: string
           minLength: 1
       previous_certificate_fingerprints:
         type: array
-        minItems: 2
-        maxItems: 2
+        minItems: 4
+        maxItems: 4
         uniqueItems: true
         items:
           type: string
           pattern: "^[0-9a-f]{64}$"
       previous_retirement_digest_set:
         type: array
-        minItems: 2
-        maxItems: 2
+        minItems: 4
+        maxItems: 4
         uniqueItems: true
         items:
           type: string
@@ -1301,7 +1301,7 @@ $defs:
         const: 90
       certificate_lifecycle_generation_count:
         type: integer
-        const: 2
+        const: 3
       certificate_lifecycle_quorum_digest:
         type: string
         pattern: "^[0-9a-f]{64}$"

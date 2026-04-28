@@ -143,12 +143,13 @@ source proof digest set と readback digest set を current-not-revoked status�
 JP-13 / SG-01 の registry response digest、response signature digest、250ms timeout、
 quorum digest を source proof set と revocation registry digest set に束縛し、
 `long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` が
-registry endpoint certificate fingerprint、certificate chain digest、OCSP /
-revocation digest、renewal event、previous certificate retirement digest を同じ
-registry response quorum に束縛する。
+registry endpoint certificate fingerprint、3 世代 certificate chain digest、OCSP /
+revocation digest、renewal event、jurisdiction ごとの 2 本の previous certificate
+retirement digest、CT-style readback、2-log quorum、SCT timestamp window、SCT
+policy authority を同じ registry response quorum に束縛する。
 raw media / raw readback に加えて raw revocation / raw refresh / raw registry /
 raw response / raw endpoint certificate / raw certificate freshness /
-raw certificate lifecycle payload も保存しない。
+raw certificate lifecycle / raw CT log / raw SCT policy authority payload も保存しない。
 
 ## トラウマ記憶の扱い
 

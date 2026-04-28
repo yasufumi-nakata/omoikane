@@ -818,6 +818,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound"
             ]
         )
+        self.assertEqual(
+            3,
+            result["validation"][
+                "long_term_media_renewal_registry_endpoint_certificate_chain_generation_count"
+            ],
+        )
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])

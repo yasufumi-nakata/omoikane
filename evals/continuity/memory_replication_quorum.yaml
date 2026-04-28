@@ -5,7 +5,8 @@ summary: >
   quorum-bound reconcile、council escalation、threshold key succession、
   multi-jurisdiction signer roster quorum、quorum threshold policy authority、
   long-term media renewal / readback proof、refresh / revocation window、
-  media registry verifier quorum を digest-bound に返すこと
+  media registry verifier quorum と 3-generation endpoint certificate chain を
+  digest-bound に返すこと
 checks:
   - name: memory replication demo smoke
     command: PYTHONPATH=src python3 -m omoikane.cli memory-replication-demo --json
@@ -48,6 +49,7 @@ expect:
   long_term_media_renewal_registry_endpoint_certificate_ct_log_bound: true
   long_term_media_renewal_registry_endpoint_certificate_ct_log_quorum_ok: true
   long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound: true
+  long_term_media_renewal_registry_endpoint_certificate_chain_generation_count: 3
   long_term_media_renewal_registry_jurisdictions:
     - JP-13
     - SG-01

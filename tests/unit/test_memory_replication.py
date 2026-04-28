@@ -77,6 +77,12 @@ class MemoryReplicationServiceTests(unittest.TestCase):
                 "long_term_media_renewal_registry_endpoint_certificate_sct_policy_authority_bound"
             ]
         )
+        self.assertEqual(
+            3,
+            validation[
+                "long_term_media_renewal_registry_endpoint_certificate_chain_generation_count"
+            ],
+        )
         self.assertFalse(validation["raw_key_material_stored"])
         self.assertFalse(validation["raw_shard_material_stored"])
         self.assertFalse(validation["raw_signer_roster_payload_stored"])
@@ -156,6 +162,22 @@ class MemoryReplicationServiceTests(unittest.TestCase):
             endpoint_certificate_lifecycle["registry_response_digest_set"],
         )
         self.assertEqual(2, len(endpoint_certificate_lifecycle["endpoint_certificate_refs"]))
+        self.assertEqual(
+            3,
+            endpoint_certificate_lifecycle["certificate_lifecycle_generation_count"],
+        )
+        self.assertEqual(
+            4,
+            len(endpoint_certificate_lifecycle["previous_certificate_refs"]),
+        )
+        self.assertEqual(
+            4,
+            len(endpoint_certificate_lifecycle["previous_certificate_fingerprints"]),
+        )
+        self.assertEqual(
+            4,
+            len(endpoint_certificate_lifecycle["previous_retirement_digest_set"]),
+        )
         self.assertEqual(
             "long-term-media-renewal-registry-endpoint-certificate-ct-log-readback-v1",
             endpoint_certificate_lifecycle["ct_log_readback_policy_id"],

@@ -117,6 +117,18 @@ class MindSchemaContractTests(unittest.TestCase):
             registry_verifier["response_digest_set"],
             endpoint_certificate_lifecycle["registry_response_digest_set"],
         )
+        self.assertEqual(
+            3,
+            endpoint_certificate_lifecycle["certificate_lifecycle_generation_count"],
+        )
+        self.assertEqual(
+            4,
+            len(endpoint_certificate_lifecycle["previous_certificate_refs"]),
+        )
+        self.assertEqual(
+            4,
+            len(endpoint_certificate_lifecycle["previous_retirement_digest_set"]),
+        )
         self.assertEqual("complete", endpoint_certificate_lifecycle["quorum_status"])
         self.assertEqual("current", endpoint_certificate_lifecycle["freshness_status"])
         self.assertEqual(
