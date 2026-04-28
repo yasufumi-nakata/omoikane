@@ -2910,6 +2910,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 self.assertTrue(entry["build_surface_refs"], entry["agent_id"])
                 self.assertTrue(entry["execution_policy_ref"], entry["agent_id"])
                 self.assertIn(entry["execution_policy_ref"], {entry["prompt_or_policy_ref"]})
+            if entry["role"] == "guardian":
+                self.assertTrue(entry["oversight_scope_refs"], entry["agent_id"])
+                self.assertTrue(entry["attestation_policy_ref"], entry["agent_id"])
+                self.assertIn(entry["attestation_policy_ref"], {entry["prompt_or_policy_ref"]})
 
     def test_sync_rejects_agent_source_definition_missing_schema_refs(self) -> None:
         service = YaoyorozuRegistryService()
@@ -3038,6 +3042,51 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(ValueError, "research_domain_refs must contain"):
+                service.sync_from_agents_directory(repo_root / "agents")
+
+    def test_sync_rejects_guardian_without_oversight_scope_refs(self) -> None:
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-guardian-source-") as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "agents" / "guardians").mkdir(parents=True)
+            (repo_root / "agents" / "guardians" / "policy.md").write_text(
+                "# policy\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas").mkdir(parents=True)
+            (repo_root / "specs" / "schemas" / "ethics_query.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas" / "ethics_decision.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            self._write_workspace_agent(
+                repo_root,
+                "agents/guardians/incomplete-guardian.yaml",
+                (
+                    "name: incomplete-guardian\n"
+                    "role: guardian\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - ethics.veto\n"
+                    "trust_floor: 0.99\n"
+                    "substrate_requirements: ['any']\n"
+                    "input_schema_ref: specs/schemas/ethics_query.yaml\n"
+                    "output_schema_ref: specs/schemas/ethics_decision.yaml\n"
+                    "attestation_policy_ref: agents/guardians/policy.md\n"
+                    "ethics_constraints: ['ALL']\n"
+                    "prompt_or_policy_ref: agents/guardians/policy.md\n"
+                    "when_to_invoke: |\n"
+                    "  - test\n"
+                    "when_not_to_invoke: |\n"
+                    "  - never\n"
+                ),
+            )
+
+            with self.assertRaisesRegex(ValueError, "oversight_scope_refs must contain"):
                 service.sync_from_agents_directory(repo_root / "agents")
 
     def test_discover_workspace_workers_returns_bounded_cross_workspace_catalog(self) -> None:

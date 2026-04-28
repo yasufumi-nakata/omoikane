@@ -73,8 +73,17 @@ trust_floor: 0.99
 substrate_requirements: ['any']
 input_schema_ref: specs/schemas/build_artifact.yaml
 output_schema_ref: specs/schemas/guardian_oversight_event.schema
+oversight_scope_refs:
+  - docs/02-subsystems/kernel/continuity-ledger.md
+  - docs/02-subsystems/mind-substrate/memory-model.md
+  - docs/02-subsystems/interface/wms-spec.md
+  - docs/02-subsystems/agentic/yaoyorozu-roster.md
+  - specs/schemas/gap_report.schema
+  - evals/continuity/gap_report_scan_receipt.yaml
+  - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+attestation_policy_ref: agents/guardians/integrity-guardian.policy.md
 ethics_constraints: ['ALL']
-prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
+prompt_or_policy_ref: agents/guardians/integrity-guardian.policy.md
 when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証

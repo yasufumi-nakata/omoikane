@@ -129,6 +129,19 @@ AGENT_SOURCE_BUILDER_SURFACE_PREFIXES = (
     "meta/",
     "research/",
 )
+AGENT_SOURCE_GUARDIAN_REQUIRED_LIST_FIELDS = (
+    "oversight_scope_refs",
+)
+AGENT_SOURCE_GUARDIAN_REQUIRED_STRING_FIELDS = (
+    "attestation_policy_ref",
+)
+AGENT_SOURCE_GUARDIAN_SCOPE_PREFIXES = (
+    "docs/",
+    "specs/",
+    "evals/",
+    "agents/",
+    "meta/",
+)
 YAOYOROZU_WORKSPACE_GUARDIAN_ROLE = "integrity"
 YAOYOROZU_WORKSPACE_GUARDIAN_CATEGORY = "attest"
 YAOYOROZU_WORKSPACE_GUARDIAN_REQUIRED_BEFORE = [
@@ -550,6 +563,32 @@ def _validate_agent_source_definition(
                 if not (repo_root / ref).exists():
                     errors.append(f"{field_name} must reference an existing repo path: {ref}")
         for field_name in AGENT_SOURCE_BUILDER_REQUIRED_STRING_FIELDS:
+            value = data.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{field_name} must be a non-empty string")
+                continue
+            ref = value.strip()
+            if ref.startswith(("agents/", "docs/", "specs/", "evals/", "meta/")) and not (
+                repo_root / ref
+            ).is_file():
+                errors.append(f"{field_name} must reference an existing repo file: {ref}")
+
+    if role == "guardian":
+        for field_name in AGENT_SOURCE_GUARDIAN_REQUIRED_LIST_FIELDS:
+            values = _normalize_string_list(data.get(field_name, []))
+            if not values:
+                errors.append(f"{field_name} must contain at least one non-empty item")
+                continue
+            for ref in values:
+                if not ref.startswith(AGENT_SOURCE_GUARDIAN_SCOPE_PREFIXES):
+                    errors.append(
+                        f"{field_name} must reference oversight surfaces under "
+                        f"{AGENT_SOURCE_GUARDIAN_SCOPE_PREFIXES}: {ref}"
+                    )
+                    continue
+                if not (repo_root / ref).exists():
+                    errors.append(f"{field_name} must reference an existing repo path: {ref}")
+        for field_name in AGENT_SOURCE_GUARDIAN_REQUIRED_STRING_FIELDS:
             value = data.get(field_name)
             if not isinstance(value, str) or not value.strip():
                 errors.append(f"{field_name} must be a non-empty string")
@@ -1026,6 +1065,8 @@ class YaoyorozuRegistryEntry:
     evidence_policy_ref: str = ""
     build_surface_refs: List[str] = field(default_factory=list)
     execution_policy_ref: str = ""
+    oversight_scope_refs: List[str] = field(default_factory=list)
+    attestation_policy_ref: str = ""
 
     def to_dict(self, trust_snapshot: Mapping[str, Any]) -> Dict[str, Any]:
         entry = {
@@ -1050,6 +1091,9 @@ class YaoyorozuRegistryEntry:
         if self.role == "builder":
             entry["build_surface_refs"] = list(self.build_surface_refs)
             entry["execution_policy_ref"] = self.execution_policy_ref
+        if self.role == "guardian":
+            entry["oversight_scope_refs"] = list(self.oversight_scope_refs)
+            entry["attestation_policy_ref"] = self.attestation_policy_ref
         return entry
 
 
@@ -2880,6 +2924,10 @@ class YaoyorozuRegistryService:
                 evidence_policy_ref=str(parsed.get("evidence_policy_ref", "")).strip(),
                 build_surface_refs=_normalize_string_list(parsed.get("build_surface_refs", [])),
                 execution_policy_ref=str(parsed.get("execution_policy_ref", "")).strip(),
+                oversight_scope_refs=_normalize_string_list(
+                    parsed.get("oversight_scope_refs", [])
+                ),
+                attestation_policy_ref=str(parsed.get("attestation_policy_ref", "")).strip(),
             )
             self._entries[agent_id] = entry
             self._ensure_trust_seed(entry)

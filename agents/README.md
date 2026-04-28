@@ -32,6 +32,8 @@ build_surface_refs: [<src/...> | <tests/...> | <specs/...> | <evals/...> | <docs
 execution_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # builder のみ必須
 research_domain_refs: [<docs/...> | <research/...>]  # researcher のみ必須
 evidence_policy_ref: <agents/... | docs/... | research/...>  # researcher のみ必須
+oversight_scope_refs: [<docs/...> | <specs/...> | <evals/...> | <agents/...> | <meta/...>]  # guardian のみ必須
+attestation_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # guardian のみ必須
 ethics_constraints: [<rule_id>]
 prompt_or_policy_ref: <agents/.../policy.md>
 when_to_invoke: |

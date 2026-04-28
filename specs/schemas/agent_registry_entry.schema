@@ -81,6 +81,15 @@ properties:
   execution_policy_ref:
     type: string
     pattern: "^(agents|docs|specs|evals|meta)/"
+  oversight_scope_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|specs|evals|agents|meta)/"
+  attestation_policy_ref:
+    type: string
+    pattern: "^(agents|docs|specs|evals|meta)/"
   ethics_constraints:
     type: array
     items:
@@ -112,6 +121,16 @@ allOf:
       required:
         - build_surface_refs
         - execution_policy_ref
+  - if:
+      properties:
+        role:
+          const: guardian
+      required:
+        - role
+    then:
+      required:
+        - oversight_scope_refs
+        - attestation_policy_ref
 examples:
   - kind: agent_registry_entry
     schema_version: 1.0.0

@@ -11,6 +11,8 @@ must:
   - researcher registry entries preserve digest-safe research domain and evidence policy refs without storing raw research payloads
   - builder source definitions must bind non-empty build_surface_refs and execution_policy_ref before registry materialization
   - builder registry entries preserve repo-local build surface and execution policy refs before any handoff
+  - guardian source definitions must bind non-empty oversight_scope_refs and attestation_policy_ref before registry materialization
+  - guardian registry entries preserve reviewer-facing oversight scope and attestation policy refs without storing raw audit payloads
 expected:
   agent_source_definition_schema_bound: true
   missing_schema_ref_rejected: true
@@ -19,4 +21,6 @@ expected:
   researcher_evidence_policy_ref_required: true
   builder_surface_refs_required: true
   builder_execution_policy_ref_required: true
+  guardian_oversight_scope_refs_required: true
+  guardian_attestation_policy_ref_required: true
   registry_entries_non_empty_contract: true

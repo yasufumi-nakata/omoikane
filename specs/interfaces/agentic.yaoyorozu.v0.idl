@@ -79,10 +79,12 @@ operations:
       - raw agent definitions must satisfy agent_source_definition before registry materialization
       - researcher definitions must bind non-empty research_domain_refs and evidence_policy_ref before registry materialization
       - builder definitions must bind non-empty build_surface_refs and execution_policy_ref before registry materialization
+      - guardian definitions must bind non-empty oversight_scope_refs and attestation_policy_ref before registry materialization
       - every entry must carry a trust_snapshot and trust_floor
       - role_index and capability_index must remain machine-readable
       - researcher registry entries must preserve research domain refs and evidence policy refs without storing raw research payloads
       - builder registry entries must preserve repo-local build surface refs and execution policy refs before handoff
+      - guardian registry entries must preserve reviewer-facing oversight scope refs and attestation policy refs without storing raw audit payloads
   prepare_council_convocation:
     summary: >
       Derive one deterministic Council convocation and builder handoff plan from the synced registry,

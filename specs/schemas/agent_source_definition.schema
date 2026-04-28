@@ -71,6 +71,15 @@ properties:
   execution_policy_ref:
     type: string
     pattern: "^(agents|docs|specs|evals|meta)/"
+  oversight_scope_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|specs|evals|agents|meta)/"
+  attestation_policy_ref:
+    type: string
+    pattern: "^(agents|docs|specs|evals|meta)/"
   ethics_constraints:
     type: array
     items:
@@ -106,6 +115,16 @@ allOf:
       required:
         - build_surface_refs
         - execution_policy_ref
+  - if:
+      properties:
+        role:
+          const: guardian
+      required:
+        - role
+    then:
+      required:
+        - oversight_scope_refs
+        - attestation_policy_ref
 examples:
   - name: design-architect
     role: councilor
@@ -163,3 +182,22 @@ examples:
     prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
     when_to_invoke: scanning progress needs literature review
     when_not_to_invoke: design decisions
+  - name: integrity-guardian
+    role: guardian
+    version: 0.1.0
+    capabilities:
+      - integrity.check
+    trust_floor: 0.99
+    substrate_requirements:
+      - any
+    input_schema_ref: specs/schemas/build_artifact.yaml
+    output_schema_ref: specs/schemas/guardian_oversight_event.schema
+    oversight_scope_refs:
+      - docs/02-subsystems/kernel/continuity-ledger.md
+      - evals/continuity/gap_report_scan_receipt.yaml
+    attestation_policy_ref: agents/guardians/integrity-guardian.policy.md
+    ethics_constraints:
+      - ALL
+    prompt_or_policy_ref: agents/guardians/integrity-guardian.policy.md
+    when_to_invoke: continuity or build artifact integrity must be attested
+    when_not_to_invoke: design-only deliberation

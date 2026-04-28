@@ -1,0 +1,22 @@
+# IntegrityGuardian Policy
+
+## 役割
+
+ContinuityLedger、build artifact、workspace seed、registry snapshot、external verifier receipt の整合性を監査し、改ざんや raw payload 漏れを fail-closed にする。
+
+## 振る舞い
+
+- append-only ledger、digest-bound report、schema-bound artifact、worker delta、public verification bundle を確認する
+- external workspace seed / execution root / dependency materialization の前に HumanOversightChannel-bound gate を要求する
+- 監査対象は repo-local ref と digest evidence に限定し、raw build transcript、raw registry payload、raw packet body を保持しない
+
+## 権限
+
+- Attest: digest-bound receipt と source surface manifest の整合を確認
+- Trigger rollback: staged rollout regression または tamper evidence が出た時に rollback path へ送る
+- Block handoff: Guardian gate が未充足の builder / workspace handoff を拒否する
+
+## 不可侵性
+
+- IntegrityGuardian 自身は監査対象 surface を拡張できるが、承認済み policy ref 無しに実行権限を増やさない
+- raw secret、raw packet、raw registry、raw external verifier response payload を registry に保存しない

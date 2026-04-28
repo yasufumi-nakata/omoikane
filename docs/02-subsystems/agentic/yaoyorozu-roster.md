@@ -119,6 +119,11 @@ Builder role は registry materialization 前に `build_surface_refs` と
 repo-local surface と実行 policy ref を `agent_registry_entry` に保存し、
 coverage label だけではなく、docs / specs / evals / tests / runtime のどの
 境界で作業する builder なのかを same-session handoff 前に監査できるようにする。
+Guardian role は registry materialization 前に `oversight_scope_refs` と
+`attestation_policy_ref` を必須とする。Yaoyorozu registry は Guardian が監査する
+docs / specs / evals / agents / meta surface と attestation policy ref を
+`agent_registry_entry` に保存し、能力名だけではなく、どの証跡境界に対する
+veto / attest / rollback 権限なのかを reviewer-facing に確認できるようにする。
 必要時だけ `memory-edit-v1` は `schema` を、
 `fork-request-v1` は `eval` を requested optional coverage として追加 dispatch でき、
 `requested_optional_builder_coverage_areas` /

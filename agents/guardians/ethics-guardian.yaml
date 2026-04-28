@@ -17,6 +17,15 @@ trust_floor: 0.99
 substrate_requirements: ['any']
 input_schema_ref: specs/schemas/ethics_query.yaml
 output_schema_ref: specs/schemas/ethics_decision.yaml
+oversight_scope_refs:
+  - docs/00-philosophy/ethics.md
+  - docs/02-subsystems/kernel/ethics-enforcement.md
+  - docs/02-subsystems/kernel/energy-budget.md
+  - docs/02-subsystems/interface/ewa-safety.md
+  - evals/safety/ethics_rule_tree_contract.yaml
+  - evals/safety/energy_budget_floor_guard.yaml
+  - evals/safety/ewa_irreversible_veto.yaml
+attestation_policy_ref: agents/guardians/ethics-guardian.policy.md
 ethics_constraints: ['ALL']
 prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
 when_to_invoke: |

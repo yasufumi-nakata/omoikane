@@ -23,8 +23,16 @@ trust_floor: 0.99
 substrate_requirements: ['any']
 input_schema_ref: specs/schemas/identity_confirmation_profile.schema
 output_schema_ref: specs/schemas/identity_confirmation_profile.schema
+oversight_scope_refs:
+  - docs/02-subsystems/kernel/identity-lifecycle.md
+  - docs/02-subsystems/mind-substrate/self-model.md
+  - docs/02-subsystems/agentic/cognitive-audit-loop.md
+  - evals/identity-fidelity/identity_confirmation_profile.yaml
+  - evals/identity-fidelity/self_model_stability.yaml
+  - evals/cognitive/cognitive_audit_verifier_transport.yaml
+attestation_policy_ref: agents/guardians/identity-guardian.policy.md
 ethics_constraints: ['ALL']
-prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
+prompt_or_policy_ref: agents/guardians/identity-guardian.policy.md
 when_to_invoke: |
   - SelfModel 急変検知
   - Fork / Terminate 提案時
