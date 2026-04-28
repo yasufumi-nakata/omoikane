@@ -11773,6 +11773,11 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_registry_verifier_digest": replication_session[
                     "long_term_media_renewal"
                 ]["refresh_window"]["registry_verifier"]["digest"],
+                "long_term_media_renewal_registry_endpoint_certificate_lifecycle_digest": replication_session[
+                    "long_term_media_renewal"
+                ]["refresh_window"]["registry_verifier"]["endpoint_certificate_lifecycle"][
+                    "digest"
+                ],
                 "long_term_media_renewal_targets": replication_validation[
                     "long_term_media_renewal_targets"
                 ],
@@ -11787,6 +11792,12 @@ json.dump(response, sys.stdout)
                 ],
                 "long_term_media_renewal_registry_verifier_quorum_ok": replication_validation[
                     "long_term_media_renewal_registry_verifier_quorum_ok"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_lifecycle_bound": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_lifecycle_bound"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_quorum_ok": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_quorum_ok"
                 ],
                 "session_digest": replication_session["digest"],
             },
@@ -11871,6 +11882,15 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_registry_verifier_quorum_ok": replication_validation[
                     "long_term_media_renewal_registry_verifier_quorum_ok"
                 ],
+                "long_term_media_renewal_registry_endpoint_certificate_lifecycle_bound": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_lifecycle_bound"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_freshness_ok": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_freshness_ok"
+                ],
+                "long_term_media_renewal_registry_endpoint_certificate_quorum_ok": replication_validation[
+                    "long_term_media_renewal_registry_endpoint_certificate_quorum_ok"
+                ],
                 "raw_signer_roster_payload_stored": replication_validation[
                     "raw_signer_roster_payload_stored"
                 ],
@@ -11897,6 +11917,15 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_media_registry_response_payload_stored": replication_validation[
                     "raw_media_registry_response_payload_stored"
+                ],
+                "raw_media_registry_endpoint_certificate_payload_stored": replication_validation[
+                    "raw_media_registry_endpoint_certificate_payload_stored"
+                ],
+                "raw_media_registry_endpoint_certificate_freshness_payload_stored": replication_validation[
+                    "raw_media_registry_endpoint_certificate_freshness_payload_stored"
+                ],
+                "raw_media_registry_endpoint_certificate_lifecycle_payload_stored": replication_validation[
+                    "raw_media_registry_endpoint_certificate_lifecycle_payload_stored"
                 ],
                 "ok": manifest_validation["ok"] and replication_validation["ok"],
             },

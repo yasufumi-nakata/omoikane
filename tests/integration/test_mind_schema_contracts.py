@@ -105,6 +105,33 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertTrue(refresh_window["revoked_source_fail_closed"])
         self.assertFalse(refresh_window["raw_revocation_payload_stored"])
         self.assertFalse(refresh_window["raw_refresh_payload_stored"])
+        registry_verifier = refresh_window["registry_verifier"]
+        endpoint_certificate_lifecycle = registry_verifier[
+            "endpoint_certificate_lifecycle"
+        ]
+        self.assertEqual(
+            "long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1",
+            endpoint_certificate_lifecycle["policy_id"],
+        )
+        self.assertEqual(
+            registry_verifier["response_digest_set"],
+            endpoint_certificate_lifecycle["registry_response_digest_set"],
+        )
+        self.assertEqual("complete", endpoint_certificate_lifecycle["quorum_status"])
+        self.assertEqual("current", endpoint_certificate_lifecycle["freshness_status"])
+        self.assertFalse(
+            endpoint_certificate_lifecycle["raw_certificate_payload_stored"]
+        )
+        self.assertFalse(
+            endpoint_certificate_lifecycle[
+                "raw_certificate_freshness_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            endpoint_certificate_lifecycle[
+                "raw_certificate_lifecycle_payload_stored"
+            ]
+        )
 
     def test_semantic_demo_handoff_matches_public_schema(self) -> None:
         result = self.runtime.run_semantic_demo()

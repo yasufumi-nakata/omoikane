@@ -802,8 +802,12 @@ renewed media proof、readback digest、3650 日 refresh interval、1000 年 tar
 90 日 revocation check、next refresh ref、stale / revoked source fail-closed、
 `long-term-media-renewal-registry-verifier-v1` による JP-13 / SG-01 registry response
 digest、response signature digest、250ms timeout budget、quorum digest、
+`long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` による registry
+endpoint certificate fingerprint、certificate chain digest、OCSP / revocation digest、
+renewal event、previous certificate retirement digest、
 raw media / raw readback / raw revocation / raw refresh / raw registry /
-raw response payload redaction、
+raw response / raw endpoint certificate / raw certificate freshness /
+raw certificate lifecycle payload redaction、
 `memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract

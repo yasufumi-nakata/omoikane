@@ -65,9 +65,14 @@ reference runtime ではこの protocol を
   stale / revoked proof fail-closed に束縛し、
   `long-term-media-renewal-registry-verifier-v1` が JP-13 / SG-01 の registry response
   digest、response signature digest、250ms timeout budget、quorum digest を
-  source proof set に束縛する。
+  source proof set に束縛する。さらに
+  `long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1` が各 registry
+  endpoint の certificate fingerprint、chain digest、OCSP / revocation digest、
+  renewal event、previous certificate retirement digest を registry response quorum と
+  同じ source proof set へ束縛する。
   raw media payload / raw readback payload / raw revocation payload / raw refresh payload /
-  raw registry payload / raw response payload は保存しない
+  raw registry payload / raw response payload / raw endpoint certificate payload /
+  raw certificate freshness payload / raw certificate lifecycle payload は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)

@@ -6,7 +6,8 @@ description: >
   placement, plaintext metadata plus encrypted payload transfer, random-block
   Merkle audit, council-escalated reconciliation, and raw-payload-redacted
   multi-jurisdiction key succession plus digest-only long-term media registry
-  verification without mutating the source manifest.
+  verification with endpoint certificate lifecycle binding without mutating the
+  source manifest.
 type: object
 additionalProperties: false
 required:
@@ -69,6 +70,7 @@ properties:
       - long_term_media_renewal_policy_id
       - long_term_media_renewal_refresh_policy_id
       - long_term_media_renewal_registry_verifier_policy_id
+      - long_term_media_renewal_registry_endpoint_certificate_lifecycle_policy_id
       - long_term_media_renewal_targets
       - long_term_media_renewal_refresh_interval_days
       - long_term_media_renewal_revocation_check_window_days
@@ -76,6 +78,8 @@ properties:
       - long_term_media_renewal_registry_jurisdictions
       - long_term_media_renewal_registry_quorum_threshold
       - long_term_media_renewal_registry_response_timeout_ms
+      - long_term_media_renewal_registry_endpoint_certificate_freshness_window_days
+      - long_term_media_renewal_registry_endpoint_certificate_chain_generations
       - verify_policy_id
       - reconcile_policy_id
       - minimum_consensus_targets
@@ -162,6 +166,9 @@ properties:
       long_term_media_renewal_registry_verifier_policy_id:
         type: string
         const: long-term-media-renewal-registry-verifier-v1
+      long_term_media_renewal_registry_endpoint_certificate_lifecycle_policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1
       long_term_media_renewal_targets:
         type: array
         minItems: 2
@@ -191,6 +198,12 @@ properties:
       long_term_media_renewal_registry_response_timeout_ms:
         type: integer
         const: 250
+      long_term_media_renewal_registry_endpoint_certificate_freshness_window_days:
+        type: integer
+        const: 90
+      long_term_media_renewal_registry_endpoint_certificate_chain_generations:
+        type: integer
+        const: 2
       verify_policy_id:
         type: string
         const: merkle-random-block-audit-v1
@@ -773,6 +786,7 @@ $defs:
       - response_timeout_ms
       - response_digest_set
       - response_signature_digest_set
+      - endpoint_certificate_lifecycle
       - registry_quorum_digest
       - quorum_threshold
       - quorum_status
@@ -881,6 +895,8 @@ $defs:
         items:
           type: string
           pattern: "^[0-9a-f]{64}$"
+      endpoint_certificate_lifecycle:
+        $ref: "#/$defs/long_term_media_renewal_registry_endpoint_certificate_lifecycle"
       registry_quorum_digest:
         type: string
         pattern: "^[0-9a-f]{64}$"
@@ -897,6 +913,248 @@ $defs:
         type: boolean
         const: false
       raw_response_payload_stored:
+        type: boolean
+        const: false
+      digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+  long_term_media_renewal_registry_endpoint_certificate_lifecycle:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - schema_version
+      - policy_id
+      - certificate_lifecycle_receipt_id
+      - identity_id
+      - source_manifest_digest
+      - registry_jurisdictions
+      - registry_endpoint_refs
+      - request_payload_digest
+      - source_media_proof_set_digest
+      - revocation_registry_digest_set
+      - registry_response_digest_set
+      - registry_response_signature_digest_set
+      - endpoint_certificate_refs
+      - endpoint_certificate_fingerprints
+      - certificate_authority_refs
+      - certificate_chain_digest_set
+      - certificate_revocation_registry_refs
+      - certificate_revocation_digest_set
+      - ocsp_responder_refs
+      - ocsp_response_digest_set
+      - renewal_event_refs
+      - renewal_event_digest_set
+      - previous_certificate_refs
+      - previous_certificate_fingerprints
+      - previous_retirement_digest_set
+      - certificate_freshness_window_days
+      - certificate_lifecycle_generation_count
+      - certificate_lifecycle_quorum_digest
+      - quorum_threshold
+      - quorum_status
+      - freshness_status
+      - certificate_lifecycle_status
+      - raw_certificate_payload_stored
+      - raw_certificate_freshness_payload_stored
+      - raw_certificate_lifecycle_payload_stored
+      - digest
+    properties:
+      kind:
+        type: string
+        const: memory_replication_long_term_media_renewal_registry_endpoint_certificate_lifecycle
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: long-term-media-renewal-registry-endpoint-certificate-lifecycle-v1
+      certificate_lifecycle_receipt_id:
+        type: string
+        minLength: 1
+      identity_id:
+        type: string
+        minLength: 1
+      source_manifest_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      registry_jurisdictions:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [JP-13, SG-01]
+      registry_endpoint_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      request_payload_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      source_media_proof_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      revocation_registry_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      registry_response_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      registry_response_signature_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      endpoint_certificate_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      endpoint_certificate_fingerprints:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      certificate_authority_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      certificate_chain_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      certificate_revocation_registry_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      certificate_revocation_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      ocsp_responder_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      ocsp_response_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      renewal_event_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      renewal_event_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      previous_certificate_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      previous_certificate_fingerprints:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      previous_retirement_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      certificate_freshness_window_days:
+        type: integer
+        const: 90
+      certificate_lifecycle_generation_count:
+        type: integer
+        const: 2
+      certificate_lifecycle_quorum_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      quorum_threshold:
+        type: integer
+        const: 2
+      quorum_status:
+        type: string
+        const: complete
+      freshness_status:
+        type: string
+        const: current
+      certificate_lifecycle_status:
+        type: string
+        const: current-not-revoked
+      raw_certificate_payload_stored:
+        type: boolean
+        const: false
+      raw_certificate_freshness_payload_stored:
+        type: boolean
+        const: false
+      raw_certificate_lifecycle_payload_stored:
         type: boolean
         const: false
       digest:
