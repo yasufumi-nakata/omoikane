@@ -793,6 +793,9 @@ JP-13 + SG-01 multi-jurisdiction signer roster quorum digest /
 quorum threshold policy registry digest / authority signature digest /
 raw key material, raw jurisdiction policy payload, raw quorum threshold policy payload,
 and raw roster payload redaction)、
+`long-term-media-renewal-proof-v1` による `coldstore` / `trustee` の
+renewed media proof、readback digest、3650 日 refresh interval、1000 年 target horizon、
+raw media / raw readback payload redaction、
 `memory-replication` ledger event を 1 シナリオで確認する。
 
 `memory-edit-demo` は L2 Memory Editing API の reference contract

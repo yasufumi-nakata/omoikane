@@ -11764,6 +11764,15 @@ json.dump(response, sys.stdout)
                 "key_succession_quorum_threshold_policy_ok": replication_validation[
                     "key_succession_quorum_threshold_policy_ok"
                 ],
+                "long_term_media_renewal_digest": replication_session[
+                    "long_term_media_renewal"
+                ]["digest"],
+                "long_term_media_renewal_targets": replication_validation[
+                    "long_term_media_renewal_targets"
+                ],
+                "long_term_media_renewal_readback_ok": replication_validation[
+                    "long_term_media_renewal_readback_ok"
+                ],
                 "session_digest": replication_session["digest"],
             },
             actor="MemoryReplicationService",
@@ -11814,6 +11823,21 @@ json.dump(response, sys.stdout)
                 "key_succession_quorum_threshold_policy_ok": replication_validation[
                     "key_succession_quorum_threshold_policy_ok"
                 ],
+                "long_term_media_renewal_bound": replication_validation[
+                    "long_term_media_renewal_bound"
+                ],
+                "long_term_media_renewal_targets": replication_validation[
+                    "long_term_media_renewal_targets"
+                ],
+                "long_term_media_renewal_readback_ok": replication_validation[
+                    "long_term_media_renewal_readback_ok"
+                ],
+                "long_term_media_renewal_refresh_interval_days": replication_validation[
+                    "long_term_media_renewal_refresh_interval_days"
+                ],
+                "long_term_media_renewal_target_horizon_years": replication_validation[
+                    "long_term_media_renewal_target_horizon_years"
+                ],
                 "raw_signer_roster_payload_stored": replication_validation[
                     "raw_signer_roster_payload_stored"
                 ],
@@ -11822,6 +11846,12 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_quorum_threshold_policy_payload_stored": replication_validation[
                     "raw_quorum_threshold_policy_payload_stored"
+                ],
+                "raw_media_payload_stored": replication_validation[
+                    "raw_media_payload_stored"
+                ],
+                "raw_media_readback_payload_stored": replication_validation[
+                    "raw_media_readback_payload_stored"
                 ],
                 "ok": manifest_validation["ok"] and replication_validation["ok"],
             },

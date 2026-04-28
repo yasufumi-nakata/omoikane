@@ -749,11 +749,21 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["key_succession_quorum_threshold_policy_bound"])
         self.assertTrue(result["validation"]["key_succession_quorum_threshold_policy_ok"])
+        self.assertTrue(result["validation"]["long_term_media_renewal_bound"])
+        self.assertEqual(
+            ["coldstore", "trustee"],
+            result["validation"]["long_term_media_renewal_targets"],
+        )
+        self.assertTrue(result["validation"]["long_term_media_renewal_readback_ok"])
+        self.assertEqual(3650, result["validation"]["long_term_media_renewal_refresh_interval_days"])
+        self.assertEqual(1000, result["validation"]["long_term_media_renewal_target_horizon_years"])
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])
         self.assertFalse(result["validation"]["raw_jurisdiction_policy_payload_stored"])
         self.assertFalse(result["validation"]["raw_quorum_threshold_policy_payload_stored"])
+        self.assertFalse(result["validation"]["raw_media_payload_stored"])
+        self.assertFalse(result["validation"]["raw_media_readback_payload_stored"])
         self.assertEqual(
             ["coldstore", "mirror", "primary"],
             result["validation"]["replication"]["consensus_target_ids"],
@@ -792,6 +802,18 @@ class CliIntegrationTests(unittest.TestCase):
             result["memory_replication"]["session"]["key_succession"][
                 "signer_roster_quorum"
             ]["threshold_policy_authority"]["threshold_policy_registry_bound"]
+        )
+        self.assertEqual(
+            "long-term-media-renewal-proof-v1",
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "policy_id"
+            ],
+        )
+        self.assertEqual(
+            ["coldstore", "trustee"],
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "renewal_target_ids"
+            ],
         )
         self.assertEqual(
             ["JP-13", "SG-01"],

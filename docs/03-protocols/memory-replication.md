@@ -57,6 +57,10 @@ reference runtime ではこの protocol を
   multi-jurisdiction signer roster quorum digest と quorum threshold policy authority
   digest を保存する。ただし raw key / raw shard material / raw jurisdiction policy
   payload / raw quorum threshold policy payload / raw signer roster payload は保存しない
+- `long-term-media-renewal-proof-v1` receipt を同じ session に束縛し、
+  `coldstore` / `trustee` の long-term copy を renewed media proof、readback digest、
+  migration attestation digest、3650 日 refresh interval、1000 年 target horizon へ固定する。
+  raw media payload / raw readback payload は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)
@@ -76,6 +80,6 @@ IDL:
 
 ## 未解決
 
-- 100-1000 年スケールの保管メディア → [docs/05-research-frontiers/long-term-storage.md](../05-research-frontiers/long-term-storage.md)
+- 実物理媒体での 100-1000 年スケール耐久実証 → [docs/05-research-frontiers/long-term-storage.md](../05-research-frontiers/long-term-storage.md)
 - 量子情報の冗長保管（no-cloning に抵触）
-- repo 外 key ceremony / HSM / trustee network / signer roster authority への実接続
+- repo 外 key ceremony / HSM / trustee network / signer roster authority / physical storage audit への実接続

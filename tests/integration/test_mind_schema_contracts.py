@@ -84,6 +84,15 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertTrue(threshold_authority["threshold_policy_registry_bound"])
         self.assertFalse(threshold_authority["raw_threshold_policy_payload_stored"])
         self.assertFalse(threshold_authority["raw_policy_registry_payload_stored"])
+        media_renewal = result["memory_replication"]["session"][
+            "long_term_media_renewal"
+        ]
+        self.assertEqual("long-term-media-renewal-proof-v1", media_renewal["policy_id"])
+        self.assertEqual(["coldstore", "trustee"], media_renewal["renewal_target_ids"])
+        self.assertEqual(2, len(media_renewal["proof_digest_set"]))
+        self.assertEqual(2, len(media_renewal["readback_digest_set"]))
+        self.assertFalse(media_renewal["raw_media_payload_stored"])
+        self.assertFalse(media_renewal["raw_media_readback_payload_stored"])
 
     def test_semantic_demo_handoff_matches_public_schema(self) -> None:
         result = self.runtime.run_semantic_demo()

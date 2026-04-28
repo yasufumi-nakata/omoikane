@@ -33,11 +33,26 @@ class MemoryReplicationServiceTests(unittest.TestCase):
         )
         self.assertTrue(validation["key_succession_quorum_threshold_policy_bound"])
         self.assertTrue(validation["key_succession_quorum_threshold_policy_ok"])
+        self.assertTrue(validation["long_term_media_renewal_bound"])
+        self.assertEqual(
+            ["coldstore", "trustee"],
+            validation["long_term_media_renewal_targets"],
+        )
+        self.assertTrue(validation["long_term_media_renewal_readback_ok"])
+        self.assertEqual(3650, validation["long_term_media_renewal_refresh_interval_days"])
+        self.assertEqual(1000, validation["long_term_media_renewal_target_horizon_years"])
         self.assertFalse(validation["raw_key_material_stored"])
         self.assertFalse(validation["raw_shard_material_stored"])
         self.assertFalse(validation["raw_signer_roster_payload_stored"])
         self.assertFalse(validation["raw_jurisdiction_policy_payload_stored"])
         self.assertFalse(validation["raw_quorum_threshold_policy_payload_stored"])
+        self.assertFalse(validation["raw_media_payload_stored"])
+        self.assertFalse(validation["raw_media_readback_payload_stored"])
+        media_renewal = session["long_term_media_renewal"]
+        self.assertEqual("long-term-media-renewal-proof-v1", media_renewal["policy_id"])
+        self.assertEqual(["coldstore", "trustee"], media_renewal["renewal_target_ids"])
+        self.assertEqual(2, len(media_renewal["proof_digest_set"]))
+        self.assertEqual(2, len(media_renewal["readback_digest_set"]))
         signer_roster_quorum = session["key_succession"]["signer_roster_quorum"]
         self.assertEqual(
             ["JP-13", "SG-01"],
@@ -241,6 +256,43 @@ class MemoryReplicationServiceTests(unittest.TestCase):
                 "raw_threshold_policy_payload_stored" in error
                 for error in validation["errors"]
             )
+        )
+
+    def test_validate_session_rejects_long_term_media_readback_drift(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        session["long_term_media_renewal"]["media_proofs"][0]["readback_digest"] = "f" * 64
+        session["long_term_media_renewal"]["media_proofs"][0]["proof_digest"] = "0" * 64
+        session["long_term_media_renewal"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["long_term_media_renewal_bound"])
+        self.assertFalse(validation["long_term_media_renewal_readback_ok"])
+        self.assertTrue(
+            any("readback_digest mismatch" in error for error in validation["errors"])
+        )
+
+    def test_validate_session_rejects_raw_long_term_media_payload_storage(self) -> None:
+        service = MemoryReplicationService()
+
+        session = service.build_reference_session("identity-demo")
+        session["long_term_media_renewal"]["media_proofs"][1][
+            "raw_media_payload_stored"
+        ] = True
+        session["long_term_media_renewal"]["digest"] = "0" * 64
+        session["digest"] = "0" * 64
+
+        validation = service.validate_session(session)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["long_term_media_renewal_bound"])
+        self.assertTrue(validation["raw_media_payload_stored"])
+        self.assertTrue(
+            any("raw_media_payload_stored" in error for error in validation["errors"])
         )
 
 

@@ -6,7 +6,7 @@ summary: >
   Deterministic four-target MemoryCrystal replication contract with plaintext
   metadata plus encrypted payload transfer, random-block Merkle audit, and
   council-escalated reconciliation plus threshold key succession recovery with
-  multi-jurisdiction signer roster authority.
+  multi-jurisdiction signer roster authority and long-term media renewal proof.
 imports:
   memory_crystal_manifest: ../schemas/memory_crystal_manifest.schema
   memory_replication_session: ../schemas/memory_replication_session.schema
@@ -38,6 +38,7 @@ operations:
       - key_succession must bind successor-key preparation to a JP-13 primary signer roster policy with identity-guardian and integrity-guardian signatures, without storing raw roster payload
       - key_succession must additionally bind JP-13 and SG-01 signer roster policies into a digest-only multi-jurisdiction quorum without storing raw jurisdiction policy payloads
       - multi-jurisdiction key_succession quorum threshold must be bound to a digest-only policy registry and authority signature quorum before complete status is allowed
+      - long_term_media_renewal must bind coldstore and trustee copies to renewed media proofs, readback digests, a 3650-day refresh interval, and a 1000-year target horizon without storing raw media or readback payloads
   validate_session:
     summary: Validate one replication session against the fixed quorum and reconciliation policy.
     input:
@@ -70,11 +71,18 @@ operations:
           - key_succession_signer_roster_quorum_ok
           - key_succession_quorum_threshold_policy_bound
           - key_succession_quorum_threshold_policy_ok
+          - long_term_media_renewal_bound
+          - long_term_media_renewal_targets
+          - long_term_media_renewal_readback_ok
+          - long_term_media_renewal_refresh_interval_days
+          - long_term_media_renewal_target_horizon_years
           - raw_key_material_stored
           - raw_shard_material_stored
           - raw_signer_roster_payload_stored
           - raw_jurisdiction_policy_payload_stored
           - raw_quorum_threshold_policy_payload_stored
+          - raw_media_payload_stored
+          - raw_media_readback_payload_stored
           - errors
         properties:
           ok:
@@ -125,6 +133,19 @@ operations:
             type: boolean
           key_succession_quorum_threshold_policy_ok:
             type: boolean
+          long_term_media_renewal_bound:
+            type: boolean
+          long_term_media_renewal_targets:
+            type: array
+            items:
+              type: string
+              minLength: 1
+          long_term_media_renewal_readback_ok:
+            type: boolean
+          long_term_media_renewal_refresh_interval_days:
+            type: integer
+          long_term_media_renewal_target_horizon_years:
+            type: integer
           raw_key_material_stored:
             type: boolean
           raw_shard_material_stored:
@@ -134,6 +155,10 @@ operations:
           raw_jurisdiction_policy_payload_stored:
             type: boolean
           raw_quorum_threshold_policy_payload_stored:
+            type: boolean
+          raw_media_payload_stored:
+            type: boolean
+          raw_media_readback_payload_stored:
             type: boolean
           errors:
             type: array
