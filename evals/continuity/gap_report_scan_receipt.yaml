@@ -4,7 +4,7 @@ level: L5
 description: >
   gap-report が all-zero / non-zero 判定、prioritized task count、scan surface、
   report digest、各 truth-source の surface digest manifest、continuity ledger 用
-  event ref / digest を public schema と digest-bound receipt に固定し、
+  event ref / digest と実 ContinuityLedger append entry を public schema と digest-bound receipt に固定し、
   automation gate の判定形を reviewer-facing に検証できること
 inputs:
   - source: reference-runtime
@@ -20,6 +20,13 @@ expected:
   surface_manifest_digest_bound: true
   continuity_ledger_bound: true
   continuity_event_digest_bound: true
+  continuity_ledger_appended: true
+  continuity_ledger_entry_digest_bound: true
+  continuity_ledger_payload_ref_bound: true
+  continuity_ledger_signature_roles_bound: true
+  continuity_ledger_signature_roles:
+    - self
+    - guardian
   prioritized_tasks_empty_when_all_zero: true
   raw_report_payload_stored: false
   raw_surface_payload_stored: false

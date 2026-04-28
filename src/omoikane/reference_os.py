@@ -897,7 +897,19 @@ class OmoikaneReferenceOS:
         }
 
     def generate_gap_report(self, repo_root: Path) -> Dict[str, Any]:
-        return self.gap_scanner.scan(repo_root)
+        report = self.gap_scanner.scan(repo_root)
+        receipt = report["scan_receipt"]
+        ledger_entry = self.ledger.append(
+            identity_id="omoikane-reference-runtime",
+            event_type=receipt["continuity_ledger_event_type"],
+            payload=self.gap_scanner.continuity_event_payload(report),
+            actor="GapReportService",
+            category=receipt["continuity_ledger_category"],
+            layer="L5",
+            signature_roles=receipt["continuity_ledger_signature_roles"],
+            substrate="reference-runtime",
+        )
+        return self.gap_scanner.bind_continuity_ledger_entry(report, ledger_entry)
 
     def run_version_demo(self) -> Dict[str, Any]:
         repo_root = Path(__file__).resolve().parents[2]

@@ -705,6 +705,26 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             report["scan_receipt"]["validation"]["continuity_event_digest_bound"]
         )
+        self.assertTrue(report["scan_receipt"]["continuity_ledger_appended"])
+        self.assertTrue(
+            report["scan_receipt"]["validation"]["continuity_ledger_entry_appended"]
+        )
+        self.assertTrue(
+            report["scan_receipt"]["validation"]["continuity_ledger_payload_ref_bound"]
+        )
+        self.assertEqual(
+            ["self", "guardian"],
+            report["scan_receipt"]["continuity_ledger_signature_roles"],
+        )
+        self.assertTrue(
+            report["scan_receipt"]["validation"][
+                "continuity_ledger_signature_roles_bound"
+            ]
+        )
+        self.assertEqual(
+            1,
+            runtime.ledger.verify()["category_counts"]["selfctor-gap-report-scan"],
+        )
         self.assertFalse(report["scan_receipt"]["validation"]["raw_surface_payload_stored"])
         self.assertFalse(report["scan_receipt"]["raw_continuity_event_payload_stored"])
         self.assertFalse(

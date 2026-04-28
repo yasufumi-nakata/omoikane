@@ -7,7 +7,7 @@ imports:
   gap_report: ../schemas/gap_report.schema
 operations:
   scan_repo:
-    summary: Scan one repository root for open questions, inventory drift, catalog coverage gaps, residual future work, runtime stubs, and latest decision-log follow-up.
+    summary: Scan one repository root for open questions, inventory drift, catalog coverage gaps, residual future work, runtime stubs, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
     input:
       inline_schema:
         type: object
@@ -25,6 +25,7 @@ operations:
       - scan_receipt must bind the entire report payload through report_digest without storing raw report payload separately
       - scan_receipt must bind each matched truth-source file through scan_surface_digests and surface_manifest_digest without storing raw source payloads
       - scan_receipt must bind report_digest plus surface_manifest_digest to a continuity_event_ref / continuity_event_digest pair without storing raw continuity event payload
+      - scan_receipt must expose the real continuity ledger entry ref, entry hash, payload ref, and self+guardian signature roles after the reference runtime append path succeeds
       - all_zero must be true only when every gap count and prioritized_task_count is zero
       - abstract Backend extension hooks are excluded from implementation_stub_hits, while concrete NotImplementedError paths remain reportable
       - latest decision-log residual and frontier chains must respect closes_next_gaps frontmatter

@@ -42,6 +42,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "self-modify": ["self", "council", "guardian"],
     "fork": ["self", "council", "guardian", "third_party"],
     "terminate": ["self", "council", "guardian", "third_party"],
+    "selfctor-gap-report-scan": ["self", "guardian"],
     "ethics-veto": ["guardian"],
     "ethics-escalate": ["guardian"],
     "cognitive-failover": ["guardian"],

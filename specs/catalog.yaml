@@ -52,7 +52,9 @@ entries:
     consumers:
       - specs/schemas/council_output.yaml
       - evals/continuity/continuity_chain_self_modify.yaml
-    rationale: Required to encode append-only continuity evidence.
+      - specs/schemas/gap_report.schema
+      - evals/continuity/gap_report_scan_receipt.yaml
+    rationale: Required to encode append-only continuity evidence, including gap-report scan events bound by self and guardian signatures.
   - priority: P1
     kind: schema
     file: specs/schemas/continuity_public_verification_bundle.schema
@@ -3231,7 +3233,7 @@ entries:
       - reference-runtime
       - evals/continuity/gap_report_scan_receipt.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including source surface digests and continuity-ledger event binding, for automation gate review.
+    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including source surface digests, continuity-ledger event binding, and actual ledger entry append evidence for automation gate review.
   - priority: P1
     kind: interface
     file: specs/interfaces/selfctor.gap_report.v0.idl
@@ -3240,7 +3242,7 @@ entries:
       - specs/schemas/gap_report.schema
       - evals/continuity/gap_report_scan_receipt.yaml
       - docs/07-reference-implementation/README.md
-    rationale: Required to bind the self-construction gap-report scan operation to the public schema, scan receipt contract, and continuity-ledger event evidence.
+    rationale: Required to bind the self-construction gap-report scan operation to the public schema, scan receipt contract, and continuity-ledger event plus appended entry evidence.
   - priority: P1
     kind: eval
     file: evals/continuity/gap_report_scan_receipt.yaml
@@ -3249,7 +3251,7 @@ entries:
       - specs/schemas/gap_report.schema
       - src/omoikane/self_construction/gaps.py
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects gap-report all-zero gate receipts from count drift, unbound report/surface/continuity-event digests, and raw report, raw surface, or raw continuity event payload storage.
+    rationale: Protects gap-report all-zero gate receipts from count drift, unbound report/surface/continuity-event digests, missing ledger append evidence, and raw report, raw surface, or raw continuity event payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/energy_budget_floor_receipt.schema

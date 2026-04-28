@@ -46,6 +46,9 @@ class GapScannerTests(unittest.TestCase):
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
             self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
+            self.assertFalse(receipt["continuity_ledger_appended"])
+            self.assertIsNone(receipt["continuity_ledger_entry_ref"])
+            self.assertFalse(receipt["validation"]["continuity_ledger_entry_appended"])
             digest_payload = {
                 key: value for key, value in report.items() if key != "scan_receipt"
             }

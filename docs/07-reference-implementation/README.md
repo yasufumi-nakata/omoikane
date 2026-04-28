@@ -124,6 +124,11 @@ raw report / raw surface payload 非保存を
 さらに scan receipt は `gap-report-scan-continuity-ledger-binding-v1` として
 `continuity_event_ref` / `continuity_event_digest` を返し、report digest と
 surface manifest digest を continuity ledger 用 evidence に束縛する。
+`OmoikaneReferenceOS.generate_gap_report()` は同じ digest-only event payload を
+`selfctor-gap-report-scan` category の `ContinuityLedger` entry として実際に append し、
+receipt に `continuity_ledger_entry_ref` / `continuity_ledger_entry_hash` /
+`continuity_ledger_payload_ref` / `continuity_ledger_signature_roles=[self, guardian]`
+を返す。
 raw continuity event payload は保存しない。
 
 

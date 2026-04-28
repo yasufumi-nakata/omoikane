@@ -15,6 +15,8 @@ GAP_REPORT_SCAN_RECEIPT_LEDGER_BINDING_PROFILE = (
     "gap-report-scan-continuity-ledger-binding-v1"
 )
 GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY = "selfctor-gap-report-scan"
+GAP_REPORT_SCAN_RECEIPT_LEDGER_EVENT_TYPE = "selfctor.gap_report.scanned"
+GAP_REPORT_SCAN_RECEIPT_LEDGER_SIGNATURE_ROLES = ("self", "guardian")
 PLACEHOLDER_MARKERS = (
     "プレースホルダ",
     "すべて未生成",
@@ -275,24 +277,16 @@ class GapScanner:
         receipt_id = new_id("gap-report-scan")
         generated_at = utc_now_iso()
         continuity_event_ref = f"ledger://selfctor/gap-report-scan/{receipt_id}"
-        continuity_event_digest = sha256_text(
-            canonical_json(
-                {
-                    "event_ref": continuity_event_ref,
-                    "category": GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY,
-                    "binding_profile": (
-                        GAP_REPORT_SCAN_RECEIPT_LEDGER_BINDING_PROFILE
-                    ),
-                    "scan_receipt_id": receipt_id,
-                    "scan_receipt_profile": GAP_REPORT_SCAN_RECEIPT_PROFILE,
-                    "repo_root": str(report["repo_root"]),
-                    "report_digest": report_digest,
-                    "surface_manifest_digest": surface_manifest_digest,
-                    "counts": counts,
-                    "all_zero": all_zero,
-                }
-            )
+        continuity_event_payload = self._continuity_event_payload(
+            report=report,
+            continuity_event_ref=continuity_event_ref,
+            receipt_id=receipt_id,
+            report_digest=report_digest,
+            surface_manifest_digest=surface_manifest_digest,
+            counts=counts,
+            all_zero=all_zero,
         )
+        continuity_event_digest = sha256_text(canonical_json(continuity_event_payload))
         receipt: Dict[str, Any] = {
             "kind": "gap_report_scan_receipt",
             "schema_version": GAP_REPORT_SCHEMA_VERSION,
@@ -306,9 +300,17 @@ class GapScanner:
             "continuity_event_ref": continuity_event_ref,
             "continuity_event_digest": continuity_event_digest,
             "continuity_ledger_category": GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY,
+            "continuity_ledger_event_type": GAP_REPORT_SCAN_RECEIPT_LEDGER_EVENT_TYPE,
             "continuity_ledger_binding_profile": (
                 GAP_REPORT_SCAN_RECEIPT_LEDGER_BINDING_PROFILE
             ),
+            "continuity_ledger_signature_roles": list(
+                GAP_REPORT_SCAN_RECEIPT_LEDGER_SIGNATURE_ROLES
+            ),
+            "continuity_ledger_appended": False,
+            "continuity_ledger_entry_ref": None,
+            "continuity_ledger_entry_hash": None,
+            "continuity_ledger_payload_ref": None,
             "counts": counts,
             "all_zero": all_zero,
             "report_digest": report_digest,
@@ -322,6 +324,10 @@ class GapScanner:
                 "surface_manifest_digest_bound": True,
                 "continuity_ledger_bound": True,
                 "continuity_event_digest_bound": True,
+                "continuity_ledger_entry_appended": False,
+                "continuity_ledger_entry_digest_bound": False,
+                "continuity_ledger_payload_ref_bound": False,
+                "continuity_ledger_signature_roles_bound": False,
                 "prioritized_tasks_empty_when_all_zero": (
                     len(report["prioritized_tasks"]) == 0 if all_zero else True
                 ),
@@ -332,12 +338,89 @@ class GapScanner:
         }
         return receipt
 
+    def continuity_event_payload(self, report: Dict[str, Any]) -> Dict[str, Any]:
+        """Return the digest-only payload that must be appended to ContinuityLedger."""
+        receipt = report["scan_receipt"]
+        return self._continuity_event_payload(
+            report=report,
+            continuity_event_ref=str(receipt["continuity_event_ref"]),
+            receipt_id=str(receipt["receipt_id"]),
+            report_digest=str(receipt["report_digest"]),
+            surface_manifest_digest=str(receipt["surface_manifest_digest"]),
+            counts=dict(receipt["counts"]),
+            all_zero=bool(receipt["all_zero"]),
+        )
+
+    def bind_continuity_ledger_entry(
+        self, report: Dict[str, Any], ledger_entry: Any
+    ) -> Dict[str, Any]:
+        """Attach a real ledger entry reference without exposing the raw entry payload."""
+        receipt = report["scan_receipt"]
+        expected_payload = self.continuity_event_payload(report)
+        expected_payload_ref = f"cas://sha256/{sha256_text(canonical_json(expected_payload))}"
+        signature_roles = list(GAP_REPORT_SCAN_RECEIPT_LEDGER_SIGNATURE_ROLES)
+        entry_signature_roles = list(getattr(ledger_entry, "signatures", {}).keys())
+        entry_ref = f"ledger://continuity-ledger/{ledger_entry.entry_id}"
+
+        entry_digest_bound = (
+            getattr(ledger_entry, "payload", None) == expected_payload
+            and getattr(ledger_entry, "category", None)
+            == GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY
+            and getattr(ledger_entry, "event_type", None)
+            == GAP_REPORT_SCAN_RECEIPT_LEDGER_EVENT_TYPE
+            and getattr(ledger_entry, "layer", None) == "L5"
+        )
+        payload_ref_bound = getattr(ledger_entry, "payload_ref", None) == expected_payload_ref
+        signature_roles_bound = entry_signature_roles == signature_roles
+
+        receipt["continuity_ledger_appended"] = True
+        receipt["continuity_ledger_entry_ref"] = entry_ref
+        receipt["continuity_ledger_entry_hash"] = ledger_entry.entry_hash
+        receipt["continuity_ledger_payload_ref"] = ledger_entry.payload_ref
+        receipt["validation"]["continuity_ledger_entry_appended"] = True
+        receipt["validation"]["continuity_ledger_entry_digest_bound"] = entry_digest_bound
+        receipt["validation"]["continuity_ledger_payload_ref_bound"] = payload_ref_bound
+        receipt["validation"]["continuity_ledger_signature_roles_bound"] = (
+            signature_roles_bound
+        )
+        receipt["validation"]["ok"] = (
+            bool(receipt["validation"]["ok"])
+            and entry_digest_bound
+            and payload_ref_bound
+            and signature_roles_bound
+        )
+        return report
+
     @staticmethod
     def _report_digest_payload(report: Dict[str, Any]) -> Dict[str, Any]:
         return {
             key: value
             for key, value in report.items()
             if key != "scan_receipt"
+        }
+
+    @staticmethod
+    def _continuity_event_payload(
+        report: Dict[str, Any],
+        continuity_event_ref: str,
+        receipt_id: str,
+        report_digest: str,
+        surface_manifest_digest: str,
+        counts: Dict[str, Any],
+        all_zero: bool,
+    ) -> Dict[str, Any]:
+        return {
+            "event_ref": continuity_event_ref,
+            "category": GAP_REPORT_SCAN_RECEIPT_LEDGER_CATEGORY,
+            "event_type": GAP_REPORT_SCAN_RECEIPT_LEDGER_EVENT_TYPE,
+            "binding_profile": GAP_REPORT_SCAN_RECEIPT_LEDGER_BINDING_PROFILE,
+            "scan_receipt_id": receipt_id,
+            "scan_receipt_profile": GAP_REPORT_SCAN_RECEIPT_PROFILE,
+            "repo_root": str(report["repo_root"]),
+            "report_digest": report_digest,
+            "surface_manifest_digest": surface_manifest_digest,
+            "counts": counts,
+            "all_zero": all_zero,
         }
 
     @staticmethod

@@ -54,6 +54,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["scan_receipt"]["validation"]["continuity_event_digest_bound"]
         )
+        self.assertTrue(result["scan_receipt"]["continuity_ledger_appended"])
+        self.assertTrue(
+            result["scan_receipt"]["validation"]["continuity_ledger_entry_appended"]
+        )
+        self.assertTrue(
+            result["scan_receipt"]["validation"]["continuity_ledger_payload_ref_bound"]
+        )
+        self.assertEqual(
+            ["self", "guardian"],
+            result["scan_receipt"]["continuity_ledger_signature_roles"],
+        )
         self.assertFalse(result["scan_receipt"]["validation"]["raw_surface_payload_stored"])
         self.assertFalse(result["scan_receipt"]["raw_continuity_event_payload_stored"])
         self.assertFalse(

@@ -47,6 +47,7 @@ capabilities:
   - gap-report.implementation-stub.attest
   - gap-report.scan-receipt.attest
   - gap-report.continuity-ledger-binding.attest
+  - gap-report.continuity-ledger-entry.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest
   - wms.time-rate-deviation.attest
   - wms.time-rate-attestation-transport.attest
@@ -107,6 +108,7 @@ when_to_invoke: |
   - gap-report が非抽象 runtime path に残る `NotImplementedError` stub を `implementation_stub_hits` として検出し、Backend 抽象 hook だけを除外していることを検証する時
   - gap-report の scan_receipt が all-zero 判定、prioritized task count、scan surface、report digest、surface digest manifest、raw report / raw surface payload 非保存に束縛されていることを検証する時
   - gap-report の scan_receipt が continuity_event_ref / continuity_event_digest を返し、raw continuity event payload を保存しないことを検証する時
+  - gap-report の scan_receipt が実 ContinuityLedger entry ref / hash / payload ref と self+guardian 署名 role に束縛されていることを検証する時
   - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時
   - WMS shared reality の requested time_rate deviation が fixed-time-rate private escape evidence に束縛され、WorldState.time_rate が変更されていないことを検証する時
   - WMS shared reality の requested time_rate deviation が participant subjective-time IMC attestation receipt set に束縛されていることを検証する時

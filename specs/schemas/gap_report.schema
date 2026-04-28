@@ -164,7 +164,13 @@ properties:
       - continuity_event_ref
       - continuity_event_digest
       - continuity_ledger_category
+      - continuity_ledger_event_type
       - continuity_ledger_binding_profile
+      - continuity_ledger_signature_roles
+      - continuity_ledger_appended
+      - continuity_ledger_entry_ref
+      - continuity_ledger_entry_hash
+      - continuity_ledger_payload_ref
       - counts
       - all_zero
       - report_digest
@@ -209,8 +215,35 @@ properties:
         pattern: "^[a-f0-9]{64}$"
       continuity_ledger_category:
         const: selfctor-gap-report-scan
+      continuity_ledger_event_type:
+        const: selfctor.gap_report.scanned
       continuity_ledger_binding_profile:
         const: gap-report-scan-continuity-ledger-binding-v1
+      continuity_ledger_signature_roles:
+        type: array
+        minItems: 2
+        maxItems: 2
+        prefixItems:
+          - const: self
+          - const: guardian
+        items: false
+      continuity_ledger_appended:
+        type: boolean
+      continuity_ledger_entry_ref:
+        oneOf:
+          - type: string
+            pattern: "^ledger://continuity-ledger/[a-f0-9]{64}$"
+          - type: "null"
+      continuity_ledger_entry_hash:
+        oneOf:
+          - type: string
+            pattern: "^[a-f0-9]{64}$"
+          - type: "null"
+      continuity_ledger_payload_ref:
+        oneOf:
+          - type: string
+            pattern: "^cas://sha256/[a-f0-9]{64}$"
+          - type: "null"
       counts:
         type: object
         additionalProperties: false
@@ -288,6 +321,10 @@ properties:
           - surface_manifest_digest_bound
           - continuity_ledger_bound
           - continuity_event_digest_bound
+          - continuity_ledger_entry_appended
+          - continuity_ledger_entry_digest_bound
+          - continuity_ledger_payload_ref_bound
+          - continuity_ledger_signature_roles_bound
           - prioritized_tasks_empty_when_all_zero
           - raw_report_payload_stored
           - raw_surface_payload_stored
@@ -306,6 +343,14 @@ properties:
           continuity_ledger_bound:
             type: boolean
           continuity_event_digest_bound:
+            type: boolean
+          continuity_ledger_entry_appended:
+            type: boolean
+          continuity_ledger_entry_digest_bound:
+            type: boolean
+          continuity_ledger_payload_ref_bound:
+            type: boolean
+          continuity_ledger_signature_roles_bound:
             type: boolean
           prioritized_tasks_empty_when_all_zero:
             type: boolean
@@ -410,7 +455,15 @@ examples:
       continuity_event_ref: ledger://selfctor/gap-report-scan/gap-report-scan-0123456789ab
       continuity_event_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       continuity_ledger_category: selfctor-gap-report-scan
+      continuity_ledger_event_type: selfctor.gap_report.scanned
       continuity_ledger_binding_profile: gap-report-scan-continuity-ledger-binding-v1
+      continuity_ledger_signature_roles:
+        - self
+        - guardian
+      continuity_ledger_appended: true
+      continuity_ledger_entry_ref: ledger://continuity-ledger/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_ledger_entry_hash: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      continuity_ledger_payload_ref: cas://sha256/0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       counts:
         open_question_count: 0
         missing_expected_file_count: 0
@@ -437,6 +490,10 @@ examples:
         surface_manifest_digest_bound: true
         continuity_ledger_bound: true
         continuity_event_digest_bound: true
+        continuity_ledger_entry_appended: true
+        continuity_ledger_entry_digest_bound: true
+        continuity_ledger_payload_ref_bound: true
+        continuity_ledger_signature_roles_bound: true
         prioritized_tasks_empty_when_all_zero: true
         raw_report_payload_stored: false
         raw_surface_payload_stored: false

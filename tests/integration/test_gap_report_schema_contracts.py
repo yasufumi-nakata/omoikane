@@ -118,6 +118,7 @@ class GapReportSchemaContractTests(unittest.TestCase):
         event_payload = {
             "event_ref": receipt["continuity_event_ref"],
             "category": receipt["continuity_ledger_category"],
+            "event_type": receipt["continuity_ledger_event_type"],
             "binding_profile": receipt["continuity_ledger_binding_profile"],
             "scan_receipt_id": receipt["receipt_id"],
             "scan_receipt_profile": receipt["profile"],
@@ -138,6 +139,20 @@ class GapReportSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(receipt["validation"]["continuity_ledger_bound"])
         self.assertTrue(receipt["validation"]["continuity_event_digest_bound"])
+        self.assertTrue(receipt["continuity_ledger_appended"])
+        self.assertTrue(receipt["validation"]["continuity_ledger_entry_appended"])
+        self.assertTrue(receipt["validation"]["continuity_ledger_entry_digest_bound"])
+        self.assertTrue(receipt["validation"]["continuity_ledger_payload_ref_bound"])
+        self.assertEqual(
+            ["self", "guardian"],
+            receipt["continuity_ledger_signature_roles"],
+        )
+        self.assertTrue(
+            receipt["validation"]["continuity_ledger_signature_roles_bound"]
+        )
+        self.assertRegex(receipt["continuity_ledger_entry_ref"], r"^ledger://continuity-ledger/[a-f0-9]{64}$")
+        self.assertRegex(receipt["continuity_ledger_entry_hash"], r"^[a-f0-9]{64}$")
+        self.assertRegex(receipt["continuity_ledger_payload_ref"], r"^cas://sha256/[a-f0-9]{64}$")
         self.assertFalse(receipt["raw_continuity_event_payload_stored"])
         self.assertFalse(
             receipt["validation"]["raw_continuity_event_payload_stored"]
