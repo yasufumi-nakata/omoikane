@@ -757,6 +757,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["long_term_media_renewal_readback_ok"])
         self.assertEqual(3650, result["validation"]["long_term_media_renewal_refresh_interval_days"])
         self.assertEqual(1000, result["validation"]["long_term_media_renewal_target_horizon_years"])
+        self.assertTrue(result["validation"]["long_term_media_renewal_refresh_window_bound"])
+        self.assertTrue(result["validation"]["long_term_media_renewal_source_proof_current"])
+        self.assertTrue(result["validation"]["long_term_media_renewal_revocation_check_ok"])
+        self.assertEqual(
+            90,
+            result["validation"]["long_term_media_renewal_revocation_check_window_days"],
+        )
         self.assertFalse(result["validation"]["replication"]["raw_key_material_stored"])
         self.assertFalse(result["validation"]["replication"]["raw_shard_material_stored"])
         self.assertFalse(result["validation"]["raw_signer_roster_payload_stored"])
@@ -764,6 +771,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["validation"]["raw_quorum_threshold_policy_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_payload_stored"])
         self.assertFalse(result["validation"]["raw_media_readback_payload_stored"])
+        self.assertFalse(result["validation"]["raw_media_revocation_payload_stored"])
+        self.assertFalse(result["validation"]["raw_media_refresh_payload_stored"])
         self.assertEqual(
             ["coldstore", "mirror", "primary"],
             result["validation"]["replication"]["consensus_target_ids"],
@@ -814,6 +823,18 @@ class CliIntegrationTests(unittest.TestCase):
             result["memory_replication"]["session"]["long_term_media_renewal"][
                 "renewal_target_ids"
             ],
+        )
+        self.assertEqual(
+            "long-term-media-renewal-refresh-window-v1",
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "refresh_window"
+            ]["policy_id"],
+        )
+        self.assertEqual(
+            "current-not-revoked",
+            result["memory_replication"]["session"]["long_term_media_renewal"][
+                "refresh_window"
+            ]["source_proof_status"],
         )
         self.assertEqual(
             ["JP-13", "SG-01"],

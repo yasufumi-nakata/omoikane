@@ -93,6 +93,18 @@ class MindSchemaContractTests(unittest.TestCase):
         self.assertEqual(2, len(media_renewal["readback_digest_set"]))
         self.assertFalse(media_renewal["raw_media_payload_stored"])
         self.assertFalse(media_renewal["raw_media_readback_payload_stored"])
+        refresh_window = media_renewal["refresh_window"]
+        self.assertEqual(
+            "long-term-media-renewal-refresh-window-v1",
+            refresh_window["policy_id"],
+        )
+        self.assertEqual("current-not-revoked", refresh_window["source_proof_status"])
+        self.assertEqual("within-window", refresh_window["refresh_status"])
+        self.assertEqual(90, refresh_window["revocation_check_window_days"])
+        self.assertTrue(refresh_window["stale_source_fail_closed"])
+        self.assertTrue(refresh_window["revoked_source_fail_closed"])
+        self.assertFalse(refresh_window["raw_revocation_payload_stored"])
+        self.assertFalse(refresh_window["raw_refresh_payload_stored"])
 
     def test_semantic_demo_handoff_matches_public_schema(self) -> None:
         result = self.runtime.run_semantic_demo()

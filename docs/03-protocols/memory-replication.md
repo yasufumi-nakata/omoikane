@@ -60,7 +60,10 @@ reference runtime ではこの protocol を
 - `long-term-media-renewal-proof-v1` receipt を同じ session に束縛し、
   `coldstore` / `trustee` の long-term copy を renewed media proof、readback digest、
   migration attestation digest、3650 日 refresh interval、1000 年 target horizon へ固定する。
-  raw media payload / raw readback payload は保存しない
+  さらに `long-term-media-renewal-refresh-window-v1` receipt が source proof set を
+  current-not-revoked status、90 日 revocation check window、次回 refresh ref、
+  stale / revoked proof fail-closed に束縛する。
+  raw media payload / raw readback payload / raw revocation payload / raw refresh payload は保存しない
 
 canonical schema:
 [specs/schemas/memory_replication_session.schema](../../specs/schemas/memory_replication_session.schema)

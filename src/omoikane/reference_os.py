@@ -11767,11 +11767,20 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_digest": replication_session[
                     "long_term_media_renewal"
                 ]["digest"],
+                "long_term_media_renewal_refresh_commit_digest": replication_session[
+                    "long_term_media_renewal"
+                ]["refresh_window"]["refresh_commit_digest"],
                 "long_term_media_renewal_targets": replication_validation[
                     "long_term_media_renewal_targets"
                 ],
                 "long_term_media_renewal_readback_ok": replication_validation[
                     "long_term_media_renewal_readback_ok"
+                ],
+                "long_term_media_renewal_revocation_check_ok": replication_validation[
+                    "long_term_media_renewal_revocation_check_ok"
+                ],
+                "long_term_media_renewal_revocation_check_window_days": replication_validation[
+                    "long_term_media_renewal_revocation_check_window_days"
                 ],
                 "session_digest": replication_session["digest"],
             },
@@ -11838,6 +11847,18 @@ json.dump(response, sys.stdout)
                 "long_term_media_renewal_target_horizon_years": replication_validation[
                     "long_term_media_renewal_target_horizon_years"
                 ],
+                "long_term_media_renewal_refresh_window_bound": replication_validation[
+                    "long_term_media_renewal_refresh_window_bound"
+                ],
+                "long_term_media_renewal_source_proof_current": replication_validation[
+                    "long_term_media_renewal_source_proof_current"
+                ],
+                "long_term_media_renewal_revocation_check_ok": replication_validation[
+                    "long_term_media_renewal_revocation_check_ok"
+                ],
+                "long_term_media_renewal_revocation_check_window_days": replication_validation[
+                    "long_term_media_renewal_revocation_check_window_days"
+                ],
                 "raw_signer_roster_payload_stored": replication_validation[
                     "raw_signer_roster_payload_stored"
                 ],
@@ -11852,6 +11873,12 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_media_readback_payload_stored": replication_validation[
                     "raw_media_readback_payload_stored"
+                ],
+                "raw_media_revocation_payload_stored": replication_validation[
+                    "raw_media_revocation_payload_stored"
+                ],
+                "raw_media_refresh_payload_stored": replication_validation[
+                    "raw_media_refresh_payload_stored"
                 ],
                 "ok": manifest_validation["ok"] and replication_validation["ok"],
             },

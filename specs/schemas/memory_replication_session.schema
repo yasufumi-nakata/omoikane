@@ -66,8 +66,10 @@ properties:
       - key_succession_signer_roster_quorum_threshold
       - key_succession_quorum_threshold_policy_id
       - long_term_media_renewal_policy_id
+      - long_term_media_renewal_refresh_policy_id
       - long_term_media_renewal_targets
       - long_term_media_renewal_refresh_interval_days
+      - long_term_media_renewal_revocation_check_window_days
       - long_term_media_renewal_target_horizon_years
       - verify_policy_id
       - reconcile_policy_id
@@ -149,6 +151,9 @@ properties:
       long_term_media_renewal_policy_id:
         type: string
         const: long-term-media-renewal-proof-v1
+      long_term_media_renewal_refresh_policy_id:
+        type: string
+        const: long-term-media-renewal-refresh-window-v1
       long_term_media_renewal_targets:
         type: array
         minItems: 2
@@ -159,6 +164,9 @@ properties:
       long_term_media_renewal_refresh_interval_days:
         type: integer
         const: 3650
+      long_term_media_renewal_revocation_check_window_days:
+        type: integer
+        const: 90
       long_term_media_renewal_target_horizon_years:
         type: integer
         const: 1000
@@ -420,6 +428,7 @@ $defs:
       - refresh_interval_days
       - target_horizon_years
       - next_refresh_due_ref
+      - refresh_window
       - council_review_ref
       - guardian_attestation_ref
       - raw_media_payload_stored
@@ -496,6 +505,8 @@ $defs:
       next_refresh_due_ref:
         type: string
         minLength: 1
+      refresh_window:
+        $ref: "#/$defs/long_term_media_renewal_refresh_window"
       council_review_ref:
         type: string
         minLength: 1
@@ -584,6 +595,135 @@ $defs:
         type: boolean
         const: false
       proof_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+  long_term_media_renewal_refresh_window:
+    type: object
+    additionalProperties: false
+    required:
+      - kind
+      - schema_version
+      - policy_id
+      - refresh_window_id
+      - identity_id
+      - source_manifest_digest
+      - renewal_target_ids
+      - source_proof_digest_set
+      - source_readback_digest_set
+      - source_media_proof_set_digest
+      - freshness_window_days
+      - revocation_check_window_days
+      - refresh_due_ref
+      - revocation_registry_refs
+      - revocation_registry_digest_set
+      - next_required_refresh_ref
+      - council_review_ref
+      - guardian_attestation_ref
+      - source_proof_status
+      - refresh_status
+      - stale_source_fail_closed
+      - revoked_source_fail_closed
+      - raw_revocation_payload_stored
+      - raw_refresh_payload_stored
+      - refresh_commit_digest
+    properties:
+      kind:
+        type: string
+        const: memory_replication_long_term_media_renewal_refresh_window
+      schema_version:
+        type: string
+        const: "1.0"
+      policy_id:
+        type: string
+        const: long-term-media-renewal-refresh-window-v1
+      refresh_window_id:
+        type: string
+        minLength: 1
+      identity_id:
+        type: string
+        minLength: 1
+      source_manifest_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      renewal_target_ids:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          enum: [coldstore, trustee]
+      source_proof_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      source_readback_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      source_media_proof_set_digest:
+        type: string
+        pattern: "^[0-9a-f]{64}$"
+      freshness_window_days:
+        type: integer
+        const: 3650
+      revocation_check_window_days:
+        type: integer
+        const: 90
+      refresh_due_ref:
+        type: string
+        minLength: 1
+      revocation_registry_refs:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      revocation_registry_digest_set:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+      next_required_refresh_ref:
+        type: string
+        minLength: 1
+      council_review_ref:
+        type: string
+        minLength: 1
+      guardian_attestation_ref:
+        type: string
+        minLength: 1
+      source_proof_status:
+        type: string
+        const: current-not-revoked
+      refresh_status:
+        type: string
+        const: within-window
+      stale_source_fail_closed:
+        type: boolean
+        const: true
+      revoked_source_fail_closed:
+        type: boolean
+        const: true
+      raw_revocation_payload_stored:
+        type: boolean
+        const: false
+      raw_refresh_payload_stored:
+        type: boolean
+        const: false
+      refresh_commit_digest:
         type: string
         pattern: "^[0-9a-f]{64}$"
   key_succession:

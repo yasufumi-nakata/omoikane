@@ -130,6 +130,7 @@ status: decided | superseded
 - [2026-04-28_self-model-value-archive-retention-proof.md](2026-04-28_self-model-value-archive-retention-proof.md)
 - [2026-04-28_self-model-value-archive-retention-refresh.md](2026-04-28_self-model-value-archive-retention-refresh.md)
 - [2026-04-28_memory-replication-long-term-media-renewal.md](2026-04-28_memory-replication-long-term-media-renewal.md)
+- [2026-04-28_memory-replication-media-renewal-refresh-window.md](2026-04-28_memory-replication-media-renewal-refresh-window.md)
 - [2026-04-28_self-model-autonomy-review-boundary.md](2026-04-28_self-model-autonomy-review-boundary.md)
 - [2026-04-18_guardian-oversight-channel.md](2026-04-18_guardian-oversight-channel.md)
 - [2026-04-18_ethics-rule-language.md](2026-04-18_ethics-rule-language.md)

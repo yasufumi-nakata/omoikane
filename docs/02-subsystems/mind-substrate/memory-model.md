@@ -135,6 +135,11 @@ digest、identity-guardian / integrity-guardian signature digest、JP-13 / SG-01
 multi-jurisdiction signer roster quorum digest、quorum threshold policy authority
 digest だけを保存し、raw key / raw shard material / raw jurisdiction policy payload /
 raw quorum threshold policy payload / raw signer roster payload は保存しない。
+同じ session の `long-term-media-renewal-proof-v1` は、
+`long-term-media-renewal-refresh-window-v1` を nested receipt として持ち、
+source proof digest set と readback digest set を current-not-revoked status、
+90 日 revocation check window、次回 refresh ref、stale / revoked proof fail-closed
+に束縛する。raw media / raw readback に加えて raw revocation / raw refresh payload も保存しない。
 
 ## トラウマ記憶の扱い
 
