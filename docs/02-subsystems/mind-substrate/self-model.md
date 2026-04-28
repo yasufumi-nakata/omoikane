@@ -139,26 +139,32 @@ raw trustee / care / legal / SelfModel payload は保存せず、OS は長期責
 
 `self-model-care-trustee-registry-binding-v1` は、care trustee handoff で列挙した
 trustee、care team、legal guardian refs が、現在有効な外部 registry entry、
-verifier key ref、not-revoked revocation ref に束縛されていることだけを確認する
-contract である。registry は外部制度側の authority のままであり、OS は registry
-payload や revocation payload を取り込まない。
+verifier key ref、not-revoked revocation ref、JP-13 / US-CA の live revocation
+verifier quorum に束縛されていることだけを確認する contract である。registry と
+revocation verifier は外部制度側の authority のままであり、OS は registry payload、
+revocation payload、verifier response payload を取り込まない。
 
 `self_model_care_trustee_registry_binding_receipt` は元の care trustee handoff
 receipt digest、source refs、registry entry digest set、registry snapshot digest、
-verifier key refs、revocation refs、Council resolution、Guardian boundary、
-continuity review ref を `registry_binding_digest` へ束ねる。
+verifier key refs、revocation refs、signed live verifier response digest set、
+verifier quorum digest、Council resolution、Guardian boundary、continuity review ref
+を `registry_binding_digest` へ束ねる。
 
 この receipt は `role_binding_status=bound`、`registry_status=current`、
 `revocation_status=not-revoked`、
 `external_registry_bound=true`、`verifier_key_refs_bound=true`、
-`revocation_refs_bound=true` の時だけ受理される。
+`revocation_refs_bound=true`、`revocation_verifier_quorum_status=complete`、
+`revocation_live_verifier_bound=true` の時だけ受理される。
 同時に `os_trustee_role_allowed=false`、
 `os_medical_authority_allowed=false`、
 `os_legal_guardianship_allowed=false`、
 `self_model_writeback_allowed=false`、
 `raw_registry_payload_stored=false`、
-`raw_revocation_payload_stored=false` を保ち、OS は外部 registry の current/not-revoked
-証跡だけを digest-only に監査する。
+`raw_revocation_payload_stored=false`、
+`raw_revocation_verifier_payload_stored=false`、
+`stale_revocation_response_accepted=false`、
+`revoked_revocation_response_accepted=false` を保ち、OS は外部 registry と live
+revocation verifier の current/not-revoked 証跡だけを digest-only に監査する。
 
 ## reference runtime で固定した外部 adjudication result 境界
 

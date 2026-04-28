@@ -33,6 +33,16 @@ required:
   - role_binding_status
   - registry_status
   - revocation_status
+  - revocation_verifier_policy_id
+  - revocation_verifier_profile
+  - revocation_verifier_network_scope
+  - revocation_verifier_receipts
+  - required_revocation_verifier_jurisdictions
+  - accepted_revocation_verifier_jurisdictions
+  - revocation_verifier_quorum_threshold
+  - revocation_verifier_quorum_status
+  - revocation_verifier_receipt_digest_set
+  - revocation_verifier_quorum_digest
   - council_resolution_ref
   - guardian_boundary_ref
   - continuity_review_ref
@@ -42,7 +52,12 @@ required:
   - external_registry_bound
   - verifier_key_refs_bound
   - revocation_refs_bound
+  - revocation_live_verifier_bound
+  - revocation_verifier_signed_response_envelope_bound
+  - revocation_verifier_freshness_window_bound
   - boundary_only_review
+  - stale_revocation_response_accepted
+  - revoked_revocation_response_accepted
   - os_trustee_role_allowed
   - os_medical_authority_allowed
   - os_legal_guardianship_allowed
@@ -50,6 +65,8 @@ required:
   - forced_correction_allowed
   - raw_registry_payload_stored
   - raw_revocation_payload_stored
+  - raw_revocation_verifier_payload_stored
+  - raw_revocation_response_signature_payload_stored
   - raw_trustee_payload_stored
   - raw_care_payload_stored
   - raw_legal_payload_stored
@@ -224,6 +241,140 @@ properties:
   revocation_status:
     type: string
     enum: [not-revoked, revoked-or-unknown]
+  revocation_verifier_policy_id:
+    type: string
+    const: self-model-care-trustee-registry-revocation-live-verifier-quorum-v1
+  revocation_verifier_profile:
+    type: string
+    const: care-role-revocation-live-verifier-quorum-v1
+  revocation_verifier_network_scope:
+    type: string
+    const: digest-only-care-role-revocation-verification
+  revocation_verifier_receipts:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - verifier_ref
+        - verifier_endpoint
+        - jurisdiction
+        - checked_at_ref
+        - response_ref
+        - response_digest
+        - response_status
+        - freshness_window_seconds
+        - observed_latency_ms
+        - signed_response_envelope_ref
+        - response_signing_key_ref
+        - response_signature_digest
+        - covered_revocation_refs
+        - covered_revocation_digest_set
+        - covered_revocation_set_digest
+        - verifier_key_ref
+        - trust_root_ref
+        - route_ref
+        - raw_response_payload_stored
+        - receipt_digest
+      properties:
+        verifier_ref:
+          type: string
+          minLength: 1
+        verifier_endpoint:
+          type: string
+          minLength: 1
+        jurisdiction:
+          type: string
+          minLength: 1
+        checked_at_ref:
+          type: string
+          minLength: 1
+        response_ref:
+          type: string
+          minLength: 1
+        response_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        response_status:
+          type: string
+          enum: [not-revoked, stale, revoked]
+        freshness_window_seconds:
+          type: integer
+          minimum: 1
+        observed_latency_ms:
+          type: number
+          minimum: 0
+        signed_response_envelope_ref:
+          type: string
+          minLength: 1
+        response_signing_key_ref:
+          type: string
+          minLength: 1
+        response_signature_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        covered_revocation_refs:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+        covered_revocation_digest_set:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+        covered_revocation_set_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        verifier_key_ref:
+          type: string
+          minLength: 1
+        trust_root_ref:
+          type: string
+          minLength: 1
+        route_ref:
+          type: string
+          minLength: 1
+        raw_response_payload_stored:
+          type: boolean
+          const: false
+        receipt_digest:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+  required_revocation_verifier_jurisdictions:
+    type: array
+    minItems: 2
+    maxItems: 2
+    prefixItems:
+      - type: string
+        const: JP-13
+      - type: string
+        const: US-CA
+  accepted_revocation_verifier_jurisdictions:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  revocation_verifier_quorum_threshold:
+    type: integer
+    const: 2
+  revocation_verifier_quorum_status:
+    type: string
+    enum: [complete, incomplete]
+  revocation_verifier_receipt_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[0-9a-f]{64}$"
+  revocation_verifier_quorum_digest:
+    type: string
+    pattern: "^[0-9a-f]{64}$"
   council_resolution_ref:
     type: string
     minLength: 1
@@ -259,9 +410,24 @@ properties:
   revocation_refs_bound:
     type: boolean
     const: true
+  revocation_live_verifier_bound:
+    type: boolean
+    const: true
+  revocation_verifier_signed_response_envelope_bound:
+    type: boolean
+    const: true
+  revocation_verifier_freshness_window_bound:
+    type: boolean
+    const: true
   boundary_only_review:
     type: boolean
     const: true
+  stale_revocation_response_accepted:
+    type: boolean
+    const: false
+  revoked_revocation_response_accepted:
+    type: boolean
+    const: false
   os_trustee_role_allowed:
     type: boolean
     const: false
@@ -281,6 +447,12 @@ properties:
     type: boolean
     const: false
   raw_revocation_payload_stored:
+    type: boolean
+    const: false
+  raw_revocation_verifier_payload_stored:
+    type: boolean
+    const: false
+  raw_revocation_response_signature_payload_stored:
     type: boolean
     const: false
   raw_trustee_payload_stored:
@@ -337,6 +509,58 @@ examples:
     role_binding_status: bound
     registry_status: current
     revocation_status: not-revoked
+    revocation_verifier_policy_id: self-model-care-trustee-registry-revocation-live-verifier-quorum-v1
+    revocation_verifier_profile: care-role-revocation-live-verifier-quorum-v1
+    revocation_verifier_network_scope: digest-only-care-role-revocation-verification
+    revocation_verifier_receipts:
+      - verifier_ref: verifier://jp-13/self-model/care-revocation-live/v1
+        verifier_endpoint: https://verifier.jp-13.example.invalid/self-model/care-revocation
+        jurisdiction: JP-13
+        checked_at_ref: timestamp://self-model/care-revocation/verifier/jp-13
+        response_ref: response://jp-13/self-model/care-revocation/not-revoked/v1
+        response_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        response_status: not-revoked
+        freshness_window_seconds: 900
+        observed_latency_ms: 38.5
+        signed_response_envelope_ref: signed-envelope://jp-13/self-model/care-revocation/v1
+        response_signing_key_ref: key://jp-13/self-model/care-revocation/verifier-key/v1
+        response_signature_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        covered_revocation_refs: [external-care-revocation://jp-13/trustee/long-term-trustee]
+        covered_revocation_digest_set: ["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]
+        covered_revocation_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        verifier_key_ref: key://jp-13/self-model/care-revocation/verifier-key/v1
+        trust_root_ref: trust-root://jp-13/self-model/care-revocation/pki/v1
+        route_ref: route://jp-13/self-model/care-revocation/live-json/v1
+        raw_response_payload_stored: false
+        receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - verifier_ref: verifier://us-ca/self-model/care-revocation-live/v1
+        verifier_endpoint: https://verifier.us-ca.example.invalid/self-model/care-revocation
+        jurisdiction: US-CA
+        checked_at_ref: timestamp://self-model/care-revocation/verifier/us-ca
+        response_ref: response://us-ca/self-model/care-revocation/not-revoked/v1
+        response_digest: "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        response_status: not-revoked
+        freshness_window_seconds: 900
+        observed_latency_ms: 53.25
+        signed_response_envelope_ref: signed-envelope://us-ca/self-model/care-revocation/v1
+        response_signing_key_ref: key://us-ca/self-model/care-revocation/verifier-key/v1
+        response_signature_digest: "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        covered_revocation_refs: [external-care-revocation://jp-13/trustee/long-term-trustee]
+        covered_revocation_digest_set: ["0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"]
+        covered_revocation_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+        verifier_key_ref: key://us-ca/self-model/care-revocation/verifier-key/v1
+        trust_root_ref: trust-root://us-ca/self-model/care-revocation/pki/v1
+        route_ref: route://us-ca/self-model/care-revocation/live-json/v1
+        raw_response_payload_stored: false
+        receipt_digest: "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    required_revocation_verifier_jurisdictions: [JP-13, US-CA]
+    accepted_revocation_verifier_jurisdictions: [JP-13, US-CA]
+    revocation_verifier_quorum_threshold: 2
+    revocation_verifier_quorum_status: complete
+    revocation_verifier_receipt_digest_set:
+      - "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - "1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    revocation_verifier_quorum_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
     council_resolution_ref: council://self-model/care-trustee-registry/boundary-only
     guardian_boundary_ref: guardian://self-model/care-trustee-registry/no-os-authority
     continuity_review_ref: continuity://self-model/care-trustee-registry/chain/v1
@@ -346,7 +570,12 @@ examples:
     external_registry_bound: true
     verifier_key_refs_bound: true
     revocation_refs_bound: true
+    revocation_live_verifier_bound: true
+    revocation_verifier_signed_response_envelope_bound: true
+    revocation_verifier_freshness_window_bound: true
     boundary_only_review: true
+    stale_revocation_response_accepted: false
+    revoked_revocation_response_accepted: false
     os_trustee_role_allowed: false
     os_medical_authority_allowed: false
     os_legal_guardianship_allowed: false
@@ -354,6 +583,8 @@ examples:
     forced_correction_allowed: false
     raw_registry_payload_stored: false
     raw_revocation_payload_stored: false
+    raw_revocation_verifier_payload_stored: false
+    raw_revocation_response_signature_payload_stored: false
     raw_trustee_payload_stored: false
     raw_care_payload_stored: false
     raw_legal_payload_stored: false

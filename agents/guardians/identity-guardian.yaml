@@ -9,6 +9,7 @@ capabilities:
   - self_model.pathology_escalation.boundary_handoff_review
   - self_model.care_trustee_handoff.boundary_review
   - self_model.care_trustee_registry.registry_binding_review
+  - self_model.care_trustee_registry.revocation_verifier_quorum_review
   - self_model.external_adjudication.boundary_review
   - self_model.external_adjudication.live_verifier_review
   - self_model.value_generation.autonomy_review
@@ -47,7 +48,7 @@ when_to_invoke: |
   - SelfModel 校正 receipt が本人同意・Council resolution・Guardian redaction を持ち、advisory-only から逸脱していないか確認する時
   - SelfModel pathological self-assessment escalation receipt が OS 内診断・強制補正・SelfModel writeback に進まず、外部医療・法制度 adjudication と care handoff へ digest-only に束縛されているか確認する時
   - SelfModel care trustee handoff receipt が長期 trustee / care team / legal guardian refs を外部制度側に留め、OS trustee role / OS medical authority / OS legal guardianship / raw trustee payload 保存へ逸脱していないか確認する時
-  - SelfModel care trustee registry binding receipt が handoff refs を current external registry entry / verifier key ref / not-revoked revocation ref に束縛し、raw registry payload 保存や OS trustee / medical / legal authority へ逸脱していないか確認する時
+  - SelfModel care trustee registry binding receipt が handoff refs を current external registry entry / verifier key ref / not-revoked revocation ref / JP-13 / US-CA live revocation verifier quorum に束縛し、stale / revoked verifier response 受容、raw registry / verifier payload 保存、OS trustee / medical / legal authority へ逸脱していないか確認する時
   - SelfModel external adjudication result receipt が外部医療・法制度・trustee の判断結果を jurisdiction policy と appeal/review path 付き digest-only refs に留め、OS adjudication authority / OS medical authority / OS legal authority / OS trustee role / SelfModel writeback / raw result payload 保存へ逸脱していないか確認する時
   - SelfModel external adjudication verifier receipt が appeal/review live verifier response を JP-13 / US-CA quorum、signed response envelope、freshness window に束縛し、stale / revoked response 受容、OS adjudication authority、SelfModel writeback、raw verifier payload 保存へ逸脱していないか確認する時
   - SelfModel value-generation receipt が self-authored proposal と future self acceptance を保ち、external veto / forced stability lock / immediate writeback へ逸脱していないか確認する時

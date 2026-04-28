@@ -311,10 +311,27 @@ class MindSchemaContractTests(unittest.TestCase):
             "not-revoked",
             result["care_trustee_registry_binding"]["revocation_status"],
         )
+        self.assertEqual(
+            "complete",
+            result["care_trustee_registry_binding"]["revocation_verifier_quorum_status"],
+        )
         self.assertTrue(result["care_trustee_registry_binding"]["verifier_key_refs_bound"])
         self.assertTrue(result["care_trustee_registry_binding"]["revocation_refs_bound"])
+        self.assertTrue(
+            result["care_trustee_registry_binding"]["revocation_live_verifier_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["care_trustee_registry_binding"][
+                "revocation_verifier_quorum_digest_bound"
+            ]
+        )
         self.assertFalse(result["care_trustee_registry_binding"]["raw_registry_payload_stored"])
         self.assertFalse(result["care_trustee_registry_binding"]["raw_revocation_payload_stored"])
+        self.assertFalse(
+            result["care_trustee_registry_binding"][
+                "raw_revocation_verifier_payload_stored"
+            ]
+        )
         self.assertFalse(result["care_trustee_registry_binding"]["os_trustee_role_allowed"])
         self.assertFalse(result["care_trustee_registry_binding"]["self_model_writeback_allowed"])
 

@@ -173,8 +173,10 @@ digest-only に束縛し、OS 自身が trustee、医療 authority、legal guard
 昇格しないことを確認する。
 care-trustee-registry-binding branch は、その handoff refs が current external
 registry entry、verifier key ref、not-revoked revocation ref に束縛されていることを
-digest-only に確認し、raw registry / revocation payload や OS trustee / medical /
-legal / writeback authority を許さない。
+digest-only に確認する。さらに accepted revocation refs を JP-13 / US-CA の
+live revocation verifier quorum、signed response envelope、freshness window に束縛し、
+stale / revoked verifier response を fail-closed する。raw registry / revocation /
+verifier payload や OS trustee / medical / legal / writeback authority は許さない。
 external-adjudication branch は外部医療・法制度・trustee 側の adjudication result、
 jurisdiction policy、appeal/review path を digest-only refs として束縛し、
 OS 自身が adjudicator、医療 authority、legal authority、trustee、SelfModel writeback
@@ -703,8 +705,10 @@ care trustee handoff の digest と source refs を前提に、current external 
 entries、verifier key refs、not-revoked revocation refs を digest-only に束ねる。
 この branch は `role_binding_status=bound`、`registry_status=current`、
 `revocation_status=not-revoked`、`external_registry_bound=true`、
-`verifier_key_refs_bound=true`、`revocation_refs_bound=true` を確認する。
+`verifier_key_refs_bound=true`、`revocation_refs_bound=true`、
+`revocation_verifier_quorum_status=complete`、`revocation_live_verifier_bound=true` を確認する。
 また `raw_registry_payload_stored=false`、`raw_revocation_payload_stored=false`、
+`raw_revocation_verifier_payload_stored=false`、
 `os_trustee_role_allowed=false`、`os_medical_authority_allowed=false`、
 `os_legal_guardianship_allowed=false`、`self_model_writeback_allowed=false` を保ち、
 OS が外部 registry の検証証跡を持っても trustee / medical / legal authority へ

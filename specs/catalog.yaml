@@ -810,7 +810,7 @@ entries:
       - evals/identity-fidelity/self_model_care_trustee_registry_binding.yaml
       - agents/guardians/identity-guardian.yaml
       - reference-runtime
-    rationale: Required to serialize current external registry entries, verifier key refs, and not-revoked revocation refs for care trustee handoff subjects without importing trustee, medical, legal, writeback, or raw registry authority into the OS.
+    rationale: Required to serialize current external registry entries, verifier key refs, not-revoked revocation refs, and JP-13/US-CA live revocation verifier quorum for care trustee handoff subjects without importing trustee, medical, legal, writeback, raw registry, or raw verifier authority into the OS.
   - priority: P1
     kind: schema
     file: specs/schemas/self_model_external_adjudication_result_receipt.schema
@@ -3123,7 +3123,7 @@ entries:
       - docs/02-subsystems/mind-substrate/self-model.md
       - specs/schemas/self_model_care_trustee_registry_binding_receipt.schema
       - agents/guardians/identity-guardian.yaml
-    rationale: Protects care trustee registry binding from accepting stale, revoked, or unverifier-bound external role entries and from becoming OS trustee, medical, legal, writeback, or raw registry payload authority.
+    rationale: Protects care trustee registry binding from accepting stale, revoked, unverifier-bound external role entries or stale/revoked live verifier responses, and from becoming OS trustee, medical, legal, writeback, raw registry, or raw verifier payload authority.
   - priority: P1
     kind: eval
     file: evals/identity-fidelity/self_model_external_adjudication_boundary.yaml

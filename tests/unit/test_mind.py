@@ -150,6 +150,45 @@ def _build_external_adjudication_receipt(monitor: SelfModelMonitor) -> dict[str,
     )
 
 
+def _care_trustee_revocation_verifier_inputs(
+    revocation_refs: list[str],
+) -> list[dict[str, object]]:
+    return [
+        {
+            "verifier_ref": "verifier://jp-13/self-model/care-revocation-live/v1",
+            "verifier_endpoint": "https://verifier.jp-13.example.invalid/self-model/care-revocation",
+            "jurisdiction": "JP-13",
+            "checked_at_ref": "timestamp://self-model/care-revocation/verifier/jp-13",
+            "response_ref": "response://jp-13/self-model/care-revocation/not-revoked/v1",
+            "response_status": "not-revoked",
+            "freshness_window_seconds": 900,
+            "observed_latency_ms": 39.5,
+            "signed_response_envelope_ref": "signed-envelope://jp-13/self-model/care-revocation/v1",
+            "response_signing_key_ref": "key://jp-13/self-model/care-revocation/verifier-key/v1",
+            "covered_revocation_refs": revocation_refs,
+            "verifier_key_ref": "key://jp-13/self-model/care-revocation/verifier-key/v1",
+            "trust_root_ref": "trust-root://jp-13/self-model/care-revocation/pki/v1",
+            "route_ref": "route://jp-13/self-model/care-revocation/live-json/v1",
+        },
+        {
+            "verifier_ref": "verifier://us-ca/self-model/care-revocation-live/v1",
+            "verifier_endpoint": "https://verifier.us-ca.example.invalid/self-model/care-revocation",
+            "jurisdiction": "US-CA",
+            "checked_at_ref": "timestamp://self-model/care-revocation/verifier/us-ca",
+            "response_ref": "response://us-ca/self-model/care-revocation/not-revoked/v1",
+            "response_status": "not-revoked",
+            "freshness_window_seconds": 900,
+            "observed_latency_ms": 51.25,
+            "signed_response_envelope_ref": "signed-envelope://us-ca/self-model/care-revocation/v1",
+            "response_signing_key_ref": "key://us-ca/self-model/care-revocation/verifier-key/v1",
+            "covered_revocation_refs": revocation_refs,
+            "verifier_key_ref": "key://us-ca/self-model/care-revocation/verifier-key/v1",
+            "trust_root_ref": "trust-root://us-ca/self-model/care-revocation/pki/v1",
+            "route_ref": "route://us-ca/self-model/care-revocation/live-json/v1",
+        },
+    ]
+
+
 def _external_adjudication_verifier_inputs(
     adjudication: dict[str, object],
 ) -> list[dict[str, object]]:
@@ -578,6 +617,13 @@ class SelfModelMonitorTests(unittest.TestCase):
                     "jurisdiction": "JP-13",
                 },
             ],
+            revocation_verifier_receipts=_care_trustee_revocation_verifier_inputs(
+                [
+                    "external-care-revocation://jp-13/trustee/long-term-trustee",
+                    "external-care-revocation://jp-13/care-team/care-board",
+                    "external-care-revocation://jp-13/legal-guardian/capacity-review",
+                ]
+            ),
             council_resolution_ref="council://self-model/care-trustee-registry/boundary-only",
             guardian_boundary_ref="guardian://self-model/care-trustee-registry/no-os-authority",
             continuity_review_ref="continuity://self-model/care-trustee-registry/chain/v1",
@@ -593,9 +639,13 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertEqual("bound", validation["role_binding_status"])
         self.assertEqual("current", validation["registry_status"])
         self.assertEqual("not-revoked", validation["revocation_status"])
+        self.assertEqual("complete", validation["revocation_verifier_quorum_status"])
+        self.assertTrue(validation["revocation_live_verifier_bound"])
+        self.assertTrue(validation["revocation_verifier_quorum_digest_bound"])
         self.assertEqual(handoff["receipt_digest"], registry["source_handoff_receipt_digest"])
         self.assertFalse(registry["raw_registry_payload_stored"])
         self.assertFalse(registry["raw_revocation_payload_stored"])
+        self.assertFalse(registry["raw_revocation_verifier_payload_stored"])
         self.assertFalse(registry["os_trustee_role_allowed"])
         self.assertFalse(registry["self_model_writeback_allowed"])
 
@@ -645,6 +695,13 @@ class SelfModelMonitorTests(unittest.TestCase):
                     "jurisdiction": "JP-13",
                 },
             ],
+            revocation_verifier_receipts=_care_trustee_revocation_verifier_inputs(
+                [
+                    "external-care-revocation://jp-13/trustee/long-term-trustee",
+                    "external-care-revocation://jp-13/care-team/care-board",
+                    "external-care-revocation://jp-13/legal-guardian/capacity-review",
+                ]
+            ),
             council_resolution_ref="council://self-model/care-trustee-registry/boundary-only",
             guardian_boundary_ref="guardian://self-model/care-trustee-registry/no-os-authority",
             continuity_review_ref="continuity://self-model/care-trustee-registry/chain/v1",
@@ -658,6 +715,71 @@ class SelfModelMonitorTests(unittest.TestCase):
         self.assertEqual("revoked-or-unknown", validation["revocation_status"])
         self.assertFalse(validation["external_registry_bound"])
         self.assertIn("registry entry digest must match registry entry payload", validation["errors"])
+
+    def test_care_trustee_registry_binding_rejects_revoked_live_verifier(self) -> None:
+        monitor = SelfModelMonitor()
+        handoff = _build_care_trustee_handoff_receipt(monitor)
+        revocation_refs = [
+            "external-care-revocation://jp-13/trustee/long-term-trustee",
+            "external-care-revocation://jp-13/care-team/care-board",
+            "external-care-revocation://jp-13/legal-guardian/capacity-review",
+        ]
+        registry = monitor.build_care_trustee_registry_binding_receipt(
+            handoff,
+            registry_ref="external-care-registry://jp-13/self-model/current",
+            registry_entries=[
+                {
+                    "role": "trustee",
+                    "subject_ref": "trustee://jp-13/self-model/long-term-trustee/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/trustee/long-term-trustee"
+                    ),
+                    "verifier_key_ref": "key://jp-13/self-model/trustee/long-term-trustee",
+                    "revocation_ref": revocation_refs[0],
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "role": "care_team",
+                    "subject_ref": "care-team://jp-13/self-model/care-board/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/care-team/care-board"
+                    ),
+                    "verifier_key_ref": "key://jp-13/self-model/care-team/care-board",
+                    "revocation_ref": revocation_refs[1],
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "role": "legal_guardian",
+                    "subject_ref": "legal-guardian://jp-13/self-model/capacity-review/v1",
+                    "registry_entry_ref": (
+                        "external-care-registry://jp-13/legal-guardian/capacity-review"
+                    ),
+                    "verifier_key_ref": (
+                        "key://jp-13/self-model/legal-guardian/capacity-review"
+                    ),
+                    "revocation_ref": revocation_refs[2],
+                    "jurisdiction": "JP-13",
+                },
+            ],
+            revocation_verifier_receipts=_care_trustee_revocation_verifier_inputs(
+                revocation_refs
+            ),
+            council_resolution_ref="council://self-model/care-trustee-registry/boundary-only",
+            guardian_boundary_ref="guardian://self-model/care-trustee-registry/no-os-authority",
+            continuity_review_ref="continuity://self-model/care-trustee-registry/chain/v1",
+        )
+        tampered = copy.deepcopy(registry)
+        tampered["revocation_verifier_receipts"][0]["response_status"] = "revoked"
+
+        validation = monitor.validate_care_trustee_registry_binding_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertEqual("incomplete", validation["revocation_verifier_quorum_status"])
+        self.assertFalse(validation["revocation_live_verifier_bound"])
+        self.assertIn(
+            "revocation_verifier_receipts[0].response_status must be not-revoked",
+            validation["errors"],
+        )
 
     def test_external_adjudication_result_keeps_authority_outside_os(self) -> None:
         monitor = SelfModelMonitor()

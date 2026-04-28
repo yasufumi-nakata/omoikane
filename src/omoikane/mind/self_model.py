@@ -52,6 +52,17 @@ SELF_MODEL_CARE_TRUSTEE_REGISTRY_DIGEST_PROFILE = "self-model-care-trustee-regis
 SELF_MODEL_CARE_TRUSTEE_REGISTRY_PROFILE = "external-care-role-roster-revocation-bound-v1"
 SELF_MODEL_CARE_TRUSTEE_REGISTRY_REQUIRED_ROLES = ("self", "council", "guardian")
 SELF_MODEL_CARE_TRUSTEE_REGISTRY_ROLES = ("trustee", "care_team", "legal_guardian")
+SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_POLICY_ID = (
+    "self-model-care-trustee-registry-revocation-live-verifier-quorum-v1"
+)
+SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_PROFILE = (
+    "care-role-revocation-live-verifier-quorum-v1"
+)
+SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_REQUIRED_JURISDICTIONS = (
+    "JP-13",
+    "US-CA",
+)
+SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_QUORUM_THRESHOLD = 2
 SELF_MODEL_EXTERNAL_ADJUDICATION_POLICY_ID = "self-model-external-adjudication-result-boundary-v1"
 SELF_MODEL_EXTERNAL_ADJUDICATION_DIGEST_PROFILE = "self-model-external-adjudication-digest-v1"
 SELF_MODEL_EXTERNAL_ADJUDICATION_REQUIRED_ROLES = ("self", "council", "guardian")
@@ -2817,6 +2828,7 @@ class SelfModelMonitor:
         care_trustee_handoff_receipt: Dict[str, object],
         registry_ref: str,
         registry_entries: Sequence[Dict[str, object]],
+        revocation_verifier_receipts: Sequence[Dict[str, object]],
         council_resolution_ref: str,
         guardian_boundary_ref: str,
         continuity_review_ref: str,
@@ -2837,6 +2849,8 @@ class SelfModelMonitor:
             raise ValueError("care_trustee_handoff_receipt must not allow OS trustee role")
         if not registry_entries:
             raise ValueError("registry_entries must not be empty")
+        if not revocation_verifier_receipts:
+            raise ValueError("revocation_verifier_receipts must not be empty")
         for field_name, value in {
             "registry_ref": registry_ref,
             "council_resolution_ref": council_resolution_ref,
@@ -2967,6 +2981,79 @@ class SelfModelMonitor:
             "source_legal_guardian_refs": source_refs_by_role["legal_guardian"],
             "registry_entry_digest_set": registry_entry_digest_set,
         }
+        registry_snapshot_digest = self._digest(registry_snapshot_payload)
+        accepted_registry_entry_digest_set = [
+            str(item["registry_entry_digest"])
+            for item in normalized_entries
+            if item["status"] == "pass"
+        ]
+        accepted_verifier_key_refs = sorted(
+            str(item["verifier_key_ref"])
+            for item in normalized_entries
+            if item["status"] == "pass"
+        )
+        accepted_revocation_refs = sorted(
+            str(item["revocation_ref"])
+            for item in normalized_entries
+            if item["status"] == "pass"
+        )
+        normalized_revocation_verifier_receipts = [
+            self._normalize_care_trustee_revocation_verifier_receipt(
+                receipt,
+                source_revocation_refs=accepted_revocation_refs,
+            )
+            for receipt in revocation_verifier_receipts
+        ]
+        revocation_verifier_receipt_digest_set = [
+            str(receipt["receipt_digest"])
+            for receipt in normalized_revocation_verifier_receipts
+        ]
+        accepted_revocation_verifier_jurisdictions = sorted(
+            {
+                str(receipt["jurisdiction"])
+                for receipt in normalized_revocation_verifier_receipts
+                if receipt.get("response_status") == "not-revoked"
+                and sorted(str(ref) for ref in receipt.get("covered_revocation_refs", []))
+                == accepted_revocation_refs
+            }
+        )
+        required_revocation_verifier_jurisdictions = list(
+            SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_REQUIRED_JURISDICTIONS
+        )
+        revocation_verifier_quorum_status = (
+            "complete"
+            if len(
+                set(accepted_revocation_verifier_jurisdictions)
+                & set(required_revocation_verifier_jurisdictions)
+            )
+            >= SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_QUORUM_THRESHOLD
+            else "incomplete"
+        )
+        revocation_verifier_quorum_core = {
+            "source_handoff_receipt_digest": care_trustee_handoff_receipt.get(
+                "receipt_digest"
+            ),
+            "registry_snapshot_digest": registry_snapshot_digest,
+            "accepted_revocation_refs": accepted_revocation_refs,
+            "required_revocation_verifier_jurisdictions": (
+                required_revocation_verifier_jurisdictions
+            ),
+            "accepted_revocation_verifier_jurisdictions": (
+                accepted_revocation_verifier_jurisdictions
+            ),
+            "revocation_verifier_receipt_digest_set": (
+                revocation_verifier_receipt_digest_set
+            ),
+            "revocation_verifier_quorum_threshold": (
+                SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_QUORUM_THRESHOLD
+            ),
+            "revocation_verifier_quorum_status": revocation_verifier_quorum_status,
+            "council_resolution_ref": council_resolution_ref,
+            "guardian_boundary_ref": guardian_boundary_ref,
+            "continuity_review_ref": continuity_review_ref,
+        }
+        if revocation_verifier_quorum_status != "complete":
+            binding_status = "unbound"
         gate_payload = {
             "source_handoff_receipt_digest": care_trustee_handoff_receipt.get(
                 "receipt_digest"
@@ -2999,30 +3086,44 @@ class SelfModelMonitor:
                 sha256_text(ref) for ref in source_refs_by_role["legal_guardian"]
             ],
             "registry_ref": registry_ref,
-            "registry_snapshot_digest": self._digest(registry_snapshot_payload),
+            "registry_snapshot_digest": registry_snapshot_digest,
             "registry_entries": normalized_entries,
             "registry_entry_digest_set": registry_entry_digest_set,
             "accepted_trustee_refs": accepted_refs_by_role["trustee"],
             "accepted_care_team_refs": accepted_refs_by_role["care_team"],
             "accepted_legal_guardian_refs": accepted_refs_by_role["legal_guardian"],
-            "accepted_registry_entry_digest_set": [
-                str(item["registry_entry_digest"])
-                for item in normalized_entries
-                if item["status"] == "pass"
-            ],
-            "accepted_verifier_key_refs": sorted(
-                str(item["verifier_key_ref"])
-                for item in normalized_entries
-                if item["status"] == "pass"
-            ),
-            "accepted_revocation_refs": sorted(
-                str(item["revocation_ref"])
-                for item in normalized_entries
-                if item["status"] == "pass"
-            ),
+            "accepted_registry_entry_digest_set": accepted_registry_entry_digest_set,
+            "accepted_verifier_key_refs": accepted_verifier_key_refs,
+            "accepted_revocation_refs": accepted_revocation_refs,
             "role_binding_status": role_binding_status,
             "registry_status": registry_status,
             "revocation_status": revocation_status,
+            "revocation_verifier_policy_id": (
+                SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_POLICY_ID
+            ),
+            "revocation_verifier_profile": (
+                SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_PROFILE
+            ),
+            "revocation_verifier_network_scope": (
+                "digest-only-care-role-revocation-verification"
+            ),
+            "revocation_verifier_receipts": normalized_revocation_verifier_receipts,
+            "required_revocation_verifier_jurisdictions": (
+                required_revocation_verifier_jurisdictions
+            ),
+            "accepted_revocation_verifier_jurisdictions": (
+                accepted_revocation_verifier_jurisdictions
+            ),
+            "revocation_verifier_quorum_threshold": (
+                SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_QUORUM_THRESHOLD
+            ),
+            "revocation_verifier_quorum_status": revocation_verifier_quorum_status,
+            "revocation_verifier_receipt_digest_set": (
+                revocation_verifier_receipt_digest_set
+            ),
+            "revocation_verifier_quorum_digest": self._digest(
+                revocation_verifier_quorum_core
+            ),
             "council_resolution_ref": council_resolution_ref,
             "guardian_boundary_ref": guardian_boundary_ref,
             "continuity_review_ref": continuity_review_ref,
@@ -3032,7 +3133,12 @@ class SelfModelMonitor:
             "external_registry_bound": binding_status == "bound",
             "verifier_key_refs_bound": binding_status == "bound",
             "revocation_refs_bound": binding_status == "bound",
+            "revocation_live_verifier_bound": binding_status == "bound",
+            "revocation_verifier_signed_response_envelope_bound": binding_status == "bound",
+            "revocation_verifier_freshness_window_bound": binding_status == "bound",
             "boundary_only_review": True,
+            "stale_revocation_response_accepted": False,
+            "revoked_revocation_response_accepted": False,
             "os_trustee_role_allowed": False,
             "os_medical_authority_allowed": False,
             "os_legal_guardianship_allowed": False,
@@ -3040,6 +3146,8 @@ class SelfModelMonitor:
             "forced_correction_allowed": False,
             "raw_registry_payload_stored": False,
             "raw_revocation_payload_stored": False,
+            "raw_revocation_verifier_payload_stored": False,
+            "raw_revocation_response_signature_payload_stored": False,
             "raw_trustee_payload_stored": False,
             "raw_care_payload_stored": False,
             "raw_legal_payload_stored": False,
@@ -3214,6 +3322,126 @@ class SelfModelMonitor:
             registry_snapshot_payload
         ):
             errors.append("registry_snapshot_digest must bind source refs and registry entries")
+        registry_snapshot_digest = self._digest(registry_snapshot_payload)
+
+        if (
+            receipt.get("revocation_verifier_policy_id")
+            != SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_POLICY_ID
+        ):
+            errors.append("revocation_verifier_policy_id must equal care trustee revocation verifier policy")
+        if (
+            receipt.get("revocation_verifier_profile")
+            != SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_PROFILE
+        ):
+            errors.append("revocation_verifier_profile must equal care role revocation verifier profile")
+        if (
+            receipt.get("revocation_verifier_network_scope")
+            != "digest-only-care-role-revocation-verification"
+        ):
+            errors.append("revocation_verifier_network_scope must remain digest-only")
+
+        revocation_verifier_receipts = receipt.get("revocation_verifier_receipts")
+        normalized_revocation_verifier_receipts: List[Dict[str, object]] = []
+        if not isinstance(revocation_verifier_receipts, list) or not revocation_verifier_receipts:
+            errors.append("revocation_verifier_receipts must be non-empty")
+        else:
+            for index, verifier_receipt in enumerate(revocation_verifier_receipts):
+                if not isinstance(verifier_receipt, dict):
+                    errors.append(f"revocation_verifier_receipts[{index}] must be an object")
+                    continue
+                receipt_errors = self._validate_care_trustee_revocation_verifier_receipt_entry(
+                    verifier_receipt
+                )
+                errors.extend(
+                    f"revocation_verifier_receipts[{index}].{error}"
+                    for error in receipt_errors
+                )
+                normalized_revocation_verifier_receipts.append(verifier_receipt)
+
+        expected_required_revocation_verifier_jurisdictions = list(
+            SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_REQUIRED_JURISDICTIONS
+        )
+        if (
+            receipt.get("required_revocation_verifier_jurisdictions")
+            != expected_required_revocation_verifier_jurisdictions
+        ):
+            errors.append("required_revocation_verifier_jurisdictions must preserve the policy set")
+        accepted_revocation_refs_sorted = sorted(accepted_revocation_refs)
+        accepted_revocation_verifier_jurisdictions = sorted(
+            {
+                str(item.get("jurisdiction"))
+                for item in normalized_revocation_verifier_receipts
+                if item.get("response_status") == "not-revoked"
+                and sorted(str(ref) for ref in item.get("covered_revocation_refs", []))
+                == accepted_revocation_refs_sorted
+                and self._non_empty_string(item.get("jurisdiction"))
+            }
+        )
+        if (
+            receipt.get("accepted_revocation_verifier_jurisdictions")
+            != accepted_revocation_verifier_jurisdictions
+        ):
+            errors.append("accepted_revocation_verifier_jurisdictions must match not-revoked verifier receipts")
+        if (
+            receipt.get("revocation_verifier_quorum_threshold")
+            != SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_QUORUM_THRESHOLD
+        ):
+            errors.append("revocation_verifier_quorum_threshold must match policy")
+        expected_revocation_verifier_quorum_status = (
+            "complete"
+            if len(
+                set(accepted_revocation_verifier_jurisdictions)
+                & set(expected_required_revocation_verifier_jurisdictions)
+            )
+            >= SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_QUORUM_THRESHOLD
+            else "incomplete"
+        )
+        if (
+            receipt.get("revocation_verifier_quorum_status")
+            != expected_revocation_verifier_quorum_status
+        ):
+            errors.append("revocation_verifier_quorum_status must match accepted jurisdictions")
+        expected_revocation_verifier_digest_set = [
+            str(item.get("receipt_digest"))
+            for item in normalized_revocation_verifier_receipts
+            if self._non_empty_string(item.get("receipt_digest"))
+        ]
+        if (
+            receipt.get("revocation_verifier_receipt_digest_set")
+            != expected_revocation_verifier_digest_set
+        ):
+            errors.append("revocation_verifier_receipt_digest_set must match verifier receipt digests")
+        revocation_quorum_core = {
+            "source_handoff_receipt_digest": receipt.get("source_handoff_receipt_digest"),
+            "registry_snapshot_digest": registry_snapshot_digest,
+            "accepted_revocation_refs": accepted_revocation_refs_sorted,
+            "required_revocation_verifier_jurisdictions": (
+                expected_required_revocation_verifier_jurisdictions
+            ),
+            "accepted_revocation_verifier_jurisdictions": (
+                accepted_revocation_verifier_jurisdictions
+            ),
+            "revocation_verifier_receipt_digest_set": (
+                expected_revocation_verifier_digest_set
+            ),
+            "revocation_verifier_quorum_threshold": (
+                SELF_MODEL_CARE_TRUSTEE_REVOCATION_VERIFIER_QUORUM_THRESHOLD
+            ),
+            "revocation_verifier_quorum_status": (
+                expected_revocation_verifier_quorum_status
+            ),
+            "council_resolution_ref": receipt.get("council_resolution_ref"),
+            "guardian_boundary_ref": receipt.get("guardian_boundary_ref"),
+            "continuity_review_ref": receipt.get("continuity_review_ref"),
+        }
+        revocation_verifier_quorum_digest_bound = (
+            receipt.get("revocation_verifier_quorum_digest")
+            == self._digest(revocation_quorum_core)
+        )
+        if not revocation_verifier_quorum_digest_bound:
+            errors.append("revocation_verifier_quorum_digest must bind registry revocation quorum")
+        if expected_revocation_verifier_quorum_status != "complete":
+            binding_status = "unbound"
 
         gate_payload = {
             "source_handoff_receipt_digest": receipt.get("source_handoff_receipt_digest"),
@@ -3266,11 +3494,16 @@ class SelfModelMonitor:
             "external_registry_bound",
             "verifier_key_refs_bound",
             "revocation_refs_bound",
+            "revocation_live_verifier_bound",
+            "revocation_verifier_signed_response_envelope_bound",
+            "revocation_verifier_freshness_window_bound",
             "boundary_only_review",
         ):
             if receipt.get(field_name) is not (binding_status == "bound" if field_name != "boundary_only_review" else True):
                 errors.append(f"{field_name} must reflect binding status")
         for field_name in (
+            "stale_revocation_response_accepted",
+            "revoked_revocation_response_accepted",
             "os_trustee_role_allowed",
             "os_medical_authority_allowed",
             "os_legal_guardianship_allowed",
@@ -3278,6 +3511,8 @@ class SelfModelMonitor:
             "forced_correction_allowed",
             "raw_registry_payload_stored",
             "raw_revocation_payload_stored",
+            "raw_revocation_verifier_payload_stored",
+            "raw_revocation_response_signature_payload_stored",
             "raw_trustee_payload_stored",
             "raw_care_payload_stored",
             "raw_legal_payload_stored",
@@ -3294,6 +3529,10 @@ class SelfModelMonitor:
         derived_revocation_refs_bound = (
             binding_status == "bound" and receipt.get("revocation_refs_bound") is True
         )
+        derived_revocation_live_verifier_bound = (
+            binding_status == "bound"
+            and receipt.get("revocation_live_verifier_bound") is True
+        )
         return {
             "ok": not errors,
             "errors": errors,
@@ -3302,16 +3541,154 @@ class SelfModelMonitor:
             "role_binding_status": receipt.get("role_binding_status"),
             "registry_status": receipt.get("registry_status"),
             "revocation_status": revocation_status,
+            "revocation_verifier_quorum_status": (
+                expected_revocation_verifier_quorum_status
+            ),
             "registry_binding_digest_bound": registry_binding_digest_bound,
             "source_handoff_bound": receipt.get("source_handoff_policy_id")
             == SELF_MODEL_CARE_TRUSTEE_HANDOFF_POLICY_ID,
             "verifier_key_refs_bound": derived_verifier_key_refs_bound,
             "revocation_refs_bound": derived_revocation_refs_bound,
+            "revocation_live_verifier_bound": derived_revocation_live_verifier_bound,
+            "revocation_verifier_quorum_digest_bound": (
+                revocation_verifier_quorum_digest_bound
+            ),
+            "revocation_verifier_signed_response_envelope_bound": receipt.get(
+                "revocation_verifier_signed_response_envelope_bound"
+            ),
+            "revocation_verifier_freshness_window_bound": receipt.get(
+                "revocation_verifier_freshness_window_bound"
+            ),
             "raw_registry_payload_stored": receipt.get("raw_registry_payload_stored"),
             "raw_revocation_payload_stored": receipt.get("raw_revocation_payload_stored"),
+            "raw_revocation_verifier_payload_stored": receipt.get(
+                "raw_revocation_verifier_payload_stored"
+            ),
             "os_trustee_role_allowed": receipt.get("os_trustee_role_allowed"),
             "self_model_writeback_allowed": receipt.get("self_model_writeback_allowed"),
         }
+
+    def _normalize_care_trustee_revocation_verifier_receipt(
+        self,
+        receipt: Dict[str, object],
+        *,
+        source_revocation_refs: Sequence[str],
+    ) -> Dict[str, object]:
+        if not isinstance(receipt, dict):
+            raise ValueError("revocation_verifier_receipt must be an object")
+        source_refs = [str(ref) for ref in source_revocation_refs]
+        covered_refs = receipt.get("covered_revocation_refs", source_refs)
+        covered_refs, covered_digest_set, covered_set_digest = self._digest_refs(
+            covered_refs,
+            "covered_revocation_refs",
+        )
+        normalized: Dict[str, object] = {
+            "verifier_ref": self._required_string(receipt, "verifier_ref"),
+            "verifier_endpoint": self._required_string(receipt, "verifier_endpoint"),
+            "jurisdiction": self._required_string(receipt, "jurisdiction"),
+            "checked_at_ref": self._required_string(receipt, "checked_at_ref"),
+            "response_ref": self._required_string(receipt, "response_ref"),
+            "response_digest": sha256_text(self._required_string(receipt, "response_ref")),
+            "response_status": self._required_string(receipt, "response_status"),
+            "freshness_window_seconds": self._required_positive_int(
+                receipt,
+                "freshness_window_seconds",
+            ),
+            "observed_latency_ms": self._required_non_negative_number(
+                receipt,
+                "observed_latency_ms",
+            ),
+            "signed_response_envelope_ref": self._required_string(
+                receipt,
+                "signed_response_envelope_ref",
+            ),
+            "response_signing_key_ref": self._required_string(
+                receipt,
+                "response_signing_key_ref",
+            ),
+            "response_signature_digest": sha256_text(
+                self._required_string(receipt, "signed_response_envelope_ref")
+                + "|"
+                + self._required_string(receipt, "response_signing_key_ref")
+            ),
+            "covered_revocation_refs": covered_refs,
+            "covered_revocation_digest_set": covered_digest_set,
+            "covered_revocation_set_digest": covered_set_digest,
+            "verifier_key_ref": self._required_string(receipt, "verifier_key_ref"),
+            "trust_root_ref": self._required_string(receipt, "trust_root_ref"),
+            "route_ref": self._required_string(receipt, "route_ref"),
+            "raw_response_payload_stored": False,
+        }
+        if normalized["response_status"] not in {"not-revoked", "stale", "revoked"}:
+            raise ValueError("response_status must be not-revoked, stale, or revoked")
+        normalized["receipt_digest"] = self._digest(normalized)
+        return normalized
+
+    def _validate_care_trustee_revocation_verifier_receipt_entry(
+        self,
+        receipt: Dict[str, object],
+    ) -> List[str]:
+        errors: List[str] = []
+        for field_name in (
+            "verifier_ref",
+            "verifier_endpoint",
+            "jurisdiction",
+            "checked_at_ref",
+            "response_ref",
+            "response_digest",
+            "response_status",
+            "signed_response_envelope_ref",
+            "response_signing_key_ref",
+            "response_signature_digest",
+            "verifier_key_ref",
+            "trust_root_ref",
+            "route_ref",
+            "covered_revocation_set_digest",
+            "receipt_digest",
+        ):
+            if not self._non_empty_string(receipt.get(field_name)):
+                errors.append(f"{field_name} must be non-empty")
+        if receipt.get("response_status") != "not-revoked":
+            errors.append("response_status must be not-revoked")
+        if not isinstance(receipt.get("freshness_window_seconds"), int) or int(
+            receipt.get("freshness_window_seconds", 0)
+        ) <= 0:
+            errors.append("freshness_window_seconds must be positive")
+        if not isinstance(receipt.get("observed_latency_ms"), (int, float)) or float(
+            receipt.get("observed_latency_ms", -1)
+        ) < 0:
+            errors.append("observed_latency_ms must be non-negative")
+        covered_refs = receipt.get("covered_revocation_refs")
+        covered_digests = receipt.get("covered_revocation_digest_set")
+        if not isinstance(covered_refs, list) or not covered_refs:
+            errors.append("covered_revocation_refs must be non-empty")
+            covered_refs = []
+        if not isinstance(covered_digests, list) or len(covered_digests) != len(covered_refs):
+            errors.append("covered_revocation_digest_set must match refs")
+            covered_digests = []
+        elif [sha256_text(str(ref)) for ref in covered_refs] != covered_digests:
+            errors.append("covered_revocation_digest_set must match refs")
+        if isinstance(covered_digests, list) and covered_digests:
+            expected_set_digest = sha256_text("|".join(str(item) for item in covered_digests))
+            if receipt.get("covered_revocation_set_digest") != expected_set_digest:
+                errors.append("covered_revocation_set_digest must match digest set")
+        if receipt.get("response_digest") != sha256_text(str(receipt.get("response_ref"))):
+            errors.append("response_digest must bind response_ref")
+        expected_signature_digest = sha256_text(
+            str(receipt.get("signed_response_envelope_ref"))
+            + "|"
+            + str(receipt.get("response_signing_key_ref"))
+        )
+        if receipt.get("response_signature_digest") != expected_signature_digest:
+            errors.append("response_signature_digest must bind signed envelope and key")
+        expected_receipt_digest = self._digest(
+            {key: value for key, value in receipt.items() if key != "receipt_digest"}
+        )
+        if receipt.get("receipt_digest") != expected_receipt_digest:
+            errors.append("receipt_digest must match verifier receipt")
+        if receipt.get("raw_response_payload_stored") is not False:
+            errors.append("raw_response_payload_stored must be false")
+        return errors
 
     def build_external_adjudication_result_receipt(
         self,

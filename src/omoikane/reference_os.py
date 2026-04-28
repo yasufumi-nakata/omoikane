@@ -14810,6 +14810,94 @@ json.dump(response, sys.stdout)
                         "jurisdiction": "JP-13",
                     },
                 ],
+                revocation_verifier_receipts=[
+                    {
+                        "verifier_ref": (
+                            "verifier://jp-13/self-model/care-revocation-live/v1"
+                        ),
+                        "verifier_endpoint": (
+                            "https://verifier.jp-13.example.invalid/self-model/care-revocation"
+                        ),
+                        "jurisdiction": "JP-13",
+                        "checked_at_ref": (
+                            "timestamp://self-model/care-revocation/verifier/jp-13/2026q2"
+                        ),
+                        "response_ref": (
+                            "response://jp-13/self-model/care-revocation/not-revoked/v1"
+                        ),
+                        "response_status": "not-revoked",
+                        "freshness_window_seconds": 900,
+                        "observed_latency_ms": 38.5,
+                        "signed_response_envelope_ref": (
+                            "signed-envelope://jp-13/self-model/care-revocation/v1"
+                        ),
+                        "response_signing_key_ref": (
+                            "key://jp-13/self-model/care-revocation/verifier-key/v1"
+                        ),
+                        "covered_revocation_refs": [
+                            "external-care-revocation://jp-13/trustee/long-term-trustee",
+                            "external-care-revocation://jp-13/trustee/backup-trustee",
+                            "external-care-revocation://jp-13/care-team/care-board",
+                            "external-care-revocation://jp-13/care-team/clinical-liaison",
+                            (
+                                "external-care-revocation://jp-13/legal-guardian/"
+                                "capacity-review"
+                            ),
+                        ],
+                        "verifier_key_ref": (
+                            "key://jp-13/self-model/care-revocation/verifier-key/v1"
+                        ),
+                        "trust_root_ref": (
+                            "trust-root://jp-13/self-model/care-revocation/pki/v1"
+                        ),
+                        "route_ref": (
+                            "route://jp-13/self-model/care-revocation/live-json/v1"
+                        ),
+                    },
+                    {
+                        "verifier_ref": (
+                            "verifier://us-ca/self-model/care-revocation-live/v1"
+                        ),
+                        "verifier_endpoint": (
+                            "https://verifier.us-ca.example.invalid/self-model/care-revocation"
+                        ),
+                        "jurisdiction": "US-CA",
+                        "checked_at_ref": (
+                            "timestamp://self-model/care-revocation/verifier/us-ca/2026q2"
+                        ),
+                        "response_ref": (
+                            "response://us-ca/self-model/care-revocation/not-revoked/v1"
+                        ),
+                        "response_status": "not-revoked",
+                        "freshness_window_seconds": 900,
+                        "observed_latency_ms": 53.25,
+                        "signed_response_envelope_ref": (
+                            "signed-envelope://us-ca/self-model/care-revocation/v1"
+                        ),
+                        "response_signing_key_ref": (
+                            "key://us-ca/self-model/care-revocation/verifier-key/v1"
+                        ),
+                        "covered_revocation_refs": [
+                            "external-care-revocation://jp-13/trustee/long-term-trustee",
+                            "external-care-revocation://jp-13/trustee/backup-trustee",
+                            "external-care-revocation://jp-13/care-team/care-board",
+                            "external-care-revocation://jp-13/care-team/clinical-liaison",
+                            (
+                                "external-care-revocation://jp-13/legal-guardian/"
+                                "capacity-review"
+                            ),
+                        ],
+                        "verifier_key_ref": (
+                            "key://us-ca/self-model/care-revocation/verifier-key/v1"
+                        ),
+                        "trust_root_ref": (
+                            "trust-root://us-ca/self-model/care-revocation/pki/v1"
+                        ),
+                        "route_ref": (
+                            "route://us-ca/self-model/care-revocation/live-json/v1"
+                        ),
+                    },
+                ],
                 council_resolution_ref=(
                     "council://self-model/care-trustee-registry/boundary-only"
                 ),
@@ -15113,8 +15201,28 @@ json.dump(response, sys.stdout)
                 "care_trustee_registry_external_registry_bound": (
                     care_trustee_registry_validation["external_registry_bound"]
                 ),
+                "care_trustee_registry_revocation_verifier_quorum_status": (
+                    care_trustee_registry_validation[
+                        "revocation_verifier_quorum_status"
+                    ]
+                ),
+                "care_trustee_registry_revocation_live_bound": (
+                    care_trustee_registry_validation[
+                        "revocation_live_verifier_bound"
+                    ]
+                ),
+                "care_trustee_registry_revocation_quorum_digest_bound": (
+                    care_trustee_registry_validation[
+                        "revocation_verifier_quorum_digest_bound"
+                    ]
+                ),
                 "care_trustee_registry_no_raw_registry_payload": not (
                     care_trustee_registry_validation["raw_registry_payload_stored"]
+                ),
+                "care_trustee_registry_no_raw_verifier_payload": not (
+                    care_trustee_registry_validation[
+                        "raw_revocation_verifier_payload_stored"
+                    ]
                 ),
                 "external_adjudication_policy_id": external_adjudication["policy_id"],
                 "external_adjudication_receipt_digest": external_adjudication[

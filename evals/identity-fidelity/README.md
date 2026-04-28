@@ -44,6 +44,9 @@ care-trustee-registry-binding branch と対応し、handoff で列挙された t
 care team / legal guardian refs が current external registry entry、verifier key ref、
 not-revoked revocation ref に digest-only で束縛され、raw registry / revocation payload
 保存や OS trustee / medical / legal / writeback authority へ進まないことを保護する。
+同じ eval は JP-13 / US-CA の live revocation verifier quorum、signed response
+envelope、freshness window、raw verifier payload redaction も確認し、stale / revoked
+verifier response を fail-closed する。
 
 `self_model_external_adjudication_boundary.yaml` は `self-model-demo` の
 external-adjudication branch と対応し、外部医療・法制度・trustee 側の判断結果を

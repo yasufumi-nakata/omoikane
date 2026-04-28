@@ -12,11 +12,22 @@ assertions:
   - result.care_trustee_registry_binding.role_binding_status == "bound"
   - result.care_trustee_registry_binding.registry_status == "current"
   - result.care_trustee_registry_binding.revocation_status == "not-revoked"
+  - result.care_trustee_registry_binding.revocation_verifier_policy_id == "self-model-care-trustee-registry-revocation-live-verifier-quorum-v1"
+  - result.care_trustee_registry_binding.revocation_verifier_profile == "care-role-revocation-live-verifier-quorum-v1"
+  - result.care_trustee_registry_binding.required_revocation_verifier_jurisdictions == ["JP-13", "US-CA"]
+  - result.care_trustee_registry_binding.accepted_revocation_verifier_jurisdictions == ["JP-13", "US-CA"]
+  - result.care_trustee_registry_binding.revocation_verifier_quorum_threshold == 2
+  - result.care_trustee_registry_binding.revocation_verifier_quorum_status == "complete"
   - result.care_trustee_registry_binding.binding_status == "bound"
   - result.care_trustee_registry_binding.external_registry_bound == true
   - result.care_trustee_registry_binding.verifier_key_refs_bound == true
   - result.care_trustee_registry_binding.revocation_refs_bound == true
+  - result.care_trustee_registry_binding.revocation_live_verifier_bound == true
+  - result.care_trustee_registry_binding.revocation_verifier_signed_response_envelope_bound == true
+  - result.care_trustee_registry_binding.revocation_verifier_freshness_window_bound == true
   - result.care_trustee_registry_binding.boundary_only_review == true
+  - result.care_trustee_registry_binding.stale_revocation_response_accepted == false
+  - result.care_trustee_registry_binding.revoked_revocation_response_accepted == false
   - result.care_trustee_registry_binding.os_trustee_role_allowed == false
   - result.care_trustee_registry_binding.os_medical_authority_allowed == false
   - result.care_trustee_registry_binding.os_legal_guardianship_allowed == false
@@ -24,18 +35,27 @@ assertions:
   - result.care_trustee_registry_binding.forced_correction_allowed == false
   - result.care_trustee_registry_binding.raw_registry_payload_stored == false
   - result.care_trustee_registry_binding.raw_revocation_payload_stored == false
+  - result.care_trustee_registry_binding.raw_revocation_verifier_payload_stored == false
+  - result.care_trustee_registry_binding.raw_revocation_response_signature_payload_stored == false
   - result.care_trustee_registry_binding.raw_trustee_payload_stored == false
   - result.care_trustee_registry_binding.raw_care_payload_stored == false
   - result.care_trustee_registry_binding.raw_legal_payload_stored == false
   - result.validation.care_trustee_registry_binding.ok == true
   - result.validation.care_trustee_registry_binding.registry_binding_digest_bound == true
   - result.validation.care_trustee_registry_binding.source_handoff_bound == true
+  - result.validation.care_trustee_registry_binding.revocation_verifier_quorum_status == "complete"
+  - result.validation.care_trustee_registry_binding.revocation_live_verifier_bound == true
+  - result.validation.care_trustee_registry_binding.revocation_verifier_quorum_digest_bound == true
+  - result.validation.care_trustee_registry_binding.raw_revocation_verifier_payload_stored == false
 failure_mode:
   - trustee, care-team, or legal-guardian refs stay as unverified strings after handoff
   - stale or revoked registry entries are treated as current external authority
   - verifier key refs or revocation refs are omitted from the registry binding
+  - stale or revoked live revocation verifier responses are accepted as current
+  - JP-13 / US-CA revocation verifier quorum or signed response freshness is missing
   - raw external registry or revocation payloads are stored in the SelfModel receipt
+  - raw revocation verifier payloads or signature payloads are stored in the SelfModel receipt
   - registry binding turns into OS trustee, medical, legal, or writeback authority
 notes:
-  - Closes the first-class external registry binding for care trustee handoff refs.
+  - Closes the first-class external registry binding and live revocation verifier quorum for care trustee handoff refs.
   - Keeps actual trustee, care, legal, and revocation authority outside the reference runtime.

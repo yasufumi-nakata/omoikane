@@ -277,7 +277,7 @@ operations:
           responsibility_commit_digest_bound:
             type: boolean
   build_care_trustee_registry_binding_receipt:
-    summary: Bind care trustee handoff refs to current external registry entries, verifier key refs, and not-revoked revocation refs without importing trustee authority into the OS.
+    summary: Bind care trustee handoff refs to current external registry entries, verifier key refs, not-revoked revocation refs, and JP-13/US-CA live revocation verifier quorum without importing trustee authority into the OS.
     input:
       inline_schema:
         type: object
@@ -285,6 +285,7 @@ operations:
           - care_trustee_handoff_receipt
           - registry_ref
           - registry_entries
+          - revocation_verifier_receipts
           - council_resolution_ref
           - guardian_boundary_ref
           - continuity_review_ref
@@ -299,6 +300,11 @@ operations:
             minItems: 1
             items:
               type: object
+          revocation_verifier_receipts:
+            type: array
+            minItems: 2
+            items:
+              type: object
           council_resolution_ref:
             type: string
             minLength: 1
@@ -311,7 +317,7 @@ operations:
     output:
       schema_ref: self_model_care_trustee_registry_binding_receipt
   validate_care_trustee_registry_binding_receipt:
-    summary: Fail closed unless external trustee, care-team, and legal-guardian refs are current, not revoked, verifier-key bound, raw-payload redacted, and outside OS authority.
+    summary: Fail closed unless external trustee, care-team, and legal-guardian refs are current, not revoked, verifier-key bound, covered by a fresh signed JP-13/US-CA revocation verifier quorum, raw-payload redacted, and outside OS authority.
     input:
       schema_ref: self_model_care_trustee_registry_binding_receipt
     output:
@@ -323,11 +329,17 @@ operations:
           - role_binding_status
           - registry_status
           - revocation_status
+          - revocation_verifier_quorum_status
           - registry_binding_digest_bound
           - source_handoff_bound
           - verifier_key_refs_bound
           - revocation_refs_bound
+          - revocation_live_verifier_bound
+          - revocation_verifier_quorum_digest_bound
+          - revocation_verifier_signed_response_envelope_bound
+          - revocation_verifier_freshness_window_bound
           - raw_registry_payload_stored
+          - raw_revocation_verifier_payload_stored
           - os_trustee_role_allowed
         properties:
           ok:
@@ -340,6 +352,8 @@ operations:
             type: string
           revocation_status:
             type: string
+          revocation_verifier_quorum_status:
+            type: string
           registry_binding_digest_bound:
             type: boolean
           source_handoff_bound:
@@ -348,7 +362,17 @@ operations:
             type: boolean
           revocation_refs_bound:
             type: boolean
+          revocation_live_verifier_bound:
+            type: boolean
+          revocation_verifier_quorum_digest_bound:
+            type: boolean
+          revocation_verifier_signed_response_envelope_bound:
+            type: boolean
+          revocation_verifier_freshness_window_bound:
+            type: boolean
           raw_registry_payload_stored:
+            type: boolean
+          raw_revocation_verifier_payload_stored:
             type: boolean
           os_trustee_role_allowed:
             type: boolean

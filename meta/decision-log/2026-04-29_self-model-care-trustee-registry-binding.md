@@ -45,4 +45,4 @@ SelfModel writeback、forced correction はいずれも許可しない。
 
 - 外部 registry の real verifier transport と freshness SLA を導入する時
 - trustee / care team / legal guardian registry の jurisdiction-specific schema を分岐する時
-- revocation verifier quorum を care trustee registry binding に直接接続する時
+- revocation verifier quorum の registry/transport authority を実在 PKI と接続する時
