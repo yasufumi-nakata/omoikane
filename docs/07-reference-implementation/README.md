@@ -117,7 +117,9 @@ residual `future work` に加え、
 decision log 側で append-only に gap chain を保つ時は、
 frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
 同じ report は `self-construction-gap-report-scan-receipt-v1` の `scan_receipt` を返し、
-counts、prioritized task count、scan surface、report digest、raw report payload 非保存を
+counts、prioritized task count、scan surface、report digest、
+truth-source ごとの digest-only `scan_surface_digests` / `surface_manifest_digest`、
+raw report / raw surface payload 非保存を
 `gap_report.schema` で machine-checkable に固定する。
 
 

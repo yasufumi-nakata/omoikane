@@ -43,6 +43,9 @@ class GapScannerTests(unittest.TestCase):
             self.assertTrue(receipt["validation"]["ok"])
             self.assertFalse(receipt["raw_report_payload_stored"])
             self.assertEqual(0, receipt["counts"]["prioritized_task_count"])
+            self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
+            self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
+            self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
             digest_payload = {
                 key: value for key, value in report.items() if key != "scan_receipt"
             }
@@ -50,6 +53,22 @@ class GapScannerTests(unittest.TestCase):
                 sha256_text(canonical_json(digest_payload)),
                 receipt["report_digest"],
             )
+            surface_manifest_payload = {
+                "scanned_surfaces": receipt["scanned_surfaces"],
+                "scan_surface_digests": receipt["scan_surface_digests"],
+            }
+            self.assertEqual(
+                sha256_text(canonical_json(surface_manifest_payload)),
+                receipt["surface_manifest_digest"],
+            )
+            open_question_digest = next(
+                entry
+                for entry in receipt["scan_surface_digests"]
+                if entry["path"] == "meta/open-questions.md"
+            )
+            self.assertEqual("meta/open-questions.md", open_question_digest["surface_pattern"])
+            self.assertEqual(sha256_text("# Open Questions\n"), open_question_digest["sha256"])
+            self.assertEqual(len("# Open Questions\n".encode("utf-8")), open_question_digest["byte_length"])
 
     def test_scan_receipt_marks_non_zero_gap_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -67,6 +86,8 @@ class GapScannerTests(unittest.TestCase):
                 receipt["counts"]["missing_required_reference_file_count"],
             )
             self.assertEqual(1, receipt["counts"]["prioritized_task_count"])
+            self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
+            self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
 
     def test_scan_reports_empty_eval_surface(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

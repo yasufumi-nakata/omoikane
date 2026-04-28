@@ -699,6 +699,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(report["scan_receipt"]["validation"]["ok"])
         self.assertEqual(0, report["scan_receipt"]["counts"]["prioritized_task_count"])
         self.assertFalse(report["scan_receipt"]["raw_report_payload_stored"])
+        self.assertTrue(report["scan_receipt"]["validation"]["scan_surface_digests_bound"])
+        self.assertTrue(report["scan_receipt"]["validation"]["surface_manifest_digest_bound"])
+        self.assertFalse(report["scan_receipt"]["validation"]["raw_surface_payload_stored"])
+        self.assertTrue(
+            any(
+                entry["path"] == "meta/open-questions.md"
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+            )
+        )
         self.assertIn("decision_log_frontier_count", report)
         self.assertEqual(
             report["decision_log_frontier_count"],

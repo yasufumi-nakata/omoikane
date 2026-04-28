@@ -69,6 +69,20 @@ CATALOG_COVERAGE_SPECS = (
 EVAL_INVENTORY_GLOB = "evals/*/README.md"
 IMPLEMENTATION_STUB_GLOB = "src/omoikane/**/*.py"
 IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES = ("Backend",)
+SCAN_RECEIPT_SURFACES = (
+    "meta/open-questions.md",
+    "references/*.md",
+    "specs/catalog.yaml",
+    "specs/interfaces/README.md",
+    "specs/schemas/README.md",
+    "evals/*/README.md",
+    "README.md",
+    "docs/07-reference-implementation/README.md",
+    "specs/interfaces/**/*.idl",
+    "specs/schemas/README.md",
+    "src/omoikane/**/*.py",
+    "meta/decision-log/*.md",
+)
 
 
 class GapScanner:
@@ -243,6 +257,17 @@ class GapScanner:
         }
         all_zero = all(value == 0 for value in counts.values())
         report_digest = sha256_text(canonical_json(self._report_digest_payload(report)))
+        repo_root = Path(str(report["repo_root"]))
+        scanned_surfaces = list(SCAN_RECEIPT_SURFACES)
+        scan_surface_digests = self._scan_surface_digests(repo_root, scanned_surfaces)
+        surface_manifest_digest = sha256_text(
+            canonical_json(
+                {
+                    "scanned_surfaces": scanned_surfaces,
+                    "scan_surface_digests": scan_surface_digests,
+                }
+            )
+        )
         receipt: Dict[str, Any] = {
             "kind": "gap_report_scan_receipt",
             "schema_version": GAP_REPORT_SCHEMA_VERSION,
@@ -250,20 +275,9 @@ class GapScanner:
             "generated_at": utc_now_iso(),
             "profile": GAP_REPORT_SCAN_RECEIPT_PROFILE,
             "repo_root": str(report["repo_root"]),
-            "scanned_surfaces": [
-                "meta/open-questions.md",
-                "references/*.md",
-                "specs/catalog.yaml",
-                "specs/interfaces/README.md",
-                "specs/schemas/README.md",
-                "evals/*/README.md",
-                "README.md",
-                "docs/07-reference-implementation/README.md",
-                "specs/interfaces/**/*.idl",
-                "specs/schemas/README.md",
-                "src/omoikane/**/*.py",
-                "meta/decision-log/*.md",
-            ],
+            "scanned_surfaces": scanned_surfaces,
+            "scan_surface_digests": scan_surface_digests,
+            "surface_manifest_digest": surface_manifest_digest,
             "counts": counts,
             "all_zero": all_zero,
             "report_digest": report_digest,
@@ -272,10 +286,13 @@ class GapScanner:
                 "ok": all_zero,
                 "counts_match_report": True,
                 "report_digest_bound": True,
+                "scan_surface_digests_bound": True,
+                "surface_manifest_digest_bound": True,
                 "prioritized_tasks_empty_when_all_zero": (
                     len(report["prioritized_tasks"]) == 0 if all_zero else True
                 ),
                 "raw_report_payload_stored": False,
+                "raw_surface_payload_stored": False,
             },
         }
         return receipt
@@ -287,6 +304,39 @@ class GapScanner:
             for key, value in report.items()
             if key != "scan_receipt"
         }
+
+    @staticmethod
+    def _scan_surface_digests(
+        repo_root: Path, scanned_surfaces: List[str]
+    ) -> List[Dict[str, Any]]:
+        entries: List[Dict[str, Any]] = []
+        seen_entries: set[tuple[str, str]] = set()
+        for pattern in scanned_surfaces:
+            if any(marker in pattern for marker in ("*", "?", "[")):
+                candidates = sorted(path for path in repo_root.glob(pattern) if path.is_file())
+            else:
+                candidate = repo_root / pattern
+                candidates = [candidate] if candidate.is_file() else []
+            for path in candidates:
+                relative_path = str(path.relative_to(repo_root))
+                key = (pattern, relative_path)
+                if key in seen_entries:
+                    continue
+                seen_entries.add(key)
+                try:
+                    text = path.read_text(encoding="utf-8")
+                except UnicodeDecodeError:
+                    continue
+                encoded = text.encode("utf-8")
+                entries.append(
+                    {
+                        "surface_pattern": pattern,
+                        "path": relative_path,
+                        "sha256": sha256_text(text),
+                        "byte_length": len(encoded),
+                    }
+                )
+        return entries
 
     @staticmethod
     def _catalog_pending_files(catalog_path: Path, repo_root: Path) -> List[str]:

@@ -48,6 +48,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["scan_receipt"]["validation"]["ok"])
         self.assertEqual(0, result["scan_receipt"]["counts"]["prioritized_task_count"])
         self.assertFalse(result["scan_receipt"]["raw_report_payload_stored"])
+        self.assertTrue(result["scan_receipt"]["validation"]["scan_surface_digests_bound"])
+        self.assertTrue(result["scan_receipt"]["validation"]["surface_manifest_digest_bound"])
+        self.assertFalse(result["scan_receipt"]["validation"]["raw_surface_payload_stored"])
+        self.assertTrue(
+            any(
+                entry["path"] == "meta/open-questions.md"
+                for entry in result["scan_receipt"]["scan_surface_digests"]
+            )
+        )
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()

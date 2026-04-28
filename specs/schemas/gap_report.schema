@@ -159,6 +159,8 @@ properties:
       - profile
       - repo_root
       - scanned_surfaces
+      - scan_surface_digests
+      - surface_manifest_digest
       - counts
       - all_zero
       - report_digest
@@ -187,6 +189,13 @@ properties:
         items:
           type: string
           minLength: 1
+      scan_surface_digests:
+        type: array
+        items:
+          $ref: "#/$defs/surface_digest"
+      surface_manifest_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
       counts:
         type: object
         additionalProperties: false
@@ -258,8 +267,11 @@ properties:
           - ok
           - counts_match_report
           - report_digest_bound
+          - scan_surface_digests_bound
+          - surface_manifest_digest_bound
           - prioritized_tasks_empty_when_all_zero
           - raw_report_payload_stored
+          - raw_surface_payload_stored
         properties:
           ok:
             type: boolean
@@ -267,11 +279,38 @@ properties:
             type: boolean
           report_digest_bound:
             type: boolean
+          scan_surface_digests_bound:
+            type: boolean
+          surface_manifest_digest_bound:
+            type: boolean
           prioritized_tasks_empty_when_all_zero:
             type: boolean
           raw_report_payload_stored:
             const: false
+          raw_surface_payload_stored:
+            const: false
 $defs:
+  surface_digest:
+    type: object
+    additionalProperties: false
+    required:
+      - surface_pattern
+      - path
+      - sha256
+      - byte_length
+    properties:
+      surface_pattern:
+        type: string
+        minLength: 1
+      path:
+        type: string
+        minLength: 1
+      sha256:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      byte_length:
+        type: integer
+        minimum: 0
   gap_hit:
     type: object
     additionalProperties: false
@@ -336,6 +375,12 @@ examples:
       repo_root: /repo
       scanned_surfaces:
         - meta/open-questions.md
+      scan_surface_digests:
+        - surface_pattern: meta/open-questions.md
+          path: meta/open-questions.md
+          sha256: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          byte_length: 16
+      surface_manifest_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       counts:
         open_question_count: 0
         missing_expected_file_count: 0
@@ -357,5 +402,8 @@ examples:
         ok: true
         counts_match_report: true
         report_digest_bound: true
+        scan_surface_digests_bound: true
+        surface_manifest_digest_bound: true
         prioritized_tasks_empty_when_all_zero: true
         raw_report_payload_stored: false
+        raw_surface_payload_stored: false

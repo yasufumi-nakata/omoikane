@@ -7,6 +7,7 @@ from typing import Any
 import jsonschema
 import yaml
 
+from omoikane.common import canonical_json, sha256_text
 from omoikane.reference_os import OmoikaneReferenceOS
 
 
@@ -87,6 +88,29 @@ class GapReportSchemaContractTests(unittest.TestCase):
         )
         self.assertEqual(report["catalog_pending_count"], counts["catalog_pending_count"])
         self.assertEqual(len(report["prioritized_tasks"]), counts["prioritized_task_count"])
+
+    def test_gap_report_scan_receipt_binds_surface_manifest(self) -> None:
+        report = self.runtime.generate_gap_report(REPO_ROOT)
+        receipt = report["scan_receipt"]
+        manifest_payload = {
+            "scanned_surfaces": receipt["scanned_surfaces"],
+            "scan_surface_digests": receipt["scan_surface_digests"],
+        }
+
+        self.assertEqual(
+            sha256_text(canonical_json(manifest_payload)),
+            receipt["surface_manifest_digest"],
+        )
+        self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
+        self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
+        self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
+        self.assertTrue(
+            any(
+                entry["path"] == "specs/catalog.yaml"
+                and entry["surface_pattern"] == "specs/catalog.yaml"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
 
 
 if __name__ == "__main__":
