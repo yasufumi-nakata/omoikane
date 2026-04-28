@@ -28,6 +28,8 @@ trust_floor: <0.0-1.0>
 substrate_requirements: [<id> | 'any']
 input_schema_ref: <specs/...>
 output_schema_ref: <specs/...>
+deliberation_scope_refs: [<docs/...> | <specs/...> | <evals/...> | <agents/...> | <meta/...>]  # councilor のみ必須
+deliberation_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # councilor のみ必須
 build_surface_refs: [<src/...> | <tests/...> | <specs/...> | <evals/...> | <docs/...>]  # builder のみ必須
 execution_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # builder のみ必須
 research_domain_refs: [<docs/...> | <research/...>]  # researcher のみ必須

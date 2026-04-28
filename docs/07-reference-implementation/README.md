@@ -501,6 +501,9 @@ proposal profile ごとの review policy で走査した `yaoyorozu_workspace_di
 repo-local `agents/` から materialize した trust-bound registry snapshot、
 raw `agents/**/*.yaml` が `agent_source_definition.schema` の必須 field、
 non-empty substrate / schema refs、repo-local policy refs を満たしてから registry 化されること、
+`councilor` role では `deliberation_scope_refs` と `deliberation_policy_ref` を
+raw source definition と materialized registry entry の両方に保持し、
+議事 transcript 本体ではなく repo-local deliberation boundary ref だけを渡すこと、
 さらに `researcher` role では `research_domain_refs` と `evidence_policy_ref` を
 raw source definition と materialized registry entry の両方に保持し、
 research payload 本体ではなく repo-local evidence boundary ref だけを渡すこと、

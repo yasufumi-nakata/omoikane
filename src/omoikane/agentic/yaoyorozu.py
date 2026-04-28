@@ -107,6 +107,22 @@ AGENT_SOURCE_REQUIRED_LIST_FIELDS = (
     "capabilities",
     "substrate_requirements",
 )
+AGENT_SOURCE_COUNCILOR_REQUIRED_LIST_FIELDS = (
+    "deliberation_scope_refs",
+)
+AGENT_SOURCE_COUNCILOR_REQUIRED_STRING_FIELDS = (
+    "deliberation_policy_ref",
+)
+AGENT_SOURCE_COUNCILOR_SCOPE_PREFIXES = (
+    "docs/",
+    "specs/",
+    "evals/",
+    "agents/",
+    "meta/",
+    "src/",
+    "tests/",
+    "research/",
+)
 AGENT_SOURCE_RESEARCHER_REQUIRED_LIST_FIELDS = (
     "research_domain_refs",
 )
@@ -532,6 +548,32 @@ def _validate_agent_source_definition(
         ref = str(data.get(ref_field, "")).strip()
         if ref and ref.startswith(("agents/", "specs/")) and not (repo_root / ref).is_file():
             errors.append(f"{ref_field} must reference an existing repo file: {ref}")
+
+    if role == "councilor":
+        for field_name in AGENT_SOURCE_COUNCILOR_REQUIRED_LIST_FIELDS:
+            values = _normalize_string_list(data.get(field_name, []))
+            if not values:
+                errors.append(f"{field_name} must contain at least one non-empty item")
+                continue
+            for ref in values:
+                if not ref.startswith(AGENT_SOURCE_COUNCILOR_SCOPE_PREFIXES):
+                    errors.append(
+                        f"{field_name} must reference deliberation surfaces under "
+                        f"{AGENT_SOURCE_COUNCILOR_SCOPE_PREFIXES}: {ref}"
+                    )
+                    continue
+                if not (repo_root / ref).exists():
+                    errors.append(f"{field_name} must reference an existing repo path: {ref}")
+        for field_name in AGENT_SOURCE_COUNCILOR_REQUIRED_STRING_FIELDS:
+            value = data.get(field_name)
+            if not isinstance(value, str) or not value.strip():
+                errors.append(f"{field_name} must be a non-empty string")
+                continue
+            ref = value.strip()
+            if ref.startswith(("agents/", "docs/", "specs/", "evals/", "meta/")) and not (
+                repo_root / ref
+            ).is_file():
+                errors.append(f"{field_name} must reference an existing repo file: {ref}")
 
     if role == "researcher":
         for field_name in AGENT_SOURCE_RESEARCHER_REQUIRED_LIST_FIELDS:
@@ -1061,6 +1103,8 @@ class YaoyorozuRegistryEntry:
     output_schema_ref: str = ""
     ethics_constraints: List[str] = field(default_factory=list)
     prompt_or_policy_ref: str = ""
+    deliberation_scope_refs: List[str] = field(default_factory=list)
+    deliberation_policy_ref: str = ""
     research_domain_refs: List[str] = field(default_factory=list)
     evidence_policy_ref: str = ""
     build_surface_refs: List[str] = field(default_factory=list)
@@ -1085,6 +1129,9 @@ class YaoyorozuRegistryEntry:
             "prompt_or_policy_ref": self.prompt_or_policy_ref,
             "trust_snapshot": dict(trust_snapshot),
         }
+        if self.role == "councilor":
+            entry["deliberation_scope_refs"] = list(self.deliberation_scope_refs)
+            entry["deliberation_policy_ref"] = self.deliberation_policy_ref
         if self.role == "researcher":
             entry["research_domain_refs"] = list(self.research_domain_refs)
             entry["evidence_policy_ref"] = self.evidence_policy_ref
@@ -2918,6 +2965,10 @@ class YaoyorozuRegistryService:
                 output_schema_ref=str(parsed.get("output_schema_ref", "")).strip(),
                 ethics_constraints=_normalize_string_list(parsed.get("ethics_constraints", [])),
                 prompt_or_policy_ref=str(parsed.get("prompt_or_policy_ref", "")).strip(),
+                deliberation_scope_refs=_normalize_string_list(
+                    parsed.get("deliberation_scope_refs", [])
+                ),
+                deliberation_policy_ref=str(parsed.get("deliberation_policy_ref", "")).strip(),
                 research_domain_refs=_normalize_string_list(
                     parsed.get("research_domain_refs", [])
                 ),

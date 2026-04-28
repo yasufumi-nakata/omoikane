@@ -58,6 +58,13 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         for entry in researcher_entries:
             self.assertTrue(entry["research_domain_refs"], entry["agent_id"])
             self.assertTrue(entry["evidence_policy_ref"], entry["agent_id"])
+        councilor_entries = [
+            entry for entry in result["registry"]["entries"] if entry["role"] == "councilor"
+        ]
+        self.assertTrue(councilor_entries)
+        for entry in councilor_entries:
+            self.assertTrue(entry["deliberation_scope_refs"], entry["agent_id"])
+            self.assertTrue(entry["deliberation_policy_ref"], entry["agent_id"])
         builder_entries = [
             entry for entry in result["registry"]["entries"] if entry["role"] == "builder"
         ]

@@ -8,6 +8,12 @@ trust_floor: 0.7
 substrate_requirements: ['any']
 input_schema_ref: specs/schemas/ethics_query.yaml
 output_schema_ref: specs/schemas/ethics_decision.yaml
+deliberation_scope_refs:
+  - docs/00-philosophy/ethics.md
+  - docs/04-ai-governance/amendment-protocol.md
+  - specs/schemas/ethics_query.yaml
+  - specs/schemas/ethics_decision.yaml
+deliberation_policy_ref: agents/councilors/ethics-committee.policy.md
 ethics_constraints: ['ALL']
 prompt_or_policy_ref: agents/councilors/ethics-committee.policy.md
 when_to_invoke: |

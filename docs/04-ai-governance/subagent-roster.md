@@ -76,6 +76,10 @@ preseed integrity Guardian gate、dependency materialization manifest、
 dependency lockfile / sealed wheel attestation、
 sealed materialized-only import isolation、materialized dependency module-origin binding、seed commit、
 candidate/source success count を receipt に残す。
+Councilor role 自体も `deliberation_scope_refs` と `deliberation_policy_ref` を
+registry entry に保持し、DesignArchitect / ChangeAdvocate / ConservatismAdvocate /
+EthicsCommittee / MemoryArchivist がどの docs / specs / evals / agents / meta
+surface を評議するかを Council handoff 前に確認できる。
 Guardian role 自体も `oversight_scope_refs` と `attestation_policy_ref` を
 registry entry に保持し、Ethics / Identity / Integrity の各 Guardian が
 どの docs / specs / evals / agents / meta surface を監査するかを

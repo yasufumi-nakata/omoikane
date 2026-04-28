@@ -7,6 +7,8 @@ must:
   - agent_source_definition.schema requires non-empty input_schema_ref and output_schema_ref
   - registry sync rejects raw source definitions with missing required fields
   - registry entries preserve non-empty substrate and schema refs after materialization
+  - councilor source definitions must bind non-empty deliberation_scope_refs and deliberation_policy_ref before registry materialization
+  - councilor registry entries preserve reviewer-facing deliberation scope and policy refs without storing raw deliberation transcripts
   - researcher source definitions must bind non-empty research_domain_refs and evidence_policy_ref before registry materialization
   - researcher registry entries preserve digest-safe research domain and evidence policy refs without storing raw research payloads
   - builder source definitions must bind non-empty build_surface_refs and execution_policy_ref before registry materialization
@@ -17,6 +19,8 @@ expected:
   agent_source_definition_schema_bound: true
   missing_schema_ref_rejected: true
   empty_substrate_rejected: true
+  councilor_deliberation_scope_refs_required: true
+  councilor_deliberation_policy_ref_required: true
   researcher_domain_refs_required: true
   researcher_evidence_policy_ref_required: true
   builder_surface_refs_required: true

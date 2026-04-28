@@ -2906,6 +2906,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                     entry["evidence_policy_ref"],
                     {entry["prompt_or_policy_ref"], "agents/researchers/consciousness-theorist.policy.md"},
                 )
+            if entry["role"] == "councilor":
+                self.assertTrue(entry["deliberation_scope_refs"], entry["agent_id"])
+                self.assertTrue(entry["deliberation_policy_ref"], entry["agent_id"])
+                self.assertIn(entry["deliberation_policy_ref"], {entry["prompt_or_policy_ref"]})
             if entry["role"] == "builder":
                 self.assertTrue(entry["build_surface_refs"], entry["agent_id"])
                 self.assertTrue(entry["execution_policy_ref"], entry["agent_id"])
@@ -3042,6 +3046,51 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(ValueError, "research_domain_refs must contain"):
+                service.sync_from_agents_directory(repo_root / "agents")
+
+    def test_sync_rejects_councilor_without_deliberation_scope_refs(self) -> None:
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-councilor-source-") as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "agents" / "councilors").mkdir(parents=True)
+            (repo_root / "agents" / "councilors" / "policy.md").write_text(
+                "# policy\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas").mkdir(parents=True)
+            (repo_root / "specs" / "schemas" / "council_input.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas" / "council_argument.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            self._write_workspace_agent(
+                repo_root,
+                "agents/councilors/incomplete-councilor.yaml",
+                (
+                    "name: incomplete-councilor\n"
+                    "role: councilor\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - argue.for-change\n"
+                    "trust_floor: 0.5\n"
+                    "substrate_requirements: ['any']\n"
+                    "input_schema_ref: specs/schemas/council_input.yaml\n"
+                    "output_schema_ref: specs/schemas/council_argument.yaml\n"
+                    "deliberation_policy_ref: agents/councilors/policy.md\n"
+                    "ethics_constraints: []\n"
+                    "prompt_or_policy_ref: agents/councilors/policy.md\n"
+                    "when_to_invoke: |\n"
+                    "  - test\n"
+                    "when_not_to_invoke: |\n"
+                    "  - never\n"
+                ),
+            )
+
+            with self.assertRaisesRegex(ValueError, "deliberation_scope_refs must contain"):
                 service.sync_from_agents_directory(repo_root / "agents")
 
     def test_sync_rejects_guardian_without_oversight_scope_refs(self) -> None:

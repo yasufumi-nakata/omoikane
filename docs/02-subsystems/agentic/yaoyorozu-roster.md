@@ -108,6 +108,12 @@ worker を実行し、
 実際の `omoikane.agentic.local_worker_stub` import 元ファイルと digest が
 source checkout fallback 無しの materialized dependency snapshot 配下であることまで束縛する。
 
+Councilor role は registry materialization 前に `deliberation_scope_refs` と
+`deliberation_policy_ref` を必須とする。Yaoyorozu registry は Councilor が評議する
+docs / specs / evals / agents / meta surface と deliberation policy ref を
+`agent_registry_entry` に保存し、role 名だけではなく、どの設計境界について
+発言・記録・反対・倫理判断を行うのかを reviewer-facing に確認できるようにする。
+
 Researcher role は registry materialization 前に `research_domain_refs` と
 `evidence_policy_ref` を必須とする。Yaoyorozu registry は raw research payload を
 保持せず、docs / research / agents 配下の境界 ref だけを
