@@ -5,9 +5,9 @@
 - `affect_state.schema`
 - `affect_transition.schema`
 - `agent_registry_entry.schema`
-  - councilor deliberation scope、researcher evidence scope、builder build surface scope、guardian oversight/attestation scope を role-specific required fields として保持する
+  - councilor deliberation scope、researcher evidence scope / evidence schema、builder build surface scope、guardian oversight/attestation scope を role-specific required fields として保持する
 - `agent_source_definition.schema`
-  - raw `agents/**/*.yaml` で councilor deliberation scope、researcher evidence scope、builder build surface scope、guardian oversight/attestation scope を materialization 前に検証する
+  - raw `agents/**/*.yaml` で councilor deliberation scope、researcher evidence scope / evidence schema、builder build surface scope、guardian oversight/attestation scope を materialization 前に検証する
 - `amendment_decision.schema`
 - `amendment_proposal.schema`
 - `ascension_plan.schema`
@@ -119,6 +119,10 @@
 - `memory_edit_session.schema`
 - `memory_replication_session.schema`
   - includes long-term media renewal cadence policy, refresh / revocation window binding, and registry endpoint certificate CT/SCT evidence for coldstore and trustee proof sets
+- `research_evidence_report.schema`
+  - role-specific Yaoyorozu researcher output contract with digest-only evidence, claim ceilings, advisory-only implications, and no Council decision authority
+- `research_evidence_request.schema`
+  - role-specific Yaoyorozu researcher input contract for bounded evidence questions, repo-local evidence boundaries, and no raw payload retention
 - `metacognition_report.schema`
 - `metacognition_shift.schema`
 - `naming_policy.schema`

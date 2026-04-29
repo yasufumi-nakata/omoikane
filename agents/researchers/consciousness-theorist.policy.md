@@ -11,6 +11,9 @@
 - 複数理論を比較表で示す
 - OmoikaneOS の代理表現との対応を考察
 - 自分の解釈と確立事実を区別する
+- 入力は `research_evidence_request.schema`、出力は `research_evidence_report.schema` に従う
+- evidence item は source ref と digest で示し、raw research payload を保持しない
+- claim ceiling、uncertainty、competing explanations を明示し、advisory-only implication に留める
 
 ## 出力先
 
@@ -21,3 +24,5 @@
 
 - 設計を一方的に変更すること（Council 経由のみ）
 - 確立されていない理論を「事実」として書くこと
+- Council resolution、runtime write、clinical / legal authority claim を researcher output として発行すること
+- raw source payload や unpublished full text を registry / report に保存すること

@@ -1,0 +1,120 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/research_evidence_request.schema"
+title: ResearchEvidenceRequest
+description: >
+  Role-specific input contract for Yaoyorozu researcher agents. It carries
+  bounded research questions and repo-local evidence boundaries without
+  turning the researcher into a Council decision maker.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - request_id
+  - requested_by_ref
+  - research_domain_refs
+  - evidence_policy_ref
+  - question
+  - requested_output_sections
+  - constraints
+properties:
+  kind:
+    const: research_evidence_request
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  request_id:
+    type: string
+    pattern: "^research-evidence-request-[a-f0-9]{12}$"
+  requested_by_ref:
+    type: string
+    pattern: "^(council|guardian|selfctor|agent)://"
+  research_domain_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|research)/"
+  evidence_policy_ref:
+    type: string
+    pattern: "^(agents|docs|research)/"
+  question:
+    type: string
+    minLength: 1
+  seed_evidence_refs:
+    type: array
+    items:
+      type: string
+      pattern: "^(docs|research|specs|evals)/"
+  requested_output_sections:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      enum:
+        - summary
+        - source_refs
+        - competing_explanations
+        - uncertainty
+        - claim_ceiling
+        - design_implications
+  constraints:
+    type: object
+    additionalProperties: false
+    required:
+      - allowed_source_classes
+      - forbidden_actions
+      - raw_source_payload_allowed
+      - decision_authority_allowed
+    properties:
+      allowed_source_classes:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          enum:
+            - primary-literature
+            - official-documentation
+            - repo-local-doc
+            - experiment-protocol
+            - legal-or-governance-source
+      forbidden_actions:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          enum:
+            - council-resolution
+            - runtime-write
+            - raw-payload-retention
+            - clinical-or-legal-authority-claim
+      raw_source_payload_allowed:
+        const: false
+      decision_authority_allowed:
+        const: false
+examples:
+  - kind: research_evidence_request
+    schema_version: 1.0.0
+    request_id: research-evidence-request-012345abcdef
+    requested_by_ref: council://session/yaoyorozu-demo
+    research_domain_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
+    question: Summarize evidence ceilings for connectome scan fidelity.
+    seed_evidence_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    requested_output_sections:
+      - summary
+      - source_refs
+      - uncertainty
+      - claim_ceiling
+    constraints:
+      allowed_source_classes:
+        - primary-literature
+        - repo-local-doc
+      forbidden_actions:
+        - council-resolution
+        - runtime-write
+        - raw-payload-retention
+      raw_source_payload_allowed: false
+      decision_authority_allowed: false

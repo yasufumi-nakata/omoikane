@@ -62,8 +62,8 @@ capabilities:
 trust_floor: <0.0-1.0>
 substrate_requirements:
   - <substrate_id or 'any'>
-input_schema_ref: <specs/...>
-output_schema_ref: <specs/...>
+input_schema_ref: <specs/...>   # researcher は specs/schemas/research_evidence_request.schema 固定
+output_schema_ref: <specs/...>  # researcher は specs/schemas/research_evidence_report.schema 固定
 ethics_constraints:
   - <rule_id>
 prompt_or_policy_ref: <agents/.../policy.md>
@@ -128,6 +128,11 @@ Researcher role は registry materialization 前に `research_domain_refs` と
 保持せず、docs / research / agents 配下の境界 ref だけを
 `agent_registry_entry` に保存して、Council が研究補助 agent の evidence scope を
 reviewer-facing に確認できるようにする。
+さらに researcher の `input_schema_ref` / `output_schema_ref` は
+`research_evidence_request.schema` / `research_evidence_report.schema` に固定し、
+Council session schema を再利用しない。researcher output は claim ceiling、
+advisory-only implication、raw research payload 非保存、decision authority 不保持を
+schema contract として返す。
 
 Builder role は registry materialization 前に `build_surface_refs` と
 `execution_policy_ref` を必須とする。Yaoyorozu registry は builder が触れる

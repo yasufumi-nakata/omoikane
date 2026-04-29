@@ -32,7 +32,11 @@ from .agentic.trust import (
     TRUST_TRANSFER_FULL_CLONE_EXPORT_PROFILE_ID,
     TrustService,
 )
-from .agentic.yaoyorozu import YaoyorozuRegistryService
+from .agentic.yaoyorozu import (
+    AGENT_SOURCE_RESEARCHER_INPUT_SCHEMA_REF,
+    AGENT_SOURCE_RESEARCHER_OUTPUT_SCHEMA_REF,
+    YaoyorozuRegistryService,
+)
 from .common import canonical_json, new_id, sha256_text, utc_now_iso
 from .cognitive import (
     AttentionCue,
@@ -4247,6 +4251,16 @@ json.dump(response, sys.stdout)
             )
             and registry_snapshot["raw_source_payload_stored"] is False
         )
+        researcher_entries = [
+            entry for entry in registry_snapshot["entries"] if entry["role"] == "researcher"
+        ]
+        researcher_evidence_schema_contract_bound = bool(researcher_entries) and all(
+            entry["input_schema_ref"] == AGENT_SOURCE_RESEARCHER_INPUT_SCHEMA_REF
+            and entry["output_schema_ref"] == AGENT_SOURCE_RESEARCHER_OUTPUT_SCHEMA_REF
+            and bool(entry["research_domain_refs"])
+            and bool(entry["evidence_policy_ref"])
+            for entry in researcher_entries
+        )
 
         return {
             "identity": {
@@ -4288,6 +4302,9 @@ json.dump(response, sys.stdout)
                 ],
                 "registry_entry_count": registry_snapshot["entry_count"],
                 "registry_source_digest_manifest_bound": registry_source_digest_manifest_bound,
+                "researcher_evidence_schema_contract_bound": (
+                    researcher_evidence_schema_contract_bound
+                ),
                 "source_manifest_ledger_binding_ok": source_manifest_ledger_binding[
                     "validation"
                 ]["ok"],
@@ -4564,6 +4581,7 @@ json.dump(response, sys.stdout)
                     and build_request_binding_validation["ok"]
                     and execution_chain_validation["ok"]
                     and registry_source_digest_manifest_bound
+                    and researcher_evidence_schema_contract_bound
                     and source_manifest_ledger_binding["validation"]["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),

@@ -110,6 +110,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         for entry in researcher_entries:
             self.assertTrue(entry["research_domain_refs"], entry["agent_id"])
             self.assertTrue(entry["evidence_policy_ref"], entry["agent_id"])
+            self.assertEqual(
+                "specs/schemas/research_evidence_request.schema",
+                entry["input_schema_ref"],
+            )
+            self.assertEqual(
+                "specs/schemas/research_evidence_report.schema",
+                entry["output_schema_ref"],
+            )
         councilor_entries = [
             entry for entry in result["registry"]["entries"] if entry["role"] == "councilor"
         ]
@@ -142,6 +150,20 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             if errors:
                 formatted = "\n".join(error.message for error in errors[:5])
                 self.fail(f"{source_path.relative_to(REPO_ROOT)} validation failed:\n{formatted}")
+
+    def test_research_evidence_examples_match_public_schemas(self) -> None:
+        for schema_path in (
+            "specs/schemas/agent_registry_entry.schema",
+            "specs/schemas/research_evidence_request.schema",
+            "specs/schemas/research_evidence_report.schema",
+        ):
+            schema = _load_schema(schema_path)
+            validator = jsonschema.Draft202012Validator(schema)
+            for index, payload in enumerate(schema.get("examples", []), start=1):
+                errors = sorted(validator.iter_errors(payload), key=lambda error: list(error.path))
+                if errors:
+                    formatted = "\n".join(error.message for error in errors[:5])
+                    self.fail(f"{schema_path} example {index} validation failed:\n{formatted}")
 
     def test_workspace_discovery_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()

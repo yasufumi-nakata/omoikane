@@ -3428,5 +3428,35 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects public reviewer verification of Yaoyorozu registry provenance by requiring source manifest digest, ledger entry evidence, self+guardian signature digests, verifier key refs, and raw payload redaction to remain bound.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/research_evidence_request.schema
+    consumers:
+      - specs/schemas/agent_source_definition.schema
+      - specs/schemas/agent_registry_entry.schema
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - reference-runtime
+      - agents/researchers/consciousness-theorist.yaml
+      - agents/researchers/experiment-designer.yaml
+      - agents/researchers/legal-scholar.yaml
+      - agents/researchers/neuroscience-scout.yaml
+      - agents/researchers/quantum-scout.yaml
+      - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+    rationale: Required to keep Yaoyorozu researcher inputs on an advisory-only evidence request contract instead of reusing Council session input.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/research_evidence_report.schema
+    consumers:
+      - specs/schemas/agent_source_definition.schema
+      - specs/schemas/agent_registry_entry.schema
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - reference-runtime
+      - agents/researchers/consciousness-theorist.yaml
+      - agents/researchers/experiment-designer.yaml
+      - agents/researchers/legal-scholar.yaml
+      - agents/researchers/neuroscience-scout.yaml
+      - agents/researchers/quantum-scout.yaml
+      - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+    rationale: Required to keep Yaoyorozu researcher outputs as digest-only advisory evidence reports with claim ceilings and no Council decision authority.
 next_priority:
   # Future automation can append the next missing contract here.

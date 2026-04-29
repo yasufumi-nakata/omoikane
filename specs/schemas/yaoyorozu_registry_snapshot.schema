@@ -166,6 +166,8 @@ examples:
         - design-architect
       builder:
         - codex-builder
+      researcher:
+        - neuroscience-scout
       guardian:
         - integrity-guardian
     capability_index:
@@ -173,6 +175,8 @@ examples:
         - design-architect
       code.generate:
         - codex-builder
+      literature.survey:
+        - neuroscience-scout
     selection_ready_counts:
       invite_ready: 3
       weighted_vote_ready: 3

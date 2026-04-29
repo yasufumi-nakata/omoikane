@@ -1,0 +1,147 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/research_evidence_report.schema"
+title: ResearchEvidenceReport
+description: >
+  Role-specific output contract for Yaoyorozu researcher agents. It preserves
+  digest-only evidence, claim ceilings, and advisory-only design implications
+  without storing raw research payloads or issuing Council decisions.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - report_id
+  - request_ref
+  - researcher_agent_id
+  - research_domain_refs
+  - evidence_policy_ref
+  - evidence_items
+  - claim_ceiling
+  - advisory_design_implications
+  - raw_research_payload_stored
+  - decision_authority_claimed
+  - report_digest
+properties:
+  kind:
+    const: research_evidence_report
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  report_id:
+    type: string
+    pattern: "^research-evidence-report-[a-f0-9]{12}$"
+  request_ref:
+    type: string
+    pattern: "^research-evidence-request://research-evidence-request-[a-f0-9]{12}$"
+  researcher_agent_id:
+    type: string
+    minLength: 1
+  research_domain_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|research)/"
+  evidence_policy_ref:
+    type: string
+    pattern: "^(agents|docs|research)/"
+  evidence_items:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - evidence_ref
+        - evidence_digest
+        - source_class
+        - claim_scope
+      properties:
+        evidence_ref:
+          type: string
+          pattern: "^(docs|research|specs|evals|doi|pubmed|legal|official)[:/]"
+        evidence_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        source_class:
+          type: string
+          enum:
+            - primary-literature
+            - official-documentation
+            - repo-local-doc
+            - experiment-protocol
+            - legal-or-governance-source
+        claim_scope:
+          type: string
+          enum:
+            - supports
+            - contradicts
+            - constrains
+            - background-only
+  claim_ceiling:
+    type: string
+    enum:
+      - background-only
+      - hypothesis-generating
+      - implementation-advisory
+      - reviewer-facing-claim
+  uncertainty_notes:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  advisory_design_implications:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - implication_id
+        - summary
+        - target_ref
+        - authority_level
+      properties:
+        implication_id:
+          type: string
+          pattern: "^research-implication-[a-f0-9]{12}$"
+        summary:
+          type: string
+          minLength: 1
+        target_ref:
+          type: string
+          pattern: "^(docs|specs|evals|src|tests|agents|meta|research)/"
+        authority_level:
+          const: advisory-only
+  raw_research_payload_stored:
+    const: false
+  decision_authority_claimed:
+    const: false
+  report_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: research_evidence_report
+    schema_version: 1.0.0
+    report_id: research-evidence-report-012345abcdef
+    request_ref: research-evidence-request://research-evidence-request-012345abcdef
+    researcher_agent_id: neuroscience-scout
+    research_domain_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
+    evidence_items:
+      - evidence_ref: docs/05-research-frontiers/scan-fidelity.md
+        evidence_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        source_class: repo-local-doc
+        claim_scope: constrains
+    claim_ceiling: implementation-advisory
+    uncertainty_notes:
+      - Source remains advisory and does not authorize runtime writeback.
+    advisory_design_implications:
+      - implication_id: research-implication-012345abcdef
+        summary: Keep scan fidelity claims bounded to evidence ceilings.
+        target_ref: docs/05-research-frontiers/scan-fidelity.md
+        authority_level: advisory-only
+    raw_research_payload_stored: false
+    decision_authority_claimed: false
+    report_digest: 1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

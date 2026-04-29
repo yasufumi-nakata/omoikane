@@ -11,6 +11,8 @@ must:
   - councilor registry entries preserve reviewer-facing deliberation scope and policy refs without storing raw deliberation transcripts
   - researcher source definitions must bind non-empty research_domain_refs and evidence_policy_ref before registry materialization
   - researcher registry entries preserve digest-safe research domain and evidence policy refs without storing raw research payloads
+  - researcher source definitions must use research_evidence_request and research_evidence_report schemas instead of Council input/output schemas
+  - researcher registry entries preserve the same role-specific evidence schema refs after materialization
   - builder source definitions must bind non-empty build_surface_refs and execution_policy_ref before registry materialization
   - builder registry entries preserve repo-local build surface and execution policy refs before any handoff
   - guardian source definitions must bind non-empty oversight_scope_refs and attestation_policy_ref before registry materialization
@@ -25,6 +27,9 @@ expected:
   councilor_deliberation_policy_ref_required: true
   researcher_domain_refs_required: true
   researcher_evidence_policy_ref_required: true
+  researcher_evidence_input_schema_ref: specs/schemas/research_evidence_request.schema
+  researcher_evidence_output_schema_ref: specs/schemas/research_evidence_report.schema
+  researcher_evidence_schema_contract_bound: true
   builder_surface_refs_required: true
   builder_execution_policy_ref_required: true
   guardian_oversight_scope_refs_required: true

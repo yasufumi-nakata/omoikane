@@ -526,6 +526,11 @@ raw source definition と materialized registry entry の両方に保持し、
 さらに `researcher` role では `research_domain_refs` と `evidence_policy_ref` を
 raw source definition と materialized registry entry の両方に保持し、
 research payload 本体ではなく repo-local evidence boundary ref だけを渡すこと、
+加えて `input_schema_ref=specs/schemas/research_evidence_request.schema` と
+`output_schema_ref=specs/schemas/research_evidence_report.schema` に固定し、
+Council session schema ではなく advisory-only research evidence request/report として
+claim ceiling、source refs、raw research payload 非保存、decision authority 不保持を
+machine-readable にすること、
 `builder` role では `build_surface_refs` と `execution_policy_ref` を
 raw source definition と materialized registry entry の両方に保持し、
 coverage label だけではなく repo-local write/eval/schema/doc surface と

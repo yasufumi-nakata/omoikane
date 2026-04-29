@@ -143,6 +143,12 @@ AGENT_SOURCE_RESEARCHER_REQUIRED_LIST_FIELDS = (
 AGENT_SOURCE_RESEARCHER_REQUIRED_STRING_FIELDS = (
     "evidence_policy_ref",
 )
+AGENT_SOURCE_RESEARCHER_INPUT_SCHEMA_REF = (
+    "specs/schemas/research_evidence_request.schema"
+)
+AGENT_SOURCE_RESEARCHER_OUTPUT_SCHEMA_REF = (
+    "specs/schemas/research_evidence_report.schema"
+)
 AGENT_SOURCE_BUILDER_REQUIRED_LIST_FIELDS = (
     "build_surface_refs",
 )
@@ -594,6 +600,16 @@ def _validate_agent_source_definition(
             values = _normalize_string_list(data.get(field_name, []))
             if not values:
                 errors.append(f"{field_name} must contain at least one non-empty item")
+                continue
+            for ref in values:
+                if not ref.startswith(("docs/", "research/")):
+                    errors.append(
+                        f"{field_name} must reference research evidence surfaces under "
+                        f"('docs/', 'research/'): {ref}"
+                    )
+                    continue
+                if not (repo_root / ref).exists():
+                    errors.append(f"{field_name} must reference an existing repo path: {ref}")
         for field_name in AGENT_SOURCE_RESEARCHER_REQUIRED_STRING_FIELDS:
             value = data.get(field_name)
             if not isinstance(value, str) or not value.strip():
@@ -602,6 +618,19 @@ def _validate_agent_source_definition(
             ref = value.strip()
             if ref.startswith(("agents/", "docs/", "research/")) and not (repo_root / ref).is_file():
                 errors.append(f"{field_name} must reference an existing repo file: {ref}")
+        if str(data.get("input_schema_ref", "")).strip() != AGENT_SOURCE_RESEARCHER_INPUT_SCHEMA_REF:
+            errors.append(
+                "researcher input_schema_ref must equal "
+                f"{AGENT_SOURCE_RESEARCHER_INPUT_SCHEMA_REF}"
+            )
+        if (
+            str(data.get("output_schema_ref", "")).strip()
+            != AGENT_SOURCE_RESEARCHER_OUTPUT_SCHEMA_REF
+        ):
+            errors.append(
+                "researcher output_schema_ref must equal "
+                f"{AGENT_SOURCE_RESEARCHER_OUTPUT_SCHEMA_REF}"
+            )
 
     if role == "builder":
         for field_name in AGENT_SOURCE_BUILDER_REQUIRED_LIST_FIELDS:

@@ -130,6 +130,11 @@ allOf:
       required:
         - research_domain_refs
         - evidence_policy_ref
+      properties:
+        input_schema_ref:
+          const: specs/schemas/research_evidence_request.schema
+        output_schema_ref:
+          const: specs/schemas/research_evidence_report.schema
   - if:
       properties:
         role:
@@ -194,6 +199,49 @@ examples:
       eligibility:
         invite_to_council: true
         count_for_weighted_vote: true
+        apply_to_runtime: false
+        self_modify_role: false
+        guardian_role: false
+  - kind: agent_registry_entry
+    schema_version: 1.0.0
+    agent_id: neuroscience-scout
+    display_name: NeuroscienceScout
+    role: researcher
+    source_ref: agents/researchers/neuroscience-scout.yaml
+    capabilities:
+      - literature.survey
+      - news.scan
+    trust_floor: 0.4
+    substrate_requirements:
+      - any
+    input_schema_ref: specs/schemas/research_evidence_request.schema
+    output_schema_ref: specs/schemas/research_evidence_report.schema
+    research_domain_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
+    ethics_constraints:
+      - A1-continuity
+    prompt_or_policy_ref: agents/researchers/consciousness-theorist.policy.md
+    trust_snapshot:
+      kind: trust_snapshot
+      schema_version: 1.0.0
+      agent_id: neuroscience-scout
+      global_score: 0.44
+      per_domain:
+        research_evidence: 0.5
+      history: []
+      pinned_by_human: false
+      pinned_reason: ""
+      thresholds:
+        council_invite_floor: 0.5
+        weighted_vote_floor: 0.6
+        apply_floor: 0.8
+        self_modify_floor: 0.95
+        guardian_floor: 0.99
+        guardian_requires_human_pin: true
+      eligibility:
+        invite_to_council: false
+        count_for_weighted_vote: false
         apply_to_runtime: false
         self_modify_role: false
         guardian_role: false

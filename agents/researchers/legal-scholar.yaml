@@ -8,8 +8,8 @@ capabilities:
   - cognitive_audit.multi_jurisdiction_review
 trust_floor: 0.4
 substrate_requirements: ['any']
-input_schema_ref: specs/schemas/guardian_jurisdiction_evidence_bundle.schema
-output_schema_ref: specs/schemas/guardian_jurisdiction_legal_execution.schema
+input_schema_ref: specs/schemas/research_evidence_request.schema
+output_schema_ref: specs/schemas/research_evidence_report.schema
 research_domain_refs:
   - docs/05-research-frontiers/legal-personhood.md
   - docs/05-research-frontiers/governance.md

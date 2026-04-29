@@ -5,6 +5,8 @@ service: YaoyorozuRegistryService
 summary: Repo-local agent registry sync plus digest-only source manifest ContinuityLedger binding, bounded same-host workspace discovery, Guardian-gated external workspace seeding and dependency materialization, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
 imports:
   agent_source_definition: ../schemas/agent_source_definition.schema
+  research_evidence_request: ../schemas/research_evidence_request.schema
+  research_evidence_report: ../schemas/research_evidence_report.schema
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_workspace_guardian_preseed_gate: ../schemas/yaoyorozu_workspace_guardian_preseed_gate.schema
   yaoyorozu_dependency_materialization_manifest: ../schemas/yaoyorozu_dependency_materialization_manifest.schema
@@ -81,6 +83,7 @@ operations:
       - raw agent definitions must satisfy agent_source_definition before registry materialization
       - councilor definitions must bind non-empty deliberation_scope_refs and deliberation_policy_ref before registry materialization
       - researcher definitions must bind non-empty research_domain_refs and evidence_policy_ref before registry materialization
+      - researcher definitions must use research_evidence_request and research_evidence_report schema refs instead of Council session schemas
       - builder definitions must bind non-empty build_surface_refs and execution_policy_ref before registry materialization
       - guardian definitions must bind non-empty oversight_scope_refs and attestation_policy_ref before registry materialization
       - every entry must carry a trust_snapshot and trust_floor
@@ -88,7 +91,7 @@ operations:
       - source_definition_digests must bind every raw agents/**/*.yaml file by source_ref, agent_id, role, sha256, and byte_length
       - source_manifest_digest must be derived from the ordered source_definition_digests while raw_source_payload_stored remains false
       - councilor registry entries must preserve deliberation surface refs and deliberation policy refs without storing raw deliberation transcripts
-      - researcher registry entries must preserve research domain refs and evidence policy refs without storing raw research payloads
+      - researcher registry entries must preserve research domain refs, evidence policy refs, and role-specific evidence schema refs without storing raw research payloads
       - builder registry entries must preserve repo-local build surface refs and execution policy refs before handoff
       - guardian registry entries must preserve reviewer-facing oversight scope refs and attestation policy refs without storing raw audit payloads
   bind_source_manifest_ledger_entry:

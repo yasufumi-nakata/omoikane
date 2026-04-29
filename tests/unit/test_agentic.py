@@ -2931,6 +2931,14 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             if entry["role"] == "researcher":
                 self.assertTrue(entry["research_domain_refs"], entry["agent_id"])
                 self.assertTrue(entry["evidence_policy_ref"], entry["agent_id"])
+                self.assertEqual(
+                    "specs/schemas/research_evidence_request.schema",
+                    entry["input_schema_ref"],
+                )
+                self.assertEqual(
+                    "specs/schemas/research_evidence_report.schema",
+                    entry["output_schema_ref"],
+                )
                 self.assertIn(
                     entry["evidence_policy_ref"],
                     {entry["prompt_or_policy_ref"], "agents/researchers/consciousness-theorist.policy.md"},
@@ -3043,11 +3051,11 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 encoding="utf-8",
             )
             (repo_root / "specs" / "schemas").mkdir(parents=True)
-            (repo_root / "specs" / "schemas" / "council_input.yaml").write_text(
+            (repo_root / "specs" / "schemas" / "research_evidence_request.schema").write_text(
                 "type: object\n",
                 encoding="utf-8",
             )
-            (repo_root / "specs" / "schemas" / "council_output.yaml").write_text(
+            (repo_root / "specs" / "schemas" / "research_evidence_report.schema").write_text(
                 "type: object\n",
                 encoding="utf-8",
             )
@@ -3062,8 +3070,8 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                     "  - literature.survey\n"
                     "trust_floor: 0.4\n"
                     "substrate_requirements: ['any']\n"
-                    "input_schema_ref: specs/schemas/council_input.yaml\n"
-                    "output_schema_ref: specs/schemas/council_output.yaml\n"
+                    "input_schema_ref: specs/schemas/research_evidence_request.schema\n"
+                    "output_schema_ref: specs/schemas/research_evidence_report.schema\n"
                     "evidence_policy_ref: agents/researchers/policy.md\n"
                     "ethics_constraints: []\n"
                     "prompt_or_policy_ref: agents/researchers/policy.md\n"
@@ -3075,6 +3083,58 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             )
 
             with self.assertRaisesRegex(ValueError, "research_domain_refs must contain"):
+                service.sync_from_agents_directory(repo_root / "agents")
+
+    def test_sync_rejects_researcher_with_council_schema_refs(self) -> None:
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory(prefix="omoikane-researcher-schema-") as temp_dir:
+            repo_root = Path(temp_dir)
+            (repo_root / "agents" / "researchers").mkdir(parents=True)
+            (repo_root / "agents" / "researchers" / "policy.md").write_text(
+                "# policy\n",
+                encoding="utf-8",
+            )
+            (repo_root / "docs" / "05-research-frontiers").mkdir(parents=True)
+            (repo_root / "docs" / "05-research-frontiers" / "scan-fidelity.md").write_text(
+                "# scan fidelity\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas").mkdir(parents=True)
+            (repo_root / "specs" / "schemas" / "council_input.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas" / "council_output.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            self._write_workspace_agent(
+                repo_root,
+                "agents/researchers/council-shaped-researcher.yaml",
+                (
+                    "name: council-shaped-researcher\n"
+                    "role: researcher\n"
+                    "version: 0.1.0\n"
+                    "capabilities:\n"
+                    "  - literature.survey\n"
+                    "trust_floor: 0.4\n"
+                    "substrate_requirements: ['any']\n"
+                    "input_schema_ref: specs/schemas/council_input.yaml\n"
+                    "output_schema_ref: specs/schemas/council_output.yaml\n"
+                    "research_domain_refs:\n"
+                    "  - docs/05-research-frontiers/scan-fidelity.md\n"
+                    "evidence_policy_ref: agents/researchers/policy.md\n"
+                    "ethics_constraints: []\n"
+                    "prompt_or_policy_ref: agents/researchers/policy.md\n"
+                    "when_to_invoke: |\n"
+                    "  - test\n"
+                    "when_not_to_invoke: |\n"
+                    "  - never\n"
+                ),
+            )
+
+            with self.assertRaisesRegex(ValueError, "researcher input_schema_ref must equal"):
                 service.sync_from_agents_directory(repo_root / "agents")
 
     def test_sync_rejects_councilor_without_deliberation_scope_refs(self) -> None:

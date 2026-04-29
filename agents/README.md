@@ -22,6 +22,9 @@ registry snapshot には raw YAML 本文ではなく、各 source definition の
 同じ source manifest は ContinuityLedger entry と public verification bundle に束縛され、
 raw source / registry / continuity event / signature payload を公開しない。
 Builder の `build_surface_refs` は convocation 時に coverage area ごとの fixed target path refs を覆う必要がある。
+Researcher の `input_schema_ref` / `output_schema_ref` は
+`specs/schemas/research_evidence_request.schema` /
+`specs/schemas/research_evidence_report.schema` に固定し、Council input/output へ混ぜない。
 
 ```yaml
 name: <unique>
@@ -30,8 +33,8 @@ version: <semver>
 capabilities: [<capability_id>]
 trust_floor: <0.0-1.0>
 substrate_requirements: [<id> | 'any']
-input_schema_ref: <specs/...>
-output_schema_ref: <specs/...>
+input_schema_ref: <specs/...>  # researcher は specs/schemas/research_evidence_request.schema 固定
+output_schema_ref: <specs/...>  # researcher は specs/schemas/research_evidence_report.schema 固定
 deliberation_scope_refs: [<docs/...> | <specs/...> | <evals/...> | <agents/...> | <meta/...>]  # councilor のみ必須
 deliberation_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # councilor のみ必須
 build_surface_refs: [<src/...> | <tests/...> | <specs/...> | <evals/...> | <docs/...>]  # builder のみ必須
