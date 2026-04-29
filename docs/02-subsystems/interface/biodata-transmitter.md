@@ -40,6 +40,8 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 10. ContinuityLedger に session / dataset adapter / circadian phase verifier / feature-window series / drift gate / latent / generated bundle / conflict sink / calibration binding を残す
 11. calibration profile と feature-window drift gate を identity confirmation / sensory loopback の confidence gate へ
     digest-only receipt として束縛する
+12. shared sensory loopback へ渡す場合は participant ごとの confidence gate と drift gate digest を
+    Sensory Loopback 側の arbitration binding へ配布し、raw BioData / drift / gate payload は渡さない
 
 ## 中間表現
 
@@ -95,6 +97,7 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 10. **circadian phase verifier** ── phase refs は external clock / sleep diary / wearable evidence digest に束縛し、raw clock / diary / wearable / phase verifier payload は保存しない
 11. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、circadian verifier digest、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
 12. **series drift gate** ── calibration confidence gate が current series を参照する時は、series profile digest、calibration digest、axis drift threshold digest を直接束縛し、raw drift payload は保存しない
+13. **shared loopback arbitration** ── shared sensory loopback へ分配する時は participant ごとの confidence gate digest、drift gate digest、threshold digest だけを渡し、raw BioData payload を arbitration に渡さない
 
 ## 個人内 calibration
 
@@ -163,6 +166,13 @@ cortical load / thought pressure `0.18`、valence `0.16`、interoceptive confide
 `0.05` である。すべて pass の場合だけ confidence gate はその drift gate digest を
 直接束縛して identity confirmation / sensory loopback の target binding を pass にできる。
 series / calibration / drift の raw payload は保存しない。
+
+shared Sensory Loopback へ接続する場合、各 participant の
+`biodata-calibration-confidence-gate-v1` receipt は
+`participant-biodata-gate-arbitration-v1` binding へ渡される。binding は
+confidence gate digest、feature-window drift gate digest、threshold digest、
+target gate-set digest だけを束ね、raw BioData / calibration / drift / gate payload を
+共有 arbitration へ渡さない。
 
 ## 関連
 

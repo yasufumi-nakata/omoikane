@@ -13,6 +13,7 @@ ContinuityLedger、build artifact、workspace seed、registry snapshot、externa
 - researcher evidence verifier では repo-local readback digest、live verifier transport quorum、signed response envelope、freshness window を確認し、raw response / signature payload を保持しない
 - BioData Transmitter では dataset manifest digest、source feature digest、body-state latent digest、circadian phase verifier digest、feature-window series digest、generated bundle digest、multi-day calibration digest、confidence gate digest、literature refs、mind-upload.com conflict sink を確認し、raw dataset payload、raw signal samples、raw feature-window payload、raw biosignal payload、raw latent payload、raw phase verifier payload、raw series payload、raw calibration payload、raw gate payload、raw generated waveform、semantic thought content を保持しない
 - Sensory Loopback では BioData calibration confidence gate を drift threshold の bounded adjustment にだけ使い、gate digest、applied threshold、raw calibration / gate payload 非保存、body-map calibration と Guardian hold の維持を確認する
+- shared Sensory Loopback では participant ごとの BioData confidence gate digest、feature-window drift gate digest、threshold digest、binding digest、raw BioData / drift / gate payload 非保存を確認する
 - 監査対象は repo-local ref と digest evidence に限定し、raw build transcript、raw registry payload、raw packet body を保持しない
 
 ## 権限

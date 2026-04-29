@@ -13,11 +13,12 @@ expected:
   validation_ok: true
   public_schema_contract_profile: sensory-loopback-public-schema-contract-v1
   public_schema_contract_bound: true
-  schema_contract_count: 9
+  schema_contract_count: 10
   required_schema_paths:
     - specs/schemas/sensory_loopback_session.schema
     - specs/schemas/sensory_loopback_receipt.schema
     - specs/schemas/sensory_loopback_artifact_family.schema
+    - specs/schemas/sensory_loopback_biodata_arbitration_binding.schema
   shared_loopback_public_schema_bound: true
   artifact_family_public_schema_bound: true
 metric: boolean

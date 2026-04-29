@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import unittest
 
 from omoikane.interface.biodata_transmitter import BioDataTransmitter
@@ -7,6 +8,45 @@ from omoikane.interface.sensory_loopback import SensoryLoopbackService
 
 
 class SensoryLoopbackServiceTests(unittest.TestCase):
+    @staticmethod
+    def _fake_biodata_confidence_gate(identity_id: str, suffix: str) -> dict:
+        return {
+            "profile_id": "biodata-calibration-confidence-gate-v1",
+            "identity_id": identity_id,
+            "gate_ref": f"confidence-gate://unit/{suffix}",
+            "gate_receipt_digest": f"{suffix[:1]}" * 64,
+            "confidence_gate_status": "bound",
+            "confidence_score": 0.91,
+            "sensory_loopback_gate_bound": True,
+            "feature_window_series_drift_gate_ref": (
+                f"feature-window-drift-gate://unit/{suffix}"
+            ),
+            "feature_window_series_drift_gate_digest": f"{suffix[:1].upper()}" * 64,
+            "feature_window_series_drift_threshold_digest": "c" * 64,
+            "feature_window_series_drift_gate_status": "pass",
+            "feature_window_series_drift_gate_bound": True,
+            "target_gate_set_digest": "d" * 64,
+            "target_gate_bindings": [
+                {
+                    "target_gate": "identity-confirmation",
+                    "status": "pass",
+                    "minimum_confidence": 0.8,
+                    "confidence_score": 0.91,
+                },
+                {
+                    "target_gate": "sensory-loopback",
+                    "status": "pass",
+                    "minimum_confidence": 0.7,
+                    "confidence_score": 0.91,
+                },
+            ],
+            "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def test_coherent_bundle_preserves_immersion_and_digest_only_audit(self) -> None:
         service = SensoryLoopbackService()
         session = service.open_session(
@@ -449,6 +489,62 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             ["identity://loopback-primary", "identity://loopback-peer"],
             artifact_family["scene_summaries"][1]["participant_identity_ids"],
         )
+
+    def test_shared_biodata_arbitration_requires_participant_drift_gates(self) -> None:
+        service = SensoryLoopbackService()
+        session = service.open_session(
+            identity_id="identity://loopback-primary",
+            world_state_ref="wms://state/shared-biodata",
+            body_anchor_ref="avatar://shared/core",
+            avatar_body_map_ref="avatar-body-map://shared/v1",
+            proprioceptive_calibration_ref="calibration://shared/v1",
+            participant_identity_ids=[
+                "identity://loopback-primary",
+                "identity://loopback-peer",
+            ],
+            shared_imc_session_id="imc://shared/session-biodata",
+            shared_collective_id="collective://shared/biodata-field",
+        )
+
+        binding = service.bind_participant_biodata_arbitration(
+            session["session_id"],
+            participant_gate_receipts={
+                "identity://loopback-primary": self._fake_biodata_confidence_gate(
+                    "identity://loopback-primary",
+                    "a-self",
+                ),
+                "identity://loopback-peer": self._fake_biodata_confidence_gate(
+                    "identity://loopback-peer",
+                    "b-peer",
+                ),
+            },
+        )
+        validation = service.validate_participant_biodata_arbitration(binding)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["session_bound"])
+        self.assertEqual(2, validation["participant_gate_count"])
+        self.assertTrue(validation["all_participant_gates_bound"])
+        self.assertTrue(validation["all_drift_gates_passed"])
+        self.assertTrue(validation["participant_gate_digest_set_bound"])
+        self.assertTrue(validation["binding_digest_bound"])
+        self.assertFalse(binding["raw_biodata_payload_stored"])
+        self.assertFalse(binding["raw_drift_payload_stored"])
+
+        tampered = deepcopy(binding)
+        tampered["participant_gate_digest_set"] = "0" * 64
+        self.assertFalse(service.validate_participant_biodata_arbitration(tampered)["ok"])
+
+        with self.assertRaisesRegex(ValueError, "cover exactly"):
+            service.bind_participant_biodata_arbitration(
+                session["session_id"],
+                participant_gate_receipts={
+                    "identity://loopback-primary": self._fake_biodata_confidence_gate(
+                        "identity://loopback-primary",
+                        "a-self",
+                    ),
+                },
+            )
 
 
 if __name__ == "__main__":

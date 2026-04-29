@@ -59,6 +59,12 @@ SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES = 4
 SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS = 4
 SENSORY_LOOPBACK_SHARED_SPACE_MODES = {"self-only", "imc-shared", "collective-shared"}
 SENSORY_LOOPBACK_ARBITRATION_POLICY = "guardian-mediated-multi-self-loopback-v1"
+SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY = (
+    "participant-biodata-gate-arbitration-v1"
+)
+SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY = (
+    "participant-gate-digest+drift-threshold-digest-only"
+)
 SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES = {
     "self-exclusive",
     "shared-aligned",
@@ -83,6 +89,7 @@ class SensoryLoopbackService:
     def __init__(self) -> None:
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.artifact_families: Dict[str, Dict[str, Any]] = {}
+        self.biodata_arbitration_bindings: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -125,6 +132,17 @@ class SensoryLoopbackService:
                 "max_participants": SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS,
                 "collective_requires_imc_binding": True,
                 "guardian_required_on_conflict": True,
+            },
+            "biodata_arbitration_policy": {
+                "policy_id": SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY,
+                "storage_policy": SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY,
+                "requires_shared_session": True,
+                "requires_participant_gate_coverage": True,
+                "requires_series_drift_gate_pass": True,
+                "raw_biodata_payload_stored": False,
+                "raw_calibration_payload_stored": False,
+                "raw_drift_payload_stored": False,
+                "raw_gate_payload_stored": False,
             },
         }
 
@@ -772,6 +790,115 @@ class SensoryLoopbackService:
         session["last_artifact_family_ref"] = artifact_family["family_ref"]
         session["last_audit_event_ref"] = artifact_family["audit_event_ref"]
         return deepcopy(artifact_family)
+
+    def bind_participant_biodata_arbitration(
+        self,
+        session_id: str,
+        *,
+        participant_gate_receipts: Mapping[str, Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        if not session["arbitration_required"]:
+            raise ValueError("participant BioData arbitration requires a shared loopback session")
+        if not isinstance(participant_gate_receipts, Mapping):
+            raise ValueError("participant_gate_receipts must be a mapping")
+
+        participant_ids = list(session["participant_identity_ids"])
+        if set(participant_gate_receipts) != set(participant_ids):
+            raise ValueError(
+                "participant_gate_receipts must cover exactly participant_identity_ids",
+            )
+
+        participant_bindings: List[Dict[str, Any]] = []
+        for participant_identity_id in participant_ids:
+            gate_receipt = participant_gate_receipts[participant_identity_id]
+            if not isinstance(gate_receipt, Mapping):
+                raise ValueError(
+                    f"participant_gate_receipts.{participant_identity_id} must be a mapping",
+                )
+            if gate_receipt.get("identity_id") != participant_identity_id:
+                raise ValueError(
+                    "participant BioData confidence gate identity_id must match the participant",
+                )
+            confidence_binding = self._derive_calibration_confidence_binding(gate_receipt)
+            if gate_receipt.get("feature_window_series_drift_gate_bound") is not True:
+                raise ValueError(
+                    "participant BioData confidence gate must bind a feature-window series drift gate",
+                )
+            if gate_receipt.get("feature_window_series_drift_gate_status") != "pass":
+                raise ValueError("participant BioData feature-window series drift gate must pass")
+            if gate_receipt.get("raw_drift_payload_stored") is not False:
+                raise ValueError(
+                    "participant BioData confidence gate raw_drift_payload_stored must be false",
+                )
+
+            participant_bindings.append(
+                {
+                    "participant_identity_id": participant_identity_id,
+                    "gate_ref": confidence_binding["gate_ref"],
+                    "gate_receipt_digest": confidence_binding["gate_digest"],
+                    "confidence_score": confidence_binding["confidence_score"],
+                    "minimum_confidence": confidence_binding["minimum_confidence"],
+                    "confidence_gate_status": confidence_binding["gate_status"],
+                    "feature_window_series_drift_gate_ref": self._normalize_non_empty_string(
+                        gate_receipt.get("feature_window_series_drift_gate_ref"),
+                        "feature_window_series_drift_gate_ref",
+                    ),
+                    "feature_window_series_drift_gate_digest": self._normalize_non_empty_string(
+                        gate_receipt.get("feature_window_series_drift_gate_digest"),
+                        "feature_window_series_drift_gate_digest",
+                    ),
+                    "feature_window_series_drift_threshold_digest": self._normalize_non_empty_string(
+                        gate_receipt.get("feature_window_series_drift_threshold_digest"),
+                        "feature_window_series_drift_threshold_digest",
+                    ),
+                    "feature_window_series_drift_gate_status": "pass",
+                    "target_gate_set_digest": self._normalize_non_empty_string(
+                        gate_receipt.get("target_gate_set_digest"),
+                        "target_gate_set_digest",
+                    ),
+                    "sensory_loopback_gate_bound": True,
+                    "raw_calibration_payload_stored": False,
+                    "raw_drift_payload_stored": False,
+                    "raw_gate_payload_stored": False,
+                    "subjective_equivalence_claimed": False,
+                    "semantic_thought_content_generated": False,
+                }
+            )
+
+        binding_id = new_id("sl-biodata-arb")
+        binding = {
+            "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
+            "binding_ref": f"loopback-biodata-arbitration://{binding_id}",
+            "created_at": utc_now_iso(),
+            "policy_id": SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY,
+            "session_id": session_id,
+            "participant_identity_ids": participant_ids,
+            "shared_space_mode": session["shared_space_mode"],
+            "shared_imc_session_id": session["shared_imc_session_id"],
+            "shared_collective_id": session["shared_collective_id"],
+            "arbitration_policy_id": session["arbitration_policy_id"],
+            "participant_gate_bindings": participant_bindings,
+            "participant_gate_count": len(participant_bindings),
+            "participant_gate_digest_set": self._participant_biodata_gate_digest_set(
+                participant_bindings,
+            ),
+            "all_participant_gates_bound": True,
+            "all_drift_gates_passed": True,
+            "arbitration_gate_status": "pass",
+            "storage_policy": SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY,
+            "raw_biodata_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        binding["binding_digest"] = sha256_text(
+            canonical_json(self._participant_biodata_arbitration_digest_payload(binding))
+        )
+        self.biodata_arbitration_bindings[binding_id] = binding
+        return deepcopy(binding)
 
     def snapshot(self, session_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_session(session_id))
@@ -1516,6 +1643,230 @@ class SensoryLoopbackService:
             and isinstance(guardian_arbitration_count, int),
         }
 
+    def validate_participant_biodata_arbitration(
+        self,
+        binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(binding, Mapping):
+            raise ValueError("binding must be a mapping")
+
+        errors: List[str] = []
+        self._check_non_empty_string(binding.get("binding_ref"), "binding_ref", errors)
+        self._check_non_empty_string(binding.get("created_at"), "created_at", errors)
+        self._check_non_empty_string(binding.get("session_id"), "session_id", errors)
+        self._check_non_empty_string(
+            binding.get("participant_gate_digest_set"),
+            "participant_gate_digest_set",
+            errors,
+        )
+        self._check_non_empty_string(binding.get("binding_digest"), "binding_digest", errors)
+        if binding.get("schema_version") != SENSORY_LOOPBACK_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {SENSORY_LOOPBACK_SCHEMA_VERSION}")
+        if binding.get("policy_id") != SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY:
+            errors.append(
+                f"policy_id must be {SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY}",
+            )
+        if binding.get("storage_policy") != SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY:
+            errors.append(
+                "storage_policy must be "
+                f"{SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY}",
+            )
+        participant_identity_ids = binding.get("participant_identity_ids")
+        if (
+            not isinstance(participant_identity_ids, list)
+            or len(participant_identity_ids) < 2
+            or len(participant_identity_ids) > SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS
+            or len(participant_identity_ids) != len(set(participant_identity_ids))
+        ):
+            errors.append("participant_identity_ids must be a unique shared participant list")
+            participant_identity_ids = []
+        if binding.get("shared_space_mode") not in {"imc-shared", "collective-shared"}:
+            errors.append("shared_space_mode must be imc-shared or collective-shared")
+        if not isinstance(binding.get("shared_imc_session_id"), str) or not binding.get(
+            "shared_imc_session_id"
+        ):
+            errors.append("shared_imc_session_id must be bound")
+        if binding.get("shared_space_mode") == "collective-shared" and not binding.get(
+            "shared_collective_id"
+        ):
+            errors.append("collective-shared biodata arbitration must bind shared_collective_id")
+        if binding.get("arbitration_policy_id") != SENSORY_LOOPBACK_ARBITRATION_POLICY:
+            errors.append(
+                f"arbitration_policy_id must be {SENSORY_LOOPBACK_ARBITRATION_POLICY}",
+            )
+
+        participant_bindings = binding.get("participant_gate_bindings")
+        if not isinstance(participant_bindings, list):
+            errors.append("participant_gate_bindings must be a list")
+            participant_bindings = []
+        if binding.get("participant_gate_count") != len(participant_bindings):
+            errors.append("participant_gate_count must match participant_gate_bindings length")
+        if participant_identity_ids and [
+            item.get("participant_identity_id")
+            for item in participant_bindings
+            if isinstance(item, Mapping)
+        ] != participant_identity_ids:
+            errors.append("participant_gate_bindings must follow participant_identity_ids order")
+
+        for index, participant_binding in enumerate(participant_bindings):
+            if not isinstance(participant_binding, Mapping):
+                errors.append(f"participant_gate_bindings[{index}] must be a mapping")
+                continue
+            self._check_non_empty_string(
+                participant_binding.get("participant_identity_id"),
+                f"participant_gate_bindings[{index}].participant_identity_id",
+                errors,
+            )
+            self._check_non_empty_string(
+                participant_binding.get("gate_ref"),
+                f"participant_gate_bindings[{index}].gate_ref",
+                errors,
+            )
+            self._check_non_empty_string(
+                participant_binding.get("gate_receipt_digest"),
+                f"participant_gate_bindings[{index}].gate_receipt_digest",
+                errors,
+            )
+            confidence_score = self._normalize_score_for_validation(
+                participant_binding.get("confidence_score"),
+                f"participant_gate_bindings[{index}].confidence_score",
+                errors,
+            )
+            expected_minimum = CONFIDENCE_GATE_TARGET_THRESHOLDS[
+                SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET
+            ]
+            if participant_binding.get("minimum_confidence") != expected_minimum:
+                errors.append(
+                    f"participant_gate_bindings[{index}].minimum_confidence must be {expected_minimum}",
+                )
+            if confidence_score < expected_minimum:
+                errors.append(
+                    f"participant_gate_bindings[{index}].confidence_score must meet sensory-loopback minimum",
+                )
+            if participant_binding.get("confidence_gate_status") != "bound":
+                errors.append(
+                    f"participant_gate_bindings[{index}].confidence_gate_status must be bound",
+                )
+            for field_name in (
+                "feature_window_series_drift_gate_ref",
+                "feature_window_series_drift_gate_digest",
+                "feature_window_series_drift_threshold_digest",
+                "target_gate_set_digest",
+            ):
+                self._check_non_empty_string(
+                    participant_binding.get(field_name),
+                    f"participant_gate_bindings[{index}].{field_name}",
+                    errors,
+                )
+            if participant_binding.get("feature_window_series_drift_gate_status") != "pass":
+                errors.append(
+                    f"participant_gate_bindings[{index}].feature_window_series_drift_gate_status must be pass",
+                )
+            if participant_binding.get("sensory_loopback_gate_bound") is not True:
+                errors.append(
+                    f"participant_gate_bindings[{index}].sensory_loopback_gate_bound must be true",
+                )
+            for field_name in (
+                "raw_calibration_payload_stored",
+                "raw_drift_payload_stored",
+                "raw_gate_payload_stored",
+                "subjective_equivalence_claimed",
+                "semantic_thought_content_generated",
+            ):
+                if participant_binding.get(field_name) is not False:
+                    errors.append(f"participant_gate_bindings[{index}].{field_name} must be false")
+
+        participant_gate_digest_set_bound = False
+        if all(isinstance(item, Mapping) for item in participant_bindings):
+            expected_gate_digest_set = self._participant_biodata_gate_digest_set(
+                participant_bindings,
+            )
+            participant_gate_digest_set_bound = (
+                bool(participant_bindings)
+                and binding.get("participant_gate_digest_set") == expected_gate_digest_set
+            )
+        if not participant_gate_digest_set_bound:
+            errors.append("participant_gate_digest_set mismatch")
+        expected_binding_digest = sha256_text(
+            canonical_json(self._participant_biodata_arbitration_digest_payload(binding))
+        )
+        binding_digest_bound = binding.get("binding_digest") == expected_binding_digest
+        if not binding_digest_bound:
+            errors.append("binding_digest mismatch")
+
+        all_participant_gates_bound = (
+            bool(participant_bindings)
+            and all(
+                isinstance(item, Mapping)
+                and item.get("confidence_gate_status") == "bound"
+                and item.get("sensory_loopback_gate_bound") is True
+                for item in participant_bindings
+            )
+        )
+        all_drift_gates_passed = (
+            bool(participant_bindings)
+            and all(
+                isinstance(item, Mapping)
+                and item.get("feature_window_series_drift_gate_status") == "pass"
+                for item in participant_bindings
+            )
+        )
+        if binding.get("all_participant_gates_bound") != all_participant_gates_bound:
+            errors.append("all_participant_gates_bound mismatch")
+        if binding.get("all_drift_gates_passed") != all_drift_gates_passed:
+            errors.append("all_drift_gates_passed mismatch")
+        expected_status = (
+            "pass"
+            if all_participant_gates_bound
+            and all_drift_gates_passed
+            and participant_gate_digest_set_bound
+            else "blocked"
+        )
+        if binding.get("arbitration_gate_status") != expected_status:
+            errors.append("arbitration_gate_status mismatch")
+        for field_name in (
+            "raw_biodata_payload_stored",
+            "raw_calibration_payload_stored",
+            "raw_drift_payload_stored",
+            "raw_gate_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if binding.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        session_bound = False
+        bound_session_id = binding.get("session_id")
+        if isinstance(bound_session_id, str) and bound_session_id in self.sessions:
+            session = self.sessions[bound_session_id]
+            session_bound = (
+                session["arbitration_required"] is True
+                and binding.get("participant_identity_ids") == session["participant_identity_ids"]
+                and binding.get("shared_space_mode") == session["shared_space_mode"]
+                and binding.get("shared_imc_session_id") == session["shared_imc_session_id"]
+                and binding.get("shared_collective_id") == session["shared_collective_id"]
+            )
+            if not session_bound:
+                errors.append("binding must match the shared loopback session")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "session_bound": session_bound,
+            "participant_gate_count": len(participant_bindings),
+            "participant_gate_digest_set_bound": participant_gate_digest_set_bound,
+            "binding_digest_bound": binding_digest_bound,
+            "all_participant_gates_bound": all_participant_gates_bound,
+            "all_drift_gates_passed": all_drift_gates_passed,
+            "arbitration_gate_status": binding.get("arbitration_gate_status"),
+            "raw_biodata_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def _require_session(self, session_id: str) -> Dict[str, Any]:
         normalized_session_id = self._normalize_non_empty_string(session_id, "session_id")
         try:
@@ -1754,6 +2105,44 @@ class SensoryLoopbackService:
             and payload.get(hold_field) == expected_hold_threshold,
             "gate_digest_bound": bool(gate_bound and gate_digest),
         }
+
+    @staticmethod
+    def _participant_biodata_gate_digest_set(
+        participant_bindings: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "policy_id": SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY,
+                    "participant_gate_bindings": [
+                        {
+                            "participant_identity_id": binding.get(
+                                "participant_identity_id"
+                            ),
+                            "gate_receipt_digest": binding.get("gate_receipt_digest"),
+                            "feature_window_series_drift_gate_digest": binding.get(
+                                "feature_window_series_drift_gate_digest"
+                            ),
+                            "feature_window_series_drift_threshold_digest": binding.get(
+                                "feature_window_series_drift_threshold_digest"
+                            ),
+                            "target_gate_set_digest": binding.get(
+                                "target_gate_set_digest"
+                            ),
+                        }
+                        for binding in participant_bindings
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
+    def _participant_biodata_arbitration_digest_payload(
+        binding: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        payload = dict(binding)
+        payload.pop("binding_digest", None)
+        return payload
 
     @staticmethod
     def _normalize_score_for_validation(

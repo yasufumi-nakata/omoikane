@@ -186,6 +186,7 @@
 - `semantic_memory_snapshot.schema`
 - `semantic_procedural_handoff.schema`
 - `sensory_loopback_artifact_family.schema`
+- `sensory_loopback_biodata_arbitration_binding.schema`
 - `sensory_loopback_receipt.schema`
 - `sensory_loopback_session.schema`
 - `staged_rollout_session.schema`

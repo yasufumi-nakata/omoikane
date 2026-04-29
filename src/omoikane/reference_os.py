@@ -12244,6 +12244,159 @@ json.dump(response, sys.stdout)
             "ledger_verification": self.ledger.verify(),
         }
 
+    def _build_sensory_loopback_biodata_gate(
+        self,
+        identity_id: str,
+        label: str,
+        *,
+        heart_rate_shift: float = 0.0,
+    ) -> Dict[str, Any]:
+        session = self.biodata_transmitter.open_session(
+            identity_id,
+            source_modalities=["eeg", "ecg", "ppg", "eda", "respiration"],
+            target_modalities=["ecg", "ppg", "respiration", "eeg", "affect", "thought"],
+        )
+
+        def manifest(day: str, phase: str) -> Dict[str, Any]:
+            return {
+                "dataset_ref": f"dataset://sensory-loopback/{label}/biodata-window",
+                "participant_ref": f"participant://sensory-loopback/{label}",
+                "license_ref": "license://open-physiology-demo/redacted-feature-window",
+                "window_ref": f"window://sensory-loopback/{label}/{day}/{phase}",
+                "modality_file_refs": {
+                    "eeg": f"dataset-file://sensory-loopback/{label}/{day}/eeg",
+                    "ecg": f"dataset-file://sensory-loopback/{label}/{day}/ecg",
+                    "ppg": f"dataset-file://sensory-loopback/{label}/{day}/ppg",
+                    "eda": f"dataset-file://sensory-loopback/{label}/{day}/eda",
+                    "respiration": f"dataset-file://sensory-loopback/{label}/{day}/resp",
+                },
+            }
+
+        adapted_day_1 = self.biodata_transmitter.adapt_dataset_feature_window(
+            session["session_id"],
+            dataset_manifest=manifest("day-1", "shared-alignment"),
+            window_feature_summaries={
+                "eeg": {"alpha_power": 0.42, "theta_power": 0.25, "beta_power": 0.32},
+                "ecg": {
+                    "heart_rate_bpm": 72.0 + heart_rate_shift,
+                    "hrv_rmssd_ms": 49.0,
+                },
+                "ppg": {
+                    "pulse_rate_bpm": 71.7 + heart_rate_shift,
+                    "pulse_amplitude": 0.76,
+                },
+                "eda": {"skin_conductance_microsiemens": 4.4},
+                "respiration": {"rate_bpm": 15.0, "phase": "inhale"},
+            },
+            context_label=f"sensory-loopback-{label}-participant-gate-day-1",
+        )
+        adapted_day_2 = self.biodata_transmitter.adapt_dataset_feature_window(
+            session["session_id"],
+            dataset_manifest=manifest("day-2", "shared-arbitration"),
+            window_feature_summaries={
+                "eeg": {"alpha_power": 0.43, "theta_power": 0.24, "beta_power": 0.31},
+                "ecg": {
+                    "heart_rate_bpm": 72.8 + heart_rate_shift,
+                    "hrv_rmssd_ms": 49.8,
+                },
+                "ppg": {
+                    "pulse_rate_bpm": 72.5 + heart_rate_shift,
+                    "pulse_amplitude": 0.77,
+                },
+                "eda": {"skin_conductance_microsiemens": 4.3},
+                "respiration": {"rate_bpm": 14.8, "phase": "exhale"},
+            },
+            context_label=f"sensory-loopback-{label}-participant-gate-day-2",
+        )
+        adapter_receipts = [
+            adapted_day_1["adapter_receipt"],
+            adapted_day_2["adapter_receipt"],
+        ]
+        latent_states = [adapted_day_1["latent_state"], adapted_day_2["latent_state"]]
+        phase_refs = [
+            f"circadian-phase://sensory-loopback/{label}/day-1/evening",
+            f"circadian-phase://sensory-loopback/{label}/day-2/morning",
+        ]
+        circadian_phase_verifier = self.biodata_transmitter.bind_circadian_phase_verifier(
+            session,
+            phase_refs,
+            [
+                {
+                    "source_type": "external-clock",
+                    "source_ref": f"clock://sensory-loopback/{label}/lab-clock",
+                    "evidence_ref": (
+                        f"clock-evidence://sensory-loopback/{label}/phase-window"
+                    ),
+                    "verifier_key_ref": f"verifier-key://sensory-loopback/{label}/clock",
+                },
+                {
+                    "source_type": "sleep-diary",
+                    "source_ref": f"sleep-diary://sensory-loopback/{label}/redacted",
+                    "evidence_ref": (
+                        f"sleep-diary-evidence://sensory-loopback/{label}/entry"
+                    ),
+                    "verifier_key_ref": f"verifier-key://sensory-loopback/{label}/diary",
+                },
+                {
+                    "source_type": "wearable",
+                    "source_ref": f"wearable://sensory-loopback/{label}/actigraphy",
+                    "evidence_ref": f"wearable-evidence://sensory-loopback/{label}/epoch",
+                    "verifier_key_ref": (
+                        f"verifier-key://sensory-loopback/{label}/wearable"
+                    ),
+                },
+            ],
+        )
+        series_profile = self.biodata_transmitter.build_feature_window_series_profile(
+            session,
+            adapter_receipts,
+            latent_states,
+            phase_refs,
+            circadian_phase_verifier,
+        )
+        calibration_profile = self.biodata_transmitter.build_calibration_profile(
+            session["session_id"],
+            latent_states,
+            calibration_day_refs=[
+                f"calibration-day://sensory-loopback/{label}/day-1",
+                f"calibration-day://sensory-loopback/{label}/day-2",
+            ],
+        )
+        drift_gate = self.biodata_transmitter.bind_feature_window_series_drift_gate(
+            session,
+            series_profile,
+            calibration_profile,
+        )
+        confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
+            session,
+            calibration_profile,
+            target_gate_refs={
+                "identity-confirmation": (
+                    f"identity-confirmation://sensory-loopback/{label}/shared-gate"
+                ),
+                "sensory-loopback": f"sensory-loopback://atrium/shared/{label}",
+            },
+            feature_window_series_drift_gate_receipt=drift_gate,
+        )
+        confidence_gate_validation = (
+            self.biodata_transmitter.validate_calibration_confidence_gate(
+                session,
+                calibration_profile,
+                confidence_gate,
+            )
+        )
+        return {
+            "session": session,
+            "adapter_receipts": adapter_receipts,
+            "latent_states": latent_states,
+            "circadian_phase_verifier": circadian_phase_verifier,
+            "feature_window_series_profile": series_profile,
+            "calibration_profile": calibration_profile,
+            "feature_window_series_drift_gate": drift_gate,
+            "confidence_gate": confidence_gate,
+            "confidence_gate_validation": confidence_gate_validation,
+        }
+
     def run_sensory_loopback_demo(self) -> Dict[str, Any]:
         identity = self.identity.create(
             human_consent_proof="consent://sensory-loopback-demo/v1",
@@ -12563,6 +12716,55 @@ json.dump(response, sys.stdout)
             shared_imc_session_id=shared_imc_session["session_id"],
             shared_collective_id=shared_collective["collective_id"],
         )
+        shared_self_biodata_gate = self._build_sensory_loopback_biodata_gate(
+            identity.identity_id,
+            "self",
+        )
+        shared_peer_biodata_gate = self._build_sensory_loopback_biodata_gate(
+            peer.identity_id,
+            "peer",
+            heart_rate_shift=1.2,
+        )
+        shared_biodata_arbitration_binding = (
+            self.sensory_loopback.bind_participant_biodata_arbitration(
+                shared_session["session_id"],
+                participant_gate_receipts={
+                    identity.identity_id: shared_self_biodata_gate["confidence_gate"],
+                    peer.identity_id: shared_peer_biodata_gate["confidence_gate"],
+                },
+            )
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="sensory_loopback.biodata_arbitration.bound",
+            payload={
+                "binding_ref": shared_biodata_arbitration_binding["binding_ref"],
+                "binding_digest": shared_biodata_arbitration_binding["binding_digest"],
+                "participant_gate_count": shared_biodata_arbitration_binding[
+                    "participant_gate_count"
+                ],
+                "participant_gate_digest_set": shared_biodata_arbitration_binding[
+                    "participant_gate_digest_set"
+                ],
+                "all_participant_gates_bound": shared_biodata_arbitration_binding[
+                    "all_participant_gates_bound"
+                ],
+                "all_drift_gates_passed": shared_biodata_arbitration_binding[
+                    "all_drift_gates_passed"
+                ],
+                "raw_biodata_payload_stored": shared_biodata_arbitration_binding[
+                    "raw_biodata_payload_stored"
+                ],
+                "raw_drift_payload_stored": shared_biodata_arbitration_binding[
+                    "raw_drift_payload_stored"
+                ],
+            },
+            actor="SensoryLoopbackService",
+            category="interface-sensory-loopback-biodata-arbitration",
+            layer="L6",
+            signature_roles=["self", "guardian", "council"],
+            substrate="virtual-sensory-plane",
+        )
         shared_aligned_tick = self.qualia.append(
             summary="shared mirror alignment keeps both participants attached to one embodied anchor",
             valence=0.22,
@@ -12689,6 +12891,11 @@ json.dump(response, sys.stdout)
         shared_artifact_family_validation = self.sensory_loopback.validate_artifact_family(
             shared_artifact_family,
         )
+        shared_biodata_arbitration_validation = (
+            self.sensory_loopback.validate_participant_biodata_arbitration(
+                shared_biodata_arbitration_binding,
+            )
+        )
         schema_contracts = [
             {
                 "payload_path": "session",
@@ -12735,6 +12942,14 @@ json.dump(response, sys.stdout)
                 "schema_path": "specs/schemas/sensory_loopback_artifact_family.schema",
                 "contract_role": "shared-loopback-artifact-family",
             },
+            {
+                "payload_path": "shared_loopback.biodata_arbitration_binding",
+                "schema_path": (
+                    "specs/schemas/"
+                    "sensory_loopback_biodata_arbitration_binding.schema"
+                ),
+                "contract_role": "shared-loopback-biodata-arbitration-binding",
+            },
         ]
 
         return {
@@ -12767,6 +12982,11 @@ json.dump(response, sys.stdout)
                 "collective": shared_collective,
                 "merge_session": shared_merge_session,
                 "session": shared_final_session,
+                "biodata_gate_artifacts": {
+                    "self": shared_self_biodata_gate,
+                    "peer": shared_peer_biodata_gate,
+                },
+                "biodata_arbitration_binding": shared_biodata_arbitration_binding,
                 "receipts": {
                     "aligned": shared_aligned,
                     "mediated": shared_mediated,
@@ -12776,11 +12996,46 @@ json.dump(response, sys.stdout)
                     "ok": shared_session_validation["ok"]
                     and shared_aligned_validation["ok"]
                     and shared_mediated_validation["ok"]
-                    and shared_artifact_family_validation["ok"],
+                    and shared_artifact_family_validation["ok"]
+                    and shared_biodata_arbitration_validation["ok"],
                     "session_ok": shared_session_validation["ok"],
                     "aligned_ok": shared_aligned_validation["ok"],
                     "mediated_ok": shared_mediated_validation["ok"],
                     "artifact_family_ok": shared_artifact_family_validation["ok"],
+                    "biodata_arbitration_ok": (
+                        shared_biodata_arbitration_validation["ok"]
+                    ),
+                    "biodata_arbitration_participants_bound": (
+                        shared_biodata_arbitration_validation[
+                            "all_participant_gates_bound"
+                        ]
+                    ),
+                    "biodata_arbitration_drift_gates_passed": (
+                        shared_biodata_arbitration_validation["all_drift_gates_passed"]
+                    ),
+                    "biodata_arbitration_digest_bound": (
+                        shared_biodata_arbitration_validation[
+                            "binding_digest_bound"
+                        ]
+                    ),
+                    "biodata_arbitration_raw_payload_redacted": (
+                        shared_biodata_arbitration_validation[
+                            "raw_biodata_payload_stored"
+                        ]
+                        is False
+                        and shared_biodata_arbitration_validation[
+                            "raw_calibration_payload_stored"
+                        ]
+                        is False
+                        and shared_biodata_arbitration_validation[
+                            "raw_drift_payload_stored"
+                        ]
+                        is False
+                        and shared_biodata_arbitration_validation[
+                            "raw_gate_payload_stored"
+                        ]
+                        is False
+                    ),
                     "shared_space_mode_collective": shared_final_session["shared_space_mode"]
                     == "collective-shared",
                     "participant_bindings_complete": shared_mediated_validation[
@@ -12813,6 +13068,7 @@ json.dump(response, sys.stdout)
                 and shared_aligned_validation["ok"]
                 and shared_mediated_validation["ok"]
                 and shared_artifact_family_validation["ok"]
+                and shared_biodata_arbitration_validation["ok"]
                 and calibration_gate_validation["ok"],
                 "coherent_ok": coherent_validation["ok"],
                 "degraded_ok": degraded_validation["ok"],
@@ -12871,7 +13127,8 @@ json.dump(response, sys.stdout)
                 "shared_loopback_ok": shared_session_validation["ok"]
                 and shared_aligned_validation["ok"]
                 and shared_mediated_validation["ok"]
-                and shared_artifact_family_validation["ok"],
+                and shared_artifact_family_validation["ok"]
+                and shared_biodata_arbitration_validation["ok"],
                 "shared_loopback_collective_bound": shared_session_validation[
                     "shared_collective_bound"
                 ]
@@ -12890,15 +13147,56 @@ json.dump(response, sys.stdout)
                 ]
                 and shared_artifact_family["arbitration_scene_count"] == 2
                 and shared_artifact_family["guardian_arbitration_count"] == 1,
+                "shared_loopback_biodata_arbitration_ok": (
+                    shared_biodata_arbitration_validation["ok"]
+                ),
+                "shared_loopback_biodata_participant_gates_bound": (
+                    shared_biodata_arbitration_validation["all_participant_gates_bound"]
+                    and shared_biodata_arbitration_validation[
+                        "participant_gate_count"
+                    ]
+                    == 2
+                ),
+                "shared_loopback_biodata_drift_gates_passed": (
+                    shared_biodata_arbitration_validation["all_drift_gates_passed"]
+                ),
+                "shared_loopback_biodata_binding_digest_bound": (
+                    shared_biodata_arbitration_validation["binding_digest_bound"]
+                    and shared_biodata_arbitration_validation[
+                        "participant_gate_digest_set_bound"
+                    ]
+                ),
+                "shared_loopback_biodata_raw_payload_redacted": (
+                    shared_biodata_arbitration_validation[
+                        "raw_biodata_payload_stored"
+                    ]
+                    is False
+                    and shared_biodata_arbitration_validation[
+                        "raw_calibration_payload_stored"
+                    ]
+                    is False
+                    and shared_biodata_arbitration_validation[
+                        "raw_drift_payload_stored"
+                    ]
+                    is False
+                    and shared_biodata_arbitration_validation[
+                        "raw_gate_payload_stored"
+                    ]
+                    is False
+                ),
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
                 "public_schema_contract_profile": SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
-                "public_schema_contract_bound": len(schema_contracts) == 9
+                "public_schema_contract_bound": len(schema_contracts) == 10
                 and {contract["schema_path"] for contract in schema_contracts}
                 == {
                     "specs/schemas/sensory_loopback_session.schema",
                     "specs/schemas/sensory_loopback_receipt.schema",
                     "specs/schemas/sensory_loopback_artifact_family.schema",
+                    (
+                        "specs/schemas/"
+                        "sensory_loopback_biodata_arbitration_binding.schema"
+                    ),
                 },
             },
             "ledger_profile": self.ledger.profile(),

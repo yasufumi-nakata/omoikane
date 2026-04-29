@@ -1,0 +1,168 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/sensory_loopback_biodata_arbitration_binding.schema"
+title: SensoryLoopbackBioDataArbitrationBinding
+description: >
+  Digest-only binding that distributes participant-specific BioData calibration
+  confidence and feature-window drift gates into one shared Sensory Loopback
+  arbitration session without storing raw BioData, calibration, drift, or gate
+  payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - binding_ref
+  - created_at
+  - policy_id
+  - session_id
+  - participant_identity_ids
+  - shared_space_mode
+  - shared_imc_session_id
+  - shared_collective_id
+  - arbitration_policy_id
+  - participant_gate_bindings
+  - participant_gate_count
+  - participant_gate_digest_set
+  - all_participant_gates_bound
+  - all_drift_gates_passed
+  - arbitration_gate_status
+  - storage_policy
+  - raw_biodata_payload_stored
+  - raw_calibration_payload_stored
+  - raw_drift_payload_stored
+  - raw_gate_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - binding_digest
+properties:
+  schema_version:
+    const: "1.0"
+  binding_ref:
+    type: string
+    pattern: "^loopback-biodata-arbitration://sl-biodata-arb-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  policy_id:
+    const: participant-biodata-gate-arbitration-v1
+  session_id:
+    type: string
+    minLength: 8
+  participant_identity_ids:
+    type: array
+    minItems: 2
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  shared_space_mode:
+    type: string
+    enum:
+      - imc-shared
+      - collective-shared
+  shared_imc_session_id:
+    type: string
+    minLength: 1
+  shared_collective_id:
+    type: string
+  arbitration_policy_id:
+    const: guardian-mediated-multi-self-loopback-v1
+  participant_gate_bindings:
+    type: array
+    minItems: 2
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - participant_identity_id
+        - gate_ref
+        - gate_receipt_digest
+        - confidence_score
+        - minimum_confidence
+        - confidence_gate_status
+        - feature_window_series_drift_gate_ref
+        - feature_window_series_drift_gate_digest
+        - feature_window_series_drift_threshold_digest
+        - feature_window_series_drift_gate_status
+        - target_gate_set_digest
+        - sensory_loopback_gate_bound
+        - raw_calibration_payload_stored
+        - raw_drift_payload_stored
+        - raw_gate_payload_stored
+        - subjective_equivalence_claimed
+        - semantic_thought_content_generated
+      properties:
+        participant_identity_id:
+          type: string
+          minLength: 1
+        gate_ref:
+          type: string
+          minLength: 1
+        gate_receipt_digest:
+          type: string
+          minLength: 32
+        confidence_score:
+          type: number
+          minimum: 0.7
+          maximum: 1
+        minimum_confidence:
+          const: 0.7
+        confidence_gate_status:
+          const: bound
+        feature_window_series_drift_gate_ref:
+          type: string
+          minLength: 1
+        feature_window_series_drift_gate_digest:
+          type: string
+          minLength: 32
+        feature_window_series_drift_threshold_digest:
+          type: string
+          minLength: 32
+        feature_window_series_drift_gate_status:
+          const: pass
+        target_gate_set_digest:
+          type: string
+          minLength: 32
+        sensory_loopback_gate_bound:
+          const: true
+        raw_calibration_payload_stored:
+          const: false
+        raw_drift_payload_stored:
+          const: false
+        raw_gate_payload_stored:
+          const: false
+        subjective_equivalence_claimed:
+          const: false
+        semantic_thought_content_generated:
+          const: false
+  participant_gate_count:
+    type: integer
+    minimum: 2
+    maximum: 4
+  participant_gate_digest_set:
+    type: string
+    minLength: 32
+  all_participant_gates_bound:
+    const: true
+  all_drift_gates_passed:
+    const: true
+  arbitration_gate_status:
+    const: pass
+  storage_policy:
+    const: participant-gate-digest+drift-threshold-digest-only
+  raw_biodata_payload_stored:
+    const: false
+  raw_calibration_payload_stored:
+    const: false
+  raw_drift_payload_stored:
+    const: false
+  raw_gate_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  binding_digest:
+    type: string
+    minLength: 32

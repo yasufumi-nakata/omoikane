@@ -826,6 +826,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["shared_loopback_arbitrated"])
         self.assertTrue(result["validation"]["shared_loopback_owner_handoff"])
         self.assertTrue(result["validation"]["shared_loopback_family_tracked"])
+        self.assertTrue(result["validation"]["shared_loopback_biodata_arbitration_ok"])
+        self.assertTrue(
+            result["validation"]["shared_loopback_biodata_participant_gates_bound"]
+        )
+        self.assertTrue(result["validation"]["shared_loopback_biodata_drift_gates_passed"])
+        self.assertTrue(
+            result["validation"]["shared_loopback_biodata_binding_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["shared_loopback_biodata_raw_payload_redacted"]
+        )
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["session"]["status"])
@@ -841,6 +852,12 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual(2, result["shared_loopback"]["artifact_family"]["scene_count"])
         self.assertEqual(1, result["shared_loopback"]["artifact_family"]["guardian_arbitration_count"])
+        self.assertEqual(
+            2,
+            result["shared_loopback"]["biodata_arbitration_binding"][
+                "participant_gate_count"
+            ],
+        )
 
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

@@ -1,0 +1,20 @@
+eval_id: sensory_loopback_biodata_arbitration
+target: interface.sensory_loopback
+level: L6
+description: >
+  Sensory Loopback が collective-shared session で participant ごとの
+  BioData calibration confidence gate と feature-window drift gate を
+  shared arbitration binding に digest-only で束縛し、raw BioData payload を保存しないこと
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
+expected:
+  validation_ok: true
+  shared_loopback_biodata_arbitration_ok: true
+  shared_loopback_biodata_participant_gates_bound: true
+  shared_loopback_biodata_drift_gates_passed: true
+  shared_loopback_biodata_binding_digest_bound: true
+  shared_loopback_biodata_raw_payload_redacted: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

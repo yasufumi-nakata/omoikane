@@ -1233,13 +1233,25 @@ entries:
       - reference-runtime
     rationale: Required to serialize one bounded multi-scene loopback artifact family that binds coherent delivery, guardian hold, stabilization recovery, participant arbitration, calibration refs, and BioData confidence-gated threshold evidence without raw sensory/calibration/gate payload retention.
   - priority: P1
+    kind: schema
+    file: specs/schemas/sensory_loopback_biodata_arbitration_binding.schema
+    consumers:
+      - specs/interfaces/interface.sensory_loopback.v0.idl
+      - docs/02-subsystems/interface/sensory-loopback.md
+      - docs/07-reference-implementation/README.md
+      - evals/interface/sensory_loopback_biodata_arbitration.yaml
+      - evals/interface/sensory_loopback_public_schema_contract.yaml
+      - tests/integration/test_interface_schema_contracts.py
+      - reference-runtime
+    rationale: Required to serialize participant-specific BioData confidence and feature-window drift gate distribution into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, or gate payload retention.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.sensory_loopback.v0.idl
     consumers:
       - reference-runtime
       - docs/02-subsystems/interface/sensory-loopback.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make L6 sensory loopback delivery, Guardian hold, stabilization, avatar body-map calibration, BioData confidence-gated drift-threshold adjustment, shared collective/IMC arbitration, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
+    rationale: Required to make L6 sensory loopback delivery, Guardian hold, stabilization, avatar body-map calibration, BioData confidence-gated drift-threshold adjustment, shared collective/IMC arbitration, participant BioData gate arbitration, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_guard.yaml
@@ -1263,13 +1275,21 @@ entries:
     rationale: Protects shared IMC/collective participant binding, owner handoff, guardian-mediated arbitration, and arbitration-tracked artifact family capture for bounded multi-self loopback sessions.
   - priority: P1
     kind: eval
+    file: evals/interface/sensory_loopback_biodata_arbitration.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, binding digest evidence, and raw BioData/drift/gate payload redaction before shared loopback arbitration accepts participant gates.
+  - priority: P1
+    kind: eval
     file: evals/interface/sensory_loopback_public_schema_contract.yaml
     consumers:
       - reference-runtime
       - tests/integration/test_interface_schema_contracts.py
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects the sensory-loopback public schema contract manifest that maps self-only and shared session, receipt, and artifact-family payloads from the CLI demo to reviewer-facing public schemas.
+    rationale: Protects the sensory-loopback public schema contract manifest that maps self-only and shared session, receipt, artifact-family, and BioData arbitration binding payloads from the CLI demo to reviewer-facing public schemas.
   - priority: P1
     kind: schema
     file: specs/schemas/collective_merge_session.schema
