@@ -1,0 +1,23 @@
+eval_id: gap_scanner_required_reference_files
+target: self_construction.gap_report
+level: L5
+description: >
+  gap-report が automation 用 repo-local reference runbook の欠落を
+  high-priority missing-reference-file task として検出し、parallel Codex
+  orchestration 手順の未配置を all-zero gate の外へ出せること
+inputs:
+  - action: scan_repo
+    required_reference_files:
+      - references/operating-playbook.md
+      - references/parallel-codex-orchestration.md
+      - references/repo-coverage-checklist.md
+      - references/verification-checklist.md
+expected:
+  missing_required_reference_file_count: 0
+  missing_required_reference_files: []
+  parallel_codex_orchestration_required: true
+  prioritized_task_kind: missing-reference-file
+  raw_reference_payload_stored: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

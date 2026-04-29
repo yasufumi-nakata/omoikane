@@ -51,6 +51,7 @@ DECISION_LOG_NEXT_GAP_IDS_KEY = "next_gap_ids"
 DECISION_LOG_CLOSES_NEXT_GAPS_KEY = "closes_next_gaps"
 REQUIRED_REFERENCE_FILES = (
     "references/operating-playbook.md",
+    "references/parallel-codex-orchestration.md",
     "references/repo-coverage-checklist.md",
     "references/verification-checklist.md",
 )

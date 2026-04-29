@@ -111,6 +111,19 @@ class GapReportSchemaContractTests(unittest.TestCase):
                 for entry in receipt["scan_surface_digests"]
             )
         )
+        self.assertTrue(
+            any(
+                entry["path"] == "references/parallel-codex-orchestration.md"
+                and entry["surface_pattern"] == "references/*.md"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+
+    def test_gap_report_required_references_are_complete(self) -> None:
+        report = self.runtime.generate_gap_report(REPO_ROOT)
+
+        self.assertEqual(0, report["missing_required_reference_file_count"])
+        self.assertEqual([], report["missing_required_reference_files"])
 
     def test_gap_report_scan_receipt_binds_continuity_event_digest(self) -> None:
         report = self.runtime.generate_gap_report(REPO_ROOT)

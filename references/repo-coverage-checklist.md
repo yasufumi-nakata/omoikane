@@ -8,6 +8,7 @@ gap 選定前に最低限確認する repo 内サーフェスです。
 - `README.md`
 - `docs/07-reference-implementation/README.md`
 - `meta/open-questions.md`
+- `references/parallel-codex-orchestration.md` when worker / subagent coordination is in scope
 - `specs/catalog.yaml`
 - `specs/interfaces/**/*.idl`
 - `specs/schemas/README.md`

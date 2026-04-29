@@ -82,6 +82,10 @@ properties:
       type: string
       minLength: 1
   missing_required_reference_files:
+    description: >
+      Repo-local automation reference files that are absent. The reference set includes
+      operating-playbook, parallel-codex-orchestration, repo-coverage-checklist, and
+      verification-checklist runbooks.
     type: array
     items:
       type: string

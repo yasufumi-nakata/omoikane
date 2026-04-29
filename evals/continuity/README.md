@@ -129,6 +129,10 @@ builder rollback が integrity Guardian の attestation event に
 reviewer verifier-network receipt を 2 名分束縛したまま
 rollback-approved へ到達するか。
 
+### Gap Scanner Required Reference Files
+gap-report が automation の pull-first / coverage / verification / parallel Codex
+orchestration runbook 欠落を high-priority task として検出できるか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 
@@ -153,6 +157,7 @@ rollback-approved へ到達するか。
 - `differential_eval_execution_binding.yaml`
 - `episodic_stream_handoff.yaml`
 - `gap_report_scan_receipt.yaml`
+- `gap_scanner_required_reference_files.yaml`
 - `gap_scanner_implementation_stub_detection.yaml`
 - `ledger_integrity.yaml`
 - `memory_crystal_compaction.yaml`
