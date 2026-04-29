@@ -536,6 +536,13 @@ machine-readable にすること、
 researcher source digest、request/report digest、repo-local evidence digest、
 Council+Guardian 署名付き ContinuityLedger entry ref/hash/payload ref に束縛し、
 raw research payload 非保存と decision authority 不保持を runtime validation で確認すること、
+さらに複数 researcher exchange を
+`repo-local-research-evidence-synthesis-v1` として束ね、
+distinct researcher、exchange digest set、evidence digest set、
+Council session ref、Council+Guardian 署名付き ContinuityLedger entry を
+単一の advisory-only synthesis receipt に固定し、
+raw exchange / raw research payload 非保存と decision authority 不保持を
+Council deliberation 前の reviewer-facing artifact として確認すること、
 `builder` role では `build_surface_refs` と `execution_policy_ref` を
 raw source definition と materialized registry entry の両方に保持し、
 coverage label だけではなく repo-local write/eval/schema/doc surface と

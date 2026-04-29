@@ -157,6 +157,7 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/research_evidence_request.schema",
             "specs/schemas/research_evidence_report.schema",
             "specs/schemas/yaoyorozu_research_evidence_exchange.schema",
+            "specs/schemas/yaoyorozu_research_evidence_synthesis.schema",
         ):
             schema = _load_schema(schema_path)
             validator = jsonschema.Draft202012Validator(schema)
@@ -201,6 +202,40 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         )
         self.assertFalse(exchange["validation"]["raw_research_payload_stored"])
         self.assertFalse(exchange["validation"]["decision_authority_claimed"])
+
+    def test_research_evidence_synthesis_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+        synthesis = result["research_evidence_synthesis"]
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_research_evidence_synthesis.schema",
+            synthesis,
+        )
+        self.assertTrue(synthesis["validation"]["ok"])
+        self.assertGreaterEqual(synthesis["exchange_count"], 2)
+        self.assertGreaterEqual(len(synthesis["researcher_agent_ids"]), 2)
+        self.assertEqual(
+            [exchange["exchange_ref"] for exchange in result["research_evidence_exchanges"]],
+            synthesis["exchange_refs"],
+        )
+        self.assertEqual(
+            [
+                exchange["exchange_digest"]
+                for exchange in result["research_evidence_exchanges"]
+            ],
+            synthesis["exchange_digests"],
+        )
+        self.assertTrue(synthesis["validation"]["exchange_validations_bound"])
+        self.assertTrue(synthesis["validation"]["evidence_digest_set_bound"])
+        self.assertTrue(synthesis["validation"]["advisory_only"])
+        self.assertTrue(synthesis["validation"]["continuity_ledger_entry_appended"])
+        self.assertEqual(
+            ["council", "guardian"],
+            synthesis["continuity_ledger_signature_roles"],
+        )
+        self.assertFalse(synthesis["validation"]["raw_exchange_payload_stored"])
+        self.assertFalse(synthesis["validation"]["raw_research_payload_stored"])
+        self.assertFalse(synthesis["validation"]["decision_authority_claimed"])
 
     def test_workspace_discovery_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()

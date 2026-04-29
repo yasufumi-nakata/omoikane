@@ -53,6 +53,7 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 self+guardian 署名付き source manifest ContinuityLedger binding と
 raw payload 非露出の source manifest public verification bundle と
 Council+Guardian 署名付き researcher evidence exchange binding と
+複数 researcher exchange を束ねる advisory-only synthesis receipt と
 `self-modify-patch-v1` 向け Council / builder handoff plan に materialize され、
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required、
 `fork-request-v1` では `runtime+schema+docs` required、

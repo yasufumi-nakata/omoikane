@@ -1,0 +1,22 @@
+id: eval-agentic-yaoyorozu-research-evidence-synthesis
+title: Yaoyorozu multi-researcher evidence synthesis receipt
+surface: agentic.yaoyorozu
+profile: repo-local-research-evidence-synthesis-v1
+must:
+  - at least two distinct researcher exchanges are ledger-appended before synthesis
+  - synthesis exchange_refs and exchange_digests match the source exchange receipts
+  - synthesis evidence_digest_set is derived from the nested researcher reports
+  - claim ceiling remains implementation-advisory and all implications remain advisory-only
+  - raw exchange payloads and raw research payloads are not stored
+  - synthesis receipt is appended to ContinuityLedger with council and guardian signature roles
+expected:
+  minimum_exchange_count: 2
+  minimum_distinct_researchers: 2
+  continuity_ledger_category: yaoyorozu-research-evidence
+  continuity_ledger_event_type: yaoyorozu.research_evidence.synthesized
+  continuity_ledger_signature_roles:
+    - council
+    - guardian
+  raw_exchange_payload_stored: false
+  raw_research_payload_stored: false
+  decision_authority_claimed: false

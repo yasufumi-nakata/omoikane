@@ -125,6 +125,8 @@
   - role-specific Yaoyorozu researcher input contract for bounded evidence questions, repo-local evidence boundaries, and no raw payload retention
 - `yaoyorozu_research_evidence_exchange.schema`
   - binds one selected researcher request/report pair to registry source digest, repo-local evidence refs, and a Council+Guardian ContinuityLedger append
+- `yaoyorozu_research_evidence_synthesis.schema`
+  - binds multiple ledger-appended researcher exchanges into one advisory-only Council synthesis receipt with exchange digest set, evidence digest set, and no raw exchange / research payload retention
 - `metacognition_report.schema`
 - `metacognition_shift.schema`
 - `naming_policy.schema`

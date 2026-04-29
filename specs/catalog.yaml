@@ -3435,6 +3435,7 @@ entries:
       - specs/schemas/agent_source_definition.schema
       - specs/schemas/agent_registry_entry.schema
       - specs/schemas/yaoyorozu_research_evidence_exchange.schema
+      - specs/schemas/yaoyorozu_research_evidence_synthesis.schema
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - reference-runtime
       - agents/researchers/consciousness-theorist.yaml
@@ -3452,6 +3453,7 @@ entries:
       - specs/schemas/agent_source_definition.schema
       - specs/schemas/agent_registry_entry.schema
       - specs/schemas/yaoyorozu_research_evidence_exchange.schema
+      - specs/schemas/yaoyorozu_research_evidence_synthesis.schema
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - reference-runtime
       - agents/researchers/consciousness-theorist.yaml
@@ -3467,6 +3469,7 @@ entries:
     file: specs/schemas/yaoyorozu_research_evidence_exchange.schema
     consumers:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - specs/schemas/yaoyorozu_research_evidence_synthesis.schema
       - specs/schemas/research_evidence_request.schema
       - specs/schemas/research_evidence_report.schema
       - reference-runtime
@@ -3476,6 +3479,17 @@ entries:
       - docs/07-reference-implementation/README.md
     rationale: Required to serialize one advisory Yaoyorozu researcher request/report exchange with source digest, evidence digest, Council+Guardian ledger binding, and raw payload / decision authority redaction.
   - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_research_evidence_synthesis.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - specs/schemas/yaoyorozu_research_evidence_exchange.schema
+      - reference-runtime
+      - evals/agentic/yaoyorozu_research_evidence_synthesis.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/07-reference-implementation/README.md
+    rationale: Required to serialize a multi-researcher advisory Yaoyorozu synthesis receipt with exchange digest set, evidence digest set, Council+Guardian ledger binding, and raw exchange / research payload redaction.
+  - priority: P1
     kind: eval
     file: evals/agentic/yaoyorozu_research_evidence_exchange.yaml
     consumers:
@@ -3484,5 +3498,15 @@ entries:
       - tests/integration/test_reference_runtime.py
       - docs/07-reference-implementation/README.md
     rationale: Guards the researcher exchange receipt so request/report digests, repo-local evidence refs, advisory-only claim ceiling, and Council+Guardian ledger entry remain bound.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_research_evidence_synthesis.yaml
+    consumers:
+      - reference-runtime
+      - tests/integration/test_yaoyorozu_schema_contracts.py
+      - tests/integration/test_reference_runtime.py
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Guards the multi-researcher synthesis receipt so source exchange digests, evidence digest set, advisory-only boundary, and Council+Guardian ledger entry remain bound.
 next_priority:
   # Future automation can append the next missing contract here.

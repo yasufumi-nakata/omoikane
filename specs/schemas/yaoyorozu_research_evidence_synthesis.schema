@@ -1,0 +1,280 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_research_evidence_synthesis.schema"
+title: YaoyorozuResearchEvidenceSynthesis
+description: >
+  Runtime receipt that reduces multiple Yaoyorozu researcher request/report
+  exchange receipts into digest-only, advisory-only Council input without
+  storing raw exchange or research payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - synthesis_id
+  - synthesis_ref
+  - recorded_at
+  - profile_id
+  - registry_snapshot_ref
+  - registry_digest
+  - source_manifest_digest
+  - council_session_ref
+  - exchange_refs
+  - exchange_digests
+  - exchange_count
+  - researcher_agent_ids
+  - research_domain_refs
+  - evidence_refs
+  - evidence_digest_set
+  - claim_ceiling
+  - synthesis_summary
+  - advisory_design_implications
+  - raw_exchange_payload_stored
+  - raw_research_payload_stored
+  - decision_authority_claimed
+  - continuity_event_ref
+  - continuity_event_digest
+  - continuity_ledger_category
+  - continuity_ledger_event_type
+  - continuity_ledger_signature_roles
+  - continuity_ledger_appended
+  - continuity_ledger_entry_ref
+  - continuity_ledger_entry_hash
+  - continuity_ledger_payload_ref
+  - exchange_receipts
+  - synthesis_digest
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_research_evidence_synthesis
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  synthesis_id:
+    type: string
+    pattern: "^yaoyorozu-research-evidence-synthesis-[a-f0-9]{12}$"
+  synthesis_ref:
+    type: string
+    pattern: "^research-evidence-synthesis://yaoyorozu-research-evidence-synthesis-[a-f0-9]{12}$"
+  recorded_at:
+    type: string
+    minLength: 1
+  profile_id:
+    const: repo-local-research-evidence-synthesis-v1
+  registry_snapshot_ref:
+    type: string
+    pattern: "^registry://yaoyorozu-registry-[a-f0-9]{12}$"
+  registry_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  council_session_ref:
+    type: string
+    pattern: "^council://session/"
+  exchange_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^research-evidence-exchange://yaoyorozu-research-evidence-exchange-[a-f0-9]{12}$"
+  exchange_digests:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  exchange_count:
+    type: integer
+    minimum: 2
+  researcher_agent_ids:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  research_domain_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^(docs|research)/"
+  evidence_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^(docs|research|specs|evals|doi|pubmed|legal|official)[:/]"
+  evidence_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - exchange_ref
+        - researcher_agent_id
+        - evidence_ref
+        - evidence_digest
+        - claim_scope
+      properties:
+        exchange_ref:
+          type: string
+          pattern: "^research-evidence-exchange://yaoyorozu-research-evidence-exchange-[a-f0-9]{12}$"
+        researcher_agent_id:
+          type: string
+          minLength: 1
+        evidence_ref:
+          type: string
+          pattern: "^(docs|research|specs|evals|doi|pubmed|legal|official)[:/]"
+        evidence_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        claim_scope:
+          type: string
+          enum:
+            - supports
+            - contradicts
+            - constrains
+            - background-only
+  claim_ceiling:
+    const: implementation-advisory
+  synthesis_summary:
+    type: string
+    minLength: 1
+  advisory_design_implications:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - implication_id
+        - summary
+        - target_ref
+        - authority_level
+        - source_exchange_refs
+      properties:
+        implication_id:
+          type: string
+          pattern: "^research-implication-[a-f0-9]{12}$"
+        summary:
+          type: string
+          minLength: 1
+        target_ref:
+          type: string
+          pattern: "^(docs|specs|evals|src|tests|agents|meta|research)/"
+        authority_level:
+          const: advisory-only
+        source_exchange_refs:
+          type: array
+          minItems: 2
+          items:
+            type: string
+            pattern: "^research-evidence-exchange://yaoyorozu-research-evidence-exchange-[a-f0-9]{12}$"
+  raw_exchange_payload_stored:
+    const: false
+  raw_research_payload_stored:
+    const: false
+  decision_authority_claimed:
+    const: false
+  continuity_event_ref:
+    type: string
+    pattern: "^ledger://yaoyorozu/research-evidence/yaoyorozu-research-evidence-synthesis-[a-f0-9]{12}$"
+  continuity_event_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  continuity_ledger_category:
+    const: yaoyorozu-research-evidence
+  continuity_ledger_event_type:
+    const: yaoyorozu.research_evidence.synthesized
+  continuity_ledger_signature_roles:
+    type: array
+    prefixItems:
+      - const: council
+      - const: guardian
+    minItems: 2
+    maxItems: 2
+  continuity_ledger_appended:
+    const: true
+  continuity_ledger_entry_ref:
+    type: string
+    pattern: "^ledger://continuity-ledger/"
+  continuity_ledger_entry_hash:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  continuity_ledger_payload_ref:
+    type: string
+    pattern: "^cas://sha256/[a-f0-9]{64}$"
+  exchange_receipts:
+    type: array
+    minItems: 2
+    items:
+      $ref: yaoyorozu_research_evidence_exchange.schema
+  synthesis_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - ok
+      - registry_bound
+      - exchange_count_bound
+      - researcher_diversity_bound
+      - exchange_validations_bound
+      - exchange_digests_bound
+      - evidence_digest_set_bound
+      - advisory_only
+      - raw_exchange_payload_stored
+      - raw_research_payload_stored
+      - decision_authority_claimed
+      - continuity_event_digest_bound
+      - synthesis_digest_bound
+      - continuity_ledger_entry_appended
+      - continuity_ledger_entry_digest_bound
+      - continuity_ledger_payload_ref_bound
+      - continuity_ledger_signature_roles_bound
+      - errors
+    properties:
+      ok:
+        const: true
+      registry_bound:
+        const: true
+      exchange_count_bound:
+        const: true
+      researcher_diversity_bound:
+        const: true
+      exchange_validations_bound:
+        const: true
+      exchange_digests_bound:
+        const: true
+      evidence_digest_set_bound:
+        const: true
+      advisory_only:
+        const: true
+      raw_exchange_payload_stored:
+        const: false
+      raw_research_payload_stored:
+        const: false
+      decision_authority_claimed:
+        const: false
+      continuity_event_digest_bound:
+        const: true
+      synthesis_digest_bound:
+        const: true
+      continuity_ledger_entry_appended:
+        const: true
+      continuity_ledger_entry_digest_bound:
+        const: true
+      continuity_ledger_payload_ref_bound:
+        const: true
+      continuity_ledger_signature_roles_bound:
+        const: true
+      errors:
+        type: array
+        maxItems: 0

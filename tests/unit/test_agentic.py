@@ -4344,6 +4344,26 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertFalse(validation["all_external_preseed_gates_passed"])
         self.assertIn("guardian_preseed_gate.gate_status mismatch", validation["errors"])
 
+    def test_research_evidence_synthesis_rejects_single_researcher_tamper(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["research_evidence_synthesis"]))
+        first_exchange = tampered["exchange_receipts"][0]
+        tampered["exchange_receipts"] = [first_exchange, json.loads(json.dumps(first_exchange))]
+        tampered["researcher_agent_ids"] = [first_exchange["researcher_agent_id"]]
+
+        validation = runtime.yaoyorozu.validate_research_evidence_synthesis(
+            tampered,
+            result["registry"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["researcher_diversity_bound"])
+        self.assertIn(
+            "synthesis must bind at least two distinct researchers",
+            validation["errors"],
+        )
+
     def test_worker_dispatch_receipt_rejects_tampered_preseed_oversight_event(self) -> None:
         runtime = OmoikaneReferenceOS()
         result = runtime.run_yaoyorozu_demo()

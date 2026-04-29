@@ -2859,9 +2859,35 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["research_evidence_ledger_payload_ref_bound"])
         self.assertFalse(result["validation"]["research_evidence_decision_authority_claimed"])
         self.assertFalse(result["validation"]["research_evidence_raw_payload_stored"])
+        self.assertGreaterEqual(result["validation"]["research_evidence_exchange_count"], 2)
+        self.assertTrue(result["validation"]["research_evidence_synthesis_ok"])
+        self.assertTrue(
+            result["validation"]["research_evidence_synthesis_exchange_count_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["research_evidence_synthesis_researcher_diversity_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["research_evidence_synthesis_exchange_digests_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["research_evidence_synthesis_evidence_digest_set_bound"]
+        )
+        self.assertTrue(result["validation"]["research_evidence_synthesis_advisory_only"])
+        self.assertTrue(
+            result["validation"]["research_evidence_synthesis_ledger_entry_appended"]
+        )
+        self.assertFalse(
+            result["validation"]["research_evidence_synthesis_decision_authority_claimed"]
+        )
+        self.assertFalse(result["validation"]["research_evidence_synthesis_raw_payload_stored"])
         self.assertEqual(
             "neuroscience-scout",
             result["research_evidence_exchange"]["researcher_agent_id"],
+        )
+        self.assertIn(
+            "legal-scholar",
+            result["research_evidence_synthesis"]["researcher_agent_ids"],
         )
         self.assertFalse(result["validation"]["raw_signature_payload_exposed"])
         self.assertFalse(result["validation"]["raw_source_payload_stored"])

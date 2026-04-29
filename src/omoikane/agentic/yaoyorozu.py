@@ -107,8 +107,14 @@ YAOYOROZU_AGENT_SOURCE_MANIFEST_PUBLIC_VERIFICATION_PROFILE = (
 YAOYOROZU_RESEARCH_EVIDENCE_EXCHANGE_PROFILE = (
     "repo-local-research-evidence-exchange-v1"
 )
+YAOYOROZU_RESEARCH_EVIDENCE_SYNTHESIS_PROFILE = (
+    "repo-local-research-evidence-synthesis-v1"
+)
 YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_CATEGORY = "yaoyorozu-research-evidence"
 YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_EVENT_TYPE = "yaoyorozu.research_evidence.bound"
+YAOYOROZU_RESEARCH_EVIDENCE_SYNTHESIS_LEDGER_EVENT_TYPE = (
+    "yaoyorozu.research_evidence.synthesized"
+)
 YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES = ["council", "guardian"]
 AGENT_SOURCE_DEFINITION_SCHEMA_VERSION = "1.0.0"
 AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
@@ -1082,6 +1088,75 @@ def _research_evidence_exchange_continuity_payload(
         "advisory_only": exchange["advisory_only"],
         "raw_research_payload_stored": exchange["raw_research_payload_stored"],
         "decision_authority_claimed": exchange["decision_authority_claimed"],
+    }
+
+
+def _research_evidence_synthesis_digest_payload(
+    synthesis: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": synthesis["kind"],
+        "schema_version": synthesis["schema_version"],
+        "synthesis_id": synthesis["synthesis_id"],
+        "synthesis_ref": synthesis["synthesis_ref"],
+        "recorded_at": synthesis["recorded_at"],
+        "profile_id": synthesis["profile_id"],
+        "registry_snapshot_ref": synthesis["registry_snapshot_ref"],
+        "registry_digest": synthesis["registry_digest"],
+        "source_manifest_digest": synthesis["source_manifest_digest"],
+        "council_session_ref": synthesis["council_session_ref"],
+        "exchange_refs": synthesis["exchange_refs"],
+        "exchange_digests": synthesis["exchange_digests"],
+        "exchange_count": synthesis["exchange_count"],
+        "researcher_agent_ids": synthesis["researcher_agent_ids"],
+        "research_domain_refs": synthesis["research_domain_refs"],
+        "evidence_refs": synthesis["evidence_refs"],
+        "evidence_digest_set": synthesis["evidence_digest_set"],
+        "claim_ceiling": synthesis["claim_ceiling"],
+        "synthesis_summary": synthesis["synthesis_summary"],
+        "advisory_design_implications": synthesis["advisory_design_implications"],
+        "raw_exchange_payload_stored": synthesis["raw_exchange_payload_stored"],
+        "raw_research_payload_stored": synthesis["raw_research_payload_stored"],
+        "decision_authority_claimed": synthesis["decision_authority_claimed"],
+        "continuity_event_ref": synthesis["continuity_event_ref"],
+        "continuity_event_digest": synthesis["continuity_event_digest"],
+        "continuity_ledger_category": synthesis["continuity_ledger_category"],
+        "continuity_ledger_event_type": synthesis["continuity_ledger_event_type"],
+        "continuity_ledger_signature_roles": synthesis[
+            "continuity_ledger_signature_roles"
+        ],
+        "continuity_ledger_appended": synthesis["continuity_ledger_appended"],
+        "continuity_ledger_entry_ref": synthesis["continuity_ledger_entry_ref"],
+        "continuity_ledger_entry_hash": synthesis["continuity_ledger_entry_hash"],
+        "continuity_ledger_payload_ref": synthesis["continuity_ledger_payload_ref"],
+    }
+
+
+def _research_evidence_synthesis_continuity_payload(
+    synthesis: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "event_ref": synthesis["continuity_event_ref"],
+        "category": synthesis["continuity_ledger_category"],
+        "event_type": synthesis["continuity_ledger_event_type"],
+        "profile_id": synthesis["profile_id"],
+        "synthesis_id": synthesis["synthesis_id"],
+        "synthesis_ref": synthesis["synthesis_ref"],
+        "registry_snapshot_ref": synthesis["registry_snapshot_ref"],
+        "registry_digest": synthesis["registry_digest"],
+        "source_manifest_digest": synthesis["source_manifest_digest"],
+        "council_session_ref": synthesis["council_session_ref"],
+        "exchange_refs": synthesis["exchange_refs"],
+        "exchange_digests": synthesis["exchange_digests"],
+        "exchange_count": synthesis["exchange_count"],
+        "researcher_agent_ids": synthesis["researcher_agent_ids"],
+        "research_domain_refs": synthesis["research_domain_refs"],
+        "evidence_refs": synthesis["evidence_refs"],
+        "evidence_digest_set": synthesis["evidence_digest_set"],
+        "claim_ceiling": synthesis["claim_ceiling"],
+        "raw_exchange_payload_stored": synthesis["raw_exchange_payload_stored"],
+        "raw_research_payload_stored": synthesis["raw_research_payload_stored"],
+        "decision_authority_claimed": synthesis["decision_authority_claimed"],
     }
 
 
@@ -3925,6 +4000,424 @@ class YaoyorozuRegistryService:
             "advisory_only": advisory_only,
             "raw_research_payload_stored": not raw_payload_clean,
             "decision_authority_claimed": not decision_authority_clean,
+            "continuity_ledger_entry_appended": continuity_ledger_entry_appended,
+            "continuity_ledger_entry_digest_bound": continuity_ledger_entry_digest_bound,
+            "continuity_ledger_payload_ref_bound": continuity_ledger_payload_ref_bound,
+            "continuity_ledger_signature_roles_bound": (
+                continuity_ledger_signature_roles_bound
+            ),
+            "errors": errors,
+        }
+
+    def build_research_evidence_exchanges(
+        self,
+        registry_snapshot: Mapping[str, Any],
+        *,
+        requested_by_ref: str,
+        preferred_researcher_agent_ids: Optional[Sequence[str]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Build a deterministic multi-researcher exchange set for Council synthesis."""
+        researcher_entries = [
+            entry
+            for entry in registry_snapshot.get("entries", [])
+            if isinstance(entry, Mapping) and entry.get("role") == "researcher"
+        ]
+        if len(researcher_entries) < 2:
+            raise ValueError("at least two researcher entries are required for synthesis")
+        available_ids = [
+            _non_empty_string(entry.get("agent_id"), "researcher_agent_id")
+            for entry in researcher_entries
+        ]
+        preferred_ids = list(
+            preferred_researcher_agent_ids
+            or ("neuroscience-scout", "legal-scholar")
+        )
+        selected_ids = _ordered_unique(
+            [agent_id for agent_id in preferred_ids if agent_id in available_ids]
+        )
+        for agent_id in available_ids:
+            if len(selected_ids) >= 2:
+                break
+            if agent_id not in selected_ids:
+                selected_ids.append(agent_id)
+        if len(selected_ids) < 2:
+            raise ValueError("research evidence synthesis requires two distinct researchers")
+
+        return [
+            self.build_research_evidence_exchange(
+                registry_snapshot,
+                requested_by_ref=requested_by_ref,
+                preferred_researcher_agent_id=agent_id,
+            )
+            for agent_id in selected_ids
+        ]
+
+    def build_research_evidence_synthesis(
+        self,
+        exchange_receipts: Sequence[Mapping[str, Any]],
+        registry_snapshot: Mapping[str, Any],
+        *,
+        council_session_ref: str,
+    ) -> Dict[str, Any]:
+        """Synthesize multiple advisory researcher exchanges for Council deliberation."""
+        exchanges = [dict(exchange) for exchange in exchange_receipts]
+        if len(exchanges) < 2:
+            raise ValueError("research evidence synthesis requires at least two exchanges")
+        exchange_refs = [_non_empty_string(exchange.get("exchange_ref"), "exchange_ref") for exchange in exchanges]
+        exchange_digests = [
+            _non_empty_string(exchange.get("exchange_digest"), "exchange_digest")
+            for exchange in exchanges
+        ]
+        researcher_agent_ids = _ordered_unique(
+            [
+                _non_empty_string(exchange.get("researcher_agent_id"), "researcher_agent_id")
+                for exchange in exchanges
+            ]
+        )
+        research_domain_refs = _ordered_unique(
+            [
+                str(ref)
+                for exchange in exchanges
+                for ref in exchange.get("research_domain_refs", [])
+            ]
+        )
+        evidence_refs = _ordered_unique(
+            [
+                str(ref)
+                for exchange in exchanges
+                for ref in exchange.get("evidence_refs", [])
+            ]
+        )
+        evidence_digest_set: List[Dict[str, Any]] = []
+        for exchange in exchanges:
+            report = exchange.get("report", {})
+            for item in report.get("evidence_items", []) if isinstance(report, Mapping) else []:
+                if not isinstance(item, Mapping):
+                    continue
+                evidence_digest_set.append(
+                    {
+                        "exchange_ref": exchange["exchange_ref"],
+                        "researcher_agent_id": exchange["researcher_agent_id"],
+                        "evidence_ref": item["evidence_ref"],
+                        "evidence_digest": item["evidence_digest"],
+                        "claim_scope": item["claim_scope"],
+                    }
+                )
+        advisory_design_implications = [
+            {
+                "implication_id": new_id("research-implication"),
+                "summary": (
+                    "Treat multi-researcher Yaoyorozu evidence as Council input only; "
+                    "do not grant runtime write or decision authority."
+                ),
+                "target_ref": "docs/07-reference-implementation/README.md",
+                "authority_level": "advisory-only",
+                "source_exchange_refs": list(exchange_refs),
+            }
+        ]
+        synthesis_id = new_id("yaoyorozu-research-evidence-synthesis")
+        synthesis: Dict[str, Any] = {
+            "kind": "yaoyorozu_research_evidence_synthesis",
+            "schema_version": "1.0.0",
+            "synthesis_id": synthesis_id,
+            "synthesis_ref": f"research-evidence-synthesis://{synthesis_id}",
+            "recorded_at": utc_now_iso(),
+            "profile_id": YAOYOROZU_RESEARCH_EVIDENCE_SYNTHESIS_PROFILE,
+            "registry_snapshot_ref": f"registry://{registry_snapshot['registry_id']}",
+            "registry_digest": str(registry_snapshot.get("registry_digest", "")),
+            "source_manifest_digest": str(
+                registry_snapshot.get("source_manifest_digest", "")
+            ),
+            "council_session_ref": _non_empty_string(council_session_ref, "council_session_ref"),
+            "exchange_refs": exchange_refs,
+            "exchange_digests": exchange_digests,
+            "exchange_count": len(exchanges),
+            "researcher_agent_ids": researcher_agent_ids,
+            "research_domain_refs": research_domain_refs,
+            "evidence_refs": evidence_refs,
+            "evidence_digest_set": evidence_digest_set,
+            "claim_ceiling": "implementation-advisory",
+            "synthesis_summary": (
+                "Multiple Yaoyorozu researcher exchanges were reduced to digest-only, "
+                "advisory Council input with no raw research payload retention."
+            ),
+            "advisory_design_implications": advisory_design_implications,
+            "raw_exchange_payload_stored": False,
+            "raw_research_payload_stored": False,
+            "decision_authority_claimed": False,
+            "continuity_event_ref": f"ledger://yaoyorozu/research-evidence/{synthesis_id}",
+            "continuity_event_digest": "",
+            "continuity_ledger_category": YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_CATEGORY,
+            "continuity_ledger_event_type": (
+                YAOYOROZU_RESEARCH_EVIDENCE_SYNTHESIS_LEDGER_EVENT_TYPE
+            ),
+            "continuity_ledger_signature_roles": list(
+                YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES
+            ),
+            "continuity_ledger_appended": False,
+            "continuity_ledger_entry_ref": None,
+            "continuity_ledger_entry_hash": None,
+            "continuity_ledger_payload_ref": None,
+            "exchange_receipts": exchanges,
+        }
+        synthesis["continuity_event_digest"] = sha256_text(
+            canonical_json(_research_evidence_synthesis_continuity_payload(synthesis))
+        )
+        synthesis["synthesis_digest"] = sha256_text(
+            canonical_json(_research_evidence_synthesis_digest_payload(synthesis))
+        )
+        synthesis["validation"] = self.validate_research_evidence_synthesis(
+            synthesis,
+            registry_snapshot,
+        )
+        return synthesis
+
+    def research_evidence_synthesis_continuity_event_payload(
+        self,
+        synthesis: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Return the digest-only multi-researcher synthesis payload for ledger append."""
+        return _research_evidence_synthesis_continuity_payload(synthesis)
+
+    def bind_research_evidence_synthesis_ledger_entry(
+        self,
+        synthesis: Dict[str, Any],
+        ledger_entry: Any,
+        registry_snapshot: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Attach a real ContinuityLedger entry to one synthesis receipt."""
+        expected_payload = self.research_evidence_synthesis_continuity_event_payload(
+            synthesis
+        )
+        expected_payload_digest = sha256_text(canonical_json(expected_payload))
+        expected_payload_ref = f"cas://sha256/{expected_payload_digest}"
+        expected_roles = list(YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES)
+        observed_roles = list(getattr(ledger_entry, "signatures", {}).keys())
+        entry_bound = (
+            getattr(ledger_entry, "payload", None) == expected_payload
+            and getattr(ledger_entry, "category", None)
+            == YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_CATEGORY
+            and getattr(ledger_entry, "event_type", None)
+            == YAOYOROZU_RESEARCH_EVIDENCE_SYNTHESIS_LEDGER_EVENT_TYPE
+            and getattr(ledger_entry, "layer", None) == "L4"
+        )
+        payload_ref_bound = getattr(ledger_entry, "payload_ref", None) == expected_payload_ref
+        signature_roles_bound = observed_roles == expected_roles
+        synthesis["continuity_event_digest"] = expected_payload_digest
+        synthesis["continuity_ledger_appended"] = bool(
+            entry_bound and payload_ref_bound and signature_roles_bound
+        )
+        synthesis["continuity_ledger_entry_ref"] = (
+            f"ledger://continuity-ledger/{ledger_entry.entry_id}"
+        )
+        synthesis["continuity_ledger_entry_hash"] = ledger_entry.entry_hash
+        synthesis["continuity_ledger_payload_ref"] = ledger_entry.payload_ref
+        synthesis["synthesis_digest"] = sha256_text(
+            canonical_json(_research_evidence_synthesis_digest_payload(synthesis))
+        )
+        synthesis["validation"] = self.validate_research_evidence_synthesis(
+            synthesis,
+            registry_snapshot,
+        )
+        return synthesis
+
+    def validate_research_evidence_synthesis(
+        self,
+        synthesis: Mapping[str, Any],
+        registry_snapshot: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Validate a multi-researcher digest-only synthesis receipt."""
+        errors: List[str] = []
+        exchanges = [
+            exchange
+            for exchange in synthesis.get("exchange_receipts", [])
+            if isinstance(exchange, Mapping)
+        ]
+        exchange_refs = [str(exchange.get("exchange_ref", "")) for exchange in exchanges]
+        exchange_digests = [
+            str(exchange.get("exchange_digest", "")) for exchange in exchanges
+        ]
+        researcher_agent_ids = _ordered_unique(
+            [str(exchange.get("researcher_agent_id", "")) for exchange in exchanges]
+        )
+        evidence_digest_set: List[Dict[str, Any]] = []
+        for exchange in exchanges:
+            report = exchange.get("report", {})
+            if not isinstance(report, Mapping):
+                continue
+            for item in report.get("evidence_items", []):
+                if not isinstance(item, Mapping):
+                    continue
+                evidence_digest_set.append(
+                    {
+                        "exchange_ref": exchange.get("exchange_ref"),
+                        "researcher_agent_id": exchange.get("researcher_agent_id"),
+                        "evidence_ref": item.get("evidence_ref"),
+                        "evidence_digest": item.get("evidence_digest"),
+                        "claim_scope": item.get("claim_scope"),
+                    }
+                )
+
+        registry_bound = (
+            synthesis.get("registry_snapshot_ref")
+            == f"registry://{registry_snapshot.get('registry_id')}"
+            and synthesis.get("registry_digest") == registry_snapshot.get("registry_digest")
+            and synthesis.get("source_manifest_digest")
+            == registry_snapshot.get("source_manifest_digest")
+        )
+        if not registry_bound:
+            errors.append("synthesis must bind the registry snapshot and source manifest")
+
+        exchange_count_bound = (
+            len(exchanges) >= 2
+            and synthesis.get("exchange_count") == len(exchanges)
+            and synthesis.get("exchange_refs") == exchange_refs
+        )
+        if not exchange_count_bound:
+            errors.append("synthesis must bind at least two exchange refs")
+
+        researcher_diversity_bound = (
+            len(researcher_agent_ids) >= 2
+            and synthesis.get("researcher_agent_ids") == researcher_agent_ids
+        )
+        if not researcher_diversity_bound:
+            errors.append("synthesis must bind at least two distinct researchers")
+
+        exchange_validations_bound = all(
+            isinstance(exchange.get("validation"), Mapping)
+            and exchange["validation"].get("ok") is True
+            and exchange.get("continuity_ledger_appended") is True
+            and exchange.get("registry_digest") == synthesis.get("registry_digest")
+            and exchange.get("source_manifest_digest")
+            == synthesis.get("source_manifest_digest")
+            for exchange in exchanges
+        )
+        if not exchange_validations_bound:
+            errors.append("all source exchanges must be valid ledger-appended receipts")
+
+        exchange_digests_bound = (
+            synthesis.get("exchange_digests") == exchange_digests
+            and all(len(digest) == 64 for digest in exchange_digests)
+        )
+        if not exchange_digests_bound:
+            errors.append("synthesis exchange digests must match source exchange receipts")
+
+        evidence_refs = _ordered_unique(
+            [
+                str(ref)
+                for exchange in exchanges
+                for ref in exchange.get("evidence_refs", [])
+            ]
+        )
+        research_domain_refs = _ordered_unique(
+            [
+                str(ref)
+                for exchange in exchanges
+                for ref in exchange.get("research_domain_refs", [])
+            ]
+        )
+        evidence_digest_set_bound = (
+            synthesis.get("evidence_refs") == evidence_refs
+            and synthesis.get("research_domain_refs") == research_domain_refs
+            and synthesis.get("evidence_digest_set") == evidence_digest_set
+            and bool(evidence_digest_set)
+        )
+        if not evidence_digest_set_bound:
+            errors.append("synthesis must bind evidence refs and evidence digests")
+
+        advisory_only = (
+            synthesis.get("claim_ceiling") == "implementation-advisory"
+            and synthesis.get("raw_exchange_payload_stored") is False
+            and synthesis.get("raw_research_payload_stored") is False
+            and synthesis.get("decision_authority_claimed") is False
+            and all(
+                isinstance(implication, Mapping)
+                and implication.get("authority_level") == "advisory-only"
+                for implication in synthesis.get("advisory_design_implications", [])
+            )
+            and all(
+                exchange.get("claim_ceiling") == "implementation-advisory"
+                and exchange.get("advisory_only") is True
+                and exchange.get("raw_research_payload_stored") is False
+                and exchange.get("decision_authority_claimed") is False
+                for exchange in exchanges
+            )
+        )
+        if not advisory_only:
+            errors.append("synthesis must remain advisory-only with no raw payload retention")
+
+        try:
+            continuity_event_digest_bound = (
+                synthesis.get("continuity_event_digest")
+                == sha256_text(
+                    canonical_json(_research_evidence_synthesis_continuity_payload(synthesis))
+                )
+            )
+        except (KeyError, TypeError):
+            continuity_event_digest_bound = False
+            errors.append("research evidence synthesis continuity payload is incomplete")
+        if not continuity_event_digest_bound:
+            errors.append("continuity_event_digest must bind synthesis evidence")
+
+        try:
+            synthesis_digest_bound = (
+                synthesis.get("synthesis_digest")
+                == sha256_text(
+                    canonical_json(_research_evidence_synthesis_digest_payload(synthesis))
+                )
+            )
+        except (KeyError, TypeError):
+            synthesis_digest_bound = False
+            errors.append("research evidence synthesis digest payload is incomplete")
+        if not synthesis_digest_bound:
+            errors.append("synthesis_digest must bind synthesis receipt")
+
+        expected_roles = list(YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES)
+        continuity_ledger_signature_roles_bound = (
+            synthesis.get("continuity_ledger_signature_roles") == expected_roles
+        )
+        continuity_ledger_entry_appended = synthesis.get("continuity_ledger_appended") is True
+        continuity_ledger_entry_digest_bound = (
+            continuity_ledger_entry_appended
+            and str(synthesis.get("continuity_ledger_entry_ref", "")).startswith(
+                "ledger://continuity-ledger/"
+            )
+            and bool(synthesis.get("continuity_ledger_entry_hash"))
+        )
+        continuity_ledger_payload_ref_bound = (
+            continuity_ledger_entry_appended
+            and synthesis.get("continuity_ledger_payload_ref")
+            == f"cas://sha256/{synthesis.get('continuity_event_digest')}"
+        )
+        if not continuity_ledger_signature_roles_bound:
+            errors.append("synthesis ledger signature roles must be council+guardian")
+        if not continuity_ledger_entry_appended:
+            errors.append("research evidence synthesis must be appended to ContinuityLedger")
+        if not continuity_ledger_entry_digest_bound:
+            errors.append("synthesis ledger entry ref/hash must be bound")
+        if not continuity_ledger_payload_ref_bound:
+            errors.append("synthesis ledger payload ref must bind event digest")
+
+        return {
+            "ok": not errors,
+            "registry_bound": registry_bound,
+            "exchange_count_bound": exchange_count_bound,
+            "researcher_diversity_bound": researcher_diversity_bound,
+            "exchange_validations_bound": exchange_validations_bound,
+            "exchange_digests_bound": exchange_digests_bound,
+            "evidence_digest_set_bound": evidence_digest_set_bound,
+            "advisory_only": advisory_only,
+            "raw_exchange_payload_stored": bool(
+                synthesis.get("raw_exchange_payload_stored")
+            ),
+            "raw_research_payload_stored": bool(
+                synthesis.get("raw_research_payload_stored")
+            ),
+            "decision_authority_claimed": bool(
+                synthesis.get("decision_authority_claimed")
+            ),
+            "continuity_event_digest_bound": continuity_event_digest_bound,
+            "synthesis_digest_bound": synthesis_digest_bound,
             "continuity_ledger_entry_appended": continuity_ledger_entry_appended,
             "continuity_ledger_entry_digest_bound": continuity_ledger_entry_digest_bound,
             "continuity_ledger_payload_ref_bound": continuity_ledger_payload_ref_bound,

@@ -133,6 +133,10 @@ reviewer-facing に確認できるようにする。
 Council session schema を再利用しない。researcher output は claim ceiling、
 advisory-only implication、raw research payload 非保存、decision authority 不保持を
 schema contract として返す。
+複数 researcher の exchange は `yaoyorozu_research_evidence_synthesis` により
+exchange digest set / evidence digest set / Council session ref へ束縛され、
+raw exchange payload と raw research payload を保存しないまま Council deliberation の
+advisory input に縮約される。
 
 Builder role は registry materialization 前に `build_surface_refs` と
 `execution_policy_ref` を必須とする。Yaoyorozu registry は builder が触れる

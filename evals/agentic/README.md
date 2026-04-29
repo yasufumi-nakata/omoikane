@@ -185,6 +185,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `yaoyorozu_consensus_dispatch.yaml`
 - `yaoyorozu_source_manifest_public_verification.yaml`
 - `yaoyorozu_research_evidence_exchange.yaml`
+- `yaoyorozu_research_evidence_synthesis.yaml`
 - `yaoyorozu_council_convocation.yaml`
 - `yaoyorozu_fork_request_profile.yaml`
 - `yaoyorozu_inter_mind_negotiation_profile.yaml`
