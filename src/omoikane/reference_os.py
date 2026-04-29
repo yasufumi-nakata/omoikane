@@ -89,6 +89,7 @@ from .governance import (
     VersioningService,
 )
 from .interface.bdb import BiologicalDigitalBridge
+from .interface.biodata_transmitter import BioDataTransmitter
 from .interface.collective import CollectiveIdentityService
 from .interface.ewa import ExternalWorldAgentController
 from .interface.imc import (
@@ -249,6 +250,7 @@ class OmoikaneReferenceOS:
             ],
         )
         self.bdb = BiologicalDigitalBridge()
+        self.biodata_transmitter = BioDataTransmitter()
         self.ewa = ExternalWorldAgentController(self.ethics)
         self.imc = InterMindChannel()
         self.collective = CollectiveIdentityService()
@@ -7681,6 +7683,135 @@ json.dump(response, sys.stdout)
                 "decrease": decrease,
             },
             "fallback": fallback,
+            "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_biodata_transmitter_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://biodata-transmitter-demo/v1",
+            metadata={"display_name": "BioData Transmitter Sandbox"},
+        )
+        session = self.biodata_transmitter.open_session(
+            identity.identity_id,
+            source_modalities=["eeg", "ecg", "ppg", "eda", "respiration"],
+            target_modalities=["ecg", "ppg", "respiration", "eeg", "affect", "thought"],
+        )
+        latent_state = self.biodata_transmitter.encode_body_state(
+            session["session_id"],
+            biosignal_features={
+                "eeg": {
+                    "alpha_power": 0.38,
+                    "theta_power": 0.29,
+                    "beta_power": 0.34,
+                },
+                "ecg": {
+                    "heart_rate_bpm": 76.0,
+                    "hrv_rmssd_ms": 44.0,
+                },
+                "ppg": {
+                    "pulse_rate_bpm": 75.6,
+                    "pulse_amplitude": 0.71,
+                },
+                "eda": {
+                    "skin_conductance_microsiemens": 5.2,
+                },
+                "respiration": {
+                    "rate_bpm": 16.2,
+                    "phase": "exhale",
+                },
+            },
+            context_label="quiet-review-with-attention-shift",
+        )
+        generated_bundle = self.biodata_transmitter.generate_biosignal_bundle(
+            session["session_id"],
+            latent_state,
+        )
+        validation = self.biodata_transmitter.validate_transmission(
+            session,
+            latent_state,
+            generated_bundle,
+        )
+
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.session.opened",
+            payload={
+                "session_id": session["session_id"],
+                "profile_id": session["profile_id"],
+                "source_modalities": session["source_modalities"],
+                "target_modalities": session["target_modalities"],
+                "mind_upload_conflict_sink_url": session["mind_upload_conflict_sink_url"],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter",
+            layer="L6",
+            signature_roles=["self"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.body_state_encoded",
+            payload={
+                "latent_ref": latent_state["latent_ref"],
+                "latent_digest": latent_state["latent_digest"],
+                "source_feature_digest": latent_state["source_feature_digest"],
+                "interoceptive_confidence": latent_state["interoceptive_confidence"],
+                "raw_source_payload_stored": latent_state["raw_source_payload_stored"],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.signal_bundle_generated",
+            payload={
+                "bundle_ref": generated_bundle["bundle_ref"],
+                "bundle_digest": generated_bundle["bundle_digest"],
+                "source_latent_digest": generated_bundle["source_latent_digest"],
+                "target_modalities": generated_bundle["target_modalities"],
+                "raw_generated_waveform_stored": generated_bundle[
+                    "raw_generated_waveform_stored"
+                ],
+                "semantic_thought_content_generated": generated_bundle[
+                    "semantic_thought_content_generated"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.conflict_sink_bound",
+            payload={
+                "mind_upload_conflict_sink_url": session["mind_upload_conflict_sink_url"],
+                "conflict_refs": session["conflict_refs"],
+                "subjective_equivalence_claimed": False,
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-conflict",
+            layer="L6",
+            signature_roles=["guardian"],
+            substrate="hybrid-bio-digital",
+        )
+
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.biodata_transmitter.reference_profile(),
+            "session": session,
+            "latent_state": latent_state,
+            "generated_bundle": generated_bundle,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

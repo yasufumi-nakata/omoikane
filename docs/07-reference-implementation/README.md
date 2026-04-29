@@ -52,6 +52,7 @@ PYTHONPATH=src python3 -m omoikane.cli energy-budget-pool-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-subsidy-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-fabric-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
+PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
@@ -1055,6 +1056,14 @@ single-switch failover、`SelfModelMonitor` の abrupt change と
 `latency_budget_ms=5.0`、`failover_budget_ms=1.0`、
 coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 をまとめて確認する。
+
+`biodata-transmitter-demo` は L6 BioData Transmitter の reference contract
+(`interface.biodata_transmitter.v0`) を JSON で可視化し、
+EEG/ECG/PPG/EDA/respiration features を `physiology-latent-body-state-v0` に束ね、
+ECG/PPG/respiration/EEG/affect/thought proxy を生成する。
+同じ demo は literature refs、source feature digest、latent digest、generated bundle digest、
+`mind-upload.com` conflict sink binding、raw source payload / raw generated waveform 非保持、
+semantic thought content 非生成、subjective equivalence 非主張をまとめて検証する。
 
 `imc-demo` は L6 Inter-Mind Channel の reference contract
 (`interface.imc.v0`) を JSON で可視化し、

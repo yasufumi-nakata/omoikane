@@ -49,6 +49,7 @@
 
 | 用語 | 意味 |
 |---|---|
+| **BDT** | BioData Transmitter |
 | **BDB** | Biological-Digital Bridge |
 | **IMC** | Inter-Mind Channel |
 | **WMS** | World Model Sync |

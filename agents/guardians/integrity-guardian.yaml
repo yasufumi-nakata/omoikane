@@ -14,6 +14,7 @@ capabilities:
   - memory-replication.long-term-media-registry-endpoint-certificate-ct-log.attest
   - memory-replication.long-term-media-registry-endpoint-certificate-sct-policy.attest
   - continuity.public-verification.attest
+  - biodata-transmitter.roundtrip.attest
   - collective.dissolution-receipt.attest
   - collective.recovery-verifier-transport.attest
   - collective.recovery-route-trace.attest
@@ -84,7 +85,11 @@ output_schema_ref: specs/schemas/guardian_oversight_event.schema
 oversight_scope_refs:
   - docs/02-subsystems/kernel/continuity-ledger.md
   - docs/02-subsystems/mind-substrate/memory-model.md
+  - docs/02-subsystems/interface/biodata-transmitter.md
   - docs/02-subsystems/interface/wms-spec.md
+  - specs/schemas/biodata_transmitter_session.schema
+  - specs/schemas/biodata_body_state_latent.schema
+  - specs/schemas/biodata_signal_bundle.schema
   - docs/02-subsystems/agentic/yaoyorozu-roster.md
   - specs/schemas/gap_report.schema
   - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
@@ -103,6 +108,7 @@ when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
+  - BioData Transmitter の source feature digest、body-state latent digest、generated bundle digest、literature refs、mind-upload.com conflict sink、raw biosignal payload 非保存、semantic thought content 非生成を検証する時
   - Yaoyorozu researcher evidence verifier の live transport quorum / signed response / freshness window を検証する時
   - MemoryCrystal replication の key succession receipt が 3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref、JP-13 signer roster policy digest、identity-guardian / integrity-guardian signature digest、JP-13 + SG-01 multi-jurisdiction signer roster quorum digest、quorum threshold policy registry digest と authority signature digest に束縛され、raw key / raw shard / raw jurisdiction policy / raw quorum threshold policy / raw signer roster payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal receipt が coldstore / trustee の renewed media proof、readback digest、migration attestation digest、3650 日 refresh interval、1000 年 target horizon に束縛され、raw media / raw readback payload を保存していないことを検証する時

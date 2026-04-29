@@ -1,0 +1,136 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_transmitter_session.schema"
+title: BioDataTransmitterSession
+description: >
+  Person-bound L6 transmitter session that maps biological data through an
+  internal body-state latent before generating bounded target biosignal proxies.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - session_id
+  - identity_id
+  - opened_at
+  - profile_id
+  - latent_profile_id
+  - generator_profile_id
+  - source_modalities
+  - target_modalities
+  - literature_refs
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - storage_policy
+  - raw_source_payload_stored
+  - raw_generated_waveform_stored
+  - subjective_equivalence_claimed
+  - last_latent_ref
+  - last_generated_bundle_ref
+properties:
+  schema_version:
+    const: "1.0"
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  opened_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: person-bound-biodata-transmitter-v0
+  latent_profile_id:
+    const: physiology-latent-body-state-v0
+  generator_profile_id:
+    const: bounded-cross-modal-biosignal-generator-v0
+  source_modalities:
+    $ref: "#/$defs/modalities"
+  target_modalities:
+    $ref: "#/$defs/modalities"
+  literature_refs:
+    type: array
+    minItems: 5
+    items:
+      $ref: "#/$defs/literature_ref"
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/conflict_ref"
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/biosignal-transmitter
+  storage_policy:
+    const: feature-digest+latent-summary-only
+  raw_source_payload_stored:
+    const: false
+  raw_generated_waveform_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  last_latent_ref:
+    type: string
+  last_generated_bundle_ref:
+    type: string
+$defs:
+  modalities:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - eeg
+        - ecg
+        - ppg
+        - eda
+        - respiration
+        - affect
+        - thought
+  literature_ref:
+    type: object
+    additionalProperties: false
+    required:
+      - ref_id
+      - title
+      - url
+      - claim
+      - claim_status
+    properties:
+      ref_id:
+        type: string
+        minLength: 1
+      title:
+        type: string
+        minLength: 1
+      url:
+        type: string
+        minLength: 1
+      claim:
+        type: string
+        minLength: 1
+      claim_status:
+        type: string
+        minLength: 1
+  conflict_ref:
+    type: object
+    additionalProperties: false
+    required:
+      - topic
+      - status
+      - mind_upload_ref
+      - reason
+    properties:
+      topic:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        enum:
+          - unresolved
+          - insufficient-evidence
+      mind_upload_ref:
+        type: string
+        pattern: "^https://mind-upload\\.com/frontiers/biosignal-transmitter#"
+      reason:
+        type: string
+        minLength: 1

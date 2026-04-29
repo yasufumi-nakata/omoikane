@@ -2183,6 +2183,45 @@ entries:
     rationale: Required to serialize one closed-loop BDB cycle with latency evidence and continuity refs.
   - priority: P1
     kind: schema
+    file: specs/schemas/biodata_transmitter_session.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+    rationale: Required to open a person-bound biosignal transmitter session with literature refs and mind-upload.com conflict sinks.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/biodata_body_state_latent.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+    rationale: Required to serialize the internal body-state intermediate representation between source and target biosignals.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/biodata_signal_bundle.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+    rationale: Required to serialize generated target biosignal, affect, and thought-pressure proxies without raw waveform storage.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/interface.biodata_transmitter.v0.idl
+    consumers:
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - docs/05-research-frontiers/biosignal-transmitter.md
+      - reference-runtime
+    rationale: Required to make the biosignal to body-state latent to biosignal transmitter machine-readable.
+  - priority: P1
+    kind: eval
+    file: evals/interface/biodata_transmitter_roundtrip.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+    rationale: Protects literature-backed intermediate, target signal generation, mind-upload.com conflict sink binding, and raw payload redaction.
+  - priority: P1
+    kind: schema
     file: specs/schemas/bdb_session.schema
     consumers:
       - specs/interfaces/interface.bdb.v0.idl

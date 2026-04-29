@@ -21,6 +21,7 @@
 - `governance.amendment.v0.idl`
 - `governance.naming.v0.idl`
 - `governance.oversight.v0.idl`
+- `interface.biodata_transmitter.v0.idl`
 - `interface.bdb.v0.idl`
 - `interface.collective.v0.idl`
 - `interface.ewa.v0.idl`

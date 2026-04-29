@@ -11,6 +11,7 @@ ContinuityLedger、build artifact、workspace seed、registry snapshot、externa
 - Yaoyorozu registry snapshot では raw agent source set の digest manifest、dedicated ContinuityLedger binding、builder coverage target path binding を確認する
 - source manifest public verification bundle では self+guardian signature digest と verifier key refs を raw signature payload なしで確認する
 - researcher evidence verifier では repo-local readback digest、live verifier transport quorum、signed response envelope、freshness window を確認し、raw response / signature payload を保持しない
+- BioData Transmitter では source feature digest、body-state latent digest、generated bundle digest、literature refs、mind-upload.com conflict sink を確認し、raw biosignal payload、raw generated waveform、semantic thought content を保持しない
 - 監査対象は repo-local ref と digest evidence に限定し、raw build transcript、raw registry payload、raw packet body を保持しない
 
 ## 権限

@@ -7,9 +7,9 @@
                           │
                           ▼
             ┌──────────────────────────┐
-   L6       │ Interface (BCI / IMC)    │
+   L6       │ Interface (BDT / BCI / IMC) │
             └─────────┬────────────────┘
-                      │ 入力 stream
+                      │ 生体データ / body-state latent / 入力 stream
                       ▼
             ┌──────────────────────────┐
    L3       │ Perception → Attention   │──┐
@@ -36,6 +36,11 @@
    L0       │ Quantum / Neuro / Bio    │
             └──────────────────────────┘
 ```
+
+BioData Transmitter は L6 の入口で、脳波・心電・脈波・皮膚電気活動・呼吸などを
+`internal body-state latent` に束ね、別モダリティの生体データ proxy へ再投影する。
+この latent は L2/L3 へ渡せるが、主観同一性や semantic thought content は
+runtime fact として扱わず、mind-upload.com の conflict sink ref に分離する。
 
 ## 2. 連続性ログの粒度
 

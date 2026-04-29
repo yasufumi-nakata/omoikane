@@ -1,6 +1,9 @@
 # Architecture Overview
 
 OmoikaneOS は **7 層** で構成される。下位層ほど物理に近く、上位層ほど自我に近い。
+実装可能な中心像は、脳波・心電・脈波・皮膚電気活動・呼吸などの生体データを
+その人の `internal body-state latent` に写し、そこから別モダリティの生体データや
+affect / thought-pressure proxy を生成する BioData Transmitter である。
 各層は **未来の Substrate に対して中立** に設計され、層間は明示的なプロトコルでのみ通信する。
 
 ```

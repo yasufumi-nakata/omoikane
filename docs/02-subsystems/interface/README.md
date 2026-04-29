@@ -4,6 +4,15 @@
 
 ## 主要境界
 
+### BioData Transmitter (BDT)
+- 脳波・心電・脈波・皮膚電気活動・呼吸などの生体データ
+- 生体データを `internal body-state latent` に束ね、別モダリティの生体データ proxy を生成
+- affect は valence/arousal proxy、thought は attention-pressure proxy までに制限
+- 主観同一性や thought content の飛躍は `mind-upload.com` conflict sink ref に分離
+- reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json`
+  で literature-backed intermediate、target biosignal generation、raw payload redaction、
+  conflict sink binding をまとめて検証する
+
 ### Biological-Digital Bridge (BDB)
 - BCI（脳-コンピュータ・インタフェース）
 - 神経インタフェース
@@ -82,7 +91,8 @@ if shared_reality.state_hash != local_belief.state_hash:
 
 ## 不変条件
 
-1. **BDB fail-safe** ── 橋が失活したら生体側のみで自律可能な状態へ即時退避
+1. **BDT latent-first** ── 生体データ変換は必ず体内状態 latent を経由する
+2. **BDB fail-safe** ── 橋が失活したら生体側のみで自律可能な状態へ即時退避
 1. **盗聴不可** ── IMC は forward secrecy 必須
 2. **詐称不可** ── 他自我のなりすまし防止
 3. **退避自由** ── 共有現実から個別現実への退避を阻害しない
@@ -90,6 +100,7 @@ if shared_reality.state_hash != local_belief.state_hash:
 
 ## サブドキュメント
 
+- [biodata-transmitter.md](biodata-transmitter.md)
 - [bdb-protocol.md](bdb-protocol.md)
 - [collective-identity.md](collective-identity.md)
 - [imc-protocol.md](imc-protocol.md)

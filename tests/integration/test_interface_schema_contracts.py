@@ -51,6 +51,24 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertIsInstance(cursor, dict)
         return cursor
 
+    def test_biodata_transmitter_demo_matches_public_schemas(self) -> None:
+        result = self.runtime.run_biodata_transmitter_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/biodata_transmitter_session.schema",
+            result["session"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/biodata_body_state_latent.schema",
+            result["latent_state"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/biodata_signal_bundle.schema",
+            result["generated_bundle"],
+        )
+        self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
+        self.assertTrue(result["validation"]["literature_backed_intermediate"])
+
     def test_wms_demo_states_and_reconcile_match_public_schemas(self) -> None:
         result = self.runtime.run_wms_demo()
 

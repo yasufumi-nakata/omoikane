@@ -136,6 +136,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertLessEqual(result["cycle"]["roundtrip_latency_ms"], 5.0)
         self.assertLessEqual(result["fallback"]["failover_latency_ms"], 1.0)
 
+    def test_biodata_transmitter_demo_emits_body_state_roundtrip(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "biodata-transmitter-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
+        self.assertTrue(result["validation"]["literature_backed_intermediate"])
+        self.assertIn("affect", result["generated_bundle"]["signals"])
+        self.assertIn("thought", result["generated_bundle"]["signals"])
+        self.assertFalse(result["generated_bundle"]["semantic_thought_content_generated"])
+
     def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:
         stdout = io.StringIO()
 

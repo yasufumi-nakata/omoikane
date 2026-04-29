@@ -1,0 +1,150 @@
+idl_version: 1
+kind: service
+namespace: interface.biodata_transmitter.v0
+service: BioDataTransmitterService
+summary: >
+  Canonical L6 contract for a person-bound transmitter that maps EEG, ECG, PPG,
+  EDA, and respiration through an internal body-state latent before generating
+  bounded target biosignal, affect, and thought-pressure proxies.
+imports:
+  biodata_transmitter_session: ../schemas/biodata_transmitter_session.schema
+  biodata_body_state_latent: ../schemas/biodata_body_state_latent.schema
+  biodata_signal_bundle: ../schemas/biodata_signal_bundle.schema
+operations:
+  open_session:
+    summary: Open one transmitter session for a single identity and explicit modality set.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - source_modalities
+          - target_modalities
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          source_modalities:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              enum: [eeg, ecg, ppg, eda, respiration]
+          target_modalities:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              enum: [ecg, ppg, respiration, eeg, affect, thought]
+    output:
+      schema_ref: biodata_transmitter_session
+    guarantees:
+      - session must remain person-bound to one identity_id
+      - unresolved equivalence and thought-content claims must point to mind-upload.com conflict refs
+      - raw source payload and raw generated waveform storage must be false
+  encode_body_state:
+    summary: Convert source biosignal features into a digest-bound internal body-state latent.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - biosignal_features
+          - context_label
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          biosignal_features:
+            type: object
+            minProperties: 1
+          context_label:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: biodata_body_state_latent
+    guarantees:
+      - source_feature_digest must bind the input feature summary
+      - physiological axes must include cardiac, autonomic, respiratory, neural, affect, and thought proxies
+      - thought axis must not contain generated semantic thought content
+  generate_biosignal_bundle:
+    summary: Generate bounded target biosignal proxies from one internal body-state latent.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - latent_state
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          latent_state:
+            schema_ref: biodata_body_state_latent
+          target_modalities:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              enum: [ecg, ppg, respiration, eeg, affect, thought]
+    output:
+      schema_ref: biodata_signal_bundle
+    guarantees:
+      - source_latent_digest must match the latent input digest
+      - semantic_thought_content_generated must remain false
+      - subjective_equivalence_claimed must remain false
+  validate_transmission:
+    summary: Verify session, latent, generated bundle, literature refs, and conflict sink binding.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - latent_state
+          - generated_bundle
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          latent_state:
+            schema_ref: biodata_body_state_latent
+          generated_bundle:
+            schema_ref: biodata_signal_bundle
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - literature_backed_intermediate
+          - mind_upload_conflict_sink_bound
+          - target_modalities_generated
+          - semantic_thought_content_generated
+          - subjective_equivalence_claimed
+        properties:
+          ok:
+            type: boolean
+          literature_backed_intermediate:
+            type: boolean
+          mind_upload_conflict_sink_bound:
+            type: boolean
+          target_modalities_generated:
+            type: boolean
+          semantic_thought_content_generated:
+            const: false
+          subjective_equivalence_claimed:
+            const: false
+events:
+  biodata_transmitter.body_state_encoded:
+    payload:
+      schema_ref: biodata_body_state_latent
+  biodata_transmitter.signal_bundle_generated:
+    payload:
+      schema_ref: biodata_signal_bundle
+compatibility:
+  stability: bootstrap
+  notes:
+    - This contract changes the project image toward biosignal transduction without renaming OmoikaneOS.
+    - The intermediate representation is a literature-backed physiological latent, not a claim of full qualia or semantic thought recovery.
+    - Conflicting or under-evidenced claims are routed to mind-upload.com refs rather than treated as settled runtime facts.

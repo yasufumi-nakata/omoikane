@@ -62,6 +62,36 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-bdb"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-bdb-fallback"])
 
+    def test_biodata_transmitter_demo_reports_literature_backed_roundtrip(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_biodata_transmitter_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(
+            "internal-body-state-latent",
+            result["validation"]["intermediate_representation"],
+        )
+        self.assertTrue(result["validation"]["literature_backed_intermediate"])
+        self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
+        self.assertTrue(result["validation"]["target_modalities_generated"])
+        self.assertFalse(result["validation"]["semantic_thought_content_generated"])
+        self.assertFalse(result["validation"]["subjective_equivalence_claimed"])
+        self.assertIn("thought", result["generated_bundle"]["signals"])
+        self.assertFalse(
+            result["generated_bundle"]["signals"]["thought"]["semantic_content_generated"]
+        )
+        self.assertEqual(
+            3,
+            result["ledger_verification"]["category_counts"]["interface-biodata-transmitter"],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-conflict"
+            ],
+        )
+
     def test_imc_demo_reports_disclosure_floor_and_disconnect(self) -> None:
         runtime = OmoikaneReferenceOS()
 

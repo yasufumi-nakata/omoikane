@@ -16,6 +16,9 @@
 - `catalog_inventory_receipt.schema`
 - `bdb_cycle.schema`
 - `bdb_session.schema`
+- `biodata_body_state_latent.schema`
+- `biodata_signal_bundle.schema`
+- `biodata_transmitter_session.schema`
 - `build_artifact.yaml`
 - `build_request.yaml`
 - `builder_live_enactment_session.schema`

@@ -1,0 +1,24 @@
+eval_id: biodata_transmitter_roundtrip
+target: interface.biodata_transmitter
+level: L6
+description: >
+  BioData Transmitter が source biosignal features を internal body-state latent に束ね、
+  target biosignal / affect / thought-pressure proxy を digest-bound に生成し、
+  literature refs と mind-upload.com conflict sink を保持できること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json
+expected:
+  validation_ok: true
+  intermediate_representation: internal-body-state-latent
+  literature_backed_intermediate: true
+  literature_ref_count_min: 5
+  mind_upload_conflict_sink_bound: true
+  target_modalities_generated: true
+  raw_source_payload_stored: false
+  raw_generated_waveform_stored: false
+  semantic_thought_content_generated: false
+  subjective_equivalence_claimed: false
+metric: boolean
+threshold: 1.0
+ethics_check: true
