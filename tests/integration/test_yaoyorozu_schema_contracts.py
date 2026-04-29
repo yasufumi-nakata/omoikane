@@ -156,6 +156,7 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/agent_registry_entry.schema",
             "specs/schemas/research_evidence_request.schema",
             "specs/schemas/research_evidence_report.schema",
+            "specs/schemas/yaoyorozu_research_evidence_exchange.schema",
         ):
             schema = _load_schema(schema_path)
             validator = jsonschema.Draft202012Validator(schema)
@@ -164,6 +165,42 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
                 if errors:
                     formatted = "\n".join(error.message for error in errors[:5])
                     self.fail(f"{schema_path} example {index} validation failed:\n{formatted}")
+
+    def test_research_evidence_exchange_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+        exchange = result["research_evidence_exchange"]
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_research_evidence_exchange.schema",
+            exchange,
+        )
+        self.assertTrue(exchange["validation"]["ok"])
+        self.assertEqual("neuroscience-scout", exchange["researcher_agent_id"])
+        self.assertEqual(
+            "specs/schemas/research_evidence_request.schema",
+            exchange["input_schema_ref"],
+        )
+        self.assertEqual(
+            "specs/schemas/research_evidence_report.schema",
+            exchange["output_schema_ref"],
+        )
+        self.assertEqual(
+            exchange["request_ref"],
+            exchange["report"]["request_ref"],
+        )
+        self.assertTrue(exchange["validation"]["request_digest_bound"])
+        self.assertTrue(exchange["validation"]["report_digest_bound"])
+        self.assertTrue(exchange["validation"]["exchange_digest_bound"])
+        self.assertTrue(exchange["validation"]["evidence_refs_bound"])
+        self.assertTrue(exchange["validation"]["evidence_digests_bound"])
+        self.assertTrue(exchange["validation"]["advisory_only"])
+        self.assertTrue(exchange["validation"]["continuity_ledger_entry_appended"])
+        self.assertEqual(
+            ["council", "guardian"],
+            exchange["continuity_ledger_signature_roles"],
+        )
+        self.assertFalse(exchange["validation"]["raw_research_payload_stored"])
+        self.assertFalse(exchange["validation"]["decision_authority_claimed"])
 
     def test_workspace_discovery_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()

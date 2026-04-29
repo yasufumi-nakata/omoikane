@@ -52,6 +52,7 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 (`yaoyorozu_workspace_discovery`) と trust-bound registry snapshot と
 self+guardian 署名付き source manifest ContinuityLedger binding と
 raw payload 非露出の source manifest public verification bundle と
+Council+Guardian 署名付き researcher evidence exchange binding と
 `self-modify-patch-v1` 向け Council / builder handoff plan に materialize され、
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required、
 `fork-request-v1` では `runtime+schema+docs` required、
@@ -86,6 +87,10 @@ Guardian role 自体も `oversight_scope_refs` と `attestation_policy_ref` を
 registry entry に保持し、Ethics / Identity / Integrity の各 Guardian が
 どの docs / specs / evals / agents / meta surface を監査するかを
 Council handoff 前に確認できる。
+Researcher role は `research_evidence_request` / `research_evidence_report`
+として advisory-only request/report を返し、source digest、evidence digest、
+ledger entry ref/hash/payload ref に束縛されるが、raw research payload と
+decision authority は持たない。
 convocation artifact は、registry entry 由来の `deliberation` / `oversight` /
 `build-surface` scope refs と policy ref を各 selection に再束縛し、
 `raw_role_scope_payload_stored=false` を明示するため、Council session 側だけを見ても

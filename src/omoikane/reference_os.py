@@ -3892,6 +3892,10 @@ json.dump(response, sys.stdout)
             workspace_discovery=workspace_discovery,
             requested_optional_builder_coverage_areas=include_optional_coverage,
         )
+        research_evidence_exchange = self.yaoyorozu.build_research_evidence_exchange(
+            registry_snapshot,
+            requested_by_ref=f"council://session/{convocation['session_id']}",
+        )
         dispatch_plan = self.yaoyorozu.prepare_worker_dispatch(convocation)
         dispatch_plan_validation = self.yaoyorozu.validate_worker_dispatch_plan(dispatch_plan)
         dispatch_receipt = self.yaoyorozu.execute_worker_dispatch(dispatch_plan)
@@ -4049,6 +4053,26 @@ json.dump(response, sys.stdout)
             source_manifest_ledger_binding,
             source_manifest_ledger_entry,
         )
+        research_evidence_ledger_entry = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type=research_evidence_exchange["continuity_ledger_event_type"],
+            payload=self.yaoyorozu.research_evidence_exchange_continuity_event_payload(
+                research_evidence_exchange
+            ),
+            actor="YaoyorozuRegistryService",
+            category=research_evidence_exchange["continuity_ledger_category"],
+            layer="L4",
+            signature_roles=research_evidence_exchange["continuity_ledger_signature_roles"],
+            substrate="classical-silicon",
+        )
+        research_evidence_exchange = (
+            self.yaoyorozu.bind_research_evidence_exchange_ledger_entry(
+                research_evidence_exchange,
+                research_evidence_ledger_entry,
+                registry_snapshot,
+            )
+        )
+        research_evidence_exchange_validation = research_evidence_exchange["validation"]
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="council.convocation.prepared",
@@ -4271,6 +4295,7 @@ json.dump(response, sys.stdout)
             "workspace_discovery": workspace_discovery,
             "registry": registry_snapshot,
             "source_manifest_ledger_binding": source_manifest_ledger_binding,
+            "research_evidence_exchange": research_evidence_exchange,
             "convocation": convocation,
             "dispatch_plan": dispatch_plan,
             "dispatch_receipt": dispatch_receipt,
@@ -4330,6 +4355,43 @@ json.dump(response, sys.stdout)
                     source_manifest_ledger_binding["validation"][
                         "public_verification_bundle_digest_bound"
                     ]
+                ),
+                "research_evidence_exchange_ok": research_evidence_exchange_validation[
+                    "ok"
+                ],
+                "research_evidence_request_digest_bound": (
+                    research_evidence_exchange_validation["request_digest_bound"]
+                ),
+                "research_evidence_report_digest_bound": (
+                    research_evidence_exchange_validation["report_digest_bound"]
+                ),
+                "research_evidence_exchange_digest_bound": (
+                    research_evidence_exchange_validation["exchange_digest_bound"]
+                ),
+                "research_evidence_refs_bound": research_evidence_exchange_validation[
+                    "evidence_refs_bound"
+                ],
+                "research_evidence_advisory_only": research_evidence_exchange_validation[
+                    "advisory_only"
+                ],
+                "research_evidence_ledger_entry_appended": (
+                    research_evidence_exchange_validation["continuity_ledger_entry_appended"]
+                ),
+                "research_evidence_ledger_entry_digest_bound": (
+                    research_evidence_exchange_validation[
+                        "continuity_ledger_entry_digest_bound"
+                    ]
+                ),
+                "research_evidence_ledger_payload_ref_bound": (
+                    research_evidence_exchange_validation[
+                        "continuity_ledger_payload_ref_bound"
+                    ]
+                ),
+                "research_evidence_decision_authority_claimed": (
+                    research_evidence_exchange_validation["decision_authority_claimed"]
+                ),
+                "research_evidence_raw_payload_stored": (
+                    research_evidence_exchange_validation["raw_research_payload_stored"]
                 ),
                 "raw_source_payload_stored": registry_snapshot["raw_source_payload_stored"],
                 "raw_registry_payload_stored": source_manifest_ledger_binding[
@@ -4582,6 +4644,7 @@ json.dump(response, sys.stdout)
                     and execution_chain_validation["ok"]
                     and registry_source_digest_manifest_bound
                     and researcher_evidence_schema_contract_bound
+                    and research_evidence_exchange_validation["ok"]
                     and source_manifest_ledger_binding["validation"]["ok"]
                     and registry_snapshot["selection_ready_counts"]["guardian_ready"] >= 1
                 ),

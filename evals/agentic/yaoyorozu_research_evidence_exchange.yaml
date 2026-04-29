@@ -1,0 +1,22 @@
+id: eval-agentic-yaoyorozu-research-evidence-exchange
+title: Yaoyorozu researcher evidence exchange ledger binding
+surface: agentic.yaoyorozu
+profile: repo-local-research-evidence-exchange-v1
+must:
+  - selected researcher entry uses research_evidence_request and research_evidence_report schemas
+  - request_digest and report_digest bind nested advisory request/report payloads
+  - evidence refs resolve to repo-local docs or research paths and bind sha256 digests
+  - claim ceiling remains implementation-advisory and all implications remain advisory-only
+  - raw research payloads are not stored and researcher decision authority is not claimed
+  - exchange receipt is appended to ContinuityLedger with council and guardian signature roles
+expected:
+  selected_role: researcher
+  input_schema_ref: specs/schemas/research_evidence_request.schema
+  output_schema_ref: specs/schemas/research_evidence_report.schema
+  continuity_ledger_category: yaoyorozu-research-evidence
+  continuity_ledger_event_type: yaoyorozu.research_evidence.bound
+  continuity_ledger_signature_roles:
+    - council
+    - guardian
+  raw_research_payload_stored: false
+  decision_authority_claimed: false

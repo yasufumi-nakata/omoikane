@@ -3434,6 +3434,7 @@ entries:
     consumers:
       - specs/schemas/agent_source_definition.schema
       - specs/schemas/agent_registry_entry.schema
+      - specs/schemas/yaoyorozu_research_evidence_exchange.schema
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - reference-runtime
       - agents/researchers/consciousness-theorist.yaml
@@ -3442,6 +3443,7 @@ entries:
       - agents/researchers/neuroscience-scout.yaml
       - agents/researchers/quantum-scout.yaml
       - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+      - evals/agentic/yaoyorozu_research_evidence_exchange.yaml
     rationale: Required to keep Yaoyorozu researcher inputs on an advisory-only evidence request contract instead of reusing Council session input.
   - priority: P1
     kind: schema
@@ -3449,6 +3451,7 @@ entries:
     consumers:
       - specs/schemas/agent_source_definition.schema
       - specs/schemas/agent_registry_entry.schema
+      - specs/schemas/yaoyorozu_research_evidence_exchange.schema
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - reference-runtime
       - agents/researchers/consciousness-theorist.yaml
@@ -3457,6 +3460,29 @@ entries:
       - agents/researchers/neuroscience-scout.yaml
       - agents/researchers/quantum-scout.yaml
       - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
+      - evals/agentic/yaoyorozu_research_evidence_exchange.yaml
     rationale: Required to keep Yaoyorozu researcher outputs as digest-only advisory evidence reports with claim ceilings and no Council decision authority.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/yaoyorozu_research_evidence_exchange.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - specs/schemas/research_evidence_request.schema
+      - specs/schemas/research_evidence_report.schema
+      - reference-runtime
+      - evals/agentic/yaoyorozu_research_evidence_exchange.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/agentic/README.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to serialize one advisory Yaoyorozu researcher request/report exchange with source digest, evidence digest, Council+Guardian ledger binding, and raw payload / decision authority redaction.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_research_evidence_exchange.yaml
+    consumers:
+      - reference-runtime
+      - tests/integration/test_yaoyorozu_schema_contracts.py
+      - tests/integration/test_reference_runtime.py
+      - docs/07-reference-implementation/README.md
+    rationale: Guards the researcher exchange receipt so request/report digests, repo-local evidence refs, advisory-only claim ceiling, and Council+Guardian ledger entry remain bound.
 next_priority:
   # Future automation can append the next missing contract here.

@@ -25,6 +25,9 @@ Builder の `build_surface_refs` は convocation 時に coverage area ごとの 
 Researcher の `input_schema_ref` / `output_schema_ref` は
 `specs/schemas/research_evidence_request.schema` /
 `specs/schemas/research_evidence_report.schema` に固定し、Council input/output へ混ぜない。
+`yaoyorozu-demo` は選定 researcher の request/report を
+`yaoyorozu_research_evidence_exchange.schema` として返し、source digest、
+evidence digest、Council+Guardian 署名付き ledger entry に束縛する。
 
 ```yaml
 name: <unique>

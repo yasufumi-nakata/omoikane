@@ -2,11 +2,12 @@ idl_version: 1
 kind: service
 namespace: agentic.yaoyorozu.v0
 service: YaoyorozuRegistryService
-summary: Repo-local agent registry sync plus digest-only source manifest ContinuityLedger binding, bounded same-host workspace discovery, Guardian-gated external workspace seeding and dependency materialization, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
+summary: Repo-local agent registry sync plus digest-only source manifest ContinuityLedger binding, advisory researcher evidence exchange binding, bounded same-host workspace discovery, Guardian-gated external workspace seeding and dependency materialization, Council convocation, same-session ConsensusBus and profile-aware TaskGraph handoff binding, path/delta/priority-ranked patch-candidate-bound local worker dispatch planning, an L5 build_request-ready handoff binding, and a reviewer-facing builder execution-chain binding.
 imports:
   agent_source_definition: ../schemas/agent_source_definition.schema
   research_evidence_request: ../schemas/research_evidence_request.schema
   research_evidence_report: ../schemas/research_evidence_report.schema
+  yaoyorozu_research_evidence_exchange: ../schemas/yaoyorozu_research_evidence_exchange.schema
   yaoyorozu_workspace_discovery: ../schemas/yaoyorozu_workspace_discovery.schema
   yaoyorozu_workspace_guardian_preseed_gate: ../schemas/yaoyorozu_workspace_guardian_preseed_gate.schema
   yaoyorozu_dependency_materialization_manifest: ../schemas/yaoyorozu_dependency_materialization_manifest.schema
@@ -116,6 +117,36 @@ operations:
       - public verification bundle must bind the same source manifest digest, ledger entry ref/hash/payload ref, self+guardian signature digests, and verifier key refs
       - public verification bundle must expose no raw source, registry, continuity event, or signature payload
       - raw_source_payload_stored, raw_registry_payload_stored, and raw_continuity_event_payload_stored must remain false
+  bind_research_evidence_exchange:
+    summary: >
+      Bind one selected researcher request/report pair to the synced registry source manifest,
+      repo-local evidence digest, and a Council+Guardian signed ContinuityLedger entry without
+      granting decision authority or storing raw research payloads.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - registry_snapshot
+          - requested_by_ref
+        properties:
+          registry_snapshot:
+            schema_ref: yaoyorozu_registry_snapshot
+          requested_by_ref:
+            type: string
+            pattern: "^(council|guardian|selfctor|agent)://"
+          preferred_researcher_agent_id:
+            type: string
+            default: neuroscience-scout
+    output:
+      schema_ref: yaoyorozu_research_evidence_exchange
+    guarantees:
+      - selected researcher must be a researcher registry entry with role-specific research_evidence_request and research_evidence_report schema refs
+      - request_digest and report_digest must bind the nested request/report payloads
+      - report evidence_items must bind repo-local evidence refs and digests while raw_research_payload_stored remains false
+      - claim_ceiling must remain implementation-advisory and all design implications must be advisory-only
+      - decision_authority_claimed and request decision_authority_allowed must remain false
+      - ContinuityLedger event must use the yaoyorozu-research-evidence category and council+guardian signature roles
+      - exchange_digest must bind the researcher source digest, request/report digests, evidence refs, and ledger entry refs
   prepare_council_convocation:
     summary: >
       Derive one deterministic Council convocation and builder handoff plan from the synced registry,

@@ -254,6 +254,17 @@ class KernelTests(unittest.TestCase):
                 signature_roles=["self", "council"],
                 substrate="classical-silicon",
             )
+        with self.assertRaises(ValueError):
+            ledger.append(
+                "id-1",
+                "yaoyorozu.research_evidence.bound",
+                {"exchange_ref": "research-evidence-exchange://example"},
+                "YaoyorozuRegistryService",
+                category="yaoyorozu-research-evidence",
+                layer="L4",
+                signature_roles=["council"],
+                substrate="classical-silicon",
+            )
 
     def test_continuity_ledger_detects_signature_tamper(self) -> None:
         ledger = ContinuityLedger()

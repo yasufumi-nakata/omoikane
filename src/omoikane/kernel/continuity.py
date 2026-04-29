@@ -44,6 +44,7 @@ REQUIRED_SIGNATURE_ROLES = {
     "terminate": ["self", "council", "guardian", "third_party"],
     "selfctor-gap-report-scan": ["self", "guardian"],
     "yaoyorozu-agent-source-manifest": ["self", "guardian"],
+    "yaoyorozu-research-evidence": ["council", "guardian"],
     "ethics-veto": ["guardian"],
     "ethics-escalate": ["guardian"],
     "cognitive-failover": ["guardian"],

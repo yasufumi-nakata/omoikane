@@ -123,6 +123,8 @@
   - role-specific Yaoyorozu researcher output contract with digest-only evidence, claim ceilings, advisory-only implications, and no Council decision authority
 - `research_evidence_request.schema`
   - role-specific Yaoyorozu researcher input contract for bounded evidence questions, repo-local evidence boundaries, and no raw payload retention
+- `yaoyorozu_research_evidence_exchange.schema`
+  - binds one selected researcher request/report pair to registry source digest, repo-local evidence refs, and a Council+Guardian ContinuityLedger append
 - `metacognition_report.schema`
 - `metacognition_shift.schema`
 - `naming_policy.schema`

@@ -1,0 +1,339 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_research_evidence_exchange.schema"
+title: YaoyorozuResearchEvidenceExchange
+description: >
+  Runtime receipt for one Yaoyorozu researcher request/report exchange. It binds
+  the selected researcher source definition, advisory-only request/report
+  digests, repo-local evidence refs, and a Council+Guardian ContinuityLedger
+  append without storing raw research payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - exchange_id
+  - exchange_ref
+  - recorded_at
+  - profile_id
+  - registry_snapshot_ref
+  - registry_digest
+  - source_manifest_digest
+  - researcher_agent_id
+  - researcher_source_ref
+  - researcher_source_digest
+  - research_domain_refs
+  - evidence_policy_ref
+  - input_schema_ref
+  - output_schema_ref
+  - requested_by_ref
+  - request_ref
+  - request_digest
+  - report_ref
+  - report_digest
+  - evidence_refs
+  - evidence_ref_count
+  - claim_ceiling
+  - advisory_only
+  - raw_research_payload_stored
+  - decision_authority_claimed
+  - request
+  - report
+  - continuity_event_ref
+  - continuity_event_digest
+  - continuity_ledger_category
+  - continuity_ledger_event_type
+  - continuity_ledger_signature_roles
+  - continuity_ledger_appended
+  - continuity_ledger_entry_ref
+  - continuity_ledger_entry_hash
+  - continuity_ledger_payload_ref
+  - exchange_digest
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_research_evidence_exchange
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  exchange_id:
+    type: string
+    pattern: "^yaoyorozu-research-evidence-exchange-[a-f0-9]{12}$"
+  exchange_ref:
+    type: string
+    pattern: "^research-evidence-exchange://yaoyorozu-research-evidence-exchange-[a-f0-9]{12}$"
+  recorded_at:
+    type: string
+    minLength: 1
+  profile_id:
+    const: repo-local-research-evidence-exchange-v1
+  registry_snapshot_ref:
+    type: string
+    pattern: "^registry://yaoyorozu-registry-[a-f0-9]{12}$"
+  registry_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  researcher_agent_id:
+    type: string
+    minLength: 1
+  researcher_source_ref:
+    type: string
+    pattern: "^agents/researchers/"
+  researcher_source_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  research_domain_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|research)/"
+  evidence_policy_ref:
+    type: string
+    pattern: "^(agents|docs|research)/"
+  input_schema_ref:
+    const: specs/schemas/research_evidence_request.schema
+  output_schema_ref:
+    const: specs/schemas/research_evidence_report.schema
+  requested_by_ref:
+    type: string
+    pattern: "^(council|guardian|selfctor|agent)://"
+  request_ref:
+    type: string
+    pattern: "^research-evidence-request://research-evidence-request-[a-f0-9]{12}$"
+  request_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  report_ref:
+    type: string
+    pattern: "^research-evidence-report://research-evidence-report-[a-f0-9]{12}$"
+  report_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  evidence_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|research|specs|evals|doi|pubmed|legal|official)[:/]"
+  evidence_ref_count:
+    type: integer
+    minimum: 1
+  claim_ceiling:
+    const: implementation-advisory
+  advisory_only:
+    const: true
+  raw_research_payload_stored:
+    const: false
+  decision_authority_claimed:
+    const: false
+  request:
+    $ref: research_evidence_request.schema
+  report:
+    $ref: research_evidence_report.schema
+  continuity_event_ref:
+    type: string
+    pattern: "^ledger://yaoyorozu/research-evidence/yaoyorozu-research-evidence-exchange-[a-f0-9]{12}$"
+  continuity_event_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  continuity_ledger_category:
+    const: yaoyorozu-research-evidence
+  continuity_ledger_event_type:
+    const: yaoyorozu.research_evidence.bound
+  continuity_ledger_signature_roles:
+    type: array
+    prefixItems:
+      - const: council
+      - const: guardian
+    minItems: 2
+    maxItems: 2
+  continuity_ledger_appended:
+    const: true
+  continuity_ledger_entry_ref:
+    type: string
+    pattern: "^ledger://continuity-ledger/"
+  continuity_ledger_entry_hash:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  continuity_ledger_payload_ref:
+    type: string
+    pattern: "^cas://sha256/[a-f0-9]{64}$"
+  exchange_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - ok
+      - researcher_entry_bound
+      - researcher_source_digest_bound
+      - request_digest_bound
+      - report_digest_bound
+      - exchange_digest_bound
+      - continuity_event_digest_bound
+      - evidence_refs_bound
+      - evidence_digests_bound
+      - request_forbids_authority
+      - advisory_only
+      - raw_research_payload_stored
+      - decision_authority_claimed
+      - continuity_ledger_entry_appended
+      - continuity_ledger_entry_digest_bound
+      - continuity_ledger_payload_ref_bound
+      - continuity_ledger_signature_roles_bound
+      - errors
+    properties:
+      ok:
+        const: true
+      researcher_entry_bound:
+        const: true
+      researcher_source_digest_bound:
+        const: true
+      request_digest_bound:
+        const: true
+      report_digest_bound:
+        const: true
+      exchange_digest_bound:
+        const: true
+      continuity_event_digest_bound:
+        const: true
+      evidence_refs_bound:
+        const: true
+      evidence_digests_bound:
+        const: true
+      request_forbids_authority:
+        const: true
+      advisory_only:
+        const: true
+      raw_research_payload_stored:
+        const: false
+      decision_authority_claimed:
+        const: false
+      continuity_ledger_entry_appended:
+        const: true
+      continuity_ledger_entry_digest_bound:
+        const: true
+      continuity_ledger_payload_ref_bound:
+        const: true
+      continuity_ledger_signature_roles_bound:
+        const: true
+      errors:
+        type: array
+        maxItems: 0
+examples:
+  - kind: yaoyorozu_research_evidence_exchange
+    schema_version: 1.0.0
+    exchange_id: yaoyorozu-research-evidence-exchange-012345abcdef
+    exchange_ref: research-evidence-exchange://yaoyorozu-research-evidence-exchange-012345abcdef
+    recorded_at: "2026-04-29T00:00:00+00:00"
+    profile_id: repo-local-research-evidence-exchange-v1
+    registry_snapshot_ref: registry://yaoyorozu-registry-012345abcdef
+    registry_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    source_manifest_digest: 1123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    researcher_agent_id: neuroscience-scout
+    researcher_source_ref: agents/researchers/neuroscience-scout.yaml
+    researcher_source_digest: 2123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    research_domain_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
+    input_schema_ref: specs/schemas/research_evidence_request.schema
+    output_schema_ref: specs/schemas/research_evidence_report.schema
+    requested_by_ref: council://session/yaoyorozu-demo
+    request_ref: research-evidence-request://research-evidence-request-012345abcdef
+    request_digest: 3123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    report_ref: research-evidence-report://research-evidence-report-012345abcdef
+    report_digest: 4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    evidence_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    evidence_ref_count: 1
+    claim_ceiling: implementation-advisory
+    advisory_only: true
+    raw_research_payload_stored: false
+    decision_authority_claimed: false
+    request:
+      kind: research_evidence_request
+      schema_version: 1.0.0
+      request_id: research-evidence-request-012345abcdef
+      requested_by_ref: council://session/yaoyorozu-demo
+      research_domain_refs:
+        - docs/05-research-frontiers/scan-fidelity.md
+      evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
+      question: Summarize evidence ceilings for connectome scan fidelity.
+      seed_evidence_refs:
+        - docs/05-research-frontiers/scan-fidelity.md
+      requested_output_sections:
+        - summary
+        - source_refs
+        - uncertainty
+        - claim_ceiling
+        - design_implications
+      constraints:
+        allowed_source_classes:
+          - repo-local-doc
+        forbidden_actions:
+          - council-resolution
+          - runtime-write
+          - raw-payload-retention
+          - clinical-or-legal-authority-claim
+        raw_source_payload_allowed: false
+        decision_authority_allowed: false
+    report:
+      kind: research_evidence_report
+      schema_version: 1.0.0
+      report_id: research-evidence-report-012345abcdef
+      request_ref: research-evidence-request://research-evidence-request-012345abcdef
+      researcher_agent_id: neuroscience-scout
+      research_domain_refs:
+        - docs/05-research-frontiers/scan-fidelity.md
+      evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
+      evidence_items:
+        - evidence_ref: docs/05-research-frontiers/scan-fidelity.md
+          evidence_digest: 5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          source_class: repo-local-doc
+          claim_scope: constrains
+      claim_ceiling: implementation-advisory
+      uncertainty_notes:
+        - Source remains advisory and does not authorize runtime writeback.
+      advisory_design_implications:
+        - implication_id: research-implication-012345abcdef
+          summary: Keep scan fidelity claims bounded to evidence ceilings.
+          target_ref: docs/05-research-frontiers/scan-fidelity.md
+          authority_level: advisory-only
+      raw_research_payload_stored: false
+      decision_authority_claimed: false
+      report_digest: 4123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    continuity_event_ref: ledger://yaoyorozu/research-evidence/yaoyorozu-research-evidence-exchange-012345abcdef
+    continuity_event_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    continuity_ledger_category: yaoyorozu-research-evidence
+    continuity_ledger_event_type: yaoyorozu.research_evidence.bound
+    continuity_ledger_signature_roles:
+      - council
+      - guardian
+    continuity_ledger_appended: true
+    continuity_ledger_entry_ref: ledger://continuity-ledger/ledger-entry-example
+    continuity_ledger_entry_hash: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    continuity_ledger_payload_ref: cas://sha256/6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    exchange_digest: 8123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    validation:
+      ok: true
+      researcher_entry_bound: true
+      researcher_source_digest_bound: true
+      request_digest_bound: true
+      report_digest_bound: true
+      exchange_digest_bound: true
+      continuity_event_digest_bound: true
+      evidence_refs_bound: true
+      evidence_digests_bound: true
+      request_forbids_authority: true
+      advisory_only: true
+      raw_research_payload_stored: false
+      decision_authority_claimed: false
+      continuity_ledger_entry_appended: true
+      continuity_ledger_entry_digest_bound: true
+      continuity_ledger_payload_ref_bound: true
+      continuity_ledger_signature_roles_bound: true
+      errors: []

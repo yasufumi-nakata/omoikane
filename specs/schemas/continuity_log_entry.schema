@@ -69,6 +69,7 @@ properties:
       - substrate-release
       - self-modify
       - selfctor-gap-report-scan
+      - yaoyorozu-research-evidence
       - ethics-veto
       - ethics-escalate
       - cognitive-failover

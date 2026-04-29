@@ -104,6 +104,12 @@ YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_SIGNATURE_ROLES = ["self", "guardian"]
 YAOYOROZU_AGENT_SOURCE_MANIFEST_PUBLIC_VERIFICATION_PROFILE = (
     "yaoyorozu-source-manifest-public-verification-bundle-v1"
 )
+YAOYOROZU_RESEARCH_EVIDENCE_EXCHANGE_PROFILE = (
+    "repo-local-research-evidence-exchange-v1"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_CATEGORY = "yaoyorozu-research-evidence"
+YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_EVENT_TYPE = "yaoyorozu.research_evidence.bound"
+YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES = ["council", "guardian"]
 AGENT_SOURCE_DEFINITION_SCHEMA_VERSION = "1.0.0"
 AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
 AGENT_SOURCE_ALLOWED_ROLES = {"councilor", "builder", "researcher", "guardian"}
@@ -971,6 +977,111 @@ def _source_manifest_public_verification_bundle_core(
         "raw_registry_payload_exposed": False,
         "raw_continuity_event_payload_exposed": False,
         "raw_signature_payload_exposed": False,
+    }
+
+
+def _research_evidence_request_digest_payload(request: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "kind": request["kind"],
+        "schema_version": request["schema_version"],
+        "request_id": request["request_id"],
+        "requested_by_ref": request["requested_by_ref"],
+        "research_domain_refs": request["research_domain_refs"],
+        "evidence_policy_ref": request["evidence_policy_ref"],
+        "question": request["question"],
+        "seed_evidence_refs": request.get("seed_evidence_refs", []),
+        "requested_output_sections": request["requested_output_sections"],
+        "constraints": request["constraints"],
+    }
+
+
+def _research_evidence_report_digest_payload(report: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "kind": report["kind"],
+        "schema_version": report["schema_version"],
+        "report_id": report["report_id"],
+        "request_ref": report["request_ref"],
+        "researcher_agent_id": report["researcher_agent_id"],
+        "research_domain_refs": report["research_domain_refs"],
+        "evidence_policy_ref": report["evidence_policy_ref"],
+        "evidence_items": report["evidence_items"],
+        "claim_ceiling": report["claim_ceiling"],
+        "uncertainty_notes": report.get("uncertainty_notes", []),
+        "advisory_design_implications": report["advisory_design_implications"],
+        "raw_research_payload_stored": report["raw_research_payload_stored"],
+        "decision_authority_claimed": report["decision_authority_claimed"],
+    }
+
+
+def _research_evidence_exchange_digest_payload(exchange: Mapping[str, Any]) -> Dict[str, Any]:
+    return {
+        "kind": exchange["kind"],
+        "schema_version": exchange["schema_version"],
+        "exchange_id": exchange["exchange_id"],
+        "exchange_ref": exchange["exchange_ref"],
+        "recorded_at": exchange["recorded_at"],
+        "profile_id": exchange["profile_id"],
+        "registry_snapshot_ref": exchange["registry_snapshot_ref"],
+        "registry_digest": exchange["registry_digest"],
+        "source_manifest_digest": exchange["source_manifest_digest"],
+        "researcher_agent_id": exchange["researcher_agent_id"],
+        "researcher_source_ref": exchange["researcher_source_ref"],
+        "researcher_source_digest": exchange["researcher_source_digest"],
+        "research_domain_refs": exchange["research_domain_refs"],
+        "evidence_policy_ref": exchange["evidence_policy_ref"],
+        "input_schema_ref": exchange["input_schema_ref"],
+        "output_schema_ref": exchange["output_schema_ref"],
+        "requested_by_ref": exchange["requested_by_ref"],
+        "request_ref": exchange["request_ref"],
+        "request_digest": exchange["request_digest"],
+        "report_ref": exchange["report_ref"],
+        "report_digest": exchange["report_digest"],
+        "evidence_refs": exchange["evidence_refs"],
+        "evidence_ref_count": exchange["evidence_ref_count"],
+        "claim_ceiling": exchange["claim_ceiling"],
+        "advisory_only": exchange["advisory_only"],
+        "raw_research_payload_stored": exchange["raw_research_payload_stored"],
+        "decision_authority_claimed": exchange["decision_authority_claimed"],
+        "request": exchange["request"],
+        "report": exchange["report"],
+        "continuity_event_ref": exchange["continuity_event_ref"],
+        "continuity_event_digest": exchange["continuity_event_digest"],
+        "continuity_ledger_category": exchange["continuity_ledger_category"],
+        "continuity_ledger_event_type": exchange["continuity_ledger_event_type"],
+        "continuity_ledger_signature_roles": exchange["continuity_ledger_signature_roles"],
+        "continuity_ledger_appended": exchange["continuity_ledger_appended"],
+        "continuity_ledger_entry_ref": exchange["continuity_ledger_entry_ref"],
+        "continuity_ledger_entry_hash": exchange["continuity_ledger_entry_hash"],
+        "continuity_ledger_payload_ref": exchange["continuity_ledger_payload_ref"],
+    }
+
+
+def _research_evidence_exchange_continuity_payload(
+    exchange: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "event_ref": exchange["continuity_event_ref"],
+        "category": exchange["continuity_ledger_category"],
+        "event_type": exchange["continuity_ledger_event_type"],
+        "profile_id": exchange["profile_id"],
+        "exchange_id": exchange["exchange_id"],
+        "exchange_ref": exchange["exchange_ref"],
+        "registry_snapshot_ref": exchange["registry_snapshot_ref"],
+        "registry_digest": exchange["registry_digest"],
+        "source_manifest_digest": exchange["source_manifest_digest"],
+        "researcher_agent_id": exchange["researcher_agent_id"],
+        "researcher_source_ref": exchange["researcher_source_ref"],
+        "researcher_source_digest": exchange["researcher_source_digest"],
+        "request_ref": exchange["request_ref"],
+        "request_digest": exchange["request_digest"],
+        "report_ref": exchange["report_ref"],
+        "report_digest": exchange["report_digest"],
+        "evidence_refs": exchange["evidence_refs"],
+        "evidence_ref_count": exchange["evidence_ref_count"],
+        "claim_ceiling": exchange["claim_ceiling"],
+        "advisory_only": exchange["advisory_only"],
+        "raw_research_payload_stored": exchange["raw_research_payload_stored"],
+        "decision_authority_claimed": exchange["decision_authority_claimed"],
     }
 
 
@@ -3364,6 +3475,464 @@ class YaoyorozuRegistryService:
             and public_bundle["raw_signature_payload_exposed"] is False
         )
         return binding
+
+    def build_research_evidence_exchange(
+        self,
+        registry_snapshot: Mapping[str, Any],
+        *,
+        requested_by_ref: str,
+        preferred_researcher_agent_id: str = "neuroscience-scout",
+    ) -> Dict[str, Any]:
+        """Build one advisory-only researcher request/report exchange receipt."""
+        if self._agents_root is None:
+            raise ValueError("registry must be synced before binding research evidence")
+        researcher_entries = [
+            entry
+            for entry in registry_snapshot.get("entries", [])
+            if isinstance(entry, Mapping) and entry.get("role") == "researcher"
+        ]
+        if not researcher_entries:
+            raise ValueError("registry snapshot must include at least one researcher entry")
+        selected_entry = next(
+            (
+                entry
+                for entry in researcher_entries
+                if entry.get("agent_id") == preferred_researcher_agent_id
+            ),
+            researcher_entries[0],
+        )
+        agent_id = _non_empty_string(selected_entry.get("agent_id"), "researcher_agent_id")
+        research_domain_refs = [
+            _non_empty_string(ref, "research_domain_ref")
+            for ref in selected_entry.get("research_domain_refs", [])
+        ]
+        if not research_domain_refs:
+            raise ValueError("researcher entry must expose research_domain_refs")
+        evidence_policy_ref = _non_empty_string(
+            selected_entry.get("evidence_policy_ref"),
+            "evidence_policy_ref",
+        )
+        evidence_ref = research_domain_refs[0]
+        repo_root = self._agents_root.parent
+        evidence_path = repo_root / evidence_ref
+        if not evidence_path.is_file():
+            raise ValueError(f"research evidence ref must resolve to a repo file: {evidence_ref}")
+        source_digests = {
+            str(source.get("source_ref", "")): str(source.get("sha256", ""))
+            for source in registry_snapshot.get("source_definition_digests", [])
+            if isinstance(source, Mapping)
+        }
+        source_ref = _non_empty_string(selected_entry.get("source_ref"), "researcher_source_ref")
+        researcher_source_digest = source_digests.get(source_ref, "")
+        if not researcher_source_digest:
+            source_path = repo_root / source_ref
+            if source_path.is_file():
+                researcher_source_digest = sha256_text(source_path.read_text(encoding="utf-8"))
+        request_id = new_id("research-evidence-request")
+        request_ref = f"research-evidence-request://{request_id}"
+        request = {
+            "kind": "research_evidence_request",
+            "schema_version": "1.0.0",
+            "request_id": request_id,
+            "requested_by_ref": _non_empty_string(requested_by_ref, "requested_by_ref"),
+            "research_domain_refs": list(research_domain_refs),
+            "evidence_policy_ref": evidence_policy_ref,
+            "question": (
+                "Summarize implementation evidence ceilings and competing explanations "
+                f"for {evidence_ref} without authorizing a Council resolution."
+            ),
+            "seed_evidence_refs": [evidence_ref],
+            "requested_output_sections": [
+                "summary",
+                "source_refs",
+                "competing_explanations",
+                "uncertainty",
+                "claim_ceiling",
+                "design_implications",
+            ],
+            "constraints": {
+                "allowed_source_classes": ["repo-local-doc"],
+                "forbidden_actions": [
+                    "council-resolution",
+                    "runtime-write",
+                    "raw-payload-retention",
+                    "clinical-or-legal-authority-claim",
+                ],
+                "raw_source_payload_allowed": False,
+                "decision_authority_allowed": False,
+            },
+        }
+        request_digest = sha256_text(
+            canonical_json(_research_evidence_request_digest_payload(request))
+        )
+        report_core = {
+            "kind": "research_evidence_report",
+            "schema_version": "1.0.0",
+            "report_id": new_id("research-evidence-report"),
+            "request_ref": request_ref,
+            "researcher_agent_id": agent_id,
+            "research_domain_refs": list(research_domain_refs),
+            "evidence_policy_ref": evidence_policy_ref,
+            "evidence_items": [
+                {
+                    "evidence_ref": evidence_ref,
+                    "evidence_digest": sha256_text(
+                        evidence_path.read_text(encoding="utf-8")
+                    ),
+                    "source_class": "repo-local-doc",
+                    "claim_scope": "constrains",
+                }
+            ],
+            "claim_ceiling": "implementation-advisory",
+            "uncertainty_notes": [
+                "Repo-local research-frontier notes constrain implementation wording but do not authorize runtime writes.",
+                "Competing explanations remain reviewer-facing context rather than Council decisions.",
+            ],
+            "advisory_design_implications": [
+                {
+                    "implication_id": new_id("research-implication"),
+                    "summary": (
+                        "Keep Yaoyorozu researcher output as advisory evidence with "
+                        "digest-bound source refs before Council synthesis."
+                    ),
+                    "target_ref": evidence_ref,
+                    "authority_level": "advisory-only",
+                }
+            ],
+            "raw_research_payload_stored": False,
+            "decision_authority_claimed": False,
+        }
+        report = {
+            **report_core,
+            "report_digest": sha256_text(
+                canonical_json(_research_evidence_report_digest_payload(report_core))
+            ),
+        }
+        exchange_id = new_id("yaoyorozu-research-evidence-exchange")
+        exchange: Dict[str, Any] = {
+            "kind": "yaoyorozu_research_evidence_exchange",
+            "schema_version": "1.0.0",
+            "exchange_id": exchange_id,
+            "exchange_ref": f"research-evidence-exchange://{exchange_id}",
+            "recorded_at": utc_now_iso(),
+            "profile_id": YAOYOROZU_RESEARCH_EVIDENCE_EXCHANGE_PROFILE,
+            "registry_snapshot_ref": f"registry://{registry_snapshot['registry_id']}",
+            "registry_digest": str(registry_snapshot.get("registry_digest", "")),
+            "source_manifest_digest": str(
+                registry_snapshot.get("source_manifest_digest", "")
+            ),
+            "researcher_agent_id": agent_id,
+            "researcher_source_ref": source_ref,
+            "researcher_source_digest": researcher_source_digest,
+            "research_domain_refs": list(research_domain_refs),
+            "evidence_policy_ref": evidence_policy_ref,
+            "input_schema_ref": str(selected_entry.get("input_schema_ref", "")),
+            "output_schema_ref": str(selected_entry.get("output_schema_ref", "")),
+            "requested_by_ref": request["requested_by_ref"],
+            "request_ref": request_ref,
+            "request_digest": request_digest,
+            "report_ref": f"research-evidence-report://{report['report_id']}",
+            "report_digest": report["report_digest"],
+            "evidence_refs": [evidence_ref],
+            "evidence_ref_count": 1,
+            "claim_ceiling": report["claim_ceiling"],
+            "advisory_only": True,
+            "raw_research_payload_stored": False,
+            "decision_authority_claimed": False,
+            "request": request,
+            "report": report,
+            "continuity_event_ref": f"ledger://yaoyorozu/research-evidence/{exchange_id}",
+            "continuity_event_digest": "",
+            "continuity_ledger_category": YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_CATEGORY,
+            "continuity_ledger_event_type": YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_EVENT_TYPE,
+            "continuity_ledger_signature_roles": list(
+                YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES
+            ),
+            "continuity_ledger_appended": False,
+            "continuity_ledger_entry_ref": None,
+            "continuity_ledger_entry_hash": None,
+            "continuity_ledger_payload_ref": None,
+        }
+        exchange["continuity_event_digest"] = sha256_text(
+            canonical_json(_research_evidence_exchange_continuity_payload(exchange))
+        )
+        exchange["exchange_digest"] = sha256_text(
+            canonical_json(_research_evidence_exchange_digest_payload(exchange))
+        )
+        exchange["validation"] = self.validate_research_evidence_exchange(
+            exchange,
+            registry_snapshot,
+        )
+        return exchange
+
+    def research_evidence_exchange_continuity_event_payload(
+        self,
+        exchange: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Return the digest-only researcher exchange payload for ContinuityLedger append."""
+        return _research_evidence_exchange_continuity_payload(exchange)
+
+    def bind_research_evidence_exchange_ledger_entry(
+        self,
+        exchange: Dict[str, Any],
+        ledger_entry: Any,
+        registry_snapshot: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Attach a real ContinuityLedger entry to one researcher exchange receipt."""
+        expected_payload = self.research_evidence_exchange_continuity_event_payload(exchange)
+        expected_payload_digest = sha256_text(canonical_json(expected_payload))
+        expected_payload_ref = f"cas://sha256/{expected_payload_digest}"
+        expected_roles = list(YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES)
+        observed_roles = list(getattr(ledger_entry, "signatures", {}).keys())
+        entry_bound = (
+            getattr(ledger_entry, "payload", None) == expected_payload
+            and getattr(ledger_entry, "category", None)
+            == YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_CATEGORY
+            and getattr(ledger_entry, "event_type", None)
+            == YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_EVENT_TYPE
+            and getattr(ledger_entry, "layer", None) == "L4"
+        )
+        payload_ref_bound = getattr(ledger_entry, "payload_ref", None) == expected_payload_ref
+        signature_roles_bound = observed_roles == expected_roles
+        exchange["continuity_event_digest"] = expected_payload_digest
+        exchange["continuity_ledger_appended"] = bool(
+            entry_bound and payload_ref_bound and signature_roles_bound
+        )
+        exchange["continuity_ledger_entry_ref"] = (
+            f"ledger://continuity-ledger/{ledger_entry.entry_id}"
+        )
+        exchange["continuity_ledger_entry_hash"] = ledger_entry.entry_hash
+        exchange["continuity_ledger_payload_ref"] = ledger_entry.payload_ref
+        exchange["exchange_digest"] = sha256_text(
+            canonical_json(_research_evidence_exchange_digest_payload(exchange))
+        )
+        exchange["validation"] = self.validate_research_evidence_exchange(
+            exchange,
+            registry_snapshot,
+        )
+        return exchange
+
+    def validate_research_evidence_exchange(
+        self,
+        exchange: Mapping[str, Any],
+        registry_snapshot: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Validate one digest-bound researcher request/report exchange receipt."""
+        errors: List[str] = []
+        entries = {
+            str(entry.get("agent_id", "")): entry
+            for entry in registry_snapshot.get("entries", [])
+            if isinstance(entry, Mapping)
+        }
+        researcher_agent_id = str(exchange.get("researcher_agent_id", ""))
+        researcher_entry = entries.get(researcher_agent_id)
+        researcher_entry_bound = (
+            isinstance(researcher_entry, Mapping)
+            and researcher_entry.get("role") == "researcher"
+            and researcher_entry.get("source_ref") == exchange.get("researcher_source_ref")
+            and researcher_entry.get("research_domain_refs") == exchange.get("research_domain_refs")
+            and researcher_entry.get("evidence_policy_ref") == exchange.get("evidence_policy_ref")
+            and researcher_entry.get("input_schema_ref")
+            == AGENT_SOURCE_RESEARCHER_INPUT_SCHEMA_REF
+            and researcher_entry.get("output_schema_ref")
+            == AGENT_SOURCE_RESEARCHER_OUTPUT_SCHEMA_REF
+        )
+        if not researcher_entry_bound:
+            errors.append("researcher entry must bind role-specific evidence scope and schemas")
+
+        source_digests = {
+            str(source.get("source_ref", "")): str(source.get("sha256", ""))
+            for source in registry_snapshot.get("source_definition_digests", [])
+            if isinstance(source, Mapping)
+        }
+        researcher_source_digest_bound = (
+            bool(exchange.get("researcher_source_digest"))
+            and source_digests.get(str(exchange.get("researcher_source_ref", "")))
+            == exchange.get("researcher_source_digest")
+        )
+        if not researcher_source_digest_bound:
+            errors.append("researcher source digest must bind the registry source manifest")
+
+        request = exchange.get("request", {})
+        report = exchange.get("report", {})
+        request_ref = str(exchange.get("request_ref", ""))
+        report_ref = str(exchange.get("report_ref", ""))
+        request_digest_bound = False
+        report_digest_bound = False
+        exchange_digest_bound = False
+        continuity_event_digest_bound = False
+        try:
+            request_digest_bound = (
+                exchange.get("request_digest")
+                == sha256_text(
+                    canonical_json(_research_evidence_request_digest_payload(request))
+                )
+            )
+        except (KeyError, TypeError):
+            errors.append("research evidence request digest payload is incomplete")
+        if not request_digest_bound:
+            errors.append("request_digest must bind research evidence request")
+        try:
+            report_digest_bound = (
+                report.get("report_digest")
+                == exchange.get("report_digest")
+                == sha256_text(
+                    canonical_json(_research_evidence_report_digest_payload(report))
+                )
+            )
+        except (KeyError, TypeError):
+            errors.append("research evidence report digest payload is incomplete")
+        if not report_digest_bound:
+            errors.append("report_digest must bind research evidence report")
+        try:
+            continuity_event_digest_bound = (
+                exchange.get("continuity_event_digest")
+                == sha256_text(
+                    canonical_json(_research_evidence_exchange_continuity_payload(exchange))
+                )
+            )
+        except (KeyError, TypeError):
+            errors.append("research evidence continuity payload is incomplete")
+        if not continuity_event_digest_bound:
+            errors.append("continuity_event_digest must bind exchange evidence")
+        try:
+            exchange_digest_bound = (
+                exchange.get("exchange_digest")
+                == sha256_text(
+                    canonical_json(_research_evidence_exchange_digest_payload(exchange))
+                )
+            )
+        except (KeyError, TypeError):
+            errors.append("research evidence exchange digest payload is incomplete")
+        if not exchange_digest_bound:
+            errors.append("exchange_digest must bind exchange receipt")
+
+        request_constraints = request.get("constraints", {}) if isinstance(request, Mapping) else {}
+        request_forbids_authority = (
+            request.get("request_id") and request_ref == f"research-evidence-request://{request['request_id']}"
+            and request.get("requested_by_ref") == exchange.get("requested_by_ref")
+            and request.get("research_domain_refs") == exchange.get("research_domain_refs")
+            and request.get("evidence_policy_ref") == exchange.get("evidence_policy_ref")
+            and isinstance(request_constraints, Mapping)
+            and request_constraints.get("raw_source_payload_allowed") is False
+            and request_constraints.get("decision_authority_allowed") is False
+            and {
+                "council-resolution",
+                "runtime-write",
+                "raw-payload-retention",
+                "clinical-or-legal-authority-claim",
+            }.issubset(set(request_constraints.get("forbidden_actions", [])))
+        )
+        if not request_forbids_authority:
+            errors.append("research request must forbid authority and raw payload retention")
+
+        evidence_items = report.get("evidence_items", []) if isinstance(report, Mapping) else []
+        evidence_item_refs = [
+            str(item.get("evidence_ref", ""))
+            for item in evidence_items
+            if isinstance(item, Mapping)
+        ]
+        evidence_refs_bound = (
+            report.get("request_ref") == request_ref
+            and report_ref == f"research-evidence-report://{report.get('report_id')}"
+            and report.get("researcher_agent_id") == researcher_agent_id
+            and report.get("research_domain_refs") == exchange.get("research_domain_refs")
+            and report.get("evidence_policy_ref") == exchange.get("evidence_policy_ref")
+            and exchange.get("evidence_refs") == evidence_item_refs
+            and exchange.get("evidence_ref_count") == len(evidence_item_refs)
+            and bool(evidence_item_refs)
+        )
+        repo_root = self._agents_root.parent if self._agents_root is not None else Path(".")
+        evidence_digests_bound = True
+        for item in evidence_items:
+            if not isinstance(item, Mapping):
+                evidence_digests_bound = False
+                continue
+            evidence_ref = str(item.get("evidence_ref", ""))
+            evidence_path = repo_root / evidence_ref
+            if not evidence_path.is_file():
+                evidence_digests_bound = False
+                continue
+            if item.get("evidence_digest") != sha256_text(
+                evidence_path.read_text(encoding="utf-8")
+            ):
+                evidence_digests_bound = False
+        if not evidence_refs_bound or not evidence_digests_bound:
+            errors.append("evidence refs and digests must bind repo-local evidence items")
+
+        advisory_only = (
+            exchange.get("claim_ceiling") == "implementation-advisory"
+            and exchange.get("advisory_only") is True
+            and report.get("claim_ceiling") == "implementation-advisory"
+            and all(
+                isinstance(item, Mapping)
+                and item.get("authority_level") == "advisory-only"
+                for item in report.get("advisory_design_implications", [])
+            )
+        )
+        if not advisory_only:
+            errors.append("research evidence report must remain advisory-only")
+        raw_payload_clean = (
+            exchange.get("raw_research_payload_stored") is False
+            and report.get("raw_research_payload_stored") is False
+        )
+        decision_authority_clean = (
+            exchange.get("decision_authority_claimed") is False
+            and report.get("decision_authority_claimed") is False
+        )
+        if not raw_payload_clean:
+            errors.append("raw research payload must not be stored")
+        if not decision_authority_clean:
+            errors.append("researcher must not claim decision authority")
+
+        expected_roles = list(YAOYOROZU_RESEARCH_EVIDENCE_LEDGER_SIGNATURE_ROLES)
+        continuity_ledger_signature_roles_bound = (
+            exchange.get("continuity_ledger_signature_roles") == expected_roles
+        )
+        continuity_ledger_entry_appended = exchange.get("continuity_ledger_appended") is True
+        continuity_ledger_entry_digest_bound = (
+            continuity_ledger_entry_appended
+            and str(exchange.get("continuity_ledger_entry_ref", "")).startswith(
+                "ledger://continuity-ledger/"
+            )
+            and bool(exchange.get("continuity_ledger_entry_hash"))
+        )
+        continuity_ledger_payload_ref_bound = (
+            continuity_ledger_entry_appended
+            and exchange.get("continuity_ledger_payload_ref")
+            == f"cas://sha256/{exchange.get('continuity_event_digest')}"
+        )
+        if not continuity_ledger_signature_roles_bound:
+            errors.append("research evidence ledger signature roles must be council+guardian")
+        if not continuity_ledger_entry_appended:
+            errors.append("research evidence exchange must be appended to ContinuityLedger")
+        if not continuity_ledger_entry_digest_bound:
+            errors.append("continuity ledger entry ref/hash must be bound")
+        if not continuity_ledger_payload_ref_bound:
+            errors.append("continuity ledger payload ref must bind event digest")
+
+        return {
+            "ok": not errors,
+            "researcher_entry_bound": researcher_entry_bound,
+            "researcher_source_digest_bound": researcher_source_digest_bound,
+            "request_digest_bound": request_digest_bound,
+            "report_digest_bound": report_digest_bound,
+            "exchange_digest_bound": exchange_digest_bound,
+            "continuity_event_digest_bound": continuity_event_digest_bound,
+            "evidence_refs_bound": evidence_refs_bound,
+            "evidence_digests_bound": evidence_digests_bound,
+            "request_forbids_authority": bool(request_forbids_authority),
+            "advisory_only": advisory_only,
+            "raw_research_payload_stored": not raw_payload_clean,
+            "decision_authority_claimed": not decision_authority_clean,
+            "continuity_ledger_entry_appended": continuity_ledger_entry_appended,
+            "continuity_ledger_entry_digest_bound": continuity_ledger_entry_digest_bound,
+            "continuity_ledger_payload_ref_bound": continuity_ledger_payload_ref_bound,
+            "continuity_ledger_signature_roles_bound": (
+                continuity_ledger_signature_roles_bound
+            ),
+            "errors": errors,
+        }
 
     def prepare_council_convocation(
         self,

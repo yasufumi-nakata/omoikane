@@ -50,6 +50,7 @@ capabilities:
   - gap-report.continuity-ledger-entry.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest
   - yaoyorozu.agent-source.research-evidence-schema.attest
+  - yaoyorozu.research-evidence.exchange-ledger.attest
   - yaoyorozu.agent-source.digest-manifest.attest
   - yaoyorozu.agent-source.manifest-ledger-binding.attest
   - yaoyorozu.agent-source.manifest-public-verification.attest
@@ -129,6 +130,7 @@ when_to_invoke: |
   - Yaoyorozu councilor source definition が deliberation_scope_refs と deliberation_policy_ref を registry entry へ保持し、raw deliberation transcript ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が Council schema ではなく research_evidence_request / research_evidence_report schema に固定されていることを検証する時
+  - Yaoyorozu researcher request/report exchange が source digest、evidence digest、Council+Guardian 署名付き ledger entry に束縛され、raw research payload と decision authority を持たないことを検証する時
   - Yaoyorozu registry snapshot が raw agents/**/*.yaml source set を digest-only manifest に束縛し、raw source payload を保存していないことを検証する時
   - Yaoyorozu source manifest が dedicated ContinuityLedger entry ref / hash / payload ref と self+guardian 署名 role に束縛され、raw source / registry / continuity event payload を保存していないことを検証する時
   - Yaoyorozu source manifest public verification bundle が source digest manifest、ledger entry、self+guardian signature digest、verifier key refs を raw payload なしで束縛していることを検証する時
