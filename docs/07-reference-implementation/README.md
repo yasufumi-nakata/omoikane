@@ -1071,6 +1071,11 @@ participant ref、license ref、window ref、modality file refs の manifest dig
 feature-window digest、body-state latent ref / digest へ先に束縛される。
 adapter receipt は full EEG/ECG/PPG/EDA/respiration coverage を検証し、
 raw dataset payload、raw signal samples、raw feature-window payload は保存しない。
+さらに複数日の adapter receipt と body-state latent は
+`biodata-feature-window-series-profile-v1` により ordered longitudinal / circadian
+series へ束縛される。series profile は adapter receipt digest set、latent digest set、
+circadian phase refs、axis drift summary、required modality coverage を返し、
+raw dataset / sample / feature-window / latent / series payload は保存しない。
 さらに 2 日分の body-state latent を
 `multi-day-personal-biodata-calibration-v1` calibration profile に束ね、
 source latent digest set、calibration day refs、axis baseline mean、

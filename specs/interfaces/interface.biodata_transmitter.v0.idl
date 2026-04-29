@@ -13,6 +13,7 @@ imports:
   biodata_calibration_profile: ../schemas/biodata_calibration_profile.schema
   biodata_calibration_confidence_gate: ../schemas/biodata_calibration_confidence_gate.schema
   biodata_dataset_adapter_receipt: ../schemas/biodata_dataset_adapter_receipt.schema
+  biodata_feature_window_series_profile: ../schemas/biodata_feature_window_series_profile.schema
 operations:
   open_session:
     summary: Open one transmitter session for a single identity and explicit modality set.
@@ -107,6 +108,43 @@ operations:
       - source_feature_digest and latent_digest must match the generated body-state latent
       - full confidence-gate readiness requires eeg, ecg, ppg, eda, and respiration feature-window coverage
       - raw dataset payload, raw signal samples, and raw feature-window payload storage must remain false
+  build_feature_window_series_profile:
+    summary: Aggregate two or more dataset adapter receipts into a digest-only longitudinal / circadian latent series.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - adapter_receipts
+          - latent_states
+          - circadian_phase_refs
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          adapter_receipts:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: biodata_dataset_adapter_receipt
+          latent_states:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: biodata_body_state_latent
+          circadian_phase_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+    output:
+      schema_ref: biodata_feature_window_series_profile
+    guarantees:
+      - adapter_receipt_digests and latent_digests must be ordered and digest-bound
+      - circadian_phase_refs must contain at least two unique phase refs
+      - axis_drift_summary must be derived from body-state latent axes, not raw source payload
+      - raw dataset, signal sample, feature-window, latent, and series payload storage must remain false
   encode_body_state:
     summary: Convert source biosignal features into a digest-bound internal body-state latent.
     input:

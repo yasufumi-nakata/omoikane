@@ -1,0 +1,258 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_feature_window_series_profile.schema"
+title: BioDataFeatureWindowSeriesProfile
+description: >
+  Digest-only profile that binds two or more external BioData dataset feature
+  windows into an ordered longitudinal / circadian body-state latent series
+  without storing raw dataset, sample, feature-window, latent, or series payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - series_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - adapter_refs
+  - adapter_receipt_digests
+  - window_refs
+  - dataset_refs
+  - latent_refs
+  - latent_digests
+  - source_feature_digests
+  - series_digest_set_digest
+  - window_count
+  - dataset_count
+  - source_modalities_covered
+  - required_modalities_bound
+  - circadian_phase_refs
+  - circadian_phase_summary
+  - circadian_profile_bound
+  - axis_drift_summary
+  - drift_policy
+  - storage_policy
+  - literature_refs
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_dataset_payload_stored
+  - raw_signal_samples_stored
+  - raw_feature_window_payload_stored
+  - raw_latent_payload_stored
+  - raw_series_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - series_profile_digest
+properties:
+  schema_version:
+    const: "1.0"
+  series_ref:
+    type: string
+    pattern: "^feature-window-series://biodata/bdt-window-series-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-feature-window-series-profile-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  adapter_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^dataset-adapter://biodata/bdt-dataset-adapter-[a-f0-9]{12}$"
+  adapter_receipt_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  window_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+  dataset_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+  latent_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^latent://body-state/body-latent-[a-f0-9]{12}$"
+  latent_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  source_feature_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  series_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  window_count:
+    type: integer
+    minimum: 2
+  dataset_count:
+    type: integer
+    minimum: 1
+  source_modalities_covered:
+    type: array
+    minItems: 5
+    maxItems: 5
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_modality"
+  required_modalities_bound:
+    const: true
+  circadian_phase_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  circadian_phase_summary:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - phase_ref
+        - window_ref
+        - adapter_ref
+        - adapter_receipt_digest
+        - latent_ref
+        - latent_digest
+        - source_feature_digest
+        - normalized_window_index
+      properties:
+        phase_ref:
+          type: string
+          minLength: 1
+        window_ref:
+          type: string
+          minLength: 1
+        adapter_ref:
+          type: string
+          pattern: "^dataset-adapter://biodata/bdt-dataset-adapter-[a-f0-9]{12}$"
+        adapter_receipt_digest:
+          $ref: "#/$defs/sha256"
+        latent_ref:
+          type: string
+          pattern: "^latent://body-state/body-latent-[a-f0-9]{12}$"
+        latent_digest:
+          $ref: "#/$defs/sha256"
+        source_feature_digest:
+          $ref: "#/$defs/sha256"
+        normalized_window_index:
+          type: integer
+          minimum: 0
+  circadian_profile_bound:
+    const: true
+  axis_drift_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - heart_rate_bpm
+      - autonomic_arousal
+      - cortical_load_proxy
+      - valence_proxy
+      - thought_pressure_proxy
+      - interoceptive_confidence
+    properties:
+      heart_rate_bpm:
+        $ref: "#/$defs/axis_drift"
+      autonomic_arousal:
+        $ref: "#/$defs/axis_drift"
+      cortical_load_proxy:
+        $ref: "#/$defs/axis_drift"
+      valence_proxy:
+        $ref: "#/$defs/axis_drift"
+      thought_pressure_proxy:
+        $ref: "#/$defs/axis_drift"
+      interoceptive_confidence:
+        $ref: "#/$defs/axis_drift"
+  drift_policy:
+    const: ordered-feature-window-latent-drift-digest-only-v1
+  storage_policy:
+    const: adapter-receipt-digest+latent-digest+phase-ref-only
+  literature_refs:
+    type: array
+    minItems: 5
+    items:
+      type: object
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/biosignal-transmitter
+  raw_dataset_payload_stored:
+    const: false
+  raw_signal_samples_stored:
+    const: false
+  raw_feature_window_payload_stored:
+    const: false
+  raw_latent_payload_stored:
+    const: false
+  raw_series_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  series_profile_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_modality:
+    type: string
+    enum:
+      - eeg
+      - ecg
+      - ppg
+      - eda
+      - respiration
+  axis_drift:
+    type: object
+    additionalProperties: false
+    required:
+      - first
+      - last
+      - minimum
+      - maximum
+      - absolute_delta
+      - direction
+    properties:
+      first:
+        type: number
+      last:
+        type: number
+      minimum:
+        type: number
+      maximum:
+        type: number
+      absolute_delta:
+        type: number
+      direction:
+        type: string
+        enum:
+          - increased
+          - decreased
+          - stable

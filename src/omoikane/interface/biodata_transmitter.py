@@ -14,6 +14,7 @@ BDT_GENERATOR_PROFILE_ID = "bounded-cross-modal-biosignal-generator-v0"
 BDT_CALIBRATION_PROFILE_ID = "multi-day-personal-biodata-calibration-v1"
 BDT_CONFIDENCE_GATE_PROFILE_ID = "biodata-calibration-confidence-gate-v1"
 BDT_DATASET_ADAPTER_PROFILE_ID = "biodata-dataset-feature-window-adapter-v1"
+BDT_FEATURE_WINDOW_SERIES_PROFILE_ID = "biodata-feature-window-series-profile-v1"
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
 DEFAULT_SOURCE_MODALITIES = ("eeg", "ecg", "ppg", "eda", "respiration")
 DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "affect", "thought")
@@ -90,6 +91,7 @@ class BioDataTransmitter:
             "calibration_profile_id": BDT_CALIBRATION_PROFILE_ID,
             "confidence_gate_profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
             "dataset_adapter_profile_id": BDT_DATASET_ADAPTER_PROFILE_ID,
+            "feature_window_series_profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
             "confidence_gate_target_thresholds": dict(CONFIDENCE_GATE_TARGET_THRESHOLDS),
@@ -296,6 +298,253 @@ class BioDataTransmitter:
             "raw_signal_samples_stored": False,
             "raw_feature_window_payload_stored": False,
             "raw_source_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
+    def build_feature_window_series_profile(
+        self,
+        session: Dict[str, Any],
+        adapter_receipts: Sequence[Dict[str, Any]],
+        latent_states: Sequence[Dict[str, Any]],
+        circadian_phase_refs: Sequence[str],
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        if not isinstance(adapter_receipts, (list, tuple)) or len(adapter_receipts) < 2:
+            raise ValueError("adapter_receipts must contain at least two dataset adapter receipts")
+        if not isinstance(latent_states, (list, tuple)) or len(latent_states) != len(adapter_receipts):
+            raise ValueError("latent_states must align with adapter_receipts")
+        if not isinstance(circadian_phase_refs, (list, tuple)) or len(circadian_phase_refs) != len(adapter_receipts):
+            raise ValueError("circadian_phase_refs must align with adapter_receipts")
+
+        normalized_phase_refs: List[str] = []
+        adapter_refs: List[str] = []
+        adapter_receipt_digests: List[str] = []
+        window_refs: List[str] = []
+        dataset_refs: List[str] = []
+        latent_refs: List[str] = []
+        latent_digests: List[str] = []
+        source_feature_digests: List[str] = []
+        source_modalities = set()
+        phase_summaries: List[Dict[str, Any]] = []
+        axis_samples: Dict[str, List[float]] = {
+            "heart_rate_bpm": [],
+            "autonomic_arousal": [],
+            "cortical_load_proxy": [],
+            "valence_proxy": [],
+            "thought_pressure_proxy": [],
+            "interoceptive_confidence": [],
+        }
+
+        for index, adapter_receipt in enumerate(adapter_receipts):
+            latent_state = latent_states[index]
+            self._validate_dataset_adapter_window_for_series(session, adapter_receipt, latent_state)
+            phase_ref = str(circadian_phase_refs[index]).strip()
+            self._require_non_empty_string(phase_ref, "circadian_phase_ref")
+            normalized_phase_refs.append(phase_ref)
+            adapter_refs.append(str(adapter_receipt["adapter_ref"]))
+            adapter_receipt_digests.append(str(adapter_receipt["adapter_receipt_digest"]))
+            window_refs.append(str(adapter_receipt["window_ref"]))
+            dataset_refs.append(str(adapter_receipt["dataset_ref"]))
+            latent_refs.append(str(latent_state["latent_ref"]))
+            latent_digests.append(str(latent_state["latent_digest"]))
+            source_feature_digests.append(str(adapter_receipt["source_feature_digest"]))
+            source_modalities.update(str(item) for item in adapter_receipt["source_modalities_observed"])
+            axes = latent_state["physiological_axes"]
+            axis_samples["heart_rate_bpm"].append(float(axes["cardiac"]["heart_rate_bpm"]))
+            axis_samples["autonomic_arousal"].append(float(axes["autonomic"]["arousal"]))
+            axis_samples["cortical_load_proxy"].append(float(axes["neural"]["cortical_load_proxy"]))
+            axis_samples["valence_proxy"].append(float(axes["affect"]["valence_proxy"]))
+            axis_samples["thought_pressure_proxy"].append(
+                float(axes["thought"]["attention_pressure_proxy"])
+            )
+            axis_samples["interoceptive_confidence"].append(
+                float(latent_state["interoceptive_confidence"])
+            )
+            phase_summaries.append(
+                {
+                    "phase_ref": phase_ref,
+                    "window_ref": adapter_receipt["window_ref"],
+                    "adapter_ref": adapter_receipt["adapter_ref"],
+                    "adapter_receipt_digest": adapter_receipt["adapter_receipt_digest"],
+                    "latent_ref": latent_state["latent_ref"],
+                    "latent_digest": latent_state["latent_digest"],
+                    "source_feature_digest": adapter_receipt["source_feature_digest"],
+                    "normalized_window_index": index,
+                }
+            )
+
+        if len(set(normalized_phase_refs)) < 2:
+            raise ValueError("circadian_phase_refs must cover at least two unique phases")
+        digest_set_payload = {
+            "profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
+            "adapter_receipt_digests": adapter_receipt_digests,
+            "latent_digests": latent_digests,
+            "circadian_phase_refs": normalized_phase_refs,
+        }
+        drift_summary = {
+            axis_name: self._summarize_axis_drift(values)
+            for axis_name, values in axis_samples.items()
+        }
+        profile = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "series_ref": f"feature-window-series://biodata/{new_id('bdt-window-series')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "adapter_refs": adapter_refs,
+            "adapter_receipt_digests": adapter_receipt_digests,
+            "window_refs": window_refs,
+            "dataset_refs": dataset_refs,
+            "latent_refs": latent_refs,
+            "latent_digests": latent_digests,
+            "source_feature_digests": source_feature_digests,
+            "series_digest_set_digest": sha256_text(canonical_json(digest_set_payload)),
+            "window_count": len(adapter_receipts),
+            "dataset_count": len(set(dataset_refs)),
+            "source_modalities_covered": sorted(source_modalities),
+            "required_modalities_bound": sorted(source_modalities) == sorted(DEFAULT_SOURCE_MODALITIES),
+            "circadian_phase_refs": normalized_phase_refs,
+            "circadian_phase_summary": phase_summaries,
+            "circadian_profile_bound": len(set(normalized_phase_refs)) >= 2,
+            "axis_drift_summary": drift_summary,
+            "drift_policy": "ordered-feature-window-latent-drift-digest-only-v1",
+            "storage_policy": "adapter-receipt-digest+latent-digest+phase-ref-only",
+            "literature_refs": deepcopy(session["literature_refs"]),
+            "conflict_refs": deepcopy(session["conflict_refs"]),
+            "mind_upload_conflict_sink_url": session["mind_upload_conflict_sink_url"],
+            "raw_dataset_payload_stored": False,
+            "raw_signal_samples_stored": False,
+            "raw_feature_window_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_series_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        profile["series_profile_digest"] = sha256_text(
+            canonical_json(self._feature_window_series_digest_payload(profile))
+        )
+        return deepcopy(profile)
+
+    def validate_feature_window_series_profile(
+        self,
+        session: Dict[str, Any],
+        adapter_receipts: Sequence[Dict[str, Any]],
+        latent_states: Sequence[Dict[str, Any]],
+        series_profile: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        if series_profile.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("series_profile.schema_version mismatch")
+        if series_profile.get("profile_id") != BDT_FEATURE_WINDOW_SERIES_PROFILE_ID:
+            errors.append("series_profile.profile_id mismatch")
+        if series_profile.get("session_id") != session.get("session_id"):
+            errors.append("series_profile.session_id must match session.session_id")
+        if series_profile.get("identity_id") != session.get("identity_id"):
+            errors.append("series_profile.identity_id must match session.identity_id")
+        self._check_non_empty_string(series_profile.get("series_ref"), "series_profile.series_ref", errors)
+
+        adapter_receipt_digests = [str(item.get("adapter_receipt_digest", "")) for item in adapter_receipts]
+        latent_digests = [str(item.get("latent_digest", "")) for item in latent_states]
+        phase_refs = [str(item) for item in series_profile.get("circadian_phase_refs", [])]
+        expected_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
+                    "adapter_receipt_digests": adapter_receipt_digests,
+                    "latent_digests": latent_digests,
+                    "circadian_phase_refs": phase_refs,
+                }
+            )
+        )
+        if series_profile.get("adapter_receipt_digests") != adapter_receipt_digests:
+            errors.append("series_profile.adapter_receipt_digests must match adapter receipts")
+        if series_profile.get("latent_digests") != latent_digests:
+            errors.append("series_profile.latent_digests must match latent states")
+        if series_profile.get("series_digest_set_digest") != expected_digest_set:
+            errors.append("series_profile.series_digest_set_digest mismatch")
+
+        expected_profile_digest = sha256_text(
+            canonical_json(self._feature_window_series_digest_payload(series_profile))
+        )
+        if series_profile.get("series_profile_digest") != expected_profile_digest:
+            errors.append("series_profile.series_profile_digest mismatch")
+
+        required_modalities_bound = (
+            sorted(series_profile.get("source_modalities_covered", [])) == sorted(DEFAULT_SOURCE_MODALITIES)
+            and series_profile.get("required_modalities_bound") is True
+        )
+        if not required_modalities_bound:
+            errors.append("series_profile.required_modalities_bound must be true")
+        circadian_profile_bound = (
+            isinstance(phase_refs, list)
+            and len(phase_refs) >= 2
+            and len(set(phase_refs)) >= 2
+            and series_profile.get("circadian_profile_bound") is True
+        )
+        if not circadian_profile_bound:
+            errors.append("series_profile.circadian_profile_bound must be true")
+        axis_drift_summary = series_profile.get("axis_drift_summary", {})
+        axis_drift_summary_bound = (
+            isinstance(axis_drift_summary, dict)
+            and set(axis_drift_summary)
+            == {
+                "heart_rate_bpm",
+                "autonomic_arousal",
+                "cortical_load_proxy",
+                "valence_proxy",
+                "thought_pressure_proxy",
+                "interoceptive_confidence",
+            }
+        )
+        if not axis_drift_summary_bound:
+            errors.append("series_profile.axis_drift_summary must include required axes")
+        if series_profile.get("window_count") != len(adapter_receipts):
+            errors.append("series_profile.window_count must match adapter receipt count")
+
+        for field_name in (
+            "raw_dataset_payload_stored",
+            "raw_signal_samples_stored",
+            "raw_feature_window_payload_stored",
+            "raw_latent_payload_stored",
+            "raw_series_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if series_profile.get(field_name) is not False:
+                errors.append(f"series_profile.{field_name} must be false")
+
+        for adapter_receipt, latent_state in zip(adapter_receipts, latent_states):
+            try:
+                self._validate_dataset_adapter_window_for_series(session, adapter_receipt, latent_state)
+            except ValueError as exc:
+                errors.append(str(exc))
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": series_profile.get("profile_id"),
+            "person_bound": series_profile.get("identity_id") == session.get("identity_id"),
+            "series_digest_set_bound": (
+                series_profile.get("series_digest_set_digest") == expected_digest_set
+            ),
+            "series_profile_digest_bound": (
+                series_profile.get("series_profile_digest") == expected_profile_digest
+            ),
+            "adapter_receipt_digest_set_bound": (
+                series_profile.get("adapter_receipt_digests") == adapter_receipt_digests
+            ),
+            "latent_digest_set_bound": series_profile.get("latent_digests") == latent_digests,
+            "required_modalities_bound": required_modalities_bound,
+            "circadian_profile_bound": circadian_profile_bound,
+            "axis_drift_summary_bound": axis_drift_summary_bound,
+            "raw_dataset_payload_stored": False,
+            "raw_signal_samples_stored": False,
+            "raw_feature_window_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_series_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -1028,6 +1277,47 @@ class BioDataTransmitter:
         if "physiological_axes" not in latent_state:
             raise ValueError("latent_state must include physiological_axes")
 
+    def _validate_dataset_adapter_window_for_series(
+        self,
+        session: Dict[str, Any],
+        adapter_receipt: Dict[str, Any],
+        latent_state: Dict[str, Any],
+    ) -> None:
+        if not isinstance(adapter_receipt, dict):
+            raise ValueError("adapter_receipt must be a mapping")
+        self._validate_latent_for_session(session, latent_state)
+        if adapter_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            raise ValueError("adapter_receipt.schema_version mismatch")
+        if adapter_receipt.get("profile_id") != BDT_DATASET_ADAPTER_PROFILE_ID:
+            raise ValueError("adapter_receipt.profile_id mismatch")
+        if adapter_receipt.get("session_id") != session["session_id"]:
+            raise ValueError("adapter_receipt.session_id must match session.session_id")
+        if adapter_receipt.get("identity_id") != session["identity_id"]:
+            raise ValueError("adapter_receipt.identity_id must match session.identity_id")
+        if adapter_receipt.get("latent_ref") != latent_state.get("latent_ref"):
+            raise ValueError("adapter_receipt.latent_ref must match latent_state.latent_ref")
+        if adapter_receipt.get("latent_digest") != latent_state.get("latent_digest"):
+            raise ValueError("adapter_receipt.latent_digest must match latent_state.latent_digest")
+        if adapter_receipt.get("source_feature_digest") != latent_state.get("source_feature_digest"):
+            raise ValueError("adapter_receipt.source_feature_digest must match latent_state.source_feature_digest")
+        expected_adapter_digest = sha256_text(
+            canonical_json(self._dataset_adapter_digest_payload(adapter_receipt))
+        )
+        if adapter_receipt.get("adapter_receipt_digest") != expected_adapter_digest:
+            raise ValueError("adapter_receipt.adapter_receipt_digest mismatch")
+        if adapter_receipt.get("required_modalities_bound") is not True:
+            raise ValueError("adapter_receipt.required_modalities_bound must be true")
+        for field_name in (
+            "raw_dataset_payload_stored",
+            "raw_signal_samples_stored",
+            "raw_feature_window_payload_stored",
+            "raw_source_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if adapter_receipt.get(field_name) is not False:
+                raise ValueError(f"adapter_receipt.{field_name} must be false")
+
     def _normalize_modalities(self, values: Sequence[str] | None, field_name: str) -> List[str]:
         if not isinstance(values, (list, tuple)) or not values:
             raise ValueError(f"{field_name} must be a non-empty sequence")
@@ -1116,6 +1406,32 @@ class BioDataTransmitter:
         payload = dict(calibration_profile)
         payload.pop("calibration_digest", None)
         return payload
+
+    @staticmethod
+    def _feature_window_series_digest_payload(series_profile: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(series_profile)
+        payload.pop("series_profile_digest", None)
+        return payload
+
+    @staticmethod
+    def _summarize_axis_drift(values: Sequence[float]) -> Dict[str, Any]:
+        first = round(float(values[0]), 3)
+        last = round(float(values[-1]), 3)
+        absolute_delta = round(last - first, 3)
+        if absolute_delta > 0:
+            direction = "increased"
+        elif absolute_delta < 0:
+            direction = "decreased"
+        else:
+            direction = "stable"
+        return {
+            "first": first,
+            "last": last,
+            "minimum": round(min(float(value) for value in values), 3),
+            "maximum": round(max(float(value) for value in values), 3),
+            "absolute_delta": absolute_delta,
+            "direction": direction,
+        }
 
     @staticmethod
     def _confidence_gate_digest_payload(gate_receipt: Dict[str, Any]) -> Dict[str, Any]:

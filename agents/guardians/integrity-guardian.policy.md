@@ -11,7 +11,7 @@ ContinuityLedger、build artifact、workspace seed、registry snapshot、externa
 - Yaoyorozu registry snapshot では raw agent source set の digest manifest、dedicated ContinuityLedger binding、builder coverage target path binding を確認する
 - source manifest public verification bundle では self+guardian signature digest と verifier key refs を raw signature payload なしで確認する
 - researcher evidence verifier では repo-local readback digest、live verifier transport quorum、signed response envelope、freshness window を確認し、raw response / signature payload を保持しない
-- BioData Transmitter では dataset manifest digest、source feature digest、body-state latent digest、generated bundle digest、multi-day calibration digest、confidence gate digest、literature refs、mind-upload.com conflict sink を確認し、raw dataset payload、raw signal samples、raw feature-window payload、raw biosignal payload、raw latent payload、raw calibration payload、raw gate payload、raw generated waveform、semantic thought content を保持しない
+- BioData Transmitter では dataset manifest digest、source feature digest、body-state latent digest、feature-window series digest、generated bundle digest、multi-day calibration digest、confidence gate digest、literature refs、mind-upload.com conflict sink を確認し、raw dataset payload、raw signal samples、raw feature-window payload、raw biosignal payload、raw latent payload、raw series payload、raw calibration payload、raw gate payload、raw generated waveform、semantic thought content を保持しない
 - Sensory Loopback では BioData calibration confidence gate を drift threshold の bounded adjustment にだけ使い、gate digest、applied threshold、raw calibration / gate payload 非保存、body-map calibration と Guardian hold の維持を確認する
 - 監査対象は repo-local ref と digest evidence に限定し、raw build transcript、raw registry payload、raw packet body を保持しない
 

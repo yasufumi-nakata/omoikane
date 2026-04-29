@@ -2209,6 +2209,16 @@ entries:
     rationale: Required to bind external EEG/ECG/PPG/EDA/respiration dataset feature windows to BioData body-state latents with manifest digest, feature-window digest, latent digest, full modality coverage, and raw sample redaction.
   - priority: P1
     kind: schema
+    file: specs/schemas/biodata_feature_window_series_profile.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind multiple BioData dataset adapter receipts into an ordered longitudinal/circadian latent series with adapter digest set, latent digest set, phase refs, drift summary, and raw series payload redaction.
+  - priority: P1
+    kind: schema
     file: specs/schemas/biodata_signal_bundle.schema
     consumers:
       - specs/interfaces/interface.biodata_transmitter.v0.idl

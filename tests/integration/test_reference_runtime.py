@@ -81,9 +81,18 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dataset_adapter_latent_digest_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_required_modalities_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_profile_ok"])
+        self.assertTrue(result["validation"]["feature_window_series_digest_set_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_profile_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_adapter_receipts_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_latent_digest_set_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_required_modalities_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_axis_drift_summary_bound"])
         self.assertFalse(result["validation"]["raw_dataset_payload_stored"])
         self.assertFalse(result["validation"]["raw_signal_samples_stored"])
         self.assertFalse(result["validation"]["raw_feature_window_payload_stored"])
+        self.assertFalse(result["validation"]["raw_series_payload_stored"])
         self.assertFalse(result["validation"]["semantic_thought_content_generated"])
         self.assertFalse(result["validation"]["subjective_equivalence_claimed"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
@@ -108,6 +117,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
         self.assertEqual(2, result["calibration_profile"]["latent_count"])
+        self.assertEqual(2, result["feature_window_series_profile"]["window_count"])
         self.assertEqual(
             3,
             result["ledger_verification"]["category_counts"]["interface-biodata-transmitter"],
@@ -116,6 +126,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-biodata-transmitter-dataset-adapter"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-feature-window-series"
             ],
         )
         self.assertEqual(

@@ -29,13 +29,14 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 
 1. source modalities と target modalities を固定した BDT session を開く
 2. external dataset manifest と feature-window summary を digest-only adapter receipt に束縛する
-3. EEG/ECG/PPG/EDA/respiration features から body-state latent を作る
-4. latent digest に束縛した ECG/PPG/respiration/EEG/affect/thought proxy を生成する
-5. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
+3. 複数日の adapter receipt と body-state latent を longitudinal / circadian feature-window series profile に束縛する
+4. EEG/ECG/PPG/EDA/respiration features から body-state latent を作る
+5. latent digest に束縛した ECG/PPG/respiration/EEG/affect/thought proxy を生成する
+6. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
    semantic thought content 非生成を検証する
-6. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
-7. ContinuityLedger に session / dataset adapter / latent / generated bundle / conflict sink / calibration binding を残す
-8. calibration profile を identity confirmation / sensory loopback の confidence gate へ
+7. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
+8. ContinuityLedger に session / dataset adapter / feature-window series / latent / generated bundle / conflict sink / calibration binding を残す
+9. calibration profile を identity confirmation / sensory loopback の confidence gate へ
    digest-only receipt として束縛する
 
 ## 中間表現
@@ -89,6 +90,7 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 7. **multi-day calibration** ── 個人内 calibration は 2 日以上の latent digest set と day refs だけを束ね、raw latent / raw calibration payload は保存しない
 8. **confidence gate** ── identity confirmation / sensory loopback へ渡す時は calibration digest、source modality coverage、target 別 confidence threshold を receipt で束縛し、raw gate payload は保存しない
 9. **dataset adapter** ── 実 dataset は manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset payload、raw signal samples、raw feature-window payload は保存しない
+10. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
 
 ## 個人内 calibration
 
@@ -126,6 +128,19 @@ full source modality coverage が揃う時だけ confidence gate ready として
 raw feature-window payload は保存しない。dataset の存在や主観同一性を runtime が
 証明するものではなく、実験者が別途検証した feature summary を reference runtime へ
 安全に渡すための contract である。
+
+## Feature-window series
+
+`biodata-feature-window-series-profile-v1` は、2 件以上の dataset adapter receipt と
+対応する body-state latent を ordered series として束ねる。profile は adapter receipt
+digest set、latent digest set、window refs、dataset refs、circadian phase refs、
+source modality coverage、axis drift summary を持つ。
+
+axis drift は heart rate、autonomic arousal、cortical load、valence、thought pressure、
+interoceptive confidence の first / last / min / max / delta / direction だけを返す。
+これは longitudinal drift や日内変動を calibration の前段で監査するための
+digest-only profile であり、raw sample、raw feature-window、raw latent、raw series
+payload は保持しない。profile は主観同一性や semantic thought recovery を証明しない。
 
 ## 関連
 

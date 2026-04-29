@@ -117,6 +117,106 @@ class BioDataTransmitterTests(unittest.TestCase):
                 context_label="missing-manifest-ref",
             )
 
+    def test_builds_feature_window_series_profile_from_adapter_receipts(self) -> None:
+        transmitter = BioDataTransmitter()
+        session = transmitter.open_session("identity-bdt-feature-series")
+        base_manifest = {
+            "dataset_ref": "dataset://unit/physiology-window-series",
+            "participant_ref": "participant://unit/self",
+            "license_ref": "license://unit/redacted-feature-summary",
+            "window_ref": "window://unit/day-1/evening",
+            "modality_file_refs": {
+                "eeg": "dataset-file://unit/day-1/eeg",
+                "ecg": "dataset-file://unit/day-1/ecg",
+                "ppg": "dataset-file://unit/day-1/ppg",
+                "eda": "dataset-file://unit/day-1/eda",
+                "respiration": "dataset-file://unit/day-1/respiration",
+            },
+        }
+        day_one = transmitter.adapt_dataset_feature_window(
+            session["session_id"],
+            dataset_manifest=base_manifest,
+            window_feature_summaries={
+                "eeg": {"alpha_power": 0.38, "theta_power": 0.28, "beta_power": 0.35},
+                "ecg": {"heart_rate_bpm": 76.0, "hrv_rmssd_ms": 44.0},
+                "ppg": {"pulse_rate_bpm": 75.0, "pulse_amplitude": 0.7},
+                "eda": {"skin_conductance_microsiemens": 5.1},
+                "respiration": {"rate_bpm": 16.0, "phase": "exhale"},
+            },
+            context_label="feature-series-day-one",
+        )
+        day_two_manifest = dict(base_manifest)
+        day_two_manifest["window_ref"] = "window://unit/day-2/morning"
+        day_two_manifest["modality_file_refs"] = {
+            key: value.replace("day-1", "day-2")
+            for key, value in base_manifest["modality_file_refs"].items()
+        }
+        day_two = transmitter.adapt_dataset_feature_window(
+            session["session_id"],
+            dataset_manifest=day_two_manifest,
+            window_feature_summaries={
+                "eeg": {"alpha_power": 0.44, "theta_power": 0.24, "beta_power": 0.31},
+                "ecg": {"heart_rate_bpm": 70.0, "hrv_rmssd_ms": 52.0},
+                "ppg": {"pulse_rate_bpm": 70.2, "pulse_amplitude": 0.78},
+                "eda": {"skin_conductance_microsiemens": 4.1},
+                "respiration": {"rate_bpm": 14.0, "phase": "inhale"},
+            },
+            context_label="feature-series-day-two",
+        )
+
+        series = transmitter.build_feature_window_series_profile(
+            session,
+            [day_one["adapter_receipt"], day_two["adapter_receipt"]],
+            [day_one["latent_state"], day_two["latent_state"]],
+            [
+                "circadian-phase://unit/day-1/evening",
+                "circadian-phase://unit/day-2/morning",
+            ],
+        )
+        validation = transmitter.validate_feature_window_series_profile(
+            session,
+            [day_one["adapter_receipt"], day_two["adapter_receipt"]],
+            [day_one["latent_state"], day_two["latent_state"]],
+            series,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["series_digest_set_bound"])
+        self.assertTrue(validation["series_profile_digest_bound"])
+        self.assertTrue(validation["adapter_receipt_digest_set_bound"])
+        self.assertTrue(validation["latent_digest_set_bound"])
+        self.assertTrue(validation["required_modalities_bound"])
+        self.assertTrue(validation["circadian_profile_bound"])
+        self.assertTrue(validation["axis_drift_summary_bound"])
+        self.assertEqual(2, series["window_count"])
+        self.assertEqual(
+            "decreased",
+            series["axis_drift_summary"]["heart_rate_bpm"]["direction"],
+        )
+        self.assertFalse(series["raw_series_payload_stored"])
+        self.assertFalse(series["raw_latent_payload_stored"])
+
+        tampered = dict(series)
+        tampered["series_digest_set_digest"] = "0" * 64
+        self.assertFalse(
+            transmitter.validate_feature_window_series_profile(
+                session,
+                [day_one["adapter_receipt"], day_two["adapter_receipt"]],
+                [day_one["latent_state"], day_two["latent_state"]],
+                tampered,
+            )["ok"]
+        )
+        with self.assertRaisesRegex(ValueError, "at least two unique phases"):
+            transmitter.build_feature_window_series_profile(
+                session,
+                [day_one["adapter_receipt"], day_two["adapter_receipt"]],
+                [day_one["latent_state"], day_two["latent_state"]],
+                [
+                    "circadian-phase://unit/day-1/evening",
+                    "circadian-phase://unit/day-1/evening",
+                ],
+            )
+
     def test_builds_multi_day_calibration_profile_without_raw_payloads(self) -> None:
         transmitter = BioDataTransmitter()
         session = transmitter.open_session("identity-bdt-calibration")

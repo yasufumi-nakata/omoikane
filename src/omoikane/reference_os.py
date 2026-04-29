@@ -7741,9 +7741,23 @@ json.dump(response, sys.stdout)
         )
         dataset_adapter_receipt = adapted_window["adapter_receipt"]
         latent_state = adapted_window["latent_state"]
-        day_two_latent_state = self.biodata_transmitter.encode_body_state(
+        day_two_dataset_manifest = {
+            "dataset_ref": "dataset://physionet-compatible/demo-biodata-window",
+            "participant_ref": "participant://biodata-transmitter-demo/identity-1",
+            "license_ref": "license://open-physiology-demo/redacted-feature-window",
+            "window_ref": "window://biodata-transmitter-demo/day-2/resting-calibration",
+            "modality_file_refs": {
+                "eeg": "dataset-file://demo-biodata/day-2/eeg-window-summary",
+                "ecg": "dataset-file://demo-biodata/day-2/ecg-window-summary",
+                "ppg": "dataset-file://demo-biodata/day-2/ppg-window-summary",
+                "eda": "dataset-file://demo-biodata/day-2/eda-window-summary",
+                "respiration": "dataset-file://demo-biodata/day-2/resp-window-summary",
+            },
+        }
+        day_two_adapted_window = self.biodata_transmitter.adapt_dataset_feature_window(
             session["session_id"],
-            biosignal_features={
+            dataset_manifest=day_two_dataset_manifest,
+            window_feature_summaries={
                 "eeg": {
                     "alpha_power": 0.43,
                     "theta_power": 0.25,
@@ -7767,6 +7781,8 @@ json.dump(response, sys.stdout)
             },
             context_label="next-day-resting-calibration",
         )
+        day_two_dataset_adapter_receipt = day_two_adapted_window["adapter_receipt"]
+        day_two_latent_state = day_two_adapted_window["latent_state"]
         generated_bundle = self.biodata_transmitter.generate_biosignal_bundle(
             session["session_id"],
             latent_state,
@@ -7788,6 +7804,17 @@ json.dump(response, sys.stdout)
                 ),
                 "sensory-loopback": "sensory-loopback://biodata-transmitter-demo/session-gate",
             },
+        )
+        feature_window_series_profile = (
+            self.biodata_transmitter.build_feature_window_series_profile(
+                session,
+                [dataset_adapter_receipt, day_two_dataset_adapter_receipt],
+                [latent_state, day_two_latent_state],
+                [
+                    "circadian-phase://biodata-transmitter-demo/day-1/evening",
+                    "circadian-phase://biodata-transmitter-demo/day-2/morning",
+                ],
+            )
         )
         transmission_validation = self.biodata_transmitter.validate_transmission(
             session,
@@ -7812,12 +7839,21 @@ json.dump(response, sys.stdout)
             latent_state,
             dataset_adapter_receipt,
         )
+        feature_window_series_validation = (
+            self.biodata_transmitter.validate_feature_window_series_profile(
+                session,
+                [dataset_adapter_receipt, day_two_dataset_adapter_receipt],
+                [latent_state, day_two_latent_state],
+                feature_window_series_profile,
+            )
+        )
         validation = dict(transmission_validation)
         validation["ok"] = (
             transmission_validation["ok"]
             and calibration_validation["ok"]
             and confidence_gate_validation["ok"]
             and dataset_adapter_validation["ok"]
+            and feature_window_series_validation["ok"]
         )
         validation["dataset_adapter_ok"] = dataset_adapter_validation["ok"]
         validation["dataset_manifest_digest_bound"] = dataset_adapter_validation[
@@ -7835,6 +7871,30 @@ json.dump(response, sys.stdout)
         validation["dataset_adapter_receipt_digest_bound"] = (
             dataset_adapter_validation["adapter_receipt_digest_bound"]
         )
+        validation["feature_window_series_profile_ok"] = (
+            feature_window_series_validation["ok"]
+        )
+        validation["feature_window_series_digest_set_bound"] = (
+            feature_window_series_validation["series_digest_set_bound"]
+        )
+        validation["feature_window_series_profile_digest_bound"] = (
+            feature_window_series_validation["series_profile_digest_bound"]
+        )
+        validation["feature_window_series_adapter_receipts_bound"] = (
+            feature_window_series_validation["adapter_receipt_digest_set_bound"]
+        )
+        validation["feature_window_series_latent_digest_set_bound"] = (
+            feature_window_series_validation["latent_digest_set_bound"]
+        )
+        validation["feature_window_series_required_modalities_bound"] = (
+            feature_window_series_validation["required_modalities_bound"]
+        )
+        validation["feature_window_series_circadian_profile_bound"] = (
+            feature_window_series_validation["circadian_profile_bound"]
+        )
+        validation["feature_window_series_axis_drift_summary_bound"] = (
+            feature_window_series_validation["axis_drift_summary_bound"]
+        )
         validation["raw_dataset_payload_stored"] = dataset_adapter_validation[
             "raw_dataset_payload_stored"
         ]
@@ -7843,6 +7903,9 @@ json.dump(response, sys.stdout)
         ]
         validation["raw_feature_window_payload_stored"] = dataset_adapter_validation[
             "raw_feature_window_payload_stored"
+        ]
+        validation["raw_series_payload_stored"] = feature_window_series_validation[
+            "raw_series_payload_stored"
         ]
         validation["calibration_profile_ok"] = calibration_validation["ok"]
         validation["multi_day_calibration_bound"] = calibration_validation[
@@ -7936,6 +7999,38 @@ json.dump(response, sys.stdout)
             },
             actor="BioDataTransmitter",
             category="interface-biodata-transmitter-dataset-adapter",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.feature_window_series_profile_bound",
+            payload={
+                "series_ref": feature_window_series_profile["series_ref"],
+                "series_profile_digest": feature_window_series_profile[
+                    "series_profile_digest"
+                ],
+                "series_digest_set_digest": feature_window_series_profile[
+                    "series_digest_set_digest"
+                ],
+                "adapter_receipt_digests": feature_window_series_profile[
+                    "adapter_receipt_digests"
+                ],
+                "latent_digests": feature_window_series_profile["latent_digests"],
+                "window_count": feature_window_series_profile["window_count"],
+                "circadian_profile_bound": feature_window_series_profile[
+                    "circadian_profile_bound"
+                ],
+                "required_modalities_bound": feature_window_series_profile[
+                    "required_modalities_bound"
+                ],
+                "raw_series_payload_stored": feature_window_series_profile[
+                    "raw_series_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-feature-window-series",
             layer="L6",
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
@@ -8052,7 +8147,13 @@ json.dump(response, sys.stdout)
             "profile": self.biodata_transmitter.reference_profile(),
             "session": session,
             "dataset_manifest": dataset_manifest,
+            "dataset_manifests": [dataset_manifest, day_two_dataset_manifest],
             "dataset_adapter_receipt": dataset_adapter_receipt,
+            "dataset_adapter_receipts": [
+                dataset_adapter_receipt,
+                day_two_dataset_adapter_receipt,
+            ],
+            "feature_window_series_profile": feature_window_series_profile,
             "latent_state": latent_state,
             "calibration_latent_states": [latent_state, day_two_latent_state],
             "calibration_profile": calibration_profile,

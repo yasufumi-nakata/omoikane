@@ -155,6 +155,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dataset_adapter_latent_digest_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_required_modalities_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_profile_ok"])
+        self.assertTrue(result["validation"]["feature_window_series_digest_set_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_profile_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
         self.assertTrue(result["validation"]["calibration_digest_bound"])
@@ -167,7 +171,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["dataset_adapter_receipt"]["raw_dataset_payload_stored"])
         self.assertFalse(result["dataset_adapter_receipt"]["raw_signal_samples_stored"])
         self.assertFalse(result["dataset_adapter_receipt"]["raw_feature_window_payload_stored"])
+        self.assertFalse(result["feature_window_series_profile"]["raw_series_payload_stored"])
         self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
+        self.assertEqual(2, result["feature_window_series_profile"]["window_count"])
         self.assertEqual("bound", result["calibration_confidence_gate"]["confidence_gate_status"])
 
     def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:

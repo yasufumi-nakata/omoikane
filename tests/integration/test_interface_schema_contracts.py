@@ -62,6 +62,15 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/biodata_dataset_adapter_receipt.schema",
             result["dataset_adapter_receipt"],
         )
+        for receipt in result["dataset_adapter_receipts"]:
+            self._assert_schema_valid(
+                "specs/schemas/biodata_dataset_adapter_receipt.schema",
+                receipt,
+            )
+        self._assert_schema_valid(
+            "specs/schemas/biodata_feature_window_series_profile.schema",
+            result["feature_window_series_profile"],
+        )
         self._assert_schema_valid(
             "specs/schemas/biodata_body_state_latent.schema",
             result["latent_state"],
@@ -88,6 +97,14 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dataset_adapter_ok"])
         self.assertTrue(result["validation"]["dataset_manifest_digest_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_profile_ok"])
+        self.assertTrue(result["validation"]["feature_window_series_digest_set_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_profile_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_adapter_receipts_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_latent_digest_set_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_required_modalities_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_axis_drift_summary_bound"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_ok"])
@@ -95,6 +112,7 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
         self.assertFalse(result["validation"]["raw_calibration_payload_stored"])
         self.assertFalse(result["validation"]["raw_gate_payload_stored"])
+        self.assertFalse(result["validation"]["raw_series_payload_stored"])
 
     def test_wms_demo_states_and_reconcile_match_public_schemas(self) -> None:
         result = self.runtime.run_wms_demo()

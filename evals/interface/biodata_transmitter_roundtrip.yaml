@@ -21,6 +21,14 @@ expected:
   dataset_adapter_latent_digest_bound: true
   dataset_adapter_required_modalities_bound: true
   dataset_adapter_receipt_digest_bound: true
+  feature_window_series_profile_ok: true
+  feature_window_series_digest_set_bound: true
+  feature_window_series_profile_digest_bound: true
+  feature_window_series_adapter_receipts_bound: true
+  feature_window_series_latent_digest_set_bound: true
+  feature_window_series_required_modalities_bound: true
+  feature_window_series_circadian_profile_bound: true
+  feature_window_series_axis_drift_summary_bound: true
   calibration_profile_ok: true
   multi_day_calibration_bound: true
   source_latent_digest_set_bound: true
@@ -40,6 +48,7 @@ expected:
   raw_signal_samples_stored: false
   raw_feature_window_payload_stored: false
   raw_latent_payload_stored: false
+  raw_series_payload_stored: false
   raw_calibration_payload_stored: false
   raw_gate_payload_stored: false
   semantic_thought_content_generated: false
