@@ -159,6 +159,23 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             command_id="ewa-command-approve-001",
             reversibility="reversible",
         )
+        regulator_permit_verifier_receipt = controller.verify_regulator_permit(
+            legal_execution["execution_id"],
+            permit_authority_ref="authority://jp-13/lab-robotics-permit-desk",
+            permit_record_ref="permit://jp-13/ewa-arm-01/reposition/v1",
+            permit_record_digest=f"sha256:{'a' * 64}",
+            permit_scope_ref="permit-scope://physical-device-actuation/inspection-arm",
+            regulator_api_endpoint_ref="https://regulator.invalid/jp-13/ewa/permits/readback",
+            regulator_api_response_digest=f"sha256:{'b' * 64}",
+            regulator_api_certificate_ref="cert://jp-13/lab-robotics-permit-desk/api",
+            regulator_api_certificate_digest=f"sha256:{'c' * 64}",
+            verifier_key_ref="verifier-key://jp-13/lab-robotics-permit-desk/2026q2",
+            verifier_key_digest=f"sha256:{'d' * 64}",
+        )
+        regulator_permit_validation = controller.validate_regulator_permit_verifier_receipt(
+            regulator_permit_verifier_receipt,
+            legal_execution=legal_execution,
+        )
         oversight_event = self._build_network_oversight_event(
             command_id="ewa-command-approve-001",
             legal_execution=legal_execution,
@@ -223,6 +240,8 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             "production_connector_validation": production_connector_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
+            "regulator_permit_verifier_receipt": regulator_permit_verifier_receipt,
+            "regulator_permit_validation": regulator_permit_validation,
             "oversight_event": oversight_event,
             "guardian_oversight_gate": guardian_oversight_gate,
             "guardian_oversight_gate_validation": guardian_oversight_gate_validation,
@@ -270,6 +289,10 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(context["production_connector_validation"]["attestation_ready"])
         self.assertTrue(context["legal_execution_validation"]["ok"])
         self.assertTrue(context["legal_execution_validation"]["execution_ready"])
+        self.assertTrue(context["regulator_permit_validation"]["ok"])
+        self.assertTrue(context["regulator_permit_validation"]["receipt_ready"])
+        self.assertTrue(context["regulator_permit_validation"]["legal_execution_bound"])
+        self.assertTrue(context["regulator_permit_validation"]["raw_payload_redacted"])
         self.assertTrue(context["guardian_oversight_gate_validation"]["ok"])
         self.assertTrue(context["guardian_oversight_gate_validation"]["gate_ready"])
         self.assertTrue(authorization_validation["ok"])
@@ -390,6 +413,21 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
 
         self.assertFalse(validation["ok"])
         self.assertFalse(validation["attestation_ready"])
+
+    def test_regulator_permit_verifier_rejects_response_tamper(self) -> None:
+        context = self._build_authorized_reversible_context()
+        controller = context["controller"]
+        receipt = dict(context["regulator_permit_verifier_receipt"])
+        receipt["regulator_api_response_digest"] = f"sha256:{'0' * 64}"
+
+        validation = controller.validate_regulator_permit_verifier_receipt(
+            receipt,
+            legal_execution=context["legal_execution"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["receipt_ready"])
+        self.assertFalse(validation["permit_response_digest_matches"])
 
     def test_non_read_only_command_without_authorization_is_vetoed(self) -> None:
         controller = ExternalWorldAgentController()

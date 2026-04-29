@@ -1215,6 +1215,13 @@ jurisdiction-bound `ewa_legal_execution` が
 `policy_ref` / `legal_basis_ref` / `guardian_verification_id` /
 `guardian_verifier_ref` / `notice_authority_ref` / `liability_mode` /
 fixed 5-control preflight を固定したうえで、
+`ewa_regulator_permit_verifier_receipt` が
+`profile_id=ewa-regulator-permit-verifier-v1` /
+`transport_profile_id=digest-only-regulator-api-readback-v1` /
+legal execution digest、permit authority、permit record digest、
+regulator API response digest、API certificate digest、verifier key digest、
+raw permit / response payload redaction、decision authority 非昇格を
+同じ jurisdiction-bound preflight に束縛したうえで、
 network-attested `ewa_guardian_oversight_gate` が
 `guardian_role=integrity` / `oversight_category=attest` /
 `oversight_event_id` / `reviewer_binding_count` /

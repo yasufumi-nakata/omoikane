@@ -42,6 +42,9 @@ EWA_STOP_SIGNAL_ADAPTER_PROFILE_ID = "plc-firmware-stop-signal-adapter-v1"
 EWA_STOP_SIGNAL_ADAPTER_TRANSPORT_PROFILE_ID = "loopback-plc-firmware-probe-v1"
 EWA_PRODUCTION_CONNECTOR_PROFILE_ID = "vendor-api-safety-plc-installation-attestation-v1"
 EWA_PRODUCTION_CONNECTOR_AUTH_PROFILE_ID = "bounded-vendor-api-connector-auth-v1"
+EWA_REGULATOR_PERMIT_VERIFIER_PROFILE_ID = "ewa-regulator-permit-verifier-v1"
+EWA_REGULATOR_PERMIT_TRANSPORT_PROFILE_ID = "digest-only-regulator-api-readback-v1"
+EWA_ALLOWED_REGULATOR_PERMIT_STATUS = {"valid", "expired", "revoked"}
 EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID = "guardian-network-attested-ewa-authorization-gate-v1"
 EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE = "integrity"
 EWA_GUARDIAN_OVERSIGHT_REQUIRED_CATEGORY = "attest"
@@ -128,6 +131,10 @@ def _production_connector_digest_payload(record: Dict[str, Any]) -> Dict[str, An
     return {key: value for key, value in record.items() if key != "attestation_digest"}
 
 
+def _regulator_permit_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "receipt_digest"}
+
+
 def _oversight_gate_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "gate_digest"}
 
@@ -144,6 +151,7 @@ class ExternalWorldAgentController:
         self.stop_signal_paths: Dict[str, Dict[str, Any]] = {}
         self.stop_signal_adapter_receipts: Dict[str, Dict[str, Any]] = {}
         self.production_connector_attestations: Dict[str, Dict[str, Any]] = {}
+        self.regulator_permit_verifier_receipts: Dict[str, Dict[str, Any]] = {}
         self.guardian_oversight_gates: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
@@ -208,6 +216,16 @@ class ExternalWorldAgentController:
                 "required_bundle_status": "ready",
                 "allowed_liability_modes": sorted(EWA_ALLOWED_LIABILITY_MODES),
                 "required_controls": list(EWA_LEGAL_EXECUTION_CONTROL_TYPES),
+            },
+            "regulator_permit_verifier_policy": {
+                "profile_id": EWA_REGULATOR_PERMIT_VERIFIER_PROFILE_ID,
+                "transport_profile_id": EWA_REGULATOR_PERMIT_TRANSPORT_PROFILE_ID,
+                "delivery_scope": EWA_AUTHORIZATION_DELIVERY_SCOPE,
+                "required_permit_status": "valid",
+                "binds_legal_execution": True,
+                "raw_permit_payload_stored": False,
+                "raw_regulator_response_payload_stored": False,
+                "decision_authority_escalated": False,
             },
             "guardian_oversight_gate_policy": {
                 "policy_id": EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID,
@@ -1578,6 +1596,290 @@ class ExternalWorldAgentController:
             ),
         }
 
+    def verify_regulator_permit(
+        self,
+        legal_execution_id: str,
+        *,
+        permit_authority_ref: str,
+        permit_record_ref: str,
+        permit_record_digest: str,
+        permit_scope_ref: str,
+        regulator_api_endpoint_ref: str,
+        regulator_api_response_digest: str,
+        regulator_api_certificate_ref: str,
+        regulator_api_certificate_digest: str,
+        verifier_key_ref: str,
+        verifier_key_digest: str,
+        permit_status: str = "valid",
+    ) -> Dict[str, Any]:
+        legal_execution = self._require_legal_execution(legal_execution_id)
+        legal_execution_validation = self.validate_legal_execution(legal_execution)
+        if not legal_execution_validation["ok"]:
+            raise ValueError(legal_execution_validation["errors"][0])
+
+        normalized_permit_status = self._normalize_regulator_permit_status(permit_status)
+        if normalized_permit_status != "valid":
+            raise ValueError("regulator permit status must be valid before EWA authorization")
+
+        receipt = {
+            "kind": "ewa_regulator_permit_verifier_receipt",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "receipt_id": new_id("ewa-permit"),
+            "profile_id": EWA_REGULATOR_PERMIT_VERIFIER_PROFILE_ID,
+            "transport_profile_id": EWA_REGULATOR_PERMIT_TRANSPORT_PROFILE_ID,
+            "legal_execution_id": legal_execution["execution_id"],
+            "legal_execution_digest": legal_execution["digest"],
+            "legal_execution_profile_id": legal_execution["execution_profile_id"],
+            "handle_id": legal_execution["handle_id"],
+            "device_id": legal_execution["device_id"],
+            "command_id": legal_execution["command_id"],
+            "jurisdiction": legal_execution["jurisdiction"],
+            "delivery_scope": legal_execution["delivery_scope"],
+            "legal_basis_ref": legal_execution["legal_basis_ref"],
+            "jurisdiction_bundle_ref": legal_execution["jurisdiction_bundle_ref"],
+            "jurisdiction_bundle_digest": legal_execution["jurisdiction_bundle_digest"],
+            "permit_authority_ref": self._normalize_non_empty_string(
+                permit_authority_ref,
+                "permit_authority_ref",
+            ),
+            "permit_record_ref": self._normalize_non_empty_string(
+                permit_record_ref,
+                "permit_record_ref",
+            ),
+            "permit_record_digest": self._normalize_sha256_ref(
+                permit_record_digest,
+                "permit_record_digest",
+            ),
+            "permit_scope_ref": self._normalize_non_empty_string(
+                permit_scope_ref,
+                "permit_scope_ref",
+            ),
+            "permit_status": normalized_permit_status,
+            "regulator_api_endpoint_ref": self._normalize_non_empty_string(
+                regulator_api_endpoint_ref,
+                "regulator_api_endpoint_ref",
+            ),
+            "regulator_api_response_digest": self._normalize_sha256_ref(
+                regulator_api_response_digest,
+                "regulator_api_response_digest",
+            ),
+            "regulator_api_certificate_ref": self._normalize_non_empty_string(
+                regulator_api_certificate_ref,
+                "regulator_api_certificate_ref",
+            ),
+            "regulator_api_certificate_digest": self._normalize_sha256_ref(
+                regulator_api_certificate_digest,
+                "regulator_api_certificate_digest",
+            ),
+            "verifier_key_ref": self._normalize_non_empty_string(
+                verifier_key_ref,
+                "verifier_key_ref",
+            ),
+            "verifier_key_digest": self._normalize_sha256_ref(
+                verifier_key_digest,
+                "verifier_key_digest",
+            ),
+            "permit_response_digest": "",
+            "raw_permit_payload_stored": False,
+            "raw_regulator_response_payload_stored": False,
+            "decision_authority_escalated": False,
+            "verified_at": utc_now_iso(),
+        }
+        receipt["permit_response_digest"] = sha256_text(
+            canonical_json(
+                {
+                    "permit_authority_ref": receipt["permit_authority_ref"],
+                    "permit_record_ref": receipt["permit_record_ref"],
+                    "permit_record_digest": receipt["permit_record_digest"],
+                    "permit_status": receipt["permit_status"],
+                    "regulator_api_endpoint_ref": receipt["regulator_api_endpoint_ref"],
+                    "regulator_api_response_digest": receipt[
+                        "regulator_api_response_digest"
+                    ],
+                    "verifier_key_ref": receipt["verifier_key_ref"],
+                    "verifier_key_digest": receipt["verifier_key_digest"],
+                }
+            )
+        )
+        receipt["receipt_digest"] = sha256_text(
+            canonical_json(_regulator_permit_digest_payload(receipt))
+        )
+        self.regulator_permit_verifier_receipts[receipt["receipt_id"]] = receipt
+        return deepcopy(receipt)
+
+    def validate_regulator_permit_verifier_receipt(
+        self,
+        receipt: Mapping[str, Any],
+        *,
+        legal_execution: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(receipt, Mapping):
+            raise ValueError("receipt must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "receipt_id",
+            "legal_execution_id",
+            "legal_execution_digest",
+            "legal_execution_profile_id",
+            "handle_id",
+            "device_id",
+            "command_id",
+            "jurisdiction",
+            "delivery_scope",
+            "legal_basis_ref",
+            "jurisdiction_bundle_ref",
+            "jurisdiction_bundle_digest",
+            "permit_authority_ref",
+            "permit_record_ref",
+            "permit_record_digest",
+            "permit_scope_ref",
+            "regulator_api_endpoint_ref",
+            "regulator_api_response_digest",
+            "regulator_api_certificate_ref",
+            "regulator_api_certificate_digest",
+            "verifier_key_ref",
+            "verifier_key_digest",
+            "permit_response_digest",
+            "receipt_digest",
+        ):
+            self._check_non_empty_string(receipt.get(field_name), field_name, errors)
+
+        if receipt.get("kind") != "ewa_regulator_permit_verifier_receipt":
+            errors.append("kind must be ewa_regulator_permit_verifier_receipt")
+        if receipt.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if receipt.get("profile_id") != EWA_REGULATOR_PERMIT_VERIFIER_PROFILE_ID:
+            errors.append(
+                f"profile_id must be {EWA_REGULATOR_PERMIT_VERIFIER_PROFILE_ID}"
+            )
+        if receipt.get("transport_profile_id") != EWA_REGULATOR_PERMIT_TRANSPORT_PROFILE_ID:
+            errors.append(
+                f"transport_profile_id must be {EWA_REGULATOR_PERMIT_TRANSPORT_PROFILE_ID}"
+            )
+        if receipt.get("delivery_scope") != EWA_AUTHORIZATION_DELIVERY_SCOPE:
+            errors.append(f"delivery_scope must be {EWA_AUTHORIZATION_DELIVERY_SCOPE}")
+
+        permit_status_valid = receipt.get("permit_status") == "valid"
+        if receipt.get("permit_status") not in EWA_ALLOWED_REGULATOR_PERMIT_STATUS:
+            errors.append(
+                "permit_status must be one of "
+                f"{sorted(EWA_ALLOWED_REGULATOR_PERMIT_STATUS)}"
+            )
+        elif not permit_status_valid:
+            errors.append("regulator permit verifier receipt must be valid")
+
+        regulator_transport_verified = True
+        for field_name in (
+            "permit_record_digest",
+            "regulator_api_response_digest",
+            "regulator_api_certificate_digest",
+            "verifier_key_digest",
+        ):
+            if not self._is_sha256_ref(receipt.get(field_name)):
+                regulator_transport_verified = False
+                errors.append(f"{field_name} must be a sha256 ref")
+
+        raw_payload_redacted = (
+            receipt.get("raw_permit_payload_stored") is False
+            and receipt.get("raw_regulator_response_payload_stored") is False
+            and receipt.get("decision_authority_escalated") is False
+        )
+        if not raw_payload_redacted:
+            errors.append(
+                "regulator permit verifier must not store raw permit/response payloads or escalate decision authority"
+            )
+
+        legal_execution_bound = True
+        try:
+            bound_legal_execution = (
+                dict(legal_execution)
+                if legal_execution is not None
+                else self._require_legal_execution(str(receipt.get("legal_execution_id", "")))
+            )
+        except (KeyError, ValueError):
+            legal_execution_bound = False
+            errors.append("regulator permit verifier must reference a known legal execution")
+            bound_legal_execution = {}
+        legal_execution_validation: Dict[str, Any] = {"execution_ready": False}
+        if bound_legal_execution:
+            for receipt_field, execution_field in (
+                ("legal_execution_id", "execution_id"),
+                ("legal_execution_digest", "digest"),
+                ("legal_execution_profile_id", "execution_profile_id"),
+                ("handle_id", "handle_id"),
+                ("device_id", "device_id"),
+                ("command_id", "command_id"),
+                ("jurisdiction", "jurisdiction"),
+                ("delivery_scope", "delivery_scope"),
+                ("legal_basis_ref", "legal_basis_ref"),
+                ("jurisdiction_bundle_ref", "jurisdiction_bundle_ref"),
+                ("jurisdiction_bundle_digest", "jurisdiction_bundle_digest"),
+            ):
+                if receipt.get(receipt_field) != bound_legal_execution.get(execution_field):
+                    legal_execution_bound = False
+                    errors.append(
+                        f"regulator permit {receipt_field} must match the legal execution"
+                    )
+            legal_execution_validation = self.validate_legal_execution(bound_legal_execution)
+            if not legal_execution_validation["ok"]:
+                legal_execution_bound = False
+                errors.extend(legal_execution_validation["errors"])
+
+        expected_response_digest = sha256_text(
+            canonical_json(
+                {
+                    "permit_authority_ref": receipt.get("permit_authority_ref"),
+                    "permit_record_ref": receipt.get("permit_record_ref"),
+                    "permit_record_digest": receipt.get("permit_record_digest"),
+                    "permit_status": receipt.get("permit_status"),
+                    "regulator_api_endpoint_ref": receipt.get(
+                        "regulator_api_endpoint_ref"
+                    ),
+                    "regulator_api_response_digest": receipt.get(
+                        "regulator_api_response_digest"
+                    ),
+                    "verifier_key_ref": receipt.get("verifier_key_ref"),
+                    "verifier_key_digest": receipt.get("verifier_key_digest"),
+                }
+            )
+        )
+        permit_response_digest_matches = (
+            receipt.get("permit_response_digest") == expected_response_digest
+        )
+        if not permit_response_digest_matches:
+            errors.append("permit_response_digest must match the verifier response payload")
+
+        self._parse_datetime(receipt.get("verified_at"), "verified_at", errors)
+        receipt_digest_matches = receipt.get("receipt_digest") == sha256_text(
+            canonical_json(_regulator_permit_digest_payload(dict(receipt)))
+        )
+        if not receipt_digest_matches:
+            errors.append("receipt_digest must match the canonical regulator permit receipt")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "legal_execution_bound": legal_execution_bound,
+            "legal_execution_ready": legal_execution_validation.get(
+                "execution_ready",
+                False,
+            ),
+            "permit_status_valid": permit_status_valid,
+            "regulator_transport_verified": regulator_transport_verified,
+            "permit_response_digest_matches": permit_response_digest_matches,
+            "raw_payload_redacted": raw_payload_redacted,
+            "receipt_ready": (
+                legal_execution_bound
+                and legal_execution_validation.get("execution_ready", False)
+                and permit_status_valid
+                and regulator_transport_verified
+                and permit_response_digest_matches
+                and raw_payload_redacted
+                and receipt_digest_matches
+            ),
+        }
+
     def prepare_guardian_oversight_gate(
         self,
         handle_id: str,
@@ -2825,6 +3127,9 @@ class ExternalWorldAgentController:
 
     def snapshot_production_connector_attestation(self, attestation_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_production_connector_attestation(attestation_id))
+
+    def snapshot_regulator_permit_verifier_receipt(self, receipt_id: str) -> Dict[str, Any]:
+        return deepcopy(self._require_regulator_permit_verifier_receipt(receipt_id))
 
     def snapshot_guardian_oversight_gate(self, gate_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_guardian_oversight_gate(gate_id))
@@ -4302,6 +4607,18 @@ class ExternalWorldAgentController:
                 f"unknown production_connector_attestation_id: {normalized_attestation_id}"
             ) from exc
 
+    def _require_regulator_permit_verifier_receipt(self, receipt_id: str) -> Dict[str, Any]:
+        normalized_receipt_id = self._normalize_non_empty_string(
+            receipt_id,
+            "regulator_permit_verifier_receipt_id",
+        )
+        try:
+            return self.regulator_permit_verifier_receipts[normalized_receipt_id]
+        except KeyError as exc:
+            raise KeyError(
+                f"unknown regulator_permit_verifier_receipt_id: {normalized_receipt_id}"
+            ) from exc
+
     def _require_legal_execution(self, execution_id: str) -> Dict[str, Any]:
         normalized_execution_id = self._normalize_non_empty_string(
             execution_id,
@@ -4403,6 +4720,15 @@ class ExternalWorldAgentController:
             raise ValueError(
                 "jurisdiction_bundle_status must be one of "
                 f"{sorted(EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES)}"
+            )
+        return value
+
+    @staticmethod
+    def _normalize_regulator_permit_status(value: str) -> str:
+        if value not in EWA_ALLOWED_REGULATOR_PERMIT_STATUS:
+            raise ValueError(
+                "permit_status must be one of "
+                f"{sorted(EWA_ALLOWED_REGULATOR_PERMIT_STATUS)}"
             )
         return value
 

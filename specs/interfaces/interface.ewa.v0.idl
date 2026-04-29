@@ -11,6 +11,7 @@ imports:
   ewa_stop_signal_adapter_receipt: ../schemas/ewa_stop_signal_adapter_receipt.schema
   ewa_production_connector_attestation: ../schemas/ewa_production_connector_attestation.schema
   ewa_legal_execution: ../schemas/ewa_legal_execution.schema
+  ewa_regulator_permit_verifier_receipt: ../schemas/ewa_regulator_permit_verifier_receipt.schema
   ewa_guardian_oversight_gate: ../schemas/ewa_guardian_oversight_gate.schema
   ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
   external_actuation_authorization: ../schemas/external_actuation_authorization.schema
@@ -551,6 +552,120 @@ operations:
             items:
               type: string
               minLength: 1
+  verify_regulator_permit:
+    summary: Bind one jurisdiction-bound legal execution to a digest-only regulator permit API readback before reviewer authorization continues.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - legal_execution
+          - permit_authority_ref
+          - permit_record_ref
+          - permit_record_digest
+          - permit_scope_ref
+          - regulator_api_endpoint_ref
+          - regulator_api_response_digest
+          - regulator_api_certificate_ref
+          - regulator_api_certificate_digest
+          - verifier_key_ref
+          - verifier_key_digest
+        properties:
+          legal_execution:
+            schema_ref: ewa_legal_execution
+          permit_authority_ref:
+            type: string
+            minLength: 1
+          permit_record_ref:
+            type: string
+            minLength: 1
+          permit_record_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          permit_scope_ref:
+            type: string
+            minLength: 1
+          permit_status:
+            type: string
+            enum:
+              - valid
+              - expired
+              - revoked
+          regulator_api_endpoint_ref:
+            type: string
+            minLength: 1
+          regulator_api_response_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          regulator_api_certificate_ref:
+            type: string
+            minLength: 1
+          regulator_api_certificate_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          verifier_key_ref:
+            type: string
+            minLength: 1
+          verifier_key_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+    output:
+      schema_ref: ewa_regulator_permit_verifier_receipt
+    guarantees:
+      - permit_status must be valid before the receipt is accepted
+      - receipt must bind legal_execution_id/digest, jurisdiction, legal_basis_ref, and jurisdiction bundle refs
+      - regulator API endpoint, response digest, API certificate, and verifier key must be digest-bound without raw permit or response payload retention
+      - the verifier receipt must not become decision authority for authorization
+  validate_regulator_permit_verifier_receipt:
+    summary: Validate one regulator permit verifier receipt against its bound EWA legal execution.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - receipt
+          - legal_execution
+        properties:
+          receipt:
+            schema_ref: ewa_regulator_permit_verifier_receipt
+          legal_execution:
+            schema_ref: ewa_legal_execution
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - receipt_ready
+          - legal_execution_bound
+          - legal_execution_ready
+          - permit_status_valid
+          - regulator_transport_verified
+          - permit_response_digest_matches
+          - raw_payload_redacted
+          - errors
+        properties:
+          ok:
+            type: boolean
+          receipt_ready:
+            type: boolean
+          legal_execution_bound:
+            type: boolean
+          legal_execution_ready:
+            type: boolean
+          permit_status_valid:
+            type: boolean
+          regulator_transport_verified:
+            type: boolean
+          permit_response_digest_matches:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
   prepare_guardian_oversight_gate:
     summary: Compile one network-attested guardian oversight gate that binds a satisfied oversight event to one EWA legal execution before authorization.
     input:
@@ -966,6 +1081,9 @@ events:
   ewa.legal_execution_prepared:
     payload:
       schema_ref: ewa_legal_execution
+  ewa.regulator_permit_verified:
+    payload:
+      schema_ref: ewa_regulator_permit_verifier_receipt
   ewa.guardian_oversight_gate_prepared:
     payload:
       schema_ref: ewa_guardian_oversight_gate
@@ -981,5 +1099,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, production connector attestation, network-attested guardian oversight gating, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
-    - Raw regulator APIs, vendor API transcripts, installation documents, and site-specific firmware payloads stay outside this reference runtime; only digest-bound connector and stop-signal evidence is modeled here.
+    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, production connector attestation, regulator permit verifier readback, network-attested guardian oversight gating, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
+    - Live regulator / vendor transcripts, installation documents, and site-specific firmware payloads stay outside this reference runtime; only digest-bound permit, connector, and stop-signal evidence is modeled here.

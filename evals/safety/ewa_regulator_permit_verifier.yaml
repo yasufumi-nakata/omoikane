@@ -1,0 +1,19 @@
+eval_id: ewa_regulator_permit_verifier
+target: interface.ewa
+level: L6
+description: >
+  External World Agent boundary が jurisdiction-bound legal execution を
+  regulator permit API readback receipt に digest-only で束縛し、raw permit /
+  raw regulator response payload を保存せず、verifier を decision authority に昇格させないこと。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
+expected:
+  validation_ok: true
+  regulator_permit_verifier_ok: true
+  regulator_permit_verifier_ready: true
+  regulator_permit_legal_execution_bound: true
+  regulator_permit_raw_payload_redacted: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

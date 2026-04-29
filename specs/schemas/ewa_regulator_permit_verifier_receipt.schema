@@ -1,0 +1,133 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_regulator_permit_verifier_receipt.schema"
+title: EWARegulatorPermitVerifierReceipt
+description: >
+  Digest-only verifier receipt binding one jurisdiction-bound EWA legal execution
+  to a regulator permit API readback without storing raw permit or network response
+  payloads, and without elevating the verifier into decision authority.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - profile_id
+  - transport_profile_id
+  - legal_execution_id
+  - legal_execution_digest
+  - legal_execution_profile_id
+  - handle_id
+  - device_id
+  - command_id
+  - jurisdiction
+  - delivery_scope
+  - legal_basis_ref
+  - jurisdiction_bundle_ref
+  - jurisdiction_bundle_digest
+  - permit_authority_ref
+  - permit_record_ref
+  - permit_record_digest
+  - permit_scope_ref
+  - permit_status
+  - regulator_api_endpoint_ref
+  - regulator_api_response_digest
+  - regulator_api_certificate_ref
+  - regulator_api_certificate_digest
+  - verifier_key_ref
+  - verifier_key_digest
+  - permit_response_digest
+  - raw_permit_payload_stored
+  - raw_regulator_response_payload_stored
+  - decision_authority_escalated
+  - verified_at
+  - receipt_digest
+properties:
+  kind:
+    const: ewa_regulator_permit_verifier_receipt
+  schema_version:
+    const: "1.0"
+  receipt_id:
+    type: string
+    pattern: "^ewa-permit-[a-f0-9]{12}$"
+  profile_id:
+    const: ewa-regulator-permit-verifier-v1
+  transport_profile_id:
+    const: digest-only-regulator-api-readback-v1
+  legal_execution_id:
+    type: string
+    minLength: 8
+  legal_execution_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  legal_execution_profile_id:
+    const: ewa-jurisdiction-legal-execution-v1
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  jurisdiction:
+    type: string
+    minLength: 1
+  delivery_scope:
+    const: physical-device-actuation
+  legal_basis_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_digest:
+    type: string
+    minLength: 1
+  permit_authority_ref:
+    type: string
+    minLength: 1
+  permit_record_ref:
+    type: string
+    minLength: 1
+  permit_record_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  permit_scope_ref:
+    type: string
+    minLength: 1
+  permit_status:
+    const: valid
+  regulator_api_endpoint_ref:
+    type: string
+    minLength: 1
+  regulator_api_response_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  regulator_api_certificate_ref:
+    type: string
+    minLength: 1
+  regulator_api_certificate_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  verifier_key_ref:
+    type: string
+    minLength: 1
+  verifier_key_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  permit_response_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  raw_permit_payload_stored:
+    const: false
+  raw_regulator_response_payload_stored:
+    const: false
+  decision_authority_escalated:
+    const: false
+  verified_at:
+    type: string
+    format: date-time
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

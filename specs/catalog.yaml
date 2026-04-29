@@ -3596,5 +3596,30 @@ entries:
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
     rationale: Guards the multi-researcher synthesis receipt so source exchange digests, evidence digest set, verifier digest set, advisory-only boundary, and Council+Guardian ledger entry remain bound.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/ewa_regulator_permit_verifier_receipt.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - reference-runtime
+      - tests/integration/test_ewa_schema_contracts.py
+      - tests/unit/test_ewa.py
+      - evals/safety/ewa_regulator_permit_verifier.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to serialize digest-only regulator permit API readback against one EWA legal execution without storing raw permit or regulator response payloads or escalating verifier decision authority.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ewa_regulator_permit_verifier.yaml
+    consumers:
+      - reference-runtime
+      - tests/integration/test_cli.py
+      - tests/integration/test_reference_runtime.py
+      - tests/integration/test_ewa_schema_contracts.py
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+      - docs/07-reference-implementation/README.md
+    rationale: Guards that regulator permit verifier receipts remain legal-execution-bound, permit-status-valid, digest-only, raw-payload-redacted, and outside EWA decision authority.
 next_priority:
   # Future automation can append the next missing contract here.

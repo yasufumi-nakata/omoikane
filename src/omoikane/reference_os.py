@@ -9625,6 +9625,23 @@ json.dump(response, sys.stdout)
             command_id="ewa-command-approve-001",
             reversibility="reversible",
         )
+        regulator_permit_verifier_receipt = self.ewa.verify_regulator_permit(
+            legal_execution["execution_id"],
+            permit_authority_ref="authority://jp-13/lab-robotics-permit-desk",
+            permit_record_ref="permit://jp-13/lab-drone-arm-01/inspection-safe-reposition/v1",
+            permit_record_digest=f"sha256:{'e' * 64}",
+            permit_scope_ref="permit-scope://physical-device-actuation/lab-inspection",
+            regulator_api_endpoint_ref="https://regulator.invalid/jp-13/ewa/permits/readback",
+            regulator_api_response_digest=f"sha256:{'f' * 64}",
+            regulator_api_certificate_ref="cert://jp-13/lab-robotics-permit-desk/api",
+            regulator_api_certificate_digest=f"sha256:{'a' * 64}",
+            verifier_key_ref="verifier-key://jp-13/lab-robotics-permit-desk/2026q2",
+            verifier_key_digest=f"sha256:{'b' * 64}",
+        )
+        regulator_permit_validation = self.ewa.validate_regulator_permit_verifier_receipt(
+            regulator_permit_verifier_receipt,
+            legal_execution=legal_execution,
+        )
         guardian_oversight_event = self.oversight.record(
             guardian_role="integrity",
             category="attest",
@@ -9764,6 +9781,16 @@ json.dump(response, sys.stdout)
             "legal_execution_ok": legal_execution_validation["ok"],
             "legal_execution_bound": handle_validation["legal_execution_bound"]
             and authorization_validation["legal_execution_bound"],
+            "regulator_permit_verifier_ok": regulator_permit_validation["ok"],
+            "regulator_permit_verifier_ready": regulator_permit_validation[
+                "receipt_ready"
+            ],
+            "regulator_permit_legal_execution_bound": regulator_permit_validation[
+                "legal_execution_bound"
+            ],
+            "regulator_permit_raw_payload_redacted": regulator_permit_validation[
+                "raw_payload_redacted"
+            ],
             "guardian_oversight_gate_ok": guardian_oversight_gate_validation["ok"],
             "guardian_oversight_gate_bound": authorization_validation[
                 "guardian_oversight_gate_bound"
@@ -9863,6 +9890,7 @@ json.dump(response, sys.stdout)
             and stop_signal_adapter_validation["ok"]
             and production_connector_validation["ok"]
             and legal_execution_validation["ok"]
+            and regulator_permit_validation["ok"]
             and guardian_oversight_gate_validation["ok"]
             and authorization_validation["ok"]
             and emergency_stop_validation["ok"],
@@ -9924,6 +9952,16 @@ json.dump(response, sys.stdout)
             payload=legal_execution,
             actor="ExternalWorldAgentController",
             category="interface-ewa-legal",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.regulator_permit.verified",
+            payload=regulator_permit_verifier_receipt,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-regulator-permit",
             layer="L6",
             signature_roles=["guardian", "third_party"],
             substrate="robotic-actuator",
@@ -10037,6 +10075,8 @@ json.dump(response, sys.stdout)
             "production_connector_validation": production_connector_validation,
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
+            "regulator_permit_verifier_receipt": regulator_permit_verifier_receipt,
+            "regulator_permit_validation": regulator_permit_validation,
             "reviewers": {
                 "alpha": reviewer_alpha,
                 "beta": reviewer_beta,
