@@ -32,6 +32,10 @@ required:
   - report_digest
   - evidence_refs
   - evidence_ref_count
+  - evidence_verifier_profile
+  - evidence_verifier_ref
+  - evidence_verifier_digest
+  - evidence_verifier_receipt
   - claim_ceiling
   - advisory_only
   - raw_research_payload_stored
@@ -121,6 +125,16 @@ properties:
   evidence_ref_count:
     type: integer
     minimum: 1
+  evidence_verifier_profile:
+    const: repo-local-research-evidence-verifier-v1
+  evidence_verifier_ref:
+    type: string
+    pattern: "^research-evidence-verifier://yaoyorozu-research-evidence-verifier-[a-f0-9]{12}$"
+  evidence_verifier_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  evidence_verifier_receipt:
+    $ref: yaoyorozu_research_evidence_verifier_receipt.schema
   claim_ceiling:
     const: implementation-advisory
   advisory_only:
@@ -177,6 +191,10 @@ properties:
       - continuity_event_digest_bound
       - evidence_refs_bound
       - evidence_digests_bound
+      - evidence_verifier_bound
+      - evidence_verifier_digest_bound
+      - evidence_verifier_raw_payload_stored
+      - evidence_verifier_network_payload_stored
       - request_forbids_authority
       - advisory_only
       - raw_research_payload_stored
@@ -205,6 +223,14 @@ properties:
         const: true
       evidence_digests_bound:
         const: true
+      evidence_verifier_bound:
+        const: true
+      evidence_verifier_digest_bound:
+        const: true
+      evidence_verifier_raw_payload_stored:
+        const: false
+      evidence_verifier_network_payload_stored:
+        const: false
       request_forbids_authority:
         const: true
       advisory_only:
@@ -250,6 +276,45 @@ examples:
     evidence_refs:
       - docs/05-research-frontiers/scan-fidelity.md
     evidence_ref_count: 1
+    evidence_verifier_profile: repo-local-research-evidence-verifier-v1
+    evidence_verifier_ref: research-evidence-verifier://yaoyorozu-research-evidence-verifier-012345abcdef
+    evidence_verifier_digest: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    evidence_verifier_receipt:
+      kind: yaoyorozu_research_evidence_verifier_receipt
+      schema_version: 1.0.0
+      verifier_id: yaoyorozu-research-evidence-verifier-012345abcdef
+      verifier_ref: research-evidence-verifier://yaoyorozu-research-evidence-verifier-012345abcdef
+      verified_at: "2026-04-29T00:00:00+00:00"
+      profile_id: repo-local-research-evidence-verifier-v1
+      transport_profile: repo-local-digest-readback-v1
+      exchange_ref: research-evidence-exchange://yaoyorozu-research-evidence-exchange-012345abcdef
+      researcher_agent_id: neuroscience-scout
+      evidence_refs:
+        - docs/05-research-frontiers/scan-fidelity.md
+      evidence_digest_set:
+        - evidence_ref: docs/05-research-frontiers/scan-fidelity.md
+          expected_digest: 5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          observed_digest: 5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          source_class: repo-local-doc
+          claim_scope: constrains
+          verification_status: verified
+      evidence_digest_set_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      verified_evidence_count: 1
+      verifier_status: verified
+      raw_evidence_payload_stored: false
+      network_payload_stored: false
+      decision_authority_claimed: false
+      verifier_digest: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      validation:
+        ok: true
+        exchange_bound: true
+        evidence_ref_set_bound: true
+        evidence_digest_set_bound: true
+        verifier_digest_bound: true
+        raw_evidence_payload_stored: false
+        network_payload_stored: false
+        decision_authority_claimed: false
+        errors: []
     claim_ceiling: implementation-advisory
     advisory_only: true
     raw_research_payload_stored: false
@@ -328,6 +393,10 @@ examples:
       continuity_event_digest_bound: true
       evidence_refs_bound: true
       evidence_digests_bound: true
+      evidence_verifier_bound: true
+      evidence_verifier_digest_bound: true
+      evidence_verifier_raw_payload_stored: false
+      evidence_verifier_network_payload_stored: false
       request_forbids_authority: true
       advisory_only: true
       raw_research_payload_stored: false

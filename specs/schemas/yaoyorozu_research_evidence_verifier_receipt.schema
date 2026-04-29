@@ -1,0 +1,186 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema"
+title: YaoyorozuResearchEvidenceVerifierReceipt
+description: >
+  Digest-only verifier receipt for Yaoyorozu researcher evidence. It performs
+  repo-local readback of evidence refs, binds expected and observed digests,
+  and never stores raw evidence or network payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - verifier_id
+  - verifier_ref
+  - verified_at
+  - profile_id
+  - transport_profile
+  - exchange_ref
+  - researcher_agent_id
+  - evidence_refs
+  - evidence_digest_set
+  - evidence_digest_set_digest
+  - verified_evidence_count
+  - verifier_status
+  - raw_evidence_payload_stored
+  - network_payload_stored
+  - decision_authority_claimed
+  - verifier_digest
+  - validation
+properties:
+  kind:
+    const: yaoyorozu_research_evidence_verifier_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  verifier_id:
+    type: string
+    pattern: "^yaoyorozu-research-evidence-verifier-[a-f0-9]{12}$"
+  verifier_ref:
+    type: string
+    pattern: "^research-evidence-verifier://yaoyorozu-research-evidence-verifier-[a-f0-9]{12}$"
+  verified_at:
+    type: string
+    minLength: 1
+  profile_id:
+    const: repo-local-research-evidence-verifier-v1
+  transport_profile:
+    const: repo-local-digest-readback-v1
+  exchange_ref:
+    type: string
+    pattern: "^research-evidence-exchange://yaoyorozu-research-evidence-exchange-[a-f0-9]{12}$"
+  researcher_agent_id:
+    type: string
+    minLength: 1
+  evidence_refs:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^(docs|research|specs|evals|doi|pubmed|legal|official)[:/]"
+  evidence_digest_set:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - evidence_ref
+        - expected_digest
+        - observed_digest
+        - source_class
+        - claim_scope
+        - verification_status
+      properties:
+        evidence_ref:
+          type: string
+          pattern: "^(docs|research|specs|evals|doi|pubmed|legal|official)[:/]"
+        expected_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        observed_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        source_class:
+          type: string
+          enum:
+            - primary-literature
+            - official-documentation
+            - repo-local-doc
+            - experiment-protocol
+            - legal-or-governance-source
+        claim_scope:
+          type: string
+          enum:
+            - supports
+            - contradicts
+            - constrains
+            - background-only
+        verification_status:
+          const: verified
+  evidence_digest_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  verified_evidence_count:
+    type: integer
+    minimum: 1
+  verifier_status:
+    const: verified
+  raw_evidence_payload_stored:
+    const: false
+  network_payload_stored:
+    const: false
+  decision_authority_claimed:
+    const: false
+  verifier_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - ok
+      - exchange_bound
+      - evidence_ref_set_bound
+      - evidence_digest_set_bound
+      - verifier_digest_bound
+      - raw_evidence_payload_stored
+      - network_payload_stored
+      - decision_authority_claimed
+      - errors
+    properties:
+      ok:
+        const: true
+      exchange_bound:
+        const: true
+      evidence_ref_set_bound:
+        const: true
+      evidence_digest_set_bound:
+        const: true
+      verifier_digest_bound:
+        const: true
+      raw_evidence_payload_stored:
+        const: false
+      network_payload_stored:
+        const: false
+      decision_authority_claimed:
+        const: false
+      errors:
+        type: array
+        maxItems: 0
+examples:
+  - kind: yaoyorozu_research_evidence_verifier_receipt
+    schema_version: 1.0.0
+    verifier_id: yaoyorozu-research-evidence-verifier-012345abcdef
+    verifier_ref: research-evidence-verifier://yaoyorozu-research-evidence-verifier-012345abcdef
+    verified_at: "2026-04-29T00:00:00+00:00"
+    profile_id: repo-local-research-evidence-verifier-v1
+    transport_profile: repo-local-digest-readback-v1
+    exchange_ref: research-evidence-exchange://yaoyorozu-research-evidence-exchange-012345abcdef
+    researcher_agent_id: neuroscience-scout
+    evidence_refs:
+      - docs/05-research-frontiers/scan-fidelity.md
+    evidence_digest_set:
+      - evidence_ref: docs/05-research-frontiers/scan-fidelity.md
+        expected_digest: 5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        observed_digest: 5123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        source_class: repo-local-doc
+        claim_scope: constrains
+        verification_status: verified
+    evidence_digest_set_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    verified_evidence_count: 1
+    verifier_status: verified
+    raw_evidence_payload_stored: false
+    network_payload_stored: false
+    decision_authority_claimed: false
+    verifier_digest: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    validation:
+      ok: true
+      exchange_bound: true
+      evidence_ref_set_bound: true
+      evidence_digest_set_bound: true
+      verifier_digest_bound: true
+      raw_evidence_payload_stored: false
+      network_payload_stored: false
+      decision_authority_claimed: false
+      errors: []

@@ -123,10 +123,12 @@
   - role-specific Yaoyorozu researcher output contract with digest-only evidence, claim ceilings, advisory-only implications, and no Council decision authority
 - `research_evidence_request.schema`
   - role-specific Yaoyorozu researcher input contract for bounded evidence questions, repo-local evidence boundaries, and no raw payload retention
+- `yaoyorozu_research_evidence_verifier_receipt.schema`
+  - binds repo-local researcher evidence refs to expected / observed digest readback without storing raw evidence or network payloads
 - `yaoyorozu_research_evidence_exchange.schema`
-  - binds one selected researcher request/report pair to registry source digest, repo-local evidence refs, and a Council+Guardian ContinuityLedger append
+  - binds one selected researcher request/report pair to registry source digest, repo-local evidence refs, verifier readback receipt, and a Council+Guardian ContinuityLedger append
 - `yaoyorozu_research_evidence_synthesis.schema`
-  - binds multiple ledger-appended researcher exchanges into one advisory-only Council synthesis receipt with exchange digest set, evidence digest set, and no raw exchange / research payload retention
+  - binds multiple ledger-appended researcher exchanges into one advisory-only Council synthesis receipt with exchange digest set, evidence digest set, verifier digest set, and no raw exchange / research payload retention
 - `metacognition_report.schema`
 - `metacognition_shift.schema`
 - `naming_policy.schema`

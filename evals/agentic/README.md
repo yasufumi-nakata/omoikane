@@ -91,6 +91,10 @@ source manifest ledger binding が public verification bundle を返し、
 同じ source digest manifest、ledger entry、self+guardian signature digest、
 verifier key ref を raw payload なしで外部 reviewer へ投影できること。
 
+### Yaoyorozu Research Evidence Verifier
+researcher exchange が repo-local evidence ref を expected / observed digest readback に束縛し、
+raw evidence payload、network payload、decision authority を保持しないこと。
+
 ### Yaoyorozu External Workspace Execution
 workspace discovery により選ばれた non-source candidate workspace へ
 profile-covered builder worker が束縛され、
@@ -184,6 +188,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `yaoyorozu_external_workspace_execution.yaml`
 - `yaoyorozu_consensus_dispatch.yaml`
 - `yaoyorozu_source_manifest_public_verification.yaml`
+- `yaoyorozu_research_evidence_verifier.yaml`
 - `yaoyorozu_research_evidence_exchange.yaml`
 - `yaoyorozu_research_evidence_synthesis.yaml`
 - `yaoyorozu_council_convocation.yaml`

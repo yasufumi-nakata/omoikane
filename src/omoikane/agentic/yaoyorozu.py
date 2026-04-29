@@ -107,6 +107,12 @@ YAOYOROZU_AGENT_SOURCE_MANIFEST_PUBLIC_VERIFICATION_PROFILE = (
 YAOYOROZU_RESEARCH_EVIDENCE_EXCHANGE_PROFILE = (
     "repo-local-research-evidence-exchange-v1"
 )
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_PROFILE = (
+    "repo-local-research-evidence-verifier-v1"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TRANSPORT_PROFILE = (
+    "repo-local-digest-readback-v1"
+)
 YAOYOROZU_RESEARCH_EVIDENCE_SYNTHESIS_PROFILE = (
     "repo-local-research-evidence-synthesis-v1"
 )
@@ -1019,6 +1025,35 @@ def _research_evidence_report_digest_payload(report: Mapping[str, Any]) -> Dict[
     }
 
 
+def _research_evidence_verifier_digest_payload(
+    verifier_receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "kind": verifier_receipt["kind"],
+        "schema_version": verifier_receipt["schema_version"],
+        "verifier_id": verifier_receipt["verifier_id"],
+        "verifier_ref": verifier_receipt["verifier_ref"],
+        "profile_id": verifier_receipt["profile_id"],
+        "transport_profile": verifier_receipt["transport_profile"],
+        "exchange_ref": verifier_receipt["exchange_ref"],
+        "researcher_agent_id": verifier_receipt["researcher_agent_id"],
+        "evidence_refs": verifier_receipt["evidence_refs"],
+        "evidence_digest_set": verifier_receipt["evidence_digest_set"],
+        "evidence_digest_set_digest": verifier_receipt[
+            "evidence_digest_set_digest"
+        ],
+        "verified_evidence_count": verifier_receipt["verified_evidence_count"],
+        "verifier_status": verifier_receipt["verifier_status"],
+        "raw_evidence_payload_stored": verifier_receipt[
+            "raw_evidence_payload_stored"
+        ],
+        "network_payload_stored": verifier_receipt["network_payload_stored"],
+        "decision_authority_claimed": verifier_receipt[
+            "decision_authority_claimed"
+        ],
+    }
+
+
 def _research_evidence_exchange_digest_payload(exchange: Mapping[str, Any]) -> Dict[str, Any]:
     return {
         "kind": exchange["kind"],
@@ -1044,6 +1079,10 @@ def _research_evidence_exchange_digest_payload(exchange: Mapping[str, Any]) -> D
         "report_digest": exchange["report_digest"],
         "evidence_refs": exchange["evidence_refs"],
         "evidence_ref_count": exchange["evidence_ref_count"],
+        "evidence_verifier_profile": exchange["evidence_verifier_profile"],
+        "evidence_verifier_ref": exchange["evidence_verifier_ref"],
+        "evidence_verifier_digest": exchange["evidence_verifier_digest"],
+        "evidence_verifier_receipt": exchange["evidence_verifier_receipt"],
         "claim_ceiling": exchange["claim_ceiling"],
         "advisory_only": exchange["advisory_only"],
         "raw_research_payload_stored": exchange["raw_research_payload_stored"],
@@ -1084,6 +1123,9 @@ def _research_evidence_exchange_continuity_payload(
         "report_digest": exchange["report_digest"],
         "evidence_refs": exchange["evidence_refs"],
         "evidence_ref_count": exchange["evidence_ref_count"],
+        "evidence_verifier_profile": exchange["evidence_verifier_profile"],
+        "evidence_verifier_ref": exchange["evidence_verifier_ref"],
+        "evidence_verifier_digest": exchange["evidence_verifier_digest"],
         "claim_ceiling": exchange["claim_ceiling"],
         "advisory_only": exchange["advisory_only"],
         "raw_research_payload_stored": exchange["raw_research_payload_stored"],
@@ -1112,6 +1154,11 @@ def _research_evidence_synthesis_digest_payload(
         "research_domain_refs": synthesis["research_domain_refs"],
         "evidence_refs": synthesis["evidence_refs"],
         "evidence_digest_set": synthesis["evidence_digest_set"],
+        "evidence_verifier_refs": synthesis["evidence_verifier_refs"],
+        "evidence_verifier_digests": synthesis["evidence_verifier_digests"],
+        "evidence_verifier_digest_set_digest": synthesis[
+            "evidence_verifier_digest_set_digest"
+        ],
         "claim_ceiling": synthesis["claim_ceiling"],
         "synthesis_summary": synthesis["synthesis_summary"],
         "advisory_design_implications": synthesis["advisory_design_implications"],
@@ -1153,6 +1200,11 @@ def _research_evidence_synthesis_continuity_payload(
         "research_domain_refs": synthesis["research_domain_refs"],
         "evidence_refs": synthesis["evidence_refs"],
         "evidence_digest_set": synthesis["evidence_digest_set"],
+        "evidence_verifier_refs": synthesis["evidence_verifier_refs"],
+        "evidence_verifier_digests": synthesis["evidence_verifier_digests"],
+        "evidence_verifier_digest_set_digest": synthesis[
+            "evidence_verifier_digest_set_digest"
+        ],
         "claim_ceiling": synthesis["claim_ceiling"],
         "raw_exchange_payload_stored": synthesis["raw_exchange_payload_stored"],
         "raw_research_payload_stored": synthesis["raw_research_payload_stored"],
@@ -3710,6 +3762,10 @@ class YaoyorozuRegistryService:
             "report_digest": report["report_digest"],
             "evidence_refs": [evidence_ref],
             "evidence_ref_count": 1,
+            "evidence_verifier_profile": YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_PROFILE,
+            "evidence_verifier_ref": "",
+            "evidence_verifier_digest": "",
+            "evidence_verifier_receipt": {},
             "claim_ceiling": report["claim_ceiling"],
             "advisory_only": True,
             "raw_research_payload_stored": False,
@@ -3728,6 +3784,14 @@ class YaoyorozuRegistryService:
             "continuity_ledger_entry_hash": None,
             "continuity_ledger_payload_ref": None,
         }
+        evidence_verifier_receipt = self.build_research_evidence_verifier_receipt(
+            exchange
+        )
+        exchange["evidence_verifier_ref"] = evidence_verifier_receipt["verifier_ref"]
+        exchange["evidence_verifier_digest"] = evidence_verifier_receipt[
+            "verifier_digest"
+        ]
+        exchange["evidence_verifier_receipt"] = evidence_verifier_receipt
         exchange["continuity_event_digest"] = sha256_text(
             canonical_json(_research_evidence_exchange_continuity_payload(exchange))
         )
@@ -3739,6 +3803,204 @@ class YaoyorozuRegistryService:
             registry_snapshot,
         )
         return exchange
+
+    def build_research_evidence_verifier_receipt(
+        self,
+        exchange: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Build a digest-only verifier receipt for repo-local research evidence refs."""
+        repo_root = self._agents_root.parent if self._agents_root is not None else Path(".")
+        report = exchange.get("report", {})
+        evidence_items = report.get("evidence_items", []) if isinstance(report, Mapping) else []
+        evidence_digest_set: List[Dict[str, Any]] = []
+        for item in evidence_items:
+            if not isinstance(item, Mapping):
+                continue
+            evidence_ref = _non_empty_string(item.get("evidence_ref"), "evidence_ref")
+            evidence_path = repo_root / evidence_ref
+            observed_digest = (
+                sha256_text(evidence_path.read_text(encoding="utf-8"))
+                if evidence_path.is_file()
+                else ""
+            )
+            expected_digest = str(item.get("evidence_digest", ""))
+            evidence_digest_set.append(
+                {
+                    "evidence_ref": evidence_ref,
+                    "expected_digest": expected_digest,
+                    "observed_digest": observed_digest,
+                    "source_class": str(item.get("source_class", "")),
+                    "claim_scope": str(item.get("claim_scope", "")),
+                    "verification_status": (
+                        "verified"
+                        if expected_digest and observed_digest == expected_digest
+                        else "mismatch"
+                    ),
+                }
+            )
+        digest_set_digest = sha256_text(
+            canonical_json({"evidence_digest_set": evidence_digest_set})
+        )
+        verifier_id = new_id("yaoyorozu-research-evidence-verifier")
+        verifier_core: Dict[str, Any] = {
+            "kind": "yaoyorozu_research_evidence_verifier_receipt",
+            "schema_version": "1.0.0",
+            "verifier_id": verifier_id,
+            "verifier_ref": f"research-evidence-verifier://{verifier_id}",
+            "verified_at": utc_now_iso(),
+            "profile_id": YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_PROFILE,
+            "transport_profile": YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TRANSPORT_PROFILE,
+            "exchange_ref": str(exchange.get("exchange_ref", "")),
+            "researcher_agent_id": str(exchange.get("researcher_agent_id", "")),
+            "evidence_refs": list(exchange.get("evidence_refs", [])),
+            "evidence_digest_set": evidence_digest_set,
+            "evidence_digest_set_digest": digest_set_digest,
+            "verified_evidence_count": len(
+                [
+                    item
+                    for item in evidence_digest_set
+                    if item.get("verification_status") == "verified"
+                ]
+            ),
+            "verifier_status": (
+                "verified"
+                if evidence_digest_set
+                and all(
+                    item.get("verification_status") == "verified"
+                    for item in evidence_digest_set
+                )
+                else "mismatch"
+            ),
+            "raw_evidence_payload_stored": False,
+            "network_payload_stored": False,
+            "decision_authority_claimed": False,
+        }
+        verifier_receipt = {
+            **verifier_core,
+            "verifier_digest": sha256_text(
+                canonical_json(_research_evidence_verifier_digest_payload(verifier_core))
+            ),
+        }
+        verifier_receipt["validation"] = self.validate_research_evidence_verifier_receipt(
+            verifier_receipt,
+            exchange,
+        )
+        return verifier_receipt
+
+    def validate_research_evidence_verifier_receipt(
+        self,
+        verifier_receipt: Mapping[str, Any],
+        exchange: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        """Validate digest readback for repo-local research evidence refs."""
+        errors: List[str] = []
+        report = exchange.get("report", {})
+        evidence_items = report.get("evidence_items", []) if isinstance(report, Mapping) else []
+        evidence_refs = [
+            str(item.get("evidence_ref", ""))
+            for item in evidence_items
+            if isinstance(item, Mapping)
+        ]
+        exchange_bound = (
+            verifier_receipt.get("kind")
+            == "yaoyorozu_research_evidence_verifier_receipt"
+            and verifier_receipt.get("profile_id")
+            == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_PROFILE
+            and verifier_receipt.get("transport_profile")
+            == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TRANSPORT_PROFILE
+            and verifier_receipt.get("exchange_ref") == exchange.get("exchange_ref")
+            and verifier_receipt.get("researcher_agent_id")
+            == exchange.get("researcher_agent_id")
+        )
+        if not exchange_bound:
+            errors.append("evidence verifier must bind the source exchange and researcher")
+
+        evidence_ref_set_bound = verifier_receipt.get("evidence_refs") == evidence_refs
+        if not evidence_ref_set_bound:
+            errors.append("evidence verifier refs must match report evidence refs")
+
+        repo_root = self._agents_root.parent if self._agents_root is not None else Path(".")
+        expected_digest_set: List[Dict[str, Any]] = []
+        for item in evidence_items:
+            if not isinstance(item, Mapping):
+                continue
+            evidence_ref = str(item.get("evidence_ref", ""))
+            evidence_path = repo_root / evidence_ref
+            observed_digest = (
+                sha256_text(evidence_path.read_text(encoding="utf-8"))
+                if evidence_path.is_file()
+                else ""
+            )
+            expected_digest = str(item.get("evidence_digest", ""))
+            expected_digest_set.append(
+                {
+                    "evidence_ref": evidence_ref,
+                    "expected_digest": expected_digest,
+                    "observed_digest": observed_digest,
+                    "source_class": str(item.get("source_class", "")),
+                    "claim_scope": str(item.get("claim_scope", "")),
+                    "verification_status": (
+                        "verified"
+                        if expected_digest and observed_digest == expected_digest
+                        else "mismatch"
+                    ),
+                }
+            )
+        evidence_digest_set_bound = (
+            verifier_receipt.get("evidence_digest_set") == expected_digest_set
+            and verifier_receipt.get("evidence_digest_set_digest")
+            == sha256_text(canonical_json({"evidence_digest_set": expected_digest_set}))
+            and verifier_receipt.get("verified_evidence_count")
+            == len(
+                [
+                    item
+                    for item in expected_digest_set
+                    if item.get("verification_status") == "verified"
+                ]
+            )
+            and verifier_receipt.get("verifier_status") == "verified"
+            and bool(expected_digest_set)
+        )
+        if not evidence_digest_set_bound:
+            errors.append("evidence verifier digest set must match repo-local readback")
+
+        try:
+            verifier_digest_bound = verifier_receipt.get("verifier_digest") == sha256_text(
+                canonical_json(
+                    _research_evidence_verifier_digest_payload(verifier_receipt)
+                )
+            )
+        except (KeyError, TypeError):
+            verifier_digest_bound = False
+            errors.append("evidence verifier digest payload is incomplete")
+        if not verifier_digest_bound:
+            errors.append("verifier_digest must bind evidence verifier receipt")
+
+        raw_evidence_payload_stored = (
+            verifier_receipt.get("raw_evidence_payload_stored") is not False
+        )
+        network_payload_stored = verifier_receipt.get("network_payload_stored") is not False
+        decision_authority_claimed = (
+            verifier_receipt.get("decision_authority_claimed") is not False
+        )
+        if raw_evidence_payload_stored:
+            errors.append("evidence verifier must not store raw evidence payloads")
+        if network_payload_stored:
+            errors.append("repo-local evidence verifier must not store network payloads")
+        if decision_authority_claimed:
+            errors.append("evidence verifier must not claim decision authority")
+
+        return {
+            "ok": not errors,
+            "exchange_bound": exchange_bound,
+            "evidence_ref_set_bound": evidence_ref_set_bound,
+            "evidence_digest_set_bound": evidence_digest_set_bound,
+            "verifier_digest_bound": verifier_digest_bound,
+            "raw_evidence_payload_stored": raw_evidence_payload_stored,
+            "network_payload_stored": network_payload_stored,
+            "decision_authority_claimed": decision_authority_claimed,
+            "errors": errors,
+        }
 
     def research_evidence_exchange_continuity_event_payload(
         self,
@@ -3935,6 +4197,37 @@ class YaoyorozuRegistryService:
         if not evidence_refs_bound or not evidence_digests_bound:
             errors.append("evidence refs and digests must bind repo-local evidence items")
 
+        evidence_verifier_receipt = exchange.get("evidence_verifier_receipt", {})
+        evidence_verifier_validation = (
+            self.validate_research_evidence_verifier_receipt(
+                evidence_verifier_receipt,
+                exchange,
+            )
+            if isinstance(evidence_verifier_receipt, Mapping)
+            else {
+                "ok": False,
+                "exchange_bound": False,
+                "evidence_ref_set_bound": False,
+                "evidence_digest_set_bound": False,
+                "verifier_digest_bound": False,
+                "raw_evidence_payload_stored": True,
+                "network_payload_stored": True,
+                "decision_authority_claimed": True,
+                "errors": ["evidence_verifier_receipt must be an object"],
+            }
+        )
+        evidence_verifier_bound = (
+            evidence_verifier_validation["ok"]
+            and exchange.get("evidence_verifier_profile")
+            == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_PROFILE
+            and exchange.get("evidence_verifier_ref")
+            == evidence_verifier_receipt.get("verifier_ref")
+            and exchange.get("evidence_verifier_digest")
+            == evidence_verifier_receipt.get("verifier_digest")
+        )
+        if not evidence_verifier_bound:
+            errors.append("evidence verifier receipt must bind exchange evidence readback")
+
         advisory_only = (
             exchange.get("claim_ceiling") == "implementation-advisory"
             and exchange.get("advisory_only") is True
@@ -3996,6 +4289,16 @@ class YaoyorozuRegistryService:
             "continuity_event_digest_bound": continuity_event_digest_bound,
             "evidence_refs_bound": evidence_refs_bound,
             "evidence_digests_bound": evidence_digests_bound,
+            "evidence_verifier_bound": evidence_verifier_bound,
+            "evidence_verifier_digest_bound": evidence_verifier_validation[
+                "verifier_digest_bound"
+            ],
+            "evidence_verifier_raw_payload_stored": (
+                evidence_verifier_validation["raw_evidence_payload_stored"]
+            ),
+            "evidence_verifier_network_payload_stored": (
+                evidence_verifier_validation["network_payload_stored"]
+            ),
             "request_forbids_authority": bool(request_forbids_authority),
             "advisory_only": advisory_only,
             "raw_research_payload_stored": not raw_payload_clean,
@@ -4088,6 +4391,20 @@ class YaoyorozuRegistryService:
                 for ref in exchange.get("evidence_refs", [])
             ]
         )
+        evidence_verifier_refs = [
+            _non_empty_string(
+                exchange.get("evidence_verifier_ref"),
+                "evidence_verifier_ref",
+            )
+            for exchange in exchanges
+        ]
+        evidence_verifier_digests = [
+            _non_empty_string(
+                exchange.get("evidence_verifier_digest"),
+                "evidence_verifier_digest",
+            )
+            for exchange in exchanges
+        ]
         evidence_digest_set: List[Dict[str, Any]] = []
         for exchange in exchanges:
             report = exchange.get("report", {})
@@ -4136,6 +4453,13 @@ class YaoyorozuRegistryService:
             "research_domain_refs": research_domain_refs,
             "evidence_refs": evidence_refs,
             "evidence_digest_set": evidence_digest_set,
+            "evidence_verifier_refs": evidence_verifier_refs,
+            "evidence_verifier_digests": evidence_verifier_digests,
+            "evidence_verifier_digest_set_digest": sha256_text(
+                canonical_json(
+                    {"evidence_verifier_digests": evidence_verifier_digests}
+                )
+            ),
             "claim_ceiling": "implementation-advisory",
             "synthesis_summary": (
                 "Multiple Yaoyorozu researcher exchanges were reduced to digest-only, "
@@ -4325,6 +4649,31 @@ class YaoyorozuRegistryService:
         if not evidence_digest_set_bound:
             errors.append("synthesis must bind evidence refs and evidence digests")
 
+        evidence_verifier_refs = [
+            str(exchange.get("evidence_verifier_ref", "")) for exchange in exchanges
+        ]
+        evidence_verifier_digests = [
+            str(exchange.get("evidence_verifier_digest", "")) for exchange in exchanges
+        ]
+        evidence_verifiers_bound = (
+            synthesis.get("evidence_verifier_refs") == evidence_verifier_refs
+            and synthesis.get("evidence_verifier_digests") == evidence_verifier_digests
+            and synthesis.get("evidence_verifier_digest_set_digest")
+            == sha256_text(
+                canonical_json(
+                    {"evidence_verifier_digests": evidence_verifier_digests}
+                )
+            )
+            and all(
+                isinstance(exchange.get("validation"), Mapping)
+                and exchange["validation"].get("evidence_verifier_bound") is True
+                and exchange["validation"].get("evidence_verifier_digest_bound") is True
+                for exchange in exchanges
+            )
+        )
+        if not evidence_verifiers_bound:
+            errors.append("synthesis must bind source evidence verifier receipts")
+
         advisory_only = (
             synthesis.get("claim_ceiling") == "implementation-advisory"
             and synthesis.get("raw_exchange_payload_stored") is False
@@ -4406,6 +4755,7 @@ class YaoyorozuRegistryService:
             "exchange_validations_bound": exchange_validations_bound,
             "exchange_digests_bound": exchange_digests_bound,
             "evidence_digest_set_bound": evidence_digest_set_bound,
+            "evidence_verifiers_bound": evidence_verifiers_bound,
             "advisory_only": advisory_only,
             "raw_exchange_payload_stored": bool(
                 synthesis.get("raw_exchange_payload_stored")

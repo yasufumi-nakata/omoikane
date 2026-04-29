@@ -1,0 +1,16 @@
+id: eval-agentic-yaoyorozu-research-evidence-verifier
+title: Yaoyorozu research evidence verifier readback
+surface: agentic.yaoyorozu
+profile: repo-local-research-evidence-verifier-v1
+must:
+  - verifier receipt must bind the source exchange ref and researcher_agent_id
+  - evidence_refs must match the nested researcher report evidence refs
+  - expected and observed repo-local evidence digests must match for every evidence item
+  - verifier_digest must bind the verifier receipt
+  - raw evidence payloads, network payloads, and decision authority must remain absent
+expected:
+  transport_profile: repo-local-digest-readback-v1
+  verifier_status: verified
+  raw_evidence_payload_stored: false
+  network_payload_stored: false
+  decision_authority_claimed: false

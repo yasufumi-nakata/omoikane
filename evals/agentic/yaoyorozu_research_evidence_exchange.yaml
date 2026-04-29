@@ -6,6 +6,7 @@ must:
   - selected researcher entry uses research_evidence_request and research_evidence_report schemas
   - request_digest and report_digest bind nested advisory request/report payloads
   - evidence refs resolve to repo-local docs or research paths and bind sha256 digests
+  - evidence verifier receipt independently binds expected and observed repo-local digests
   - claim ceiling remains implementation-advisory and all implications remain advisory-only
   - raw research payloads are not stored and researcher decision authority is not claimed
   - exchange receipt is appended to ContinuityLedger with council and guardian signature roles
@@ -19,4 +20,6 @@ expected:
     - council
     - guardian
   raw_research_payload_stored: false
+  raw_evidence_payload_stored: false
+  network_payload_stored: false
   decision_authority_claimed: false

@@ -42,8 +42,9 @@
   public verification bundle を materialize し、
   researcher request/report も `repo-local-research-evidence-exchange-v1`
   として source digest、request/report digest、repo-local evidence digest、
+  repo-local verifier readback digest、
   Council+Guardian 署名付き ContinuityLedger entry に束縛し、
-  raw research payload と decision authority を持たないことを検証し、
+  raw evidence / raw research / network payload と decision authority を持たないことを検証し、
   `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` / `inter-mind-negotiation-v1` の
   Council convocation / builder handoff plan を materialize し、
   convocation 側でも `workspace_discovery_binding` により accepted workspace set と profile policy を再束縛し、

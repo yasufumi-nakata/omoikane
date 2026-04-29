@@ -4364,6 +4364,26 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             validation["errors"],
         )
 
+    def test_research_evidence_exchange_rejects_verifier_digest_tamper(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["research_evidence_exchange"]))
+        tampered["evidence_verifier_receipt"]["evidence_digest_set"][0][
+            "observed_digest"
+        ] = "0" * 64
+
+        validation = runtime.yaoyorozu.validate_research_evidence_exchange(
+            tampered,
+            result["registry"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["evidence_verifier_bound"])
+        self.assertIn(
+            "evidence verifier receipt must bind exchange evidence readback",
+            validation["errors"],
+        )
+
     def test_worker_dispatch_receipt_rejects_tampered_preseed_oversight_event(self) -> None:
         runtime = OmoikaneReferenceOS()
         result = runtime.run_yaoyorozu_demo()

@@ -156,6 +156,7 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/agent_registry_entry.schema",
             "specs/schemas/research_evidence_request.schema",
             "specs/schemas/research_evidence_report.schema",
+            "specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema",
             "specs/schemas/yaoyorozu_research_evidence_exchange.schema",
             "specs/schemas/yaoyorozu_research_evidence_synthesis.schema",
         ):
@@ -194,6 +195,22 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self.assertTrue(exchange["validation"]["exchange_digest_bound"])
         self.assertTrue(exchange["validation"]["evidence_refs_bound"])
         self.assertTrue(exchange["validation"]["evidence_digests_bound"])
+        self.assertTrue(exchange["validation"]["evidence_verifier_bound"])
+        self.assertTrue(exchange["validation"]["evidence_verifier_digest_bound"])
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema",
+            exchange["evidence_verifier_receipt"],
+        )
+        self.assertEqual(
+            exchange["evidence_verifier_ref"],
+            exchange["evidence_verifier_receipt"]["verifier_ref"],
+        )
+        self.assertEqual(
+            exchange["evidence_verifier_digest"],
+            exchange["evidence_verifier_receipt"]["verifier_digest"],
+        )
+        self.assertFalse(exchange["evidence_verifier_receipt"]["raw_evidence_payload_stored"])
+        self.assertFalse(exchange["evidence_verifier_receipt"]["network_payload_stored"])
         self.assertTrue(exchange["validation"]["advisory_only"])
         self.assertTrue(exchange["validation"]["continuity_ledger_entry_appended"])
         self.assertEqual(
@@ -227,6 +244,21 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(synthesis["validation"]["exchange_validations_bound"])
         self.assertTrue(synthesis["validation"]["evidence_digest_set_bound"])
+        self.assertTrue(synthesis["validation"]["evidence_verifiers_bound"])
+        self.assertEqual(
+            [
+                exchange["evidence_verifier_ref"]
+                for exchange in result["research_evidence_exchanges"]
+            ],
+            synthesis["evidence_verifier_refs"],
+        )
+        self.assertEqual(
+            [
+                exchange["evidence_verifier_digest"]
+                for exchange in result["research_evidence_exchanges"]
+            ],
+            synthesis["evidence_verifier_digests"],
+        )
         self.assertTrue(synthesis["validation"]["advisory_only"])
         self.assertTrue(synthesis["validation"]["continuity_ledger_entry_appended"])
         self.assertEqual(
