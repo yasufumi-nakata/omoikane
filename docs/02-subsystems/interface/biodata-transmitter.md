@@ -32,7 +32,8 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 3. latent digest に束縛した ECG/PPG/respiration/EEG/affect/thought proxy を生成する
 4. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
    semantic thought content 非生成を検証する
-5. ContinuityLedger に session / latent / generated bundle / conflict sink binding を残す
+5. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
+6. ContinuityLedger に session / latent / generated bundle / conflict sink / calibration binding を残す
 
 ## 中間表現
 
@@ -82,6 +83,18 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 4. **thought ceiling** ── thought target は attention pressure proxy までで、semantic content は生成しない
 5. **conflict sink** ── qualia equivalence と thought content の飛躍は mind-upload.com ref に束縛する
 6. **literature refs** ── 中間表現は少なくとも 5 件の文献 ref に束縛する
+7. **multi-day calibration** ── 個人内 calibration は 2 日以上の latent digest set と day refs だけを束ね、raw latent / raw calibration payload は保存しない
+
+## 個人内 calibration
+
+`multi-day-personal-biodata-calibration-v1` は、複数日の `physiology-latent-body-state-v0`
+を source latent refs / digests と calibration day refs へ束縛する。profile は
+heart rate、HRV、autonomic arousal、cortical load、valence、thought pressure、
+interoceptive confidence の平均 baseline を返すが、raw source payload、raw latent payload、
+raw calibration payload は保持しない。
+
+この profile は個人固有の baseline を上げるための reference artifact であり、
+主観同一性、qualia equivalence、semantic thought content の証明には使わない。
 
 ## 関連
 

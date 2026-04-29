@@ -10,6 +10,7 @@ imports:
   biodata_transmitter_session: ../schemas/biodata_transmitter_session.schema
   biodata_body_state_latent: ../schemas/biodata_body_state_latent.schema
   biodata_signal_bundle: ../schemas/biodata_signal_bundle.schema
+  biodata_calibration_profile: ../schemas/biodata_calibration_profile.schema
 operations:
   open_session:
     summary: Open one transmitter session for a single identity and explicit modality set.
@@ -96,6 +97,37 @@ operations:
       - source_latent_digest must match the latent input digest
       - semantic_thought_content_generated must remain false
       - subjective_equivalence_claimed must remain false
+  build_calibration_profile:
+    summary: Bind multiple days of body-state latents into one digest-only personal calibration profile.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - latent_states
+          - calibration_day_refs
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          latent_states:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: biodata_body_state_latent
+          calibration_day_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^calibration-day://"
+    output:
+      schema_ref: biodata_calibration_profile
+    guarantees:
+      - source_latent_digest_set_digest must bind the ordered source latent digests and day refs
+      - axis_baselines must be digest-only personal baselines derived from at least two days
+      - raw source, raw latent, and raw calibration payload storage must remain false
   validate_transmission:
     summary: Verify session, latent, generated bundle, literature refs, and conflict sink binding.
     input:
@@ -135,6 +167,48 @@ operations:
             const: false
           subjective_equivalence_claimed:
             const: false
+  validate_calibration_profile:
+    summary: Verify multi-day calibration digest binding, raw-payload redaction, and conflict sink boundaries.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - latent_states
+          - calibration_profile
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          latent_states:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: biodata_body_state_latent
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - multi_day_calibration_bound
+          - source_latent_digest_set_bound
+          - calibration_digest_bound
+          - axis_baselines_bound
+          - raw_calibration_payload_stored
+        properties:
+          ok:
+            type: boolean
+          multi_day_calibration_bound:
+            type: boolean
+          source_latent_digest_set_bound:
+            type: boolean
+          calibration_digest_bound:
+            type: boolean
+          axis_baselines_bound:
+            type: boolean
+          raw_calibration_payload_stored:
+            const: false
 events:
   biodata_transmitter.body_state_encoded:
     payload:
@@ -142,9 +216,13 @@ events:
   biodata_transmitter.signal_bundle_generated:
     payload:
       schema_ref: biodata_signal_bundle
+  biodata_transmitter.calibration_profile_bound:
+    payload:
+      schema_ref: biodata_calibration_profile
 compatibility:
   stability: bootstrap
   notes:
     - This contract changes the project image toward biosignal transduction without renaming OmoikaneOS.
     - The intermediate representation is a literature-backed physiological latent, not a claim of full qualia or semantic thought recovery.
     - Conflicting or under-evidenced claims are routed to mind-upload.com refs rather than treated as settled runtime facts.
+    - Multi-day calibration profiles improve person-specific baselines but still do not claim subjective equivalence or semantic thought recovery.

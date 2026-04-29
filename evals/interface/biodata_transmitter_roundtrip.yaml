@@ -15,8 +15,15 @@ expected:
   literature_ref_count_min: 5
   mind_upload_conflict_sink_bound: true
   target_modalities_generated: true
+  calibration_profile_ok: true
+  multi_day_calibration_bound: true
+  source_latent_digest_set_bound: true
+  calibration_digest_bound: true
+  axis_baselines_bound: true
   raw_source_payload_stored: false
   raw_generated_waveform_stored: false
+  raw_latent_payload_stored: false
+  raw_calibration_payload_stored: false
   semantic_thought_content_generated: false
   subjective_equivalence_claimed: false
 metric: boolean

@@ -1064,6 +1064,10 @@ ECG/PPG/respiration/EEG/affect/thought proxy を生成する。
 同じ demo は literature refs、source feature digest、latent digest、generated bundle digest、
 `mind-upload.com` conflict sink binding、raw source payload / raw generated waveform 非保持、
 semantic thought content 非生成、subjective equivalence 非主張をまとめて検証する。
+さらに 2 日分の body-state latent を
+`multi-day-personal-biodata-calibration-v1` calibration profile に束ね、
+source latent digest set、calibration day refs、axis baseline mean、
+calibration digest を raw source / latent / calibration payload なしで返す。
 
 `imc-demo` は L6 Inter-Mind Channel の reference contract
 (`interface.imc.v0`) を JSON で可視化し、

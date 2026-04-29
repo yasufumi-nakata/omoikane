@@ -39,6 +39,7 @@
 
 BioData Transmitter は L6 の入口で、脳波・心電・脈波・皮膚電気活動・呼吸などを
 `internal body-state latent` に束ね、別モダリティの生体データ proxy へ再投影する。
+複数日の latent は raw payload を保存せずに個人内 calibration profile へ束ねる。
 この latent は L2/L3 へ渡せるが、主観同一性や semantic thought content は
 runtime fact として扱わず、mind-upload.com の conflict sink ref に分離する。
 

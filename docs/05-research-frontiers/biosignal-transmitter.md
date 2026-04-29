@@ -49,6 +49,8 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - source biosignal は feature summary digest だけを保持し、raw payload を保存しない
 - intermediate は `physiology-latent-body-state-v0` として person-bound にする
 - generated target は ECG/PPG/respiration/EEG/affect/thought の bounded proxy に留める
+- 個人内 calibration は複数日の body-state latent digest set と day refs を
+  `multi-day-personal-biodata-calibration-v1` に束縛し、raw source / latent / calibration payload は保存しない
 - thought は semantic content を生成しない
 - qualia equivalence と thought content の飛躍は
   `https://mind-upload.com/frontiers/biosignal-transmitter` の conflict sink ref に束縛する

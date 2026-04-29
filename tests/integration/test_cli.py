@@ -149,9 +149,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
         self.assertTrue(result["validation"]["literature_backed_intermediate"])
+        self.assertTrue(result["validation"]["calibration_profile_ok"])
+        self.assertTrue(result["validation"]["multi_day_calibration_bound"])
+        self.assertTrue(result["validation"]["calibration_digest_bound"])
         self.assertIn("affect", result["generated_bundle"]["signals"])
         self.assertIn("thought", result["generated_bundle"]["signals"])
         self.assertFalse(result["generated_bundle"]["semantic_thought_content_generated"])
+        self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
 
     def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:
         stdout = io.StringIO()

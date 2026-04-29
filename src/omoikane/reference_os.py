@@ -7725,15 +7725,75 @@ json.dump(response, sys.stdout)
             },
             context_label="quiet-review-with-attention-shift",
         )
+        day_two_latent_state = self.biodata_transmitter.encode_body_state(
+            session["session_id"],
+            biosignal_features={
+                "eeg": {
+                    "alpha_power": 0.43,
+                    "theta_power": 0.25,
+                    "beta_power": 0.32,
+                },
+                "ecg": {
+                    "heart_rate_bpm": 72.4,
+                    "hrv_rmssd_ms": 49.0,
+                },
+                "ppg": {
+                    "pulse_rate_bpm": 72.0,
+                    "pulse_amplitude": 0.76,
+                },
+                "eda": {
+                    "skin_conductance_microsiemens": 4.6,
+                },
+                "respiration": {
+                    "rate_bpm": 14.8,
+                    "phase": "inhale",
+                },
+            },
+            context_label="next-day-resting-calibration",
+        )
         generated_bundle = self.biodata_transmitter.generate_biosignal_bundle(
             session["session_id"],
             latent_state,
         )
-        validation = self.biodata_transmitter.validate_transmission(
+        calibration_profile = self.biodata_transmitter.build_calibration_profile(
+            session["session_id"],
+            [latent_state, day_two_latent_state],
+            calibration_day_refs=[
+                "calibration-day://biodata-transmitter-demo/day-1",
+                "calibration-day://biodata-transmitter-demo/day-2",
+            ],
+        )
+        transmission_validation = self.biodata_transmitter.validate_transmission(
             session,
             latent_state,
             generated_bundle,
         )
+        calibration_validation = self.biodata_transmitter.validate_calibration_profile(
+            session,
+            [latent_state, day_two_latent_state],
+            calibration_profile,
+        )
+        validation = dict(transmission_validation)
+        validation["ok"] = transmission_validation["ok"] and calibration_validation["ok"]
+        validation["calibration_profile_ok"] = calibration_validation["ok"]
+        validation["multi_day_calibration_bound"] = calibration_validation[
+            "multi_day_calibration_bound"
+        ]
+        validation["source_latent_digest_set_bound"] = calibration_validation[
+            "source_latent_digest_set_bound"
+        ]
+        validation["calibration_digest_bound"] = calibration_validation[
+            "calibration_digest_bound"
+        ]
+        validation["axis_baselines_bound"] = calibration_validation[
+            "axis_baselines_bound"
+        ]
+        validation["raw_latent_payload_stored"] = calibration_validation[
+            "raw_latent_payload_stored"
+        ]
+        validation["raw_calibration_payload_stored"] = calibration_validation[
+            "raw_calibration_payload_stored"
+        ]
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -7802,6 +7862,28 @@ json.dump(response, sys.stdout)
             signature_roles=["guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.calibration_profile_bound",
+            payload={
+                "calibration_ref": calibration_profile["calibration_ref"],
+                "calibration_digest": calibration_profile["calibration_digest"],
+                "source_latent_digest_set_digest": calibration_profile[
+                    "source_latent_digest_set_digest"
+                ],
+                "days_covered_count": calibration_profile["days_covered_count"],
+                "latent_count": calibration_profile["latent_count"],
+                "raw_latent_payload_stored": calibration_profile["raw_latent_payload_stored"],
+                "raw_calibration_payload_stored": calibration_profile[
+                    "raw_calibration_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-calibration",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
 
         return {
             "identity": {
@@ -7811,6 +7893,8 @@ json.dump(response, sys.stdout)
             "profile": self.biodata_transmitter.reference_profile(),
             "session": session,
             "latent_state": latent_state,
+            "calibration_latent_states": [latent_state, day_two_latent_state],
+            "calibration_profile": calibration_profile,
             "generated_bundle": generated_bundle,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),

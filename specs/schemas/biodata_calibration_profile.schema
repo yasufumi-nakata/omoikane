@@ -1,0 +1,164 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_calibration_profile.schema"
+title: BioDataCalibrationProfile
+description: >
+  Multi-day person-bound BioData Transmitter calibration profile that binds
+  source body-state latent digests to digest-only personal axis baselines.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - calibration_ref
+  - session_id
+  - identity_id
+  - created_at
+  - profile_id
+  - latent_profile_id
+  - source_latent_refs
+  - source_latent_digests
+  - source_latent_digest_set_digest
+  - calibration_day_refs
+  - days_covered_count
+  - latent_count
+  - source_modalities_covered
+  - axis_baselines
+  - baseline_policy
+  - minimum_latent_count
+  - calibration_complete
+  - literature_refs
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_source_payload_stored
+  - raw_latent_payload_stored
+  - raw_calibration_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - calibration_digest
+properties:
+  schema_version:
+    const: "1.0"
+  calibration_ref:
+    type: string
+    pattern: "^calibration://biodata/bdt-calibration-[a-f0-9]{12}$"
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: multi-day-personal-biodata-calibration-v1
+  latent_profile_id:
+    const: physiology-latent-body-state-v0
+  source_latent_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^latent://body-state/body-latent-[a-f0-9]{12}$"
+  source_latent_digests:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  source_latent_digest_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  calibration_day_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^calibration-day://"
+  days_covered_count:
+    type: integer
+    minimum: 2
+  latent_count:
+    type: integer
+    minimum: 2
+  source_modalities_covered:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - eeg
+        - ecg
+        - ppg
+        - eda
+        - respiration
+  axis_baselines:
+    type: object
+    additionalProperties: false
+    required:
+      - heart_rate_bpm
+      - hrv_rmssd_ms
+      - autonomic_arousal
+      - cortical_load_proxy
+      - valence_proxy
+      - thought_pressure_proxy
+      - interoceptive_confidence
+    properties:
+      heart_rate_bpm:
+        type: number
+        minimum: 0
+      hrv_rmssd_ms:
+        type: number
+        minimum: 0
+      autonomic_arousal:
+        type: number
+        minimum: 0
+        maximum: 1
+      cortical_load_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      valence_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      thought_pressure_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      interoceptive_confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+  baseline_policy:
+    const: multi-day-mean-baseline-digest-only-v1
+  minimum_latent_count:
+    const: 2
+  calibration_complete:
+    const: true
+  literature_refs:
+    type: array
+    minItems: 5
+    items:
+      type: object
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/biosignal-transmitter
+  raw_source_payload_stored:
+    const: false
+  raw_latent_payload_stored:
+    const: false
+  raw_calibration_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  calibration_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

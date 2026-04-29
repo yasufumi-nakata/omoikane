@@ -2206,6 +2206,15 @@ entries:
       - reference-runtime
     rationale: Required to serialize generated target biosignal, affect, and thought-pressure proxies without raw waveform storage.
   - priority: P1
+    kind: schema
+    file: specs/schemas/biodata_calibration_profile.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+    rationale: Required to serialize multi-day person-bound BioData Transmitter calibration baselines with source latent digest-set binding and raw payload redaction.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.biodata_transmitter.v0.idl
     consumers:

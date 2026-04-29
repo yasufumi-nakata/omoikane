@@ -77,10 +77,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["target_modalities_generated"])
         self.assertFalse(result["validation"]["semantic_thought_content_generated"])
         self.assertFalse(result["validation"]["subjective_equivalence_claimed"])
+        self.assertTrue(result["validation"]["calibration_profile_ok"])
+        self.assertTrue(result["validation"]["multi_day_calibration_bound"])
+        self.assertTrue(result["validation"]["source_latent_digest_set_bound"])
+        self.assertTrue(result["validation"]["calibration_digest_bound"])
+        self.assertTrue(result["validation"]["axis_baselines_bound"])
+        self.assertFalse(result["validation"]["raw_latent_payload_stored"])
+        self.assertFalse(result["validation"]["raw_calibration_payload_stored"])
         self.assertIn("thought", result["generated_bundle"]["signals"])
         self.assertFalse(
             result["generated_bundle"]["signals"]["thought"]["semantic_content_generated"]
         )
+        self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
+        self.assertEqual(2, result["calibration_profile"]["latent_count"])
         self.assertEqual(
             3,
             result["ledger_verification"]["category_counts"]["interface-biodata-transmitter"],
@@ -89,6 +98,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-biodata-transmitter-conflict"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-calibration"
             ],
         )
 

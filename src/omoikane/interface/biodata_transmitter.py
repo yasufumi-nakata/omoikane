@@ -11,6 +11,7 @@ BDT_SCHEMA_VERSION = "1.0"
 BDT_PROFILE_ID = "person-bound-biodata-transmitter-v0"
 BDT_LATENT_PROFILE_ID = "physiology-latent-body-state-v0"
 BDT_GENERATOR_PROFILE_ID = "bounded-cross-modal-biosignal-generator-v0"
+BDT_CALIBRATION_PROFILE_ID = "multi-day-personal-biodata-calibration-v1"
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
 DEFAULT_SOURCE_MODALITIES = ("eeg", "ecg", "ppg", "eda", "respiration")
 DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "affect", "thought")
@@ -80,6 +81,7 @@ class BioDataTransmitter:
             "profile_id": BDT_PROFILE_ID,
             "latent_profile_id": BDT_LATENT_PROFILE_ID,
             "generator_profile_id": BDT_GENERATOR_PROFILE_ID,
+            "calibration_profile_id": BDT_CALIBRATION_PROFILE_ID,
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
             "intermediate_representation": "internal-body-state-latent",
@@ -331,6 +333,207 @@ class BioDataTransmitter:
         session["last_generated_bundle_ref"] = bundle["bundle_ref"]
         return deepcopy(bundle)
 
+    def build_calibration_profile(
+        self,
+        session_id: str,
+        latent_states: Sequence[Dict[str, Any]],
+        calibration_day_refs: Sequence[str],
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        if not isinstance(latent_states, (list, tuple)) or len(latent_states) < 2:
+            raise ValueError("latent_states must contain at least two body-state latents")
+        if not isinstance(calibration_day_refs, (list, tuple)) or len(calibration_day_refs) != len(latent_states):
+            raise ValueError("calibration_day_refs must align with latent_states")
+
+        normalized_day_refs: List[str] = []
+        source_modalities = set()
+        latent_refs: List[str] = []
+        latent_digests: List[str] = []
+        axis_samples: Dict[str, List[float]] = {
+            "heart_rate_bpm": [],
+            "hrv_rmssd_ms": [],
+            "autonomic_arousal": [],
+            "cortical_load_proxy": [],
+            "valence_proxy": [],
+            "thought_pressure_proxy": [],
+            "interoceptive_confidence": [],
+        }
+        for index, latent_state in enumerate(latent_states):
+            self._validate_latent_for_session(session, latent_state)
+            day_ref = str(calibration_day_refs[index]).strip()
+            self._require_non_empty_string(day_ref, "calibration_day_ref")
+            normalized_day_refs.append(day_ref)
+            source_modalities.update(str(item) for item in latent_state.get("source_modalities", []))
+            latent_refs.append(str(latent_state["latent_ref"]))
+            latent_digests.append(str(latent_state["latent_digest"]))
+            axes = latent_state["physiological_axes"]
+            axis_samples["heart_rate_bpm"].append(float(axes["cardiac"]["heart_rate_bpm"]))
+            axis_samples["hrv_rmssd_ms"].append(float(axes["cardiac"]["hrv_rmssd_ms"]))
+            axis_samples["autonomic_arousal"].append(float(axes["autonomic"]["arousal"]))
+            axis_samples["cortical_load_proxy"].append(float(axes["neural"]["cortical_load_proxy"]))
+            axis_samples["valence_proxy"].append(float(axes["affect"]["valence_proxy"]))
+            axis_samples["thought_pressure_proxy"].append(
+                float(axes["thought"]["attention_pressure_proxy"])
+            )
+            axis_samples["interoceptive_confidence"].append(
+                float(latent_state["interoceptive_confidence"])
+            )
+        if len(set(normalized_day_refs)) < 2:
+            raise ValueError("calibration_day_refs must cover at least two unique days")
+
+        digest_set_payload = {
+            "profile_id": BDT_CALIBRATION_PROFILE_ID,
+            "source_latent_digests": latent_digests,
+            "calibration_day_refs": normalized_day_refs,
+        }
+        axis_baselines = {
+            key: round(sum(values) / len(values), 3)
+            for key, values in axis_samples.items()
+        }
+        calibration = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "calibration_ref": f"calibration://biodata/{new_id('bdt-calibration')}",
+            "session_id": session_id,
+            "identity_id": session["identity_id"],
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_CALIBRATION_PROFILE_ID,
+            "latent_profile_id": BDT_LATENT_PROFILE_ID,
+            "source_latent_refs": latent_refs,
+            "source_latent_digests": latent_digests,
+            "source_latent_digest_set_digest": sha256_text(canonical_json(digest_set_payload)),
+            "calibration_day_refs": normalized_day_refs,
+            "days_covered_count": len(set(normalized_day_refs)),
+            "latent_count": len(latent_states),
+            "source_modalities_covered": sorted(source_modalities),
+            "axis_baselines": axis_baselines,
+            "baseline_policy": "multi-day-mean-baseline-digest-only-v1",
+            "minimum_latent_count": 2,
+            "calibration_complete": len(latent_states) >= 2 and len(set(normalized_day_refs)) >= 2,
+            "literature_refs": deepcopy(session["literature_refs"]),
+            "conflict_refs": deepcopy(session["conflict_refs"]),
+            "mind_upload_conflict_sink_url": session["mind_upload_conflict_sink_url"],
+            "raw_source_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        calibration["calibration_digest"] = sha256_text(
+            canonical_json(self._calibration_digest_payload(calibration))
+        )
+        return deepcopy(calibration)
+
+    def validate_calibration_profile(
+        self,
+        session: Dict[str, Any],
+        latent_states: Sequence[Dict[str, Any]],
+        calibration_profile: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_non_empty_string(session.get("session_id"), "session.session_id", errors)
+        self._check_non_empty_string(
+            calibration_profile.get("calibration_ref"),
+            "calibration_profile.calibration_ref",
+            errors,
+        )
+        if calibration_profile.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("calibration_profile.schema_version mismatch")
+        if calibration_profile.get("profile_id") != BDT_CALIBRATION_PROFILE_ID:
+            errors.append("calibration_profile.profile_id mismatch")
+        if calibration_profile.get("session_id") != session.get("session_id"):
+            errors.append("calibration_profile.session_id must match session.session_id")
+        if calibration_profile.get("identity_id") != session.get("identity_id"):
+            errors.append("calibration_profile.identity_id must match session.identity_id")
+
+        latent_digests = [str(latent.get("latent_digest", "")) for latent in latent_states]
+        day_refs = calibration_profile.get("calibration_day_refs", [])
+        expected_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_CALIBRATION_PROFILE_ID,
+                    "source_latent_digests": latent_digests,
+                    "calibration_day_refs": day_refs,
+                }
+            )
+        )
+        if calibration_profile.get("source_latent_digests") != latent_digests:
+            errors.append("calibration_profile.source_latent_digests must match latent states")
+        if calibration_profile.get("source_latent_digest_set_digest") != expected_digest_set:
+            errors.append("calibration_profile.source_latent_digest_set_digest mismatch")
+        expected_profile_digest = sha256_text(
+            canonical_json(self._calibration_digest_payload(calibration_profile))
+        )
+        if calibration_profile.get("calibration_digest") != expected_profile_digest:
+            errors.append("calibration_profile.calibration_digest mismatch")
+        if calibration_profile.get("raw_source_payload_stored") is not False:
+            errors.append("calibration_profile.raw_source_payload_stored must be false")
+        if calibration_profile.get("raw_latent_payload_stored") is not False:
+            errors.append("calibration_profile.raw_latent_payload_stored must be false")
+        if calibration_profile.get("raw_calibration_payload_stored") is not False:
+            errors.append("calibration_profile.raw_calibration_payload_stored must be false")
+        if calibration_profile.get("subjective_equivalence_claimed") is not False:
+            errors.append("calibration_profile.subjective_equivalence_claimed must be false")
+        if calibration_profile.get("semantic_thought_content_generated") is not False:
+            errors.append("calibration_profile.semantic_thought_content_generated must be false")
+
+        conflict_refs = calibration_profile.get("conflict_refs", [])
+        conflict_sink_bound = (
+            isinstance(conflict_refs, list)
+            and bool(conflict_refs)
+            and all(str(ref.get("mind_upload_ref", "")).startswith(BDT_CONFLICT_SINK_URL) for ref in conflict_refs)
+        )
+        days_covered = calibration_profile.get("days_covered_count")
+        latent_count = calibration_profile.get("latent_count")
+        multi_day_calibration_bound = days_covered >= 2 if isinstance(days_covered, int) else False
+        minimum_latent_count_bound = latent_count >= 2 if isinstance(latent_count, int) else False
+        if not multi_day_calibration_bound:
+            errors.append("calibration_profile.days_covered_count must be at least two")
+        if not minimum_latent_count_bound:
+            errors.append("calibration_profile.latent_count must be at least two")
+        if calibration_profile.get("calibration_complete") is not True:
+            errors.append("calibration_profile.calibration_complete must be true")
+        axis_baselines = calibration_profile.get("axis_baselines", {})
+        axis_baselines_bound = (
+            isinstance(axis_baselines, dict)
+            and set(axis_baselines.keys())
+            == {
+                "heart_rate_bpm",
+                "hrv_rmssd_ms",
+                "autonomic_arousal",
+                "cortical_load_proxy",
+                "valence_proxy",
+                "thought_pressure_proxy",
+                "interoceptive_confidence",
+            }
+        )
+        if not axis_baselines_bound:
+            errors.append("calibration_profile.axis_baselines must include the required baseline axes")
+        if not conflict_sink_bound:
+            errors.append("calibration_profile.conflict_refs must bind to the BioData conflict sink")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": calibration_profile.get("profile_id"),
+            "person_bound": calibration_profile.get("identity_id") == session.get("identity_id"),
+            "multi_day_calibration_bound": multi_day_calibration_bound,
+            "minimum_latent_count_bound": minimum_latent_count_bound,
+            "source_latent_digest_set_bound": (
+                calibration_profile.get("source_latent_digest_set_digest") == expected_digest_set
+            ),
+            "calibration_digest_bound": (
+                calibration_profile.get("calibration_digest") == expected_profile_digest
+            ),
+            "axis_baselines_bound": axis_baselines_bound,
+            "literature_backed_intermediate": len(calibration_profile.get("literature_refs", []))
+            >= len(REQUIRED_LITERATURE_REFS),
+            "mind_upload_conflict_sink_bound": conflict_sink_bound,
+            "raw_source_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def validate_transmission(
         self,
         session: Dict[str, Any],
@@ -474,3 +677,9 @@ class BioDataTransmitter:
     def _check_non_empty_string(value: Any, field_name: str, errors: List[str]) -> None:
         if not isinstance(value, str) or not value.strip():
             errors.append(f"{field_name} must be a non-empty string")
+
+    @staticmethod
+    def _calibration_digest_payload(calibration_profile: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(calibration_profile)
+        payload.pop("calibration_digest", None)
+        return payload

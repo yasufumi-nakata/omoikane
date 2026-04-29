@@ -140,6 +140,7 @@ status: decided | superseded
 - [2026-04-29_yaoyorozu-researcher-evidence-schema-contract.md](2026-04-29_yaoyorozu-researcher-evidence-schema-contract.md)
 - [2026-04-29_yaoyorozu-research-evidence-exchange.md](2026-04-29_yaoyorozu-research-evidence-exchange.md)
 - [2026-04-29_yaoyorozu-research-evidence-synthesis.md](2026-04-29_yaoyorozu-research-evidence-synthesis.md)
+- [2026-04-29_biodata-transmitter-calibration-profile.md](2026-04-29_biodata-transmitter-calibration-profile.md)
 - [2026-04-28_yaoyorozu-builder-surface-scope.md](2026-04-28_yaoyorozu-builder-surface-scope.md)
 - [2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md](2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md)
 - [2026-04-29_yaoyorozu-source-manifest-ledger-binding.md](2026-04-29_yaoyorozu-source-manifest-ledger-binding.md)
