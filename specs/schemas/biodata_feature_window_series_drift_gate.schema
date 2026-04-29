@@ -1,0 +1,165 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_feature_window_series_drift_gate.schema"
+title: BioDataFeatureWindowSeriesDriftGate
+description: >
+  Digest-only receipt that compares a BioData feature-window series drift
+  summary against bounded axis thresholds before the calibration confidence
+  gate may consume that series as current evidence.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - drift_gate_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - series_ref
+  - series_profile_digest
+  - series_digest_set_digest
+  - calibration_ref
+  - calibration_digest
+  - source_latent_digest_set_digest
+  - series_calibration_latent_set_bound
+  - axis_threshold_policy
+  - axis_thresholds
+  - axis_drift_checks
+  - drift_threshold_digest
+  - drift_gate_status
+  - series_profile_bound
+  - calibration_profile_bound
+  - drift_thresholds_bound
+  - raw_series_payload_stored
+  - raw_calibration_payload_stored
+  - raw_drift_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - drift_gate_digest
+properties:
+  schema_version:
+    const: "1.0"
+  drift_gate_ref:
+    type: string
+    pattern: "^feature-window-drift-gate://biodata/bdt-window-drift-gate-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-feature-window-series-drift-gate-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  series_ref:
+    type: string
+    pattern: "^feature-window-series://biodata/bdt-window-series-[a-f0-9]{12}$"
+  series_profile_digest:
+    $ref: "#/$defs/sha256"
+  series_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  calibration_ref:
+    type: string
+    pattern: "^calibration://biodata/bdt-calibration-[a-f0-9]{12}$"
+  calibration_digest:
+    $ref: "#/$defs/sha256"
+  source_latent_digest_set_digest:
+    $ref: "#/$defs/sha256"
+  series_calibration_latent_set_bound:
+    const: true
+  axis_threshold_policy:
+    const: feature-window-series-drift-thresholds-v1
+  axis_thresholds:
+    type: object
+    additionalProperties: false
+    required:
+      - heart_rate_bpm
+      - autonomic_arousal
+      - cortical_load_proxy
+      - valence_proxy
+      - thought_pressure_proxy
+      - interoceptive_confidence
+    properties:
+      heart_rate_bpm:
+        type: number
+        minimum: 0
+      autonomic_arousal:
+        type: number
+        minimum: 0
+      cortical_load_proxy:
+        type: number
+        minimum: 0
+      valence_proxy:
+        type: number
+        minimum: 0
+      thought_pressure_proxy:
+        type: number
+        minimum: 0
+      interoceptive_confidence:
+        type: number
+        minimum: 0
+  axis_drift_checks:
+    type: array
+    minItems: 6
+    maxItems: 6
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - axis
+        - absolute_delta
+        - max_absolute_delta
+        - within_threshold
+        - status
+      properties:
+        axis:
+          type: string
+          enum:
+            - autonomic_arousal
+            - cortical_load_proxy
+            - heart_rate_bpm
+            - interoceptive_confidence
+            - thought_pressure_proxy
+            - valence_proxy
+        absolute_delta:
+          type: number
+          minimum: 0
+        max_absolute_delta:
+          type: number
+          minimum: 0
+        within_threshold:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - pass
+            - blocked
+  drift_threshold_digest:
+    $ref: "#/$defs/sha256"
+  drift_gate_status:
+    enum:
+      - pass
+      - blocked
+  series_profile_bound:
+    const: true
+  calibration_profile_bound:
+    const: true
+  drift_thresholds_bound:
+    const: true
+  raw_series_payload_stored:
+    const: false
+  raw_calibration_payload_stored:
+    const: false
+  raw_drift_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  drift_gate_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

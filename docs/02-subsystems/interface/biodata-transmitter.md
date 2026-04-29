@@ -35,9 +35,10 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 6. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
    semantic thought content 非生成を検証する
 7. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
-8. ContinuityLedger に session / dataset adapter / feature-window series / latent / generated bundle / conflict sink / calibration binding を残す
-9. calibration profile を identity confirmation / sensory loopback の confidence gate へ
-   digest-only receipt として束縛する
+8. feature-window series の axis drift を bounded threshold receipt に束縛し、calibration confidence gate へ渡す
+9. ContinuityLedger に session / dataset adapter / feature-window series / drift gate / latent / generated bundle / conflict sink / calibration binding を残す
+10. calibration profile と feature-window drift gate を identity confirmation / sensory loopback の confidence gate へ
+    digest-only receipt として束縛する
 
 ## 中間表現
 
@@ -91,6 +92,7 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 8. **confidence gate** ── identity confirmation / sensory loopback へ渡す時は calibration digest、source modality coverage、target 別 confidence threshold を receipt で束縛し、raw gate payload は保存しない
 9. **dataset adapter** ── 実 dataset は manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset payload、raw signal samples、raw feature-window payload は保存しない
 10. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
+11. **series drift gate** ── calibration confidence gate が current series を参照する時は、series profile digest、calibration digest、axis drift threshold digest を直接束縛し、raw drift payload は保存しない
 
 ## 個人内 calibration
 
@@ -141,6 +143,19 @@ interoceptive confidence の first / last / min / max / delta / direction だけ
 これは longitudinal drift や日内変動を calibration の前段で監査するための
 digest-only profile であり、raw sample、raw feature-window、raw latent、raw series
 payload は保持しない。profile は主観同一性や semantic thought recovery を証明しない。
+
+## Feature-window series drift gate
+
+`biodata-feature-window-series-drift-gate-v1` は、feature-window series の
+axis drift summary を calibration confidence gate に渡す前の bounded gate として扱う。
+gate receipt は series profile digest、calibration digest、source latent digest set、
+axis threshold policy、axis 別 pass / blocked check、drift threshold digest を保持する。
+
+reference runtime の初期 threshold は heart rate `12.0 bpm`、autonomic arousal /
+cortical load / thought pressure `0.18`、valence `0.16`、interoceptive confidence
+`0.05` である。すべて pass の場合だけ confidence gate はその drift gate digest を
+直接束縛して identity confirmation / sensory loopback の target binding を pass にできる。
+series / calibration / drift の raw payload は保存しない。
 
 ## 関連
 

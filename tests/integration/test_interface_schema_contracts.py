@@ -72,6 +72,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             result["feature_window_series_profile"],
         )
         self._assert_schema_valid(
+            "specs/schemas/biodata_feature_window_series_drift_gate.schema",
+            result["feature_window_series_drift_gate"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/biodata_body_state_latent.schema",
             result["latent_state"],
         )
@@ -105,12 +109,20 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["feature_window_series_required_modalities_bound"])
         self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
         self.assertTrue(result["validation"]["feature_window_series_axis_drift_summary_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_ok"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_series_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_calibration_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_latent_set_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_threshold_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_digest_bound"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_ok"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_series_drift_bound"])
         self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
         self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
         self.assertFalse(result["validation"]["raw_calibration_payload_stored"])
+        self.assertFalse(result["validation"]["raw_drift_payload_stored"])
         self.assertFalse(result["validation"]["raw_gate_payload_stored"])
         self.assertFalse(result["validation"]["raw_series_payload_stored"])
 

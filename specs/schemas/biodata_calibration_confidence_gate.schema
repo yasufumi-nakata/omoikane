@@ -25,9 +25,15 @@ required:
   - target_gate_bindings
   - target_gate_set_digest
   - confidence_gate_status
+  - feature_window_series_drift_gate_ref
+  - feature_window_series_drift_gate_digest
+  - feature_window_series_drift_threshold_digest
+  - feature_window_series_drift_gate_status
+  - feature_window_series_drift_gate_bound
   - identity_confirmation_gate_bound
   - sensory_loopback_gate_bound
   - raw_calibration_payload_stored
+  - raw_drift_payload_stored
   - raw_gate_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
@@ -107,6 +113,10 @@ properties:
         - confidence_score
         - calibration_ref
         - calibration_digest
+        - feature_window_series_drift_gate_ref
+        - feature_window_series_drift_gate_digest
+        - feature_window_series_drift_gate_bound
+        - feature_window_series_drift_gate_status
         - status
       properties:
         target_gate:
@@ -131,6 +141,24 @@ properties:
         calibration_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
+        feature_window_series_drift_gate_ref:
+          anyOf:
+            - type: string
+              pattern: "^feature-window-drift-gate://biodata/bdt-window-drift-gate-[a-f0-9]{12}$"
+            - const: ""
+        feature_window_series_drift_gate_digest:
+          anyOf:
+            - type: string
+              pattern: "^[a-f0-9]{64}$"
+            - const: ""
+        feature_window_series_drift_gate_bound:
+          type: boolean
+        feature_window_series_drift_gate_status:
+          type: string
+          enum:
+            - pass
+            - blocked
+            - not-bound
         status:
           type: string
           enum:
@@ -144,11 +172,36 @@ properties:
     enum:
       - bound
       - blocked
+  feature_window_series_drift_gate_ref:
+    anyOf:
+      - type: string
+        pattern: "^feature-window-drift-gate://biodata/bdt-window-drift-gate-[a-f0-9]{12}$"
+      - const: ""
+  feature_window_series_drift_gate_digest:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  feature_window_series_drift_threshold_digest:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  feature_window_series_drift_gate_status:
+    type: string
+    enum:
+      - pass
+      - blocked
+      - not-bound
+  feature_window_series_drift_gate_bound:
+    type: boolean
   identity_confirmation_gate_bound:
     type: boolean
   sensory_loopback_gate_bound:
     type: boolean
   raw_calibration_payload_stored:
+    const: false
+  raw_drift_payload_stored:
     const: false
   raw_gate_payload_stored:
     const: false

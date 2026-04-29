@@ -1082,8 +1082,12 @@ source latent digest set、calibration day refs、axis baseline mean、
 calibration digest を raw source / latent / calibration payload なしで返す。
 同じ calibration profile は `biodata-calibration-confidence-gate-v1` により、
 identity confirmation と sensory loopback の confidence gate refs へ digest-only に束縛される。
-gate receipt は full modality coverage、target 別 confidence threshold、
-calibration digest、gate receipt digest を検証し、raw gate payload は保存しない。
+その前段で `biodata-feature-window-series-drift-gate-v1` が series profile digest、
+calibration digest、source latent digest set、axis threshold policy、axis drift check set、
+drift threshold digest を束縛し、current series が calibration と同じ latent set から
+来ていることを確認する。
+gate receipt は full modality coverage、target 別 confidence threshold、calibration digest、
+feature-window drift gate digest、gate receipt digest を検証し、raw drift / gate payload は保存しない。
 sensory loopback 側では、この gate を
 `biodata-calibration-gated-drift-threshold-v1` として受け取り、
 `confidence_score >= 0.7` の時だけ body-map drift threshold を最大 `0.04`

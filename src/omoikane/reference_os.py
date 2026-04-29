@@ -7795,16 +7795,6 @@ json.dump(response, sys.stdout)
                 "calibration-day://biodata-transmitter-demo/day-2",
             ],
         )
-        calibration_confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
-            session,
-            calibration_profile,
-            target_gate_refs={
-                "identity-confirmation": (
-                    "identity-confirmation://biodata-transmitter-demo/ascending-to-active"
-                ),
-                "sensory-loopback": "sensory-loopback://biodata-transmitter-demo/session-gate",
-            },
-        )
         feature_window_series_profile = (
             self.biodata_transmitter.build_feature_window_series_profile(
                 session,
@@ -7815,6 +7805,24 @@ json.dump(response, sys.stdout)
                     "circadian-phase://biodata-transmitter-demo/day-2/morning",
                 ],
             )
+        )
+        feature_window_series_drift_gate = (
+            self.biodata_transmitter.bind_feature_window_series_drift_gate(
+                session,
+                feature_window_series_profile,
+                calibration_profile,
+            )
+        )
+        calibration_confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
+            session,
+            calibration_profile,
+            target_gate_refs={
+                "identity-confirmation": (
+                    "identity-confirmation://biodata-transmitter-demo/ascending-to-active"
+                ),
+                "sensory-loopback": "sensory-loopback://biodata-transmitter-demo/session-gate",
+            },
+            feature_window_series_drift_gate_receipt=feature_window_series_drift_gate,
         )
         transmission_validation = self.biodata_transmitter.validate_transmission(
             session,
@@ -7847,6 +7855,14 @@ json.dump(response, sys.stdout)
                 feature_window_series_profile,
             )
         )
+        feature_window_series_drift_gate_validation = (
+            self.biodata_transmitter.validate_feature_window_series_drift_gate(
+                session,
+                feature_window_series_profile,
+                calibration_profile,
+                feature_window_series_drift_gate,
+            )
+        )
         validation = dict(transmission_validation)
         validation["ok"] = (
             transmission_validation["ok"]
@@ -7854,6 +7870,7 @@ json.dump(response, sys.stdout)
             and confidence_gate_validation["ok"]
             and dataset_adapter_validation["ok"]
             and feature_window_series_validation["ok"]
+            and feature_window_series_drift_gate_validation["ok"]
         )
         validation["dataset_adapter_ok"] = dataset_adapter_validation["ok"]
         validation["dataset_manifest_digest_bound"] = dataset_adapter_validation[
@@ -7895,6 +7912,27 @@ json.dump(response, sys.stdout)
         validation["feature_window_series_axis_drift_summary_bound"] = (
             feature_window_series_validation["axis_drift_summary_bound"]
         )
+        validation["feature_window_series_drift_gate_ok"] = (
+            feature_window_series_drift_gate_validation["ok"]
+        )
+        validation["feature_window_series_drift_gate_status"] = (
+            feature_window_series_drift_gate_validation["drift_gate_status"]
+        )
+        validation["feature_window_series_drift_gate_series_bound"] = (
+            feature_window_series_drift_gate_validation["series_profile_bound"]
+        )
+        validation["feature_window_series_drift_gate_calibration_bound"] = (
+            feature_window_series_drift_gate_validation["calibration_profile_bound"]
+        )
+        validation["feature_window_series_drift_gate_latent_set_bound"] = (
+            feature_window_series_drift_gate_validation["series_calibration_latent_set_bound"]
+        )
+        validation["feature_window_series_drift_threshold_digest_bound"] = (
+            feature_window_series_drift_gate_validation["drift_threshold_digest_bound"]
+        )
+        validation["feature_window_series_drift_gate_digest_bound"] = (
+            feature_window_series_drift_gate_validation["drift_gate_digest_bound"]
+        )
         validation["raw_dataset_payload_stored"] = dataset_adapter_validation[
             "raw_dataset_payload_stored"
         ]
@@ -7906,6 +7944,9 @@ json.dump(response, sys.stdout)
         ]
         validation["raw_series_payload_stored"] = feature_window_series_validation[
             "raw_series_payload_stored"
+        ]
+        validation["raw_drift_payload_stored"] = feature_window_series_drift_gate_validation[
+            "raw_drift_payload_stored"
         ]
         validation["calibration_profile_ok"] = calibration_validation["ok"]
         validation["multi_day_calibration_bound"] = calibration_validation[
@@ -7944,6 +7985,12 @@ json.dump(response, sys.stdout)
         )
         validation["calibration_confidence_gate_receipt_digest_bound"] = (
             confidence_gate_validation["gate_receipt_digest_bound"]
+        )
+        validation["calibration_confidence_gate_series_drift_bound"] = (
+            confidence_gate_validation["feature_window_series_drift_gate_bound"]
+        )
+        validation["calibration_confidence_gate_series_drift_status"] = (
+            confidence_gate_validation["feature_window_series_drift_gate_status"]
         )
         validation["identity_confirmation_confidence_gate_bound"] = (
             confidence_gate_validation["identity_confirmation_gate_bound"]
@@ -8037,6 +8084,59 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="biodata_transmitter.calibration_profile_bound",
+            payload={
+                "calibration_ref": calibration_profile["calibration_ref"],
+                "calibration_digest": calibration_profile["calibration_digest"],
+                "source_latent_digest_set_digest": calibration_profile[
+                    "source_latent_digest_set_digest"
+                ],
+                "days_covered_count": calibration_profile["days_covered_count"],
+                "latent_count": calibration_profile["latent_count"],
+                "raw_latent_payload_stored": calibration_profile["raw_latent_payload_stored"],
+                "raw_calibration_payload_stored": calibration_profile[
+                    "raw_calibration_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-calibration",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.feature_window_series_drift_gate_bound",
+            payload={
+                "drift_gate_ref": feature_window_series_drift_gate["drift_gate_ref"],
+                "drift_gate_digest": feature_window_series_drift_gate["drift_gate_digest"],
+                "series_profile_digest": feature_window_series_drift_gate[
+                    "series_profile_digest"
+                ],
+                "calibration_digest": feature_window_series_drift_gate[
+                    "calibration_digest"
+                ],
+                "drift_threshold_digest": feature_window_series_drift_gate[
+                    "drift_threshold_digest"
+                ],
+                "drift_gate_status": feature_window_series_drift_gate[
+                    "drift_gate_status"
+                ],
+                "series_calibration_latent_set_bound": feature_window_series_drift_gate[
+                    "series_calibration_latent_set_bound"
+                ],
+                "raw_drift_payload_stored": feature_window_series_drift_gate[
+                    "raw_drift_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-feature-window-drift-gate",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="biodata_transmitter.body_state_encoded",
             payload={
                 "latent_ref": latent_state["latent_ref"],
@@ -8088,28 +8188,6 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
-            event_type="biodata_transmitter.calibration_profile_bound",
-            payload={
-                "calibration_ref": calibration_profile["calibration_ref"],
-                "calibration_digest": calibration_profile["calibration_digest"],
-                "source_latent_digest_set_digest": calibration_profile[
-                    "source_latent_digest_set_digest"
-                ],
-                "days_covered_count": calibration_profile["days_covered_count"],
-                "latent_count": calibration_profile["latent_count"],
-                "raw_latent_payload_stored": calibration_profile["raw_latent_payload_stored"],
-                "raw_calibration_payload_stored": calibration_profile[
-                    "raw_calibration_payload_stored"
-                ],
-            },
-            actor="BioDataTransmitter",
-            category="interface-biodata-transmitter-calibration",
-            layer="L6",
-            signature_roles=["self", "guardian"],
-            substrate="hybrid-bio-digital",
-        )
-        self.ledger.append(
-            identity_id=identity.identity_id,
             event_type="biodata_transmitter.calibration_confidence_gate_bound",
             payload={
                 "gate_ref": calibration_confidence_gate["gate_ref"],
@@ -8119,8 +8197,20 @@ json.dump(response, sys.stdout)
                 "target_gate_set_digest": calibration_confidence_gate[
                     "target_gate_set_digest"
                 ],
+                "feature_window_series_drift_gate_ref": calibration_confidence_gate[
+                    "feature_window_series_drift_gate_ref"
+                ],
+                "feature_window_series_drift_gate_digest": calibration_confidence_gate[
+                    "feature_window_series_drift_gate_digest"
+                ],
+                "feature_window_series_drift_threshold_digest": calibration_confidence_gate[
+                    "feature_window_series_drift_threshold_digest"
+                ],
                 "confidence_gate_status": calibration_confidence_gate[
                     "confidence_gate_status"
+                ],
+                "feature_window_series_drift_gate_bound": calibration_confidence_gate[
+                    "feature_window_series_drift_gate_bound"
                 ],
                 "identity_confirmation_gate_bound": calibration_confidence_gate[
                     "identity_confirmation_gate_bound"
@@ -8130,6 +8220,9 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_gate_payload_stored": calibration_confidence_gate[
                     "raw_gate_payload_stored"
+                ],
+                "raw_drift_payload_stored": calibration_confidence_gate[
+                    "raw_drift_payload_stored"
                 ],
             },
             actor="BioDataTransmitter",
@@ -8154,6 +8247,7 @@ json.dump(response, sys.stdout)
                 day_two_dataset_adapter_receipt,
             ],
             "feature_window_series_profile": feature_window_series_profile,
+            "feature_window_series_drift_gate": feature_window_series_drift_gate,
             "latent_state": latent_state,
             "calibration_latent_states": [latent_state, day_two_latent_state],
             "calibration_profile": calibration_profile,

@@ -196,6 +196,55 @@ class BioDataTransmitterTests(unittest.TestCase):
         self.assertFalse(series["raw_series_payload_stored"])
         self.assertFalse(series["raw_latent_payload_stored"])
 
+        calibration = transmitter.build_calibration_profile(
+            session["session_id"],
+            [day_one["latent_state"], day_two["latent_state"]],
+            [
+                "calibration-day://unit/series-day-1",
+                "calibration-day://unit/series-day-2",
+            ],
+        )
+        drift_gate = transmitter.bind_feature_window_series_drift_gate(
+            session,
+            series,
+            calibration,
+        )
+        drift_validation = transmitter.validate_feature_window_series_drift_gate(
+            session,
+            series,
+            calibration,
+            drift_gate,
+        )
+        confidence_gate = transmitter.bind_calibration_confidence_gate(
+            session,
+            calibration,
+            {
+                "identity-confirmation": "identity-confirmation://unit/series",
+                "sensory-loopback": "sensory-loopback://unit/series",
+            },
+            feature_window_series_drift_gate_receipt=drift_gate,
+        )
+        confidence_validation = transmitter.validate_calibration_confidence_gate(
+            session,
+            calibration,
+            confidence_gate,
+        )
+
+        self.assertTrue(drift_validation["ok"])
+        self.assertEqual("pass", drift_gate["drift_gate_status"])
+        self.assertTrue(drift_validation["series_profile_bound"])
+        self.assertTrue(drift_validation["calibration_profile_bound"])
+        self.assertTrue(drift_validation["series_calibration_latent_set_bound"])
+        self.assertTrue(drift_validation["drift_threshold_digest_bound"])
+        self.assertTrue(drift_validation["drift_gate_digest_bound"])
+        self.assertFalse(drift_gate["raw_drift_payload_stored"])
+        self.assertTrue(confidence_validation["ok"])
+        self.assertTrue(confidence_validation["feature_window_series_drift_gate_bound"])
+        self.assertEqual(
+            "pass",
+            confidence_validation["feature_window_series_drift_gate_status"],
+        )
+
         tampered = dict(series)
         tampered["series_digest_set_digest"] = "0" * 64
         self.assertFalse(
@@ -215,6 +264,33 @@ class BioDataTransmitterTests(unittest.TestCase):
                     "circadian-phase://unit/day-1/evening",
                     "circadian-phase://unit/day-1/evening",
                 ],
+            )
+        tampered_gate = dict(drift_gate)
+        tampered_gate["drift_threshold_digest"] = "0" * 64
+        self.assertFalse(
+            transmitter.validate_feature_window_series_drift_gate(
+                session,
+                series,
+                calibration,
+                tampered_gate,
+            )["ok"]
+        )
+        blocked_gate = transmitter.bind_feature_window_series_drift_gate(
+            session,
+            series,
+            calibration,
+            {"heart_rate_bpm": 1.0},
+        )
+        self.assertEqual("blocked", blocked_gate["drift_gate_status"])
+        with self.assertRaisesRegex(ValueError, "drift_gate_receipt.drift_gate_status"):
+            transmitter.bind_calibration_confidence_gate(
+                session,
+                calibration,
+                {
+                    "identity-confirmation": "identity-confirmation://unit/blocked",
+                    "sensory-loopback": "sensory-loopback://unit/blocked",
+                },
+                feature_window_series_drift_gate_receipt=blocked_gate,
             )
 
     def test_builds_multi_day_calibration_profile_without_raw_payloads(self) -> None:

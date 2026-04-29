@@ -159,10 +159,25 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["feature_window_series_digest_set_bound"])
         self.assertTrue(result["validation"]["feature_window_series_profile_digest_bound"])
         self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_ok"])
+        self.assertEqual(
+            "pass",
+            result["validation"]["feature_window_series_drift_gate_status"],
+        )
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_series_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_calibration_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_latent_set_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_threshold_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_drift_gate_digest_bound"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
         self.assertTrue(result["validation"]["calibration_digest_bound"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_ok"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_series_drift_bound"])
+        self.assertEqual(
+            "pass",
+            result["validation"]["calibration_confidence_gate_series_drift_status"],
+        )
         self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
         self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
         self.assertIn("affect", result["generated_bundle"]["signals"])
@@ -172,6 +187,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["dataset_adapter_receipt"]["raw_signal_samples_stored"])
         self.assertFalse(result["dataset_adapter_receipt"]["raw_feature_window_payload_stored"])
         self.assertFalse(result["feature_window_series_profile"]["raw_series_payload_stored"])
+        self.assertFalse(result["feature_window_series_drift_gate"]["raw_drift_payload_stored"])
         self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
         self.assertEqual(2, result["feature_window_series_profile"]["window_count"])
         self.assertEqual("bound", result["calibration_confidence_gate"]["confidence_gate_status"])

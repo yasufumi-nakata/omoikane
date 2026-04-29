@@ -15,6 +15,7 @@ BDT_CALIBRATION_PROFILE_ID = "multi-day-personal-biodata-calibration-v1"
 BDT_CONFIDENCE_GATE_PROFILE_ID = "biodata-calibration-confidence-gate-v1"
 BDT_DATASET_ADAPTER_PROFILE_ID = "biodata-dataset-feature-window-adapter-v1"
 BDT_FEATURE_WINDOW_SERIES_PROFILE_ID = "biodata-feature-window-series-profile-v1"
+BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID = "biodata-feature-window-series-drift-gate-v1"
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
 DEFAULT_SOURCE_MODALITIES = ("eeg", "ecg", "ppg", "eda", "respiration")
 DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "affect", "thought")
@@ -22,6 +23,14 @@ SUPPORTED_MODALITIES = set(DEFAULT_SOURCE_MODALITIES + DEFAULT_TARGET_MODALITIES
 CONFIDENCE_GATE_TARGET_THRESHOLDS = {
     "identity-confirmation": 0.8,
     "sensory-loopback": 0.7,
+}
+FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS = {
+    "heart_rate_bpm": 12.0,
+    "autonomic_arousal": 0.18,
+    "cortical_load_proxy": 0.18,
+    "valence_proxy": 0.16,
+    "thought_pressure_proxy": 0.18,
+    "interoceptive_confidence": 0.05,
 }
 REQUIRED_LITERATURE_REFS = (
     {
@@ -92,9 +101,13 @@ class BioDataTransmitter:
             "confidence_gate_profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
             "dataset_adapter_profile_id": BDT_DATASET_ADAPTER_PROFILE_ID,
             "feature_window_series_profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
+            "feature_window_series_drift_gate_profile_id": (
+                BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID
+            ),
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
             "confidence_gate_target_thresholds": dict(CONFIDENCE_GATE_TARGET_THRESHOLDS),
+            "feature_window_series_drift_thresholds": dict(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS),
             "intermediate_representation": "internal-body-state-latent",
             "literature_refs": deepcopy(list(REQUIRED_LITERATURE_REFS)),
             "conflict_sink_url": BDT_CONFLICT_SINK_URL,
@@ -549,6 +562,231 @@ class BioDataTransmitter:
             "semantic_thought_content_generated": False,
         }
 
+    def bind_feature_window_series_drift_gate(
+        self,
+        session: Dict[str, Any],
+        series_profile: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        axis_thresholds: Dict[str, float] | None = None,
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        thresholds = self._normalize_series_drift_thresholds(axis_thresholds)
+        self._validate_series_and_calibration_for_drift_gate(
+            session,
+            series_profile,
+            calibration_profile,
+        )
+        axis_drift_summary = series_profile["axis_drift_summary"]
+        drift_checks = []
+        for axis_name in sorted(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS):
+            absolute_delta = abs(float(axis_drift_summary[axis_name]["absolute_delta"]))
+            max_absolute_delta = thresholds[axis_name]
+            within_threshold = absolute_delta <= max_absolute_delta
+            drift_checks.append(
+                {
+                    "axis": axis_name,
+                    "absolute_delta": round(absolute_delta, 3),
+                    "max_absolute_delta": max_absolute_delta,
+                    "within_threshold": within_threshold,
+                    "status": "pass" if within_threshold else "blocked",
+                }
+            )
+        drift_threshold_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID,
+                    "series_profile_digest": series_profile["series_profile_digest"],
+                    "calibration_digest": calibration_profile["calibration_digest"],
+                    "axis_thresholds": thresholds,
+                    "axis_drift_checks": drift_checks,
+                }
+            )
+        )
+        drift_gate_status = (
+            "pass" if all(check["within_threshold"] for check in drift_checks) else "blocked"
+        )
+        receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "drift_gate_ref": f"feature-window-drift-gate://biodata/{new_id('bdt-window-drift-gate')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "series_ref": series_profile["series_ref"],
+            "series_profile_digest": series_profile["series_profile_digest"],
+            "series_digest_set_digest": series_profile["series_digest_set_digest"],
+            "calibration_ref": calibration_profile["calibration_ref"],
+            "calibration_digest": calibration_profile["calibration_digest"],
+            "source_latent_digest_set_digest": calibration_profile[
+                "source_latent_digest_set_digest"
+            ],
+            "series_calibration_latent_set_bound": (
+                series_profile["latent_digests"] == calibration_profile["source_latent_digests"]
+            ),
+            "axis_threshold_policy": "feature-window-series-drift-thresholds-v1",
+            "axis_thresholds": thresholds,
+            "axis_drift_checks": drift_checks,
+            "drift_threshold_digest": drift_threshold_digest,
+            "drift_gate_status": drift_gate_status,
+            "series_profile_bound": True,
+            "calibration_profile_bound": True,
+            "drift_thresholds_bound": True,
+            "raw_series_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        receipt["drift_gate_digest"] = sha256_text(
+            canonical_json(self._series_drift_gate_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_feature_window_series_drift_gate(
+        self,
+        session: Dict[str, Any],
+        series_profile: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        drift_gate_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        self._check_non_empty_string(
+            drift_gate_receipt.get("drift_gate_ref"),
+            "drift_gate_receipt.drift_gate_ref",
+            errors,
+        )
+        if drift_gate_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("drift_gate_receipt.schema_version mismatch")
+        if drift_gate_receipt.get("profile_id") != BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID:
+            errors.append("drift_gate_receipt.profile_id mismatch")
+        if drift_gate_receipt.get("session_id") != session.get("session_id"):
+            errors.append("drift_gate_receipt.session_id must match session.session_id")
+        if drift_gate_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("drift_gate_receipt.identity_id must match session.identity_id")
+        try:
+            self._validate_series_and_calibration_for_drift_gate(
+                session,
+                series_profile,
+                calibration_profile,
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+
+        thresholds: Dict[str, float] = {}
+        try:
+            thresholds = self._normalize_series_drift_thresholds(
+                drift_gate_receipt.get("axis_thresholds")
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        expected_checks: List[Dict[str, Any]] = []
+        if thresholds and isinstance(series_profile.get("axis_drift_summary"), dict):
+            for axis_name in sorted(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS):
+                axis_summary = series_profile["axis_drift_summary"].get(axis_name, {})
+                absolute_delta = abs(float(axis_summary.get("absolute_delta", 0.0)))
+                max_absolute_delta = thresholds[axis_name]
+                within_threshold = absolute_delta <= max_absolute_delta
+                expected_checks.append(
+                    {
+                        "axis": axis_name,
+                        "absolute_delta": round(absolute_delta, 3),
+                        "max_absolute_delta": max_absolute_delta,
+                        "within_threshold": within_threshold,
+                        "status": "pass" if within_threshold else "blocked",
+                    }
+                )
+        drift_checks_bound = drift_gate_receipt.get("axis_drift_checks") == expected_checks
+        if not drift_checks_bound:
+            errors.append("drift_gate_receipt.axis_drift_checks mismatch")
+        expected_threshold_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID,
+                    "series_profile_digest": series_profile.get("series_profile_digest"),
+                    "calibration_digest": calibration_profile.get("calibration_digest"),
+                    "axis_thresholds": thresholds,
+                    "axis_drift_checks": expected_checks,
+                }
+            )
+        )
+        drift_threshold_digest_bound = (
+            drift_gate_receipt.get("drift_threshold_digest") == expected_threshold_digest
+        )
+        if not drift_threshold_digest_bound:
+            errors.append("drift_gate_receipt.drift_threshold_digest mismatch")
+        expected_status = (
+            "pass"
+            if expected_checks and all(check["within_threshold"] for check in expected_checks)
+            else "blocked"
+        )
+        if drift_gate_receipt.get("drift_gate_status") != expected_status:
+            errors.append("drift_gate_receipt.drift_gate_status mismatch")
+        expected_gate_digest = sha256_text(
+            canonical_json(self._series_drift_gate_digest_payload(drift_gate_receipt))
+        )
+        drift_gate_digest_bound = (
+            drift_gate_receipt.get("drift_gate_digest") == expected_gate_digest
+        )
+        if not drift_gate_digest_bound:
+            errors.append("drift_gate_receipt.drift_gate_digest mismatch")
+        series_profile_bound = (
+            drift_gate_receipt.get("series_ref") == series_profile.get("series_ref")
+            and drift_gate_receipt.get("series_profile_digest")
+            == series_profile.get("series_profile_digest")
+            and drift_gate_receipt.get("series_digest_set_digest")
+            == series_profile.get("series_digest_set_digest")
+            and drift_gate_receipt.get("series_profile_bound") is True
+        )
+        calibration_profile_bound = (
+            drift_gate_receipt.get("calibration_ref") == calibration_profile.get("calibration_ref")
+            and drift_gate_receipt.get("calibration_digest")
+            == calibration_profile.get("calibration_digest")
+            and drift_gate_receipt.get("source_latent_digest_set_digest")
+            == calibration_profile.get("source_latent_digest_set_digest")
+            and drift_gate_receipt.get("calibration_profile_bound") is True
+        )
+        latent_set_bound = (
+            series_profile.get("latent_digests") == calibration_profile.get("source_latent_digests")
+            and drift_gate_receipt.get("series_calibration_latent_set_bound") is True
+        )
+        if not series_profile_bound:
+            errors.append("drift_gate_receipt must bind the feature-window series profile")
+        if not calibration_profile_bound:
+            errors.append("drift_gate_receipt must bind the calibration profile")
+        if not latent_set_bound:
+            errors.append("drift_gate_receipt must bind the same latent set as calibration")
+        if drift_gate_receipt.get("drift_thresholds_bound") is not True:
+            errors.append("drift_gate_receipt.drift_thresholds_bound must be true")
+        for field_name in (
+            "raw_series_payload_stored",
+            "raw_calibration_payload_stored",
+            "raw_drift_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if drift_gate_receipt.get(field_name) is not False:
+                errors.append(f"drift_gate_receipt.{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": drift_gate_receipt.get("profile_id"),
+            "drift_gate_status": drift_gate_receipt.get("drift_gate_status"),
+            "series_profile_bound": series_profile_bound,
+            "calibration_profile_bound": calibration_profile_bound,
+            "series_calibration_latent_set_bound": latent_set_bound,
+            "drift_checks_bound": drift_checks_bound,
+            "drift_threshold_digest_bound": drift_threshold_digest_bound,
+            "drift_gate_digest_bound": drift_gate_digest_bound,
+            "drift_thresholds_bound": drift_gate_receipt.get("drift_thresholds_bound") is True,
+            "raw_series_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def encode_body_state(
         self,
         session_id: str,
@@ -960,6 +1198,7 @@ class BioDataTransmitter:
         session: Dict[str, Any],
         calibration_profile: Dict[str, Any],
         target_gate_refs: Dict[str, str],
+        feature_window_series_drift_gate_receipt: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         self._check_session_mapping(session)
         normalized_target_refs = self._normalize_confidence_gate_refs(target_gate_refs)
@@ -983,11 +1222,32 @@ class BioDataTransmitter:
         required_modalities_bound = sorted(calibration_profile.get("source_modalities_covered", [])) == sorted(
             DEFAULT_SOURCE_MODALITIES
         )
+        drift_gate_ref = ""
+        drift_gate_digest = ""
+        drift_threshold_digest = ""
+        drift_gate_status = "not-bound"
+        drift_gate_bound = False
+        drift_gate_ready = True
+        if feature_window_series_drift_gate_receipt is not None:
+            self._validate_drift_gate_receipt_for_confidence(
+                session,
+                calibration_profile,
+                feature_window_series_drift_gate_receipt,
+            )
+            drift_gate_ref = str(feature_window_series_drift_gate_receipt["drift_gate_ref"])
+            drift_gate_digest = str(feature_window_series_drift_gate_receipt["drift_gate_digest"])
+            drift_threshold_digest = str(
+                feature_window_series_drift_gate_receipt["drift_threshold_digest"]
+            )
+            drift_gate_status = str(feature_window_series_drift_gate_receipt["drift_gate_status"])
+            drift_gate_bound = True
+            drift_gate_ready = drift_gate_status == "pass"
         common_gate_ready = (
             calibration_profile.get("profile_id") == BDT_CALIBRATION_PROFILE_ID
             and calibration_profile.get("calibration_complete") is True
             and calibration_digest_bound
             and required_modalities_bound
+            and drift_gate_ready
             and calibration_profile.get("raw_source_payload_stored") is False
             and calibration_profile.get("raw_latent_payload_stored") is False
             and calibration_profile.get("raw_calibration_payload_stored") is False
@@ -1006,6 +1266,10 @@ class BioDataTransmitter:
                 "confidence_score": confidence_score,
                 "calibration_ref": calibration_profile["calibration_ref"],
                 "calibration_digest": calibration_profile["calibration_digest"],
+                "feature_window_series_drift_gate_ref": drift_gate_ref,
+                "feature_window_series_drift_gate_digest": drift_gate_digest,
+                "feature_window_series_drift_gate_bound": drift_gate_bound,
+                "feature_window_series_drift_gate_status": drift_gate_status,
                 "status": "pass" if common_gate_ready and threshold_met else "fail",
             }
             target_gate_bindings.append(binding)
@@ -1038,6 +1302,11 @@ class BioDataTransmitter:
             "target_gate_bindings": target_gate_bindings,
             "target_gate_set_digest": target_gate_set_digest,
             "confidence_gate_status": gate_status,
+            "feature_window_series_drift_gate_ref": drift_gate_ref,
+            "feature_window_series_drift_gate_digest": drift_gate_digest,
+            "feature_window_series_drift_threshold_digest": drift_threshold_digest,
+            "feature_window_series_drift_gate_status": drift_gate_status,
+            "feature_window_series_drift_gate_bound": drift_gate_bound,
             "identity_confirmation_gate_bound": any(
                 binding["target_gate"] == "identity-confirmation"
                 and binding["status"] == "pass"
@@ -1049,6 +1318,7 @@ class BioDataTransmitter:
                 for binding in target_gate_bindings
             ),
             "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
             "raw_gate_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
@@ -1097,6 +1367,27 @@ class BioDataTransmitter:
         )
         if not required_modalities_bound:
             errors.append("gate_receipt must bind all required source modalities")
+        drift_gate_bound = gate_receipt.get("feature_window_series_drift_gate_bound") is True
+        drift_gate_status = str(gate_receipt.get("feature_window_series_drift_gate_status", "not-bound"))
+        drift_gate_ready = drift_gate_status == "pass" if drift_gate_bound else True
+        if drift_gate_bound:
+            self._check_non_empty_string(
+                gate_receipt.get("feature_window_series_drift_gate_ref"),
+                "gate_receipt.feature_window_series_drift_gate_ref",
+                errors,
+            )
+            self._check_non_empty_string(
+                gate_receipt.get("feature_window_series_drift_gate_digest"),
+                "gate_receipt.feature_window_series_drift_gate_digest",
+                errors,
+            )
+            self._check_non_empty_string(
+                gate_receipt.get("feature_window_series_drift_threshold_digest"),
+                "gate_receipt.feature_window_series_drift_threshold_digest",
+                errors,
+            )
+        elif drift_gate_status != "not-bound":
+            errors.append("unbound feature-window series drift gate must use not-bound status")
 
         bindings = gate_receipt.get("target_gate_bindings", [])
         if not isinstance(bindings, list) or not bindings:
@@ -1115,6 +1406,7 @@ class BioDataTransmitter:
                 and gate_receipt.get("confidence_score", 0) >= minimum_confidence
                 and calibration_digest_bound
                 and required_modalities_bound
+                and drift_gate_ready
                 else "fail"
             )
             if (
@@ -1123,6 +1415,12 @@ class BioDataTransmitter:
                 or binding.get("confidence_score") != gate_receipt.get("confidence_score")
                 or binding.get("calibration_ref") != calibration_profile.get("calibration_ref")
                 or binding.get("calibration_digest") != calibration_profile.get("calibration_digest")
+                or binding.get("feature_window_series_drift_gate_ref")
+                != gate_receipt.get("feature_window_series_drift_gate_ref")
+                or binding.get("feature_window_series_drift_gate_digest")
+                != gate_receipt.get("feature_window_series_drift_gate_digest")
+                or binding.get("feature_window_series_drift_gate_bound") != drift_gate_bound
+                or binding.get("feature_window_series_drift_gate_status") != drift_gate_status
                 or binding.get("status") != expected_status
             ):
                 valid_bindings = False
@@ -1142,6 +1440,7 @@ class BioDataTransmitter:
             if valid_bindings
             and calibration_digest_bound
             and required_modalities_bound
+            and drift_gate_ready
             and all(binding.get("status") == "pass" for binding in bindings)
             else "blocked"
         )
@@ -1170,6 +1469,7 @@ class BioDataTransmitter:
             errors.append("gate_receipt.sensory_loopback_gate_bound mismatch")
         for field_name in (
             "raw_calibration_payload_stored",
+            "raw_drift_payload_stored",
             "raw_gate_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
@@ -1187,9 +1487,12 @@ class BioDataTransmitter:
             "required_modalities_bound": required_modalities_bound,
             "target_gate_set_digest_bound": target_gate_set_digest_bound,
             "gate_receipt_digest_bound": gate_receipt_digest_bound,
+            "feature_window_series_drift_gate_bound": drift_gate_bound,
+            "feature_window_series_drift_gate_status": drift_gate_status,
             "identity_confirmation_gate_bound": identity_confirmation_gate_bound,
             "sensory_loopback_gate_bound": sensory_loopback_gate_bound,
             "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
             "raw_gate_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
@@ -1318,6 +1621,106 @@ class BioDataTransmitter:
             if adapter_receipt.get(field_name) is not False:
                 raise ValueError(f"adapter_receipt.{field_name} must be false")
 
+    def _validate_series_and_calibration_for_drift_gate(
+        self,
+        session: Dict[str, Any],
+        series_profile: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+    ) -> None:
+        if not isinstance(series_profile, dict):
+            raise ValueError("series_profile must be a mapping")
+        if not isinstance(calibration_profile, dict):
+            raise ValueError("calibration_profile must be a mapping")
+        if series_profile.get("schema_version") != BDT_SCHEMA_VERSION:
+            raise ValueError("series_profile.schema_version mismatch")
+        if series_profile.get("profile_id") != BDT_FEATURE_WINDOW_SERIES_PROFILE_ID:
+            raise ValueError("series_profile.profile_id mismatch")
+        if series_profile.get("session_id") != session["session_id"]:
+            raise ValueError("series_profile.session_id must match session.session_id")
+        if series_profile.get("identity_id") != session["identity_id"]:
+            raise ValueError("series_profile.identity_id must match session.identity_id")
+        expected_series_digest = sha256_text(
+            canonical_json(self._feature_window_series_digest_payload(series_profile))
+        )
+        if series_profile.get("series_profile_digest") != expected_series_digest:
+            raise ValueError("series_profile.series_profile_digest mismatch")
+        if calibration_profile.get("schema_version") != BDT_SCHEMA_VERSION:
+            raise ValueError("calibration_profile.schema_version mismatch")
+        if calibration_profile.get("profile_id") != BDT_CALIBRATION_PROFILE_ID:
+            raise ValueError("calibration_profile.profile_id mismatch")
+        if calibration_profile.get("session_id") != session["session_id"]:
+            raise ValueError("calibration_profile.session_id must match session.session_id")
+        if calibration_profile.get("identity_id") != session["identity_id"]:
+            raise ValueError("calibration_profile.identity_id must match session.identity_id")
+        expected_calibration_digest = sha256_text(
+            canonical_json(self._calibration_digest_payload(calibration_profile))
+        )
+        if calibration_profile.get("calibration_digest") != expected_calibration_digest:
+            raise ValueError("calibration_profile.calibration_digest mismatch")
+        if series_profile.get("latent_digests") != calibration_profile.get("source_latent_digests"):
+            raise ValueError("series_profile latent digests must match calibration source latents")
+        if series_profile.get("required_modalities_bound") is not True:
+            raise ValueError("series_profile.required_modalities_bound must be true")
+        if calibration_profile.get("calibration_complete") is not True:
+            raise ValueError("calibration_profile.calibration_complete must be true")
+        for field_name in (
+            "raw_dataset_payload_stored",
+            "raw_signal_samples_stored",
+            "raw_feature_window_payload_stored",
+            "raw_latent_payload_stored",
+            "raw_series_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if series_profile.get(field_name) is not False:
+                raise ValueError(f"series_profile.{field_name} must be false")
+        for field_name in (
+            "raw_source_payload_stored",
+            "raw_latent_payload_stored",
+            "raw_calibration_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if calibration_profile.get(field_name) is not False:
+                raise ValueError(f"calibration_profile.{field_name} must be false")
+
+    def _validate_drift_gate_receipt_for_confidence(
+        self,
+        session: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        drift_gate_receipt: Dict[str, Any],
+    ) -> None:
+        if not isinstance(drift_gate_receipt, dict):
+            raise ValueError("feature_window_series_drift_gate_receipt must be a mapping")
+        if drift_gate_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            raise ValueError("drift_gate_receipt.schema_version mismatch")
+        if drift_gate_receipt.get("profile_id") != BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID:
+            raise ValueError("drift_gate_receipt.profile_id mismatch")
+        if drift_gate_receipt.get("session_id") != session["session_id"]:
+            raise ValueError("drift_gate_receipt.session_id must match session.session_id")
+        if drift_gate_receipt.get("identity_id") != session["identity_id"]:
+            raise ValueError("drift_gate_receipt.identity_id must match session.identity_id")
+        if drift_gate_receipt.get("calibration_ref") != calibration_profile.get("calibration_ref"):
+            raise ValueError("drift_gate_receipt.calibration_ref must match calibration_profile")
+        if drift_gate_receipt.get("calibration_digest") != calibration_profile.get("calibration_digest"):
+            raise ValueError("drift_gate_receipt.calibration_digest must match calibration_profile")
+        if drift_gate_receipt.get("drift_gate_status") != "pass":
+            raise ValueError("drift_gate_receipt.drift_gate_status must be pass")
+        expected_gate_digest = sha256_text(
+            canonical_json(self._series_drift_gate_digest_payload(drift_gate_receipt))
+        )
+        if drift_gate_receipt.get("drift_gate_digest") != expected_gate_digest:
+            raise ValueError("drift_gate_receipt.drift_gate_digest mismatch")
+        for field_name in (
+            "raw_series_payload_stored",
+            "raw_calibration_payload_stored",
+            "raw_drift_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if drift_gate_receipt.get(field_name) is not False:
+                raise ValueError(f"drift_gate_receipt.{field_name} must be false")
+
     def _normalize_modalities(self, values: Sequence[str] | None, field_name: str) -> List[str]:
         if not isinstance(values, (list, tuple)) or not values:
             raise ValueError(f"{field_name} must be a non-empty sequence")
@@ -1381,6 +1784,27 @@ class BioDataTransmitter:
         return normalized
 
     @staticmethod
+    def _normalize_series_drift_thresholds(
+        axis_thresholds: Dict[str, float] | None,
+    ) -> Dict[str, float]:
+        if axis_thresholds is None:
+            return dict(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS)
+        if not isinstance(axis_thresholds, dict):
+            raise ValueError("axis_thresholds must be a mapping")
+        unknown_axes = sorted(set(axis_thresholds) - set(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS))
+        if unknown_axes:
+            raise ValueError(f"unsupported drift threshold axes: {unknown_axes}")
+        normalized = dict(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS)
+        for axis_name, value in axis_thresholds.items():
+            if not isinstance(value, (int, float)) or isinstance(value, bool):
+                raise ValueError(f"axis_thresholds.{axis_name} must be a positive number")
+            threshold = round(float(value), 3)
+            if threshold < 0.0:
+                raise ValueError(f"axis_thresholds.{axis_name} must be non-negative")
+            normalized[str(axis_name)] = threshold
+        return normalized
+
+    @staticmethod
     def _coalesce_number(*values: Any, default: float) -> float:
         for value in values:
             if isinstance(value, (int, float)):
@@ -1437,6 +1861,12 @@ class BioDataTransmitter:
     def _confidence_gate_digest_payload(gate_receipt: Dict[str, Any]) -> Dict[str, Any]:
         payload = dict(gate_receipt)
         payload.pop("gate_receipt_digest", None)
+        return payload
+
+    @staticmethod
+    def _series_drift_gate_digest_payload(drift_gate_receipt: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(drift_gate_receipt)
+        payload.pop("drift_gate_digest", None)
         return payload
 
     @staticmethod

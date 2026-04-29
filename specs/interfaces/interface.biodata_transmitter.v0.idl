@@ -14,6 +14,7 @@ imports:
   biodata_calibration_confidence_gate: ../schemas/biodata_calibration_confidence_gate.schema
   biodata_dataset_adapter_receipt: ../schemas/biodata_dataset_adapter_receipt.schema
   biodata_feature_window_series_profile: ../schemas/biodata_feature_window_series_profile.schema
+  biodata_feature_window_series_drift_gate: ../schemas/biodata_feature_window_series_drift_gate.schema
 operations:
   open_session:
     summary: Open one transmitter session for a single identity and explicit modality set.
@@ -145,6 +146,34 @@ operations:
       - circadian_phase_refs must contain at least two unique phase refs
       - axis_drift_summary must be derived from body-state latent axes, not raw source payload
       - raw dataset, signal sample, feature-window, latent, and series payload storage must remain false
+  bind_feature_window_series_drift_gate:
+    summary: Compare one feature-window series drift summary against bounded thresholds before calibration gate consumption.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - series_profile
+          - calibration_profile
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          series_profile:
+            schema_ref: biodata_feature_window_series_profile
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          axis_thresholds:
+            type: object
+            additionalProperties:
+              type: number
+              minimum: 0
+    output:
+      schema_ref: biodata_feature_window_series_drift_gate
+    guarantees:
+      - series_profile_digest and calibration_digest must both be bound
+      - feature-window series latent digests must match the calibration source latent digests
+      - axis_drift_checks must compare ordered series drift against bounded thresholds
+      - raw series, calibration, and drift payload storage must remain false
   encode_body_state:
     summary: Convert source biosignal features into a digest-bound internal body-state latent.
     input:
@@ -334,10 +363,13 @@ operations:
             additionalProperties:
               type: string
               minLength: 1
+          feature_window_series_drift_gate_receipt:
+            schema_ref: biodata_feature_window_series_drift_gate
     output:
       schema_ref: biodata_calibration_confidence_gate
     guarantees:
       - calibration_digest_bound must prove the receipt is bound to the exact calibration profile
+      - feature-window series drift gate digest must be directly bound when a drift gate receipt is supplied
       - source_modalities_covered must cover eeg, ecg, ppg, eda, and respiration before any target gate can pass
       - identity-confirmation gates require confidence_score >= 0.8
       - sensory-loopback gates require confidence_score >= 0.7
@@ -386,6 +418,51 @@ operations:
           sensory_loopback_gate_bound:
             type: boolean
           raw_gate_payload_stored:
+            const: false
+  validate_feature_window_series_drift_gate:
+    summary: Verify BioData feature-window series drift threshold binding and raw-payload redaction.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - series_profile
+          - calibration_profile
+          - drift_gate_receipt
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          series_profile:
+            schema_ref: biodata_feature_window_series_profile
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          drift_gate_receipt:
+            schema_ref: biodata_feature_window_series_drift_gate
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - series_profile_bound
+          - calibration_profile_bound
+          - series_calibration_latent_set_bound
+          - drift_threshold_digest_bound
+          - drift_gate_digest_bound
+          - raw_drift_payload_stored
+        properties:
+          ok:
+            type: boolean
+          series_profile_bound:
+            type: boolean
+          calibration_profile_bound:
+            type: boolean
+          series_calibration_latent_set_bound:
+            type: boolean
+          drift_threshold_digest_bound:
+            type: boolean
+          drift_gate_digest_bound:
+            type: boolean
+          raw_drift_payload_stored:
             const: false
   validate_dataset_adapter_receipt:
     summary: Verify dataset manifest digest binding, latent binding, modality coverage, and raw-payload redaction.
@@ -455,6 +532,9 @@ events:
   biodata_transmitter.calibration_confidence_gate_bound:
     payload:
       schema_ref: biodata_calibration_confidence_gate
+  biodata_transmitter.feature_window_series_drift_gate_bound:
+    payload:
+      schema_ref: biodata_feature_window_series_drift_gate
 compatibility:
   stability: bootstrap
   notes:
@@ -464,3 +544,4 @@ compatibility:
     - Multi-day calibration profiles improve person-specific baselines but still do not claim subjective equivalence or semantic thought recovery.
     - Calibration confidence gates may raise confidence for identity confirmation and sensory loopback only through digest-bound calibration receipts; they do not expose raw biosignal or gate payloads.
     - Dataset feature-window adapters make external EEG/ECG/PPG/EDA/respiration corpora ingestible only as manifest digests, feature-window digests, and latent refs; raw samples are out of scope.
+    - Feature-window series drift gates let calibration confidence gates consume current longitudinal evidence only through bounded, digest-only drift-threshold receipts.

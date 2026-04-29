@@ -29,6 +29,13 @@ expected:
   feature_window_series_required_modalities_bound: true
   feature_window_series_circadian_profile_bound: true
   feature_window_series_axis_drift_summary_bound: true
+  feature_window_series_drift_gate_ok: true
+  feature_window_series_drift_gate_status: pass
+  feature_window_series_drift_gate_series_bound: true
+  feature_window_series_drift_gate_calibration_bound: true
+  feature_window_series_drift_gate_latent_set_bound: true
+  feature_window_series_drift_threshold_digest_bound: true
+  feature_window_series_drift_gate_digest_bound: true
   calibration_profile_ok: true
   multi_day_calibration_bound: true
   source_latent_digest_set_bound: true
@@ -40,6 +47,8 @@ expected:
   calibration_confidence_gate_modalities_bound: true
   calibration_confidence_gate_target_set_digest_bound: true
   calibration_confidence_gate_receipt_digest_bound: true
+  calibration_confidence_gate_series_drift_bound: true
+  calibration_confidence_gate_series_drift_status: pass
   identity_confirmation_confidence_gate_bound: true
   sensory_loopback_confidence_gate_bound: true
   raw_source_payload_stored: false
@@ -49,6 +58,7 @@ expected:
   raw_feature_window_payload_stored: false
   raw_latent_payload_stored: false
   raw_series_payload_stored: false
+  raw_drift_payload_stored: false
   raw_calibration_payload_stored: false
   raw_gate_payload_stored: false
   semantic_thought_content_generated: false

@@ -2219,6 +2219,16 @@ entries:
     rationale: Required to bind multiple BioData dataset adapter receipts into an ordered longitudinal/circadian latent series with adapter digest set, latent digest set, phase refs, drift summary, and raw series payload redaction.
   - priority: P1
     kind: schema
+    file: specs/schemas/biodata_feature_window_series_drift_gate.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to gate BioData feature-window series drift against bounded thresholds before calibration confidence gates consume the current series.
+  - priority: P1
+    kind: schema
     file: specs/schemas/biodata_signal_bundle.schema
     consumers:
       - specs/interfaces/interface.biodata_transmitter.v0.idl
@@ -2245,7 +2255,7 @@ entries:
       - reference-runtime
       - evals/interface/biodata_transmitter_roundtrip.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to bind complete BioData calibration profiles to identity-confirmation and sensory-loopback confidence gates without raw calibration or gate payload storage.
+    rationale: Required to bind complete BioData calibration profiles and optional feature-window series drift gate receipts to identity-confirmation and sensory-loopback confidence gates without raw calibration, drift, or gate payload storage.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.biodata_transmitter.v0.idl

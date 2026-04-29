@@ -17,6 +17,7 @@ capabilities:
   - biodata-transmitter.roundtrip.attest
   - biodata-transmitter.dataset-adapter.attest
   - biodata-transmitter.feature-window-series.attest
+  - biodata-transmitter.feature-window-series-drift-gate.attest
   - biodata-transmitter.calibration-profile.attest
   - biodata-transmitter.confidence-gate.attest
   - sensory-loopback.calibration-confidence-threshold.attest
@@ -97,6 +98,7 @@ oversight_scope_refs:
   - specs/schemas/biodata_transmitter_session.schema
   - specs/schemas/biodata_dataset_adapter_receipt.schema
   - specs/schemas/biodata_feature_window_series_profile.schema
+  - specs/schemas/biodata_feature_window_series_drift_gate.schema
   - specs/schemas/biodata_body_state_latent.schema
   - specs/schemas/biodata_signal_bundle.schema
   - specs/schemas/biodata_calibration_profile.schema
