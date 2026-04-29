@@ -28,6 +28,12 @@ required:
   - production_connector_attestation_digest
   - legal_execution_id
   - legal_execution_digest
+  - regulator_permit_quorum_receipt_id
+  - regulator_permit_quorum_receipt_digest
+  - regulator_permit_quorum_status
+  - regulator_permit_threshold_policy_digest
+  - regulator_permit_verifier_roster_digest
+  - regulator_permit_revocation_registry_digest
   - audit_event_ref
 properties:
   schema_version:
@@ -155,6 +161,26 @@ properties:
   legal_execution_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
+  regulator_permit_quorum_receipt_id:
+    type: string
+  regulator_permit_quorum_receipt_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  regulator_permit_quorum_status:
+    type: string
+    enum:
+      - ""
+      - complete
+      - incomplete
+  regulator_permit_threshold_policy_digest:
+    type: string
+    pattern: "^$|^sha256:[a-f0-9]{64}$"
+  regulator_permit_verifier_roster_digest:
+    type: string
+    pattern: "^$|^sha256:[a-f0-9]{64}$"
+  regulator_permit_revocation_registry_digest:
+    type: string
+    pattern: "^$|^sha256:[a-f0-9]{64}$"
   audit_event_ref:
     type: string
     minLength: 1

@@ -404,6 +404,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         )
         self.assertEqual(legal_execution["execution_id"], approved["legal_execution_id"])
         self.assertEqual(legal_execution["digest"], approved["legal_execution_digest"])
+        self.assertEqual(
+            context["regulator_permit_quorum_receipt"]["receipt_id"],
+            approved["regulator_permit_quorum_receipt_id"],
+        )
+        self.assertEqual(
+            context["regulator_permit_quorum_receipt"]["receipt_digest"],
+            approved["regulator_permit_quorum_receipt_digest"],
+        )
         self.assertEqual("held", observed["safety_status"])
         self.assertEqual("released", released["status"])
         self.assertEqual("released", snapshot["status"])
@@ -415,6 +423,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(validation["production_connector_attestation_bound"])
         self.assertTrue(validation["legal_execution_bound"])
+        self.assertTrue(validation["regulator_permit_quorum_bound"])
         self.assertTrue(validation["released"])
 
     def test_blocked_irreversible_command_is_vetoed(self) -> None:
@@ -799,6 +808,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(stop_validation["stop_signal_path_bound"])
         self.assertTrue(stop_validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(stop_validation["production_connector_attestation_bound"])
+        self.assertTrue(stop_validation["regulator_permit_quorum_bound"])
         self.assertTrue(stop_validation["trigger_binding_matched"])
         self.assertEqual("watchdog-timeout", stop["trigger_source"])
         self.assertEqual(approved["command_id"], stop["command_id"])
@@ -826,6 +836,15 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             context["production_connector_attestation"]["attestation_digest"],
             stop["production_connector_attestation_digest"],
         )
+        self.assertEqual(
+            context["regulator_permit_quorum_receipt"]["receipt_id"],
+            stop["regulator_permit_quorum_receipt_id"],
+        )
+        self.assertEqual(
+            context["regulator_permit_quorum_receipt"]["receipt_digest"],
+            stop["regulator_permit_quorum_receipt_digest"],
+        )
+        self.assertEqual("complete", stop["regulator_permit_quorum_status"])
         self.assertEqual("vetoed", veto["status"])
         self.assertEqual(
             "handle is latched in emergency stop; release required before further actuation",
@@ -837,6 +856,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(validation["legal_execution_bound"])
         self.assertTrue(validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(validation["production_connector_attestation_bound"])
+        self.assertTrue(validation["regulator_permit_quorum_bound"])
         self.assertTrue(validation["emergency_stop_release_sequence_valid"])
 
 

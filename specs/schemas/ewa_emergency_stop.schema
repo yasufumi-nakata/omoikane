@@ -32,6 +32,13 @@ required:
   - production_connector_profile_id
   - vendor_api_ref
   - installation_site_ref
+  - regulator_permit_quorum_receipt_id
+  - regulator_permit_quorum_receipt_digest
+  - regulator_permit_quorum_profile_id
+  - regulator_permit_quorum_status
+  - regulator_permit_threshold_policy_digest
+  - regulator_permit_verifier_roster_digest
+  - regulator_permit_revocation_registry_digest
   - kill_switch_wiring_ref
   - activated_binding_id
   - activated_channel_ref
@@ -121,6 +128,27 @@ properties:
   installation_site_ref:
     type: string
     minLength: 1
+  regulator_permit_quorum_receipt_id:
+    type: string
+    pattern: "^ewa-permit-quorum-[a-f0-9]{12}$"
+  regulator_permit_quorum_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  regulator_permit_quorum_profile_id:
+    type: string
+    const: ewa-regulator-permit-verifier-quorum-v1
+  regulator_permit_quorum_status:
+    type: string
+    const: complete
+  regulator_permit_threshold_policy_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  regulator_permit_verifier_roster_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  regulator_permit_revocation_registry_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
   kill_switch_wiring_ref:
     type: string
     minLength: 1

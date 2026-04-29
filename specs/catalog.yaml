@@ -1811,7 +1811,7 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to serialize one latched EWA emergency stop with bound command digests, activated stop-signal channel binding, safe-state interlock, and forced-release requirement.
+    rationale: Required to serialize one latched EWA emergency stop with bound command digests, regulator permit quorum receipt binding, activated stop-signal channel binding, safe-state interlock, and forced-release requirement.
   - priority: P1
     kind: schema
     file: specs/schemas/ewa_audit.schema
@@ -1819,7 +1819,7 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to persist append-only EWA audit entries without storing raw instructions or sensor payloads.
+    rationale: Required to persist append-only EWA audit entries with authorization, legal execution, and regulator permit quorum evidence without storing raw instructions or sensor payloads.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.ewa.v0.idl
@@ -3634,6 +3634,6 @@ entries:
       - agents/guardians/integrity-guardian.yaml
       - docs/02-subsystems/interface/ewa-safety.md
       - docs/07-reference-implementation/README.md
-    rationale: Guards that regulator permit verifier and quorum receipts remain legal-execution-bound, permit-status-valid, multi-jurisdiction, threshold-policy-bound, digest-only, raw-payload-redacted, and outside EWA decision authority.
+    rationale: Guards that regulator permit verifier and quorum receipts remain legal-execution-bound, permit-status-valid, multi-jurisdiction, threshold-policy-bound, digest-only, raw-payload-redacted, outside EWA decision authority, and carried through authorization, command audit, and emergency-stop receipts.
 next_priority:
   # Future automation can append the next missing contract here.

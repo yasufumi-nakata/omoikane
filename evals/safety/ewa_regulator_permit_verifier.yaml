@@ -21,6 +21,8 @@ expected:
   regulator_permit_quorum_roster_bound: true
   regulator_permit_quorum_revocation_registry_bound: true
   authorization_regulator_permit_quorum_ready: true
+  approved_command_regulator_permit_quorum_bound: true
+  emergency_stop_bound_to_regulator_permit_quorum: true
 metric: boolean
 threshold: 1.0
 ethics_check: true

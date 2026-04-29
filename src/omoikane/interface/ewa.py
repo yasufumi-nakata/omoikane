@@ -318,6 +318,12 @@ class ExternalWorldAgentController:
             "last_stop_signal_adapter_receipt_digest": "",
             "last_production_connector_attestation_id": "",
             "last_production_connector_attestation_digest": "",
+            "last_regulator_permit_quorum_receipt_id": "",
+            "last_regulator_permit_quorum_receipt_digest": "",
+            "last_regulator_permit_quorum_status": "",
+            "last_regulator_permit_threshold_policy_digest": "",
+            "last_regulator_permit_verifier_roster_digest": "",
+            "last_regulator_permit_revocation_registry_digest": "",
             "last_emergency_stop_id": "",
             "emergency_stop_active": False,
             "audit_log": [],
@@ -3419,6 +3425,24 @@ class ExternalWorldAgentController:
             ]
             legal_execution_id = authorization["legal_execution_id"]
             legal_execution_digest = authorization["legal_execution_digest"]
+            regulator_permit_quorum_receipt_id = authorization[
+                "regulator_permit_quorum_receipt_id"
+            ]
+            regulator_permit_quorum_receipt_digest = authorization[
+                "regulator_permit_quorum_receipt_digest"
+            ]
+            regulator_permit_quorum_status = authorization[
+                "regulator_permit_quorum_status"
+            ]
+            regulator_permit_threshold_policy_digest = authorization[
+                "regulator_permit_threshold_policy_digest"
+            ]
+            regulator_permit_verifier_roster_digest = authorization[
+                "regulator_permit_verifier_roster_digest"
+            ]
+            regulator_permit_revocation_registry_digest = authorization[
+                "regulator_permit_revocation_registry_digest"
+            ]
         else:
             motor_plan_id = ""
             motor_plan_digest = ""
@@ -3430,6 +3454,12 @@ class ExternalWorldAgentController:
             production_connector_attestation_digest = ""
             legal_execution_id = ""
             legal_execution_digest = ""
+            regulator_permit_quorum_receipt_id = ""
+            regulator_permit_quorum_receipt_digest = ""
+            regulator_permit_quorum_status = ""
+            regulator_permit_threshold_policy_digest = ""
+            regulator_permit_verifier_roster_digest = ""
+            regulator_permit_revocation_registry_digest = ""
 
         handle["actuator_state"] = "executing"
         effect_summary = self._effect_summary(normalized_reversibility, normalized_intent)
@@ -3463,6 +3493,12 @@ class ExternalWorldAgentController:
             production_connector_attestation_digest=production_connector_attestation_digest,
             legal_execution_id=legal_execution_id,
             legal_execution_digest=legal_execution_digest,
+            regulator_permit_quorum_receipt_id=regulator_permit_quorum_receipt_id,
+            regulator_permit_quorum_receipt_digest=regulator_permit_quorum_receipt_digest,
+            regulator_permit_quorum_status=regulator_permit_quorum_status,
+            regulator_permit_threshold_policy_digest=regulator_permit_threshold_policy_digest,
+            regulator_permit_verifier_roster_digest=regulator_permit_verifier_roster_digest,
+            regulator_permit_revocation_registry_digest=regulator_permit_revocation_registry_digest,
         )
         handle["actuator_state"] = "idle"
         handle["last_command_id"] = normalized_command_id
@@ -3483,6 +3519,20 @@ class ExternalWorldAgentController:
         )
         handle["last_legal_execution_id"] = legal_execution_id
         handle["last_legal_execution_digest"] = legal_execution_digest
+        handle["last_regulator_permit_quorum_receipt_id"] = regulator_permit_quorum_receipt_id
+        handle["last_regulator_permit_quorum_receipt_digest"] = (
+            regulator_permit_quorum_receipt_digest
+        )
+        handle["last_regulator_permit_quorum_status"] = regulator_permit_quorum_status
+        handle["last_regulator_permit_threshold_policy_digest"] = (
+            regulator_permit_threshold_policy_digest
+        )
+        handle["last_regulator_permit_verifier_roster_digest"] = (
+            regulator_permit_verifier_roster_digest
+        )
+        handle["last_regulator_permit_revocation_registry_digest"] = (
+            regulator_permit_revocation_registry_digest
+        )
         handle["last_emergency_stop_id"] = ""
         handle["emergency_stop_active"] = False
         handle["last_command_status"] = audit["status"]
@@ -3552,6 +3602,10 @@ class ExternalWorldAgentController:
             raise ValueError(
                 "emergency stop requires a production connector attestation bound to the last command"
             )
+        if not handle.get("last_regulator_permit_quorum_receipt_id"):
+            raise ValueError(
+                "emergency stop requires a regulator permit quorum receipt bound to the last command"
+            )
 
         normalized_trigger_source = self._normalize_emergency_stop_source(trigger_source)
         normalized_reason = self._normalize_non_empty_string(reason, "reason")
@@ -3563,6 +3617,9 @@ class ExternalWorldAgentController:
         )
         production_connector_attestation = self._require_production_connector_attestation(
             str(handle["last_production_connector_attestation_id"])
+        )
+        regulator_permit_quorum_receipt = self._require_regulator_permit_quorum_receipt(
+            str(handle["last_regulator_permit_quorum_receipt_id"])
         )
         activated_binding = next(
             (
@@ -3600,6 +3657,52 @@ class ExternalWorldAgentController:
                 self_consent_granted=False,
                 authorization_id=handle.get("last_authorization_id", ""),
             ),
+            motor_plan_id=handle.get("last_motor_plan_id", ""),
+            motor_plan_digest=handle.get("last_motor_plan_digest", ""),
+            stop_signal_path_id=handle.get("last_stop_signal_path_id", ""),
+            stop_signal_path_digest=handle.get("last_stop_signal_path_digest", ""),
+            stop_signal_adapter_receipt_id=handle.get(
+                "last_stop_signal_adapter_receipt_id",
+                "",
+            ),
+            stop_signal_adapter_receipt_digest=handle.get(
+                "last_stop_signal_adapter_receipt_digest",
+                "",
+            ),
+            production_connector_attestation_id=handle.get(
+                "last_production_connector_attestation_id",
+                "",
+            ),
+            production_connector_attestation_digest=handle.get(
+                "last_production_connector_attestation_digest",
+                "",
+            ),
+            legal_execution_id=handle.get("last_legal_execution_id", ""),
+            legal_execution_digest=handle.get("last_legal_execution_digest", ""),
+            regulator_permit_quorum_receipt_id=handle.get(
+                "last_regulator_permit_quorum_receipt_id",
+                "",
+            ),
+            regulator_permit_quorum_receipt_digest=handle.get(
+                "last_regulator_permit_quorum_receipt_digest",
+                "",
+            ),
+            regulator_permit_quorum_status=handle.get(
+                "last_regulator_permit_quorum_status",
+                "",
+            ),
+            regulator_permit_threshold_policy_digest=handle.get(
+                "last_regulator_permit_threshold_policy_digest",
+                "",
+            ),
+            regulator_permit_verifier_roster_digest=handle.get(
+                "last_regulator_permit_verifier_roster_digest",
+                "",
+            ),
+            regulator_permit_revocation_registry_digest=handle.get(
+                "last_regulator_permit_revocation_registry_digest",
+                "",
+            ),
         )
         receipt = {
             "kind": "ewa_emergency_stop",
@@ -3632,6 +3735,27 @@ class ExternalWorldAgentController:
             "production_connector_profile_id": production_connector_attestation["profile_id"],
             "vendor_api_ref": production_connector_attestation["vendor_api_ref"],
             "installation_site_ref": production_connector_attestation["installation_site_ref"],
+            "regulator_permit_quorum_receipt_id": regulator_permit_quorum_receipt[
+                "receipt_id"
+            ],
+            "regulator_permit_quorum_receipt_digest": regulator_permit_quorum_receipt[
+                "receipt_digest"
+            ],
+            "regulator_permit_quorum_profile_id": regulator_permit_quorum_receipt[
+                "profile_id"
+            ],
+            "regulator_permit_quorum_status": regulator_permit_quorum_receipt[
+                "quorum_status"
+            ],
+            "regulator_permit_threshold_policy_digest": regulator_permit_quorum_receipt[
+                "threshold_policy_digest"
+            ],
+            "regulator_permit_verifier_roster_digest": regulator_permit_quorum_receipt[
+                "verifier_roster_digest"
+            ],
+            "regulator_permit_revocation_registry_digest": regulator_permit_quorum_receipt[
+                "revocation_registry_digest"
+            ],
             "kill_switch_wiring_ref": stop_signal_path["kill_switch_wiring_ref"],
             "activated_binding_id": activated_binding["binding_id"],
             "activated_channel_ref": activated_binding["channel_ref"],
@@ -4658,6 +4782,7 @@ class ExternalWorldAgentController:
         stop_signal_adapter_receipt_bound = True
         production_connector_attestation_bound = True
         legal_execution_bound = True
+        regulator_permit_quorum_bound = True
         emergency_stop_release_sequence_valid = True
         emergency_stop_seen = False
         release_after_stop_seen = False
@@ -4745,6 +4870,30 @@ class ExternalWorldAgentController:
                     legal_execution_digest,
                 ):
                     legal_execution_bound = False
+                if not isinstance(entry.get("regulator_permit_quorum_receipt_id"), str) or not entry.get(
+                    "regulator_permit_quorum_receipt_id",
+                    "",
+                ).strip():
+                    regulator_permit_quorum_bound = False
+                regulator_permit_quorum_digest = entry.get(
+                    "regulator_permit_quorum_receipt_digest",
+                    "",
+                )
+                if not isinstance(regulator_permit_quorum_digest, str) or not re.fullmatch(
+                    r"[a-f0-9]{64}",
+                    regulator_permit_quorum_digest,
+                ):
+                    regulator_permit_quorum_bound = False
+                if entry.get("regulator_permit_quorum_status") != "complete":
+                    regulator_permit_quorum_bound = False
+                for field_name in (
+                    "regulator_permit_threshold_policy_digest",
+                    "regulator_permit_verifier_roster_digest",
+                    "regulator_permit_revocation_registry_digest",
+                ):
+                    value = entry.get(field_name, "")
+                    if not isinstance(value, str) or not self._is_sha256_ref(value):
+                        regulator_permit_quorum_bound = False
             if entry.get("operation") == "emergency-stop":
                 emergency_stop_seen = True
             elif emergency_stop_seen and entry.get("operation") == "command-approved":
@@ -4776,6 +4925,10 @@ class ExternalWorldAgentController:
             )
         if not legal_execution_bound:
             errors.append("non-read-only command execution requires a bound legal_execution receipt")
+        if not regulator_permit_quorum_bound:
+            errors.append(
+                "non-read-only command execution requires a bound regulator permit quorum receipt"
+            )
         if emergency_stop_seen and not release_after_stop_seen:
             emergency_stop_release_sequence_valid = False
             errors.append("emergency stop requires a later release entry")
@@ -4795,6 +4948,7 @@ class ExternalWorldAgentController:
             "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "production_connector_attestation_bound": production_connector_attestation_bound,
             "legal_execution_bound": legal_execution_bound,
+            "regulator_permit_quorum_bound": regulator_permit_quorum_bound,
             "emergency_stop_release_sequence_valid": emergency_stop_release_sequence_valid,
             "released": handle.get("status") == "released",
         }
@@ -4853,6 +5007,41 @@ class ExternalWorldAgentController:
         self._check_non_empty_string(
             receipt.get("production_connector_profile_id"),
             "production_connector_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("regulator_permit_quorum_receipt_id"),
+            "regulator_permit_quorum_receipt_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("regulator_permit_quorum_receipt_digest"),
+            "regulator_permit_quorum_receipt_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("regulator_permit_quorum_profile_id"),
+            "regulator_permit_quorum_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("regulator_permit_quorum_status"),
+            "regulator_permit_quorum_status",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("regulator_permit_threshold_policy_digest"),
+            "regulator_permit_threshold_policy_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("regulator_permit_verifier_roster_digest"),
+            "regulator_permit_verifier_roster_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            receipt.get("regulator_permit_revocation_registry_digest"),
+            "regulator_permit_revocation_registry_digest",
             errors,
         )
         self._check_non_empty_string(receipt.get("vendor_api_ref"), "vendor_api_ref", errors)
@@ -4945,7 +5134,19 @@ class ExternalWorldAgentController:
         stop_signal_path_bound = True
         stop_signal_adapter_receipt_bound = True
         production_connector_attestation_bound = True
+        regulator_permit_quorum_bound = True
         trigger_binding_matched = True
+        if authorization_id:
+            try:
+                authorization = self._require_authorization(str(authorization_id))
+            except (KeyError, ValueError):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "emergency stop authorization_id must reference a known authorization"
+                )
+                authorization = {}
+        else:
+            authorization = {}
         try:
             stop_signal_path = self._require_stop_signal_path(str(receipt.get("stop_signal_path_id", "")))
         except ValueError:
@@ -5086,6 +5287,64 @@ class ExternalWorldAgentController:
                 production_connector_attestation_bound = False
                 errors.extend(connector_validation["errors"])
 
+        try:
+            regulator_permit_quorum_receipt = self._require_regulator_permit_quorum_receipt(
+                str(receipt.get("regulator_permit_quorum_receipt_id", ""))
+            )
+        except (KeyError, ValueError):
+            regulator_permit_quorum_bound = False
+            errors.append("emergency stop must reference a known regulator permit quorum receipt")
+            regulator_permit_quorum_receipt = {}
+        if regulator_permit_quorum_receipt:
+            if regulator_permit_quorum_receipt.get("receipt_digest") != receipt.get(
+                "regulator_permit_quorum_receipt_digest"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "regulator_permit_quorum_receipt_digest must match the quorum receipt"
+                )
+            if regulator_permit_quorum_receipt.get("profile_id") != receipt.get(
+                "regulator_permit_quorum_profile_id"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "regulator_permit_quorum_profile_id must match the quorum receipt"
+                )
+            if regulator_permit_quorum_receipt.get("quorum_status") != receipt.get(
+                "regulator_permit_quorum_status"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append("regulator_permit_quorum_status must match the quorum receipt")
+            for quorum_field, receipt_field in (
+                ("threshold_policy_digest", "regulator_permit_threshold_policy_digest"),
+                ("verifier_roster_digest", "regulator_permit_verifier_roster_digest"),
+                (
+                    "revocation_registry_digest",
+                    "regulator_permit_revocation_registry_digest",
+                ),
+            ):
+                if regulator_permit_quorum_receipt.get(quorum_field) != receipt.get(receipt_field):
+                    regulator_permit_quorum_bound = False
+                    errors.append(f"{receipt_field} must match the quorum receipt")
+            if receipt.get("regulator_permit_quorum_status") != "complete":
+                regulator_permit_quorum_bound = False
+                errors.append("regulator_permit_quorum_status must be complete")
+            if authorization:
+                for authorization_field in (
+                    "regulator_permit_quorum_receipt_id",
+                    "regulator_permit_quorum_receipt_digest",
+                    "regulator_permit_quorum_profile_id",
+                    "regulator_permit_quorum_status",
+                    "regulator_permit_threshold_policy_digest",
+                    "regulator_permit_verifier_roster_digest",
+                    "regulator_permit_revocation_registry_digest",
+                ):
+                    if receipt.get(authorization_field) != authorization.get(authorization_field):
+                        regulator_permit_quorum_bound = False
+                        errors.append(
+                            f"emergency stop {authorization_field} must match authorization"
+                        )
+
         self._parse_datetime(receipt.get("triggered_at"), "triggered_at", errors)
 
         digest_matches = receipt.get("stop_digest") == sha256_text(
@@ -5104,6 +5363,7 @@ class ExternalWorldAgentController:
             "stop_signal_path_bound": stop_signal_path_bound,
             "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "production_connector_attestation_bound": production_connector_attestation_bound,
+            "regulator_permit_quorum_bound": regulator_permit_quorum_bound,
             "trigger_binding_matched": trigger_binding_matched,
             "release_required": release_required,
             "errors": errors,
@@ -5163,6 +5423,12 @@ class ExternalWorldAgentController:
         production_connector_attestation_digest: str = "",
         legal_execution_id: str = "",
         legal_execution_digest: str = "",
+        regulator_permit_quorum_receipt_id: str = "",
+        regulator_permit_quorum_receipt_digest: str = "",
+        regulator_permit_quorum_status: str = "",
+        regulator_permit_threshold_policy_digest: str = "",
+        regulator_permit_verifier_roster_digest: str = "",
+        regulator_permit_revocation_registry_digest: str = "",
     ) -> Dict[str, Any]:
         handle["audit_sequence"] += 1
         audit_event_ref = f"ledger://ewa/{handle['handle_id']}/{handle['audit_sequence']}"
@@ -5194,6 +5460,14 @@ class ExternalWorldAgentController:
             "production_connector_attestation_digest": production_connector_attestation_digest,
             "legal_execution_id": legal_execution_id,
             "legal_execution_digest": legal_execution_digest,
+            "regulator_permit_quorum_receipt_id": regulator_permit_quorum_receipt_id,
+            "regulator_permit_quorum_receipt_digest": regulator_permit_quorum_receipt_digest,
+            "regulator_permit_quorum_status": regulator_permit_quorum_status,
+            "regulator_permit_threshold_policy_digest": regulator_permit_threshold_policy_digest,
+            "regulator_permit_verifier_roster_digest": regulator_permit_verifier_roster_digest,
+            "regulator_permit_revocation_registry_digest": (
+                regulator_permit_revocation_registry_digest
+            ),
             "audit_event_ref": audit_event_ref,
         }
         handle["audit_log"].append(entry)

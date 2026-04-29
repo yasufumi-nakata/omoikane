@@ -9889,6 +9889,13 @@ json.dump(response, sys.stdout)
                 approved_command["legal_execution_id"] == legal_execution["execution_id"]
                 and approved_command["legal_execution_digest"] == legal_execution["digest"]
             ),
+            "approved_command_regulator_permit_quorum_bound": (
+                approved_command["regulator_permit_quorum_receipt_id"]
+                == regulator_permit_quorum_receipt["receipt_id"]
+                and approved_command["regulator_permit_quorum_receipt_digest"]
+                == regulator_permit_quorum_receipt["receipt_digest"]
+                and approved_command["regulator_permit_quorum_status"] == "complete"
+            ),
             "released": handle_validation["released"],
             "veto_handle_released": veto_handle_validation["released"],
             "emergency_stop_release_sequence_valid": handle_validation[
@@ -9954,6 +9961,13 @@ json.dump(response, sys.stdout)
             == production_connector_attestation["attestation_id"]
             and emergency_stop["production_connector_attestation_digest"]
             == production_connector_attestation["attestation_digest"],
+            "emergency_stop_bound_to_regulator_permit_quorum": emergency_stop_validation[
+                "regulator_permit_quorum_bound"
+            ]
+            and emergency_stop["regulator_permit_quorum_receipt_id"]
+            == regulator_permit_quorum_receipt["receipt_id"]
+            and emergency_stop["regulator_permit_quorum_receipt_digest"]
+            == regulator_permit_quorum_receipt["receipt_digest"],
             "release_after_stop": release["status"] == "released",
             "ok": handle_validation["ok"]
             and veto_handle_validation["ok"]

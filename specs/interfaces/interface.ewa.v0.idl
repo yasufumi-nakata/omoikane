@@ -1107,6 +1107,7 @@ operations:
       - emergency stop must bind the last command_id and bound_command_digest
       - emergency stop must bind the last authorization artifact when one was active
       - emergency stop must bind one armed stop_signal_path and the activated trigger channel that delivered the bus latch
+      - emergency stop must bind the same regulator permit quorum receipt/digest that gated the active authorization
       - release_required must remain true until the handle is force-released
       - further actuation commands must fail closed until release completes
   validate_emergency_stop:
@@ -1132,6 +1133,7 @@ operations:
           - bus_delivery_latched
           - authorization_bound
           - stop_signal_path_bound
+          - regulator_permit_quorum_bound
           - trigger_binding_matched
           - release_required
           - errors
@@ -1149,6 +1151,8 @@ operations:
           authorization_bound:
             type: boolean
           stop_signal_path_bound:
+            type: boolean
+          regulator_permit_quorum_bound:
             type: boolean
           trigger_binding_matched:
             type: boolean

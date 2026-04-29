@@ -277,6 +277,13 @@ ewa_emergency_stop:
   bound_authorization_digest: <sha256 or empty>
   stop_signal_path_id: <armed stop-signal path ref>
   stop_signal_adapter_receipt_id: <adapter readiness receipt ref>
+  production_connector_attestation_id: <vendor API / installation proof receipt ref>
+  regulator_permit_quorum_receipt_id: <permit quorum ref>
+  regulator_permit_quorum_receipt_digest: <sha256>
+  regulator_permit_quorum_status: complete
+  regulator_permit_threshold_policy_digest: <sha256 ref>
+  regulator_permit_verifier_roster_digest: <sha256 ref>
+  regulator_permit_revocation_registry_digest: <sha256 ref>
   activated_channel_ref: <latched channel ref>
   activated_signal_path_ref: <latched path ref>
   activated_interlock_ref: <latched relay ref>
@@ -291,6 +298,7 @@ ewa_emergency_stop:
 
 `emergency_stop` は raw instruction を保存せず、
 最後に実行された command / authorization への digest binding と
+authorization を gate した regulator permit quorum receipt / digest / status、
 armed stop-signal path 上でどの trigger channel が latch したか、
 forced release requirement とともに machine-readable に残す。
 
@@ -363,7 +371,7 @@ veto は **記録するだけ** ではなく、Council への自動 escalation �
 - `evals/safety/ewa_guardian_oversight_gate.yaml` で network-attested reviewer quorum と
   guardian oversight gate の binding を保証
 - `evals/safety/ewa_emergency_stop.yaml` で latched stop / safe-state interlock /
-  stop-signal path binding / forced release を保証
+  stop-signal path binding / regulator permit quorum binding / forced release を保証
 
 ## 未解決
 

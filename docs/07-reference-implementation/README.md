@@ -1247,6 +1247,9 @@ reversible command に Guardian observe を要求しつつ、
 `command_id` / `bound_command_digest` / `bound_authorization_digest` /
 `stop_signal_adapter_receipt_id` /
 `production_connector_attestation_id` /
+`regulator_permit_quorum_receipt_id` /
+`regulator_permit_quorum_receipt_digest` /
+`regulator_permit_quorum_status=complete` /
 `activated_channel_ref` / `hardware_interlock_state=engaged` /
 `release_required=true` を返し、
 その後 forced release が実行されること、
