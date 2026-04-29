@@ -59,6 +59,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             result["session"],
         )
         self._assert_schema_valid(
+            "specs/schemas/biodata_dataset_adapter_receipt.schema",
+            result["dataset_adapter_receipt"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/biodata_body_state_latent.schema",
             result["latent_state"],
         )
@@ -78,9 +82,12 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             self._assert_schema_valid(
                 "specs/schemas/biodata_body_state_latent.schema",
                 latent,
-            )
+        )
         self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
         self.assertTrue(result["validation"]["literature_backed_intermediate"])
+        self.assertTrue(result["validation"]["dataset_adapter_ok"])
+        self.assertTrue(result["validation"]["dataset_manifest_digest_bound"])
+        self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_ok"])

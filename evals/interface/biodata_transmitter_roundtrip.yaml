@@ -15,6 +15,12 @@ expected:
   literature_ref_count_min: 5
   mind_upload_conflict_sink_bound: true
   target_modalities_generated: true
+  dataset_adapter_ok: true
+  dataset_manifest_digest_bound: true
+  dataset_adapter_source_feature_digest_bound: true
+  dataset_adapter_latent_digest_bound: true
+  dataset_adapter_required_modalities_bound: true
+  dataset_adapter_receipt_digest_bound: true
   calibration_profile_ok: true
   multi_day_calibration_bound: true
   source_latent_digest_set_bound: true
@@ -30,6 +36,9 @@ expected:
   sensory_loopback_confidence_gate_bound: true
   raw_source_payload_stored: false
   raw_generated_waveform_stored: false
+  raw_dataset_payload_stored: false
+  raw_signal_samples_stored: false
+  raw_feature_window_payload_stored: false
   raw_latent_payload_stored: false
   raw_calibration_payload_stored: false
   raw_gate_payload_stored: false

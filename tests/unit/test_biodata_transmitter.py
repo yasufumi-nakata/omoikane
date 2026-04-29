@@ -43,6 +43,80 @@ class BioDataTransmitterTests(unittest.TestCase):
         self.assertFalse(bundle["signals"]["thought"]["semantic_content_generated"])
         self.assertEqual("not-generated://thought-content", bundle["signals"]["thought"]["content_ref"])
 
+    def test_adapts_dataset_feature_window_without_raw_payloads(self) -> None:
+        transmitter = BioDataTransmitter()
+        session = transmitter.open_session("identity-bdt-dataset-adapter")
+        dataset_manifest = {
+            "dataset_ref": "dataset://unit/physiology-window",
+            "participant_ref": "participant://unit/self",
+            "license_ref": "license://unit/redacted-feature-summary",
+            "window_ref": "window://unit/day-1/rest",
+            "modality_file_refs": {
+                "eeg": "dataset-file://unit/eeg",
+                "ecg": "dataset-file://unit/ecg",
+                "ppg": "dataset-file://unit/ppg",
+                "eda": "dataset-file://unit/eda",
+                "respiration": "dataset-file://unit/respiration",
+            },
+        }
+
+        adapted = transmitter.adapt_dataset_feature_window(
+            session["session_id"],
+            dataset_manifest=dataset_manifest,
+            window_feature_summaries={
+                "eeg": {"alpha_power": 0.41, "theta_power": 0.27, "beta_power": 0.33},
+                "ecg": {"heart_rate_bpm": 73.0, "hrv_rmssd_ms": 47.0},
+                "ppg": {"pulse_rate_bpm": 72.7, "pulse_amplitude": 0.74},
+                "eda": {"skin_conductance_microsiemens": 4.4},
+                "respiration": {"rate_bpm": 15.1, "phase": "inhale"},
+            },
+            context_label="dataset-window-unit",
+        )
+        receipt = adapted["adapter_receipt"]
+        latent = adapted["latent_state"]
+        validation = transmitter.validate_dataset_adapter_receipt(
+            session,
+            dataset_manifest,
+            latent,
+            receipt,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["dataset_manifest_digest_bound"])
+        self.assertTrue(validation["source_feature_digest_bound"])
+        self.assertTrue(validation["latent_digest_bound"])
+        self.assertTrue(validation["required_modalities_bound"])
+        self.assertTrue(validation["adapter_receipt_digest_bound"])
+        self.assertEqual(latent["latent_ref"], receipt["latent_ref"])
+        self.assertFalse(receipt["raw_dataset_payload_stored"])
+        self.assertFalse(receipt["raw_signal_samples_stored"])
+        self.assertFalse(receipt["raw_feature_window_payload_stored"])
+
+        tampered = dict(receipt)
+        tampered["dataset_manifest_digest"] = "0" * 64
+        self.assertFalse(
+            transmitter.validate_dataset_adapter_receipt(
+                session,
+                dataset_manifest,
+                latent,
+                tampered,
+            )["ok"]
+        )
+        incomplete_manifest = dict(dataset_manifest)
+        incomplete_manifest["modality_file_refs"] = {
+            "eeg": "dataset-file://unit/eeg",
+        }
+        with self.assertRaisesRegex(ValueError, "must cover observed modalities"):
+            transmitter.adapt_dataset_feature_window(
+                session["session_id"],
+                dataset_manifest=incomplete_manifest,
+                window_feature_summaries={
+                    "eeg": {"alpha_power": 0.41},
+                    "ecg": {"heart_rate_bpm": 73.0},
+                },
+                context_label="missing-manifest-ref",
+            )
+
     def test_builds_multi_day_calibration_profile_without_raw_payloads(self) -> None:
         transmitter = BioDataTransmitter()
         session = transmitter.open_session("identity-bdt-calibration")

@@ -1066,6 +1066,11 @@ ECG/PPG/respiration/EEG/affect/thought proxy を生成する。
 同じ demo は literature refs、source feature digest、latent digest、generated bundle digest、
 `mind-upload.com` conflict sink binding、raw source payload / raw generated waveform 非保持、
 semantic thought content 非生成、subjective equivalence 非主張をまとめて検証する。
+feature input は `biodata-dataset-feature-window-adapter-v1` により、dataset ref、
+participant ref、license ref、window ref、modality file refs の manifest digest と
+feature-window digest、body-state latent ref / digest へ先に束縛される。
+adapter receipt は full EEG/ECG/PPG/EDA/respiration coverage を検証し、
+raw dataset payload、raw signal samples、raw feature-window payload は保存しない。
 さらに 2 日分の body-state latent を
 `multi-day-personal-biodata-calibration-v1` calibration profile に束ね、
 source latent digest set、calibration day refs、axis baseline mean、

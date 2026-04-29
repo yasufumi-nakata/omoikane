@@ -1,0 +1,139 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_dataset_adapter_receipt.schema"
+title: BioDataDatasetAdapterReceipt
+description: >
+  Digest-only receipt that binds one external EEG/ECG/PPG/EDA/respiration
+  dataset feature window to a BioData body-state latent without storing raw
+  dataset payloads, signal samples, or feature-window payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - adapter_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - dataset_ref
+  - participant_ref
+  - license_ref
+  - window_ref
+  - dataset_manifest_digest
+  - source_feature_digest
+  - source_modalities_observed
+  - source_modalities_required
+  - required_modalities_bound
+  - latent_ref
+  - latent_digest
+  - latent_profile_id
+  - feature_window_policy
+  - storage_policy
+  - literature_refs
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_dataset_payload_stored
+  - raw_signal_samples_stored
+  - raw_feature_window_payload_stored
+  - raw_source_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - adapter_receipt_digest
+properties:
+  schema_version:
+    const: "1.0"
+  adapter_ref:
+    type: string
+    pattern: "^dataset-adapter://biodata/bdt-dataset-adapter-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-dataset-feature-window-adapter-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  dataset_ref:
+    type: string
+    minLength: 1
+  participant_ref:
+    type: string
+    minLength: 1
+  license_ref:
+    type: string
+    minLength: 1
+  window_ref:
+    type: string
+    minLength: 1
+  dataset_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_feature_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_modalities_observed:
+    type: array
+    minItems: 1
+    maxItems: 5
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_modality"
+  source_modalities_required:
+    type: array
+    minItems: 5
+    maxItems: 5
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_modality"
+  required_modalities_bound:
+    type: boolean
+  latent_ref:
+    type: string
+    pattern: "^latent://body-state/body-latent-[a-f0-9]{12}$"
+  latent_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  latent_profile_id:
+    const: physiology-latent-body-state-v0
+  feature_window_policy:
+    const: dataset-window-feature-summary-digest-only-v1
+  storage_policy:
+    const: dataset-manifest-digest+feature-window-digest+latent-ref-only
+  literature_refs:
+    type: array
+    minItems: 5
+    items:
+      type: object
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/biosignal-transmitter
+  raw_dataset_payload_stored:
+    const: false
+  raw_signal_samples_stored:
+    const: false
+  raw_feature_window_payload_stored:
+    const: false
+  raw_source_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  adapter_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+$defs:
+  source_modality:
+    type: string
+    enum:
+      - eeg
+      - ecg
+      - ppg
+      - eda
+      - respiration

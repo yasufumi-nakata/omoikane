@@ -75,6 +75,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["literature_backed_intermediate"])
         self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
         self.assertTrue(result["validation"]["target_modalities_generated"])
+        self.assertTrue(result["validation"]["dataset_adapter_ok"])
+        self.assertTrue(result["validation"]["dataset_manifest_digest_bound"])
+        self.assertTrue(result["validation"]["dataset_adapter_source_feature_digest_bound"])
+        self.assertTrue(result["validation"]["dataset_adapter_latent_digest_bound"])
+        self.assertTrue(result["validation"]["dataset_adapter_required_modalities_bound"])
+        self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])
+        self.assertFalse(result["validation"]["raw_dataset_payload_stored"])
+        self.assertFalse(result["validation"]["raw_signal_samples_stored"])
+        self.assertFalse(result["validation"]["raw_feature_window_payload_stored"])
         self.assertFalse(result["validation"]["semantic_thought_content_generated"])
         self.assertFalse(result["validation"]["subjective_equivalence_claimed"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
@@ -102,6 +111,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             3,
             result["ledger_verification"]["category_counts"]["interface-biodata-transmitter"],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-dataset-adapter"
+            ],
         )
         self.assertEqual(
             1,

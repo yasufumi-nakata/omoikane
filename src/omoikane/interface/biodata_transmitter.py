@@ -13,6 +13,7 @@ BDT_LATENT_PROFILE_ID = "physiology-latent-body-state-v0"
 BDT_GENERATOR_PROFILE_ID = "bounded-cross-modal-biosignal-generator-v0"
 BDT_CALIBRATION_PROFILE_ID = "multi-day-personal-biodata-calibration-v1"
 BDT_CONFIDENCE_GATE_PROFILE_ID = "biodata-calibration-confidence-gate-v1"
+BDT_DATASET_ADAPTER_PROFILE_ID = "biodata-dataset-feature-window-adapter-v1"
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
 DEFAULT_SOURCE_MODALITIES = ("eeg", "ecg", "ppg", "eda", "respiration")
 DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "affect", "thought")
@@ -88,6 +89,7 @@ class BioDataTransmitter:
             "generator_profile_id": BDT_GENERATOR_PROFILE_ID,
             "calibration_profile_id": BDT_CALIBRATION_PROFILE_ID,
             "confidence_gate_profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
+            "dataset_adapter_profile_id": BDT_DATASET_ADAPTER_PROFILE_ID,
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
             "confidence_gate_target_thresholds": dict(CONFIDENCE_GATE_TARGET_THRESHOLDS),
@@ -134,6 +136,169 @@ class BioDataTransmitter:
         }
         self.sessions[session_id] = session
         return deepcopy(session)
+
+    def adapt_dataset_feature_window(
+        self,
+        session_id: str,
+        dataset_manifest: Dict[str, Any],
+        window_feature_summaries: Dict[str, Dict[str, Any]],
+        context_label: str,
+    ) -> Dict[str, Any]:
+        session = self._require_session(session_id)
+        self._require_non_empty_string(context_label, "context_label")
+        manifest = self._normalize_dataset_manifest(dataset_manifest)
+        features = self._normalize_biosignal_features(window_feature_summaries)
+        observed_modalities = [modality for modality in session["source_modalities"] if modality in features]
+        if not observed_modalities:
+            raise ValueError("at least one source modality must be present in window_feature_summaries")
+        missing_manifest_modalities = [
+            modality for modality in observed_modalities if modality not in manifest["modality_file_refs"]
+        ]
+        if missing_manifest_modalities:
+            raise ValueError(
+                "dataset_manifest.modality_file_refs must cover observed modalities: "
+                f"{missing_manifest_modalities}"
+            )
+
+        latent_state = self.encode_body_state(
+            session_id,
+            biosignal_features=features,
+            context_label=context_label,
+        )
+        required_modalities_bound = sorted(observed_modalities) == sorted(DEFAULT_SOURCE_MODALITIES)
+        adapter_receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "adapter_ref": f"dataset-adapter://biodata/{new_id('bdt-dataset-adapter')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_DATASET_ADAPTER_PROFILE_ID,
+            "session_id": session_id,
+            "identity_id": session["identity_id"],
+            "dataset_ref": manifest["dataset_ref"],
+            "participant_ref": manifest["participant_ref"],
+            "license_ref": manifest["license_ref"],
+            "window_ref": manifest["window_ref"],
+            "dataset_manifest_digest": sha256_text(canonical_json(manifest)),
+            "source_feature_digest": latent_state["source_feature_digest"],
+            "source_modalities_observed": observed_modalities,
+            "source_modalities_required": list(DEFAULT_SOURCE_MODALITIES),
+            "required_modalities_bound": required_modalities_bound,
+            "latent_ref": latent_state["latent_ref"],
+            "latent_digest": latent_state["latent_digest"],
+            "latent_profile_id": latent_state["profile_id"],
+            "feature_window_policy": "dataset-window-feature-summary-digest-only-v1",
+            "storage_policy": "dataset-manifest-digest+feature-window-digest+latent-ref-only",
+            "literature_refs": deepcopy(session["literature_refs"]),
+            "conflict_refs": deepcopy(session["conflict_refs"]),
+            "mind_upload_conflict_sink_url": session["mind_upload_conflict_sink_url"],
+            "raw_dataset_payload_stored": False,
+            "raw_signal_samples_stored": False,
+            "raw_feature_window_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        adapter_receipt["adapter_receipt_digest"] = sha256_text(
+            canonical_json(self._dataset_adapter_digest_payload(adapter_receipt))
+        )
+        return {
+            "adapter_receipt": deepcopy(adapter_receipt),
+            "latent_state": deepcopy(latent_state),
+        }
+
+    def validate_dataset_adapter_receipt(
+        self,
+        session: Dict[str, Any],
+        dataset_manifest: Dict[str, Any],
+        latent_state: Dict[str, Any],
+        adapter_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        manifest: Dict[str, Any] = {}
+        try:
+            manifest = self._normalize_dataset_manifest(dataset_manifest)
+        except ValueError as exc:
+            errors.append(str(exc))
+        self._check_non_empty_string(adapter_receipt.get("adapter_ref"), "adapter_receipt.adapter_ref", errors)
+        if adapter_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("adapter_receipt.schema_version mismatch")
+        if adapter_receipt.get("profile_id") != BDT_DATASET_ADAPTER_PROFILE_ID:
+            errors.append("adapter_receipt.profile_id mismatch")
+        if adapter_receipt.get("session_id") != session.get("session_id"):
+            errors.append("adapter_receipt.session_id must match session.session_id")
+        if adapter_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("adapter_receipt.identity_id must match session.identity_id")
+        if latent_state.get("session_id") != session.get("session_id"):
+            errors.append("latent_state.session_id must match session.session_id")
+        if latent_state.get("identity_id") != session.get("identity_id"):
+            errors.append("latent_state.identity_id must match session.identity_id")
+        if adapter_receipt.get("latent_ref") != latent_state.get("latent_ref"):
+            errors.append("adapter_receipt.latent_ref must match latent_state.latent_ref")
+        if adapter_receipt.get("latent_digest") != latent_state.get("latent_digest"):
+            errors.append("adapter_receipt.latent_digest must match latent_state.latent_digest")
+        if adapter_receipt.get("source_feature_digest") != latent_state.get("source_feature_digest"):
+            errors.append("adapter_receipt.source_feature_digest must match latent_state.source_feature_digest")
+
+        expected_manifest_digest = sha256_text(canonical_json(manifest)) if manifest else ""
+        manifest_digest_bound = (
+            bool(expected_manifest_digest)
+            and adapter_receipt.get("dataset_manifest_digest") == expected_manifest_digest
+        )
+        if not manifest_digest_bound:
+            errors.append("adapter_receipt.dataset_manifest_digest mismatch")
+
+        required_modalities_bound = (
+            adapter_receipt.get("source_modalities_required") == list(DEFAULT_SOURCE_MODALITIES)
+            and sorted(adapter_receipt.get("source_modalities_observed", []))
+            == sorted(DEFAULT_SOURCE_MODALITIES)
+            and adapter_receipt.get("required_modalities_bound") is True
+        )
+        if not required_modalities_bound:
+            errors.append("adapter_receipt must bind all required source modalities")
+        expected_adapter_digest = sha256_text(
+            canonical_json(self._dataset_adapter_digest_payload(adapter_receipt))
+        )
+        adapter_receipt_digest_bound = (
+            adapter_receipt.get("adapter_receipt_digest") == expected_adapter_digest
+        )
+        if not adapter_receipt_digest_bound:
+            errors.append("adapter_receipt.adapter_receipt_digest mismatch")
+        for field_name in (
+            "raw_dataset_payload_stored",
+            "raw_signal_samples_stored",
+            "raw_feature_window_payload_stored",
+            "raw_source_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if adapter_receipt.get(field_name) is not False:
+                errors.append(f"adapter_receipt.{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": adapter_receipt.get("profile_id"),
+            "person_bound": session.get("identity_id") == adapter_receipt.get("identity_id") == latent_state.get("identity_id"),
+            "dataset_manifest_digest_bound": manifest_digest_bound,
+            "source_feature_digest_bound": (
+                adapter_receipt.get("source_feature_digest") == latent_state.get("source_feature_digest")
+            ),
+            "latent_digest_bound": (
+                adapter_receipt.get("latent_digest") == latent_state.get("latent_digest")
+            ),
+            "required_modalities_bound": required_modalities_bound,
+            "adapter_receipt_digest_bound": adapter_receipt_digest_bound,
+            "feature_window_policy_bound": (
+                adapter_receipt.get("feature_window_policy")
+                == "dataset-window-feature-summary-digest-only-v1"
+            ),
+            "raw_dataset_payload_stored": False,
+            "raw_signal_samples_stored": False,
+            "raw_feature_window_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
 
     def encode_body_state(
         self,
@@ -904,6 +1069,27 @@ class BioDataTransmitter:
             normalized[modality_key] = normalized_features
         return normalized
 
+    def _normalize_dataset_manifest(self, dataset_manifest: Dict[str, Any]) -> Dict[str, Any]:
+        if not isinstance(dataset_manifest, dict):
+            raise ValueError("dataset_manifest must be a mapping")
+        normalized: Dict[str, Any] = {}
+        for field_name in ("dataset_ref", "participant_ref", "license_ref", "window_ref"):
+            value = dataset_manifest.get(field_name)
+            self._require_non_empty_string(value, f"dataset_manifest.{field_name}")
+            normalized[field_name] = str(value).strip()
+        modality_file_refs = dataset_manifest.get("modality_file_refs")
+        if not isinstance(modality_file_refs, dict) or not modality_file_refs:
+            raise ValueError("dataset_manifest.modality_file_refs must be a non-empty mapping")
+        normalized_refs: Dict[str, str] = {}
+        for modality, file_ref in modality_file_refs.items():
+            modality_key = str(modality).strip().lower()
+            if modality_key not in DEFAULT_SOURCE_MODALITIES:
+                raise ValueError(f"unsupported dataset modality: {modality_key}")
+            self._require_non_empty_string(file_ref, f"dataset_manifest.modality_file_refs.{modality_key}")
+            normalized_refs[modality_key] = str(file_ref).strip()
+        normalized["modality_file_refs"] = normalized_refs
+        return normalized
+
     @staticmethod
     def _coalesce_number(*values: Any, default: float) -> float:
         for value in values:
@@ -938,6 +1124,12 @@ class BioDataTransmitter:
         return payload
 
     @staticmethod
+    def _dataset_adapter_digest_payload(adapter_receipt: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(adapter_receipt)
+        payload.pop("adapter_receipt_digest", None)
+        return payload
+
+    @staticmethod
     def _bounded_score(value: Any, field_name: str) -> float:
         if not isinstance(value, (int, float)) or isinstance(value, bool):
             raise ValueError(f"{field_name} must be a number between 0.0 and 1.0")
@@ -954,6 +1146,16 @@ class BioDataTransmitter:
             raise ValueError("session.session_id must be a non-empty string")
         if not isinstance(session.get("identity_id"), str) or not session["identity_id"].strip():
             raise ValueError("session.identity_id must be a non-empty string")
+
+    @staticmethod
+    def _check_session_mapping_for_errors(session: Dict[str, Any], errors: List[str]) -> None:
+        if not isinstance(session, dict):
+            errors.append("session must be a mapping")
+            return
+        if not isinstance(session.get("session_id"), str) or not session["session_id"].strip():
+            errors.append("session.session_id must be a non-empty string")
+        if not isinstance(session.get("identity_id"), str) or not session["identity_id"].strip():
+            errors.append("session.identity_id must be a non-empty string")
 
     @staticmethod
     def _normalize_confidence_gate_refs(target_gate_refs: Dict[str, str]) -> Dict[str, str]:

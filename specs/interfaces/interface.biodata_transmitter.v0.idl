@@ -12,6 +12,7 @@ imports:
   biodata_signal_bundle: ../schemas/biodata_signal_bundle.schema
   biodata_calibration_profile: ../schemas/biodata_calibration_profile.schema
   biodata_calibration_confidence_gate: ../schemas/biodata_calibration_confidence_gate.schema
+  biodata_dataset_adapter_receipt: ../schemas/biodata_dataset_adapter_receipt.schema
 operations:
   open_session:
     summary: Open one transmitter session for a single identity and explicit modality set.
@@ -46,6 +47,66 @@ operations:
       - session must remain person-bound to one identity_id
       - unresolved equivalence and thought-content claims must point to mind-upload.com conflict refs
       - raw source payload and raw generated waveform storage must be false
+  adapt_dataset_feature_window:
+    summary: Bind one external dataset feature window to a body-state latent without storing raw samples.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session_id
+          - dataset_manifest
+          - window_feature_summaries
+          - context_label
+        properties:
+          session_id:
+            type: string
+            minLength: 8
+          dataset_manifest:
+            type: object
+            required:
+              - dataset_ref
+              - participant_ref
+              - license_ref
+              - window_ref
+              - modality_file_refs
+            properties:
+              dataset_ref:
+                type: string
+                minLength: 1
+              participant_ref:
+                type: string
+                minLength: 1
+              license_ref:
+                type: string
+                minLength: 1
+              window_ref:
+                type: string
+                minLength: 1
+              modality_file_refs:
+                type: object
+                minProperties: 1
+          window_feature_summaries:
+            type: object
+            minProperties: 1
+          context_label:
+            type: string
+            minLength: 1
+    output:
+      inline_schema:
+        type: object
+        required:
+          - adapter_receipt
+          - latent_state
+        properties:
+          adapter_receipt:
+            schema_ref: biodata_dataset_adapter_receipt
+          latent_state:
+            schema_ref: biodata_body_state_latent
+    guarantees:
+      - dataset_manifest_digest must bind the dataset ref, participant ref, license ref, window ref, and modality file refs
+      - source_feature_digest and latent_digest must match the generated body-state latent
+      - full confidence-gate readiness requires eeg, ecg, ppg, eda, and respiration feature-window coverage
+      - raw dataset payload, raw signal samples, and raw feature-window payload storage must remain false
   encode_body_state:
     summary: Convert source biosignal features into a digest-bound internal body-state latent.
     input:
@@ -288,7 +349,62 @@ operations:
             type: boolean
           raw_gate_payload_stored:
             const: false
+  validate_dataset_adapter_receipt:
+    summary: Verify dataset manifest digest binding, latent binding, modality coverage, and raw-payload redaction.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - dataset_manifest
+          - latent_state
+          - adapter_receipt
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          dataset_manifest:
+            type: object
+            minProperties: 1
+          latent_state:
+            schema_ref: biodata_body_state_latent
+          adapter_receipt:
+            schema_ref: biodata_dataset_adapter_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - dataset_manifest_digest_bound
+          - source_feature_digest_bound
+          - latent_digest_bound
+          - required_modalities_bound
+          - adapter_receipt_digest_bound
+          - raw_dataset_payload_stored
+          - raw_signal_samples_stored
+          - raw_feature_window_payload_stored
+        properties:
+          ok:
+            type: boolean
+          dataset_manifest_digest_bound:
+            type: boolean
+          source_feature_digest_bound:
+            type: boolean
+          latent_digest_bound:
+            type: boolean
+          required_modalities_bound:
+            type: boolean
+          adapter_receipt_digest_bound:
+            type: boolean
+          raw_dataset_payload_stored:
+            const: false
+          raw_signal_samples_stored:
+            const: false
+          raw_feature_window_payload_stored:
+            const: false
 events:
+  biodata_transmitter.dataset_feature_window_adapted:
+    payload:
+      schema_ref: biodata_dataset_adapter_receipt
   biodata_transmitter.body_state_encoded:
     payload:
       schema_ref: biodata_body_state_latent
@@ -309,3 +425,4 @@ compatibility:
     - Conflicting or under-evidenced claims are routed to mind-upload.com refs rather than treated as settled runtime facts.
     - Multi-day calibration profiles improve person-specific baselines but still do not claim subjective equivalence or semantic thought recovery.
     - Calibration confidence gates may raise confidence for identity confirmation and sensory loopback only through digest-bound calibration receipts; they do not expose raw biosignal or gate payloads.
+    - Dataset feature-window adapters make external EEG/ECG/PPG/EDA/respiration corpora ingestible only as manifest digests, feature-window digests, and latent refs; raw samples are out of scope.

@@ -2199,6 +2199,16 @@ entries:
     rationale: Required to serialize the internal body-state intermediate representation between source and target biosignals.
   - priority: P1
     kind: schema
+    file: specs/schemas/biodata_dataset_adapter_receipt.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind external EEG/ECG/PPG/EDA/respiration dataset feature windows to BioData body-state latents with manifest digest, feature-window digest, latent digest, full modality coverage, and raw sample redaction.
+  - priority: P1
+    kind: schema
     file: specs/schemas/biodata_signal_bundle.schema
     consumers:
       - specs/interfaces/interface.biodata_transmitter.v0.idl
@@ -2233,14 +2243,14 @@ entries:
       - docs/02-subsystems/interface/biodata-transmitter.md
       - docs/05-research-frontiers/biosignal-transmitter.md
       - reference-runtime
-    rationale: Required to make the biosignal to body-state latent to biosignal transmitter machine-readable.
+    rationale: Required to make the dataset feature-window to body-state latent to biosignal transmitter machine-readable.
   - priority: P1
     kind: eval
     file: evals/interface/biodata_transmitter_roundtrip.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects literature-backed intermediate, target signal generation, mind-upload.com conflict sink binding, and raw payload redaction.
+    rationale: Protects dataset adapter digest binding, literature-backed intermediate, target signal generation, mind-upload.com conflict sink binding, and raw payload redaction.
   - priority: P1
     kind: schema
     file: specs/schemas/bdb_session.schema

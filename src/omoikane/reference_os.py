@@ -7699,9 +7699,23 @@ json.dump(response, sys.stdout)
             source_modalities=["eeg", "ecg", "ppg", "eda", "respiration"],
             target_modalities=["ecg", "ppg", "respiration", "eeg", "affect", "thought"],
         )
-        latent_state = self.biodata_transmitter.encode_body_state(
+        dataset_manifest = {
+            "dataset_ref": "dataset://physionet-compatible/demo-biodata-window",
+            "participant_ref": "participant://biodata-transmitter-demo/identity-1",
+            "license_ref": "license://open-physiology-demo/redacted-feature-window",
+            "window_ref": "window://biodata-transmitter-demo/day-1/quiet-review",
+            "modality_file_refs": {
+                "eeg": "dataset-file://demo-biodata/eeg-window-summary",
+                "ecg": "dataset-file://demo-biodata/ecg-window-summary",
+                "ppg": "dataset-file://demo-biodata/ppg-window-summary",
+                "eda": "dataset-file://demo-biodata/eda-window-summary",
+                "respiration": "dataset-file://demo-biodata/resp-window-summary",
+            },
+        }
+        adapted_window = self.biodata_transmitter.adapt_dataset_feature_window(
             session["session_id"],
-            biosignal_features={
+            dataset_manifest=dataset_manifest,
+            window_feature_summaries={
                 "eeg": {
                     "alpha_power": 0.38,
                     "theta_power": 0.29,
@@ -7725,6 +7739,8 @@ json.dump(response, sys.stdout)
             },
             context_label="quiet-review-with-attention-shift",
         )
+        dataset_adapter_receipt = adapted_window["adapter_receipt"]
+        latent_state = adapted_window["latent_state"]
         day_two_latent_state = self.biodata_transmitter.encode_body_state(
             session["session_id"],
             biosignal_features={
@@ -7790,12 +7806,44 @@ json.dump(response, sys.stdout)
                 calibration_confidence_gate,
             )
         )
+        dataset_adapter_validation = self.biodata_transmitter.validate_dataset_adapter_receipt(
+            session,
+            dataset_manifest,
+            latent_state,
+            dataset_adapter_receipt,
+        )
         validation = dict(transmission_validation)
         validation["ok"] = (
             transmission_validation["ok"]
             and calibration_validation["ok"]
             and confidence_gate_validation["ok"]
+            and dataset_adapter_validation["ok"]
         )
+        validation["dataset_adapter_ok"] = dataset_adapter_validation["ok"]
+        validation["dataset_manifest_digest_bound"] = dataset_adapter_validation[
+            "dataset_manifest_digest_bound"
+        ]
+        validation["dataset_adapter_source_feature_digest_bound"] = (
+            dataset_adapter_validation["source_feature_digest_bound"]
+        )
+        validation["dataset_adapter_latent_digest_bound"] = dataset_adapter_validation[
+            "latent_digest_bound"
+        ]
+        validation["dataset_adapter_required_modalities_bound"] = (
+            dataset_adapter_validation["required_modalities_bound"]
+        )
+        validation["dataset_adapter_receipt_digest_bound"] = (
+            dataset_adapter_validation["adapter_receipt_digest_bound"]
+        )
+        validation["raw_dataset_payload_stored"] = dataset_adapter_validation[
+            "raw_dataset_payload_stored"
+        ]
+        validation["raw_signal_samples_stored"] = dataset_adapter_validation[
+            "raw_signal_samples_stored"
+        ]
+        validation["raw_feature_window_payload_stored"] = dataset_adapter_validation[
+            "raw_feature_window_payload_stored"
+        ]
         validation["calibration_profile_ok"] = calibration_validation["ok"]
         validation["multi_day_calibration_bound"] = calibration_validation[
             "multi_day_calibration_bound"
@@ -7858,6 +7906,38 @@ json.dump(response, sys.stdout)
             category="interface-biodata-transmitter",
             layer="L6",
             signature_roles=["self"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.dataset_feature_window_adapted",
+            payload={
+                "adapter_ref": dataset_adapter_receipt["adapter_ref"],
+                "adapter_receipt_digest": dataset_adapter_receipt[
+                    "adapter_receipt_digest"
+                ],
+                "dataset_manifest_digest": dataset_adapter_receipt[
+                    "dataset_manifest_digest"
+                ],
+                "source_feature_digest": dataset_adapter_receipt["source_feature_digest"],
+                "latent_digest": dataset_adapter_receipt["latent_digest"],
+                "required_modalities_bound": dataset_adapter_receipt[
+                    "required_modalities_bound"
+                ],
+                "raw_dataset_payload_stored": dataset_adapter_receipt[
+                    "raw_dataset_payload_stored"
+                ],
+                "raw_signal_samples_stored": dataset_adapter_receipt[
+                    "raw_signal_samples_stored"
+                ],
+                "raw_feature_window_payload_stored": dataset_adapter_receipt[
+                    "raw_feature_window_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-dataset-adapter",
+            layer="L6",
+            signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
         self.ledger.append(
@@ -7971,6 +8051,8 @@ json.dump(response, sys.stdout)
             },
             "profile": self.biodata_transmitter.reference_profile(),
             "session": session,
+            "dataset_manifest": dataset_manifest,
+            "dataset_adapter_receipt": dataset_adapter_receipt,
             "latent_state": latent_state,
             "calibration_latent_states": [latent_state, day_two_latent_state],
             "calibration_profile": calibration_profile,
