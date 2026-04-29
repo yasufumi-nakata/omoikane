@@ -17,6 +17,9 @@ BDT_DATASET_ADAPTER_PROFILE_ID = "biodata-dataset-feature-window-adapter-v1"
 BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID = "biodata-circadian-phase-verifier-v1"
 BDT_FEATURE_WINDOW_SERIES_PROFILE_ID = "biodata-feature-window-series-profile-v1"
 BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID = "biodata-feature-window-series-drift-gate-v1"
+BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID = (
+    "biodata-drift-threshold-policy-authority-v1"
+)
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
 DEFAULT_SOURCE_MODALITIES = ("eeg", "ecg", "ppg", "eda", "respiration")
 DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "affect", "thought")
@@ -34,6 +37,11 @@ FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS = {
     "interoceptive_confidence": 0.05,
 }
 CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES = ("external-clock", "sleep-diary", "wearable")
+DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES = (
+    "clinical-reviewer",
+    "jurisdiction-policy",
+    "guardian",
+)
 REQUIRED_LITERATURE_REFS = (
     {
         "ref_id": "physionet-2000",
@@ -106,6 +114,9 @@ class BioDataTransmitter:
             "feature_window_series_profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
             "feature_window_series_drift_gate_profile_id": (
                 BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID
+            ),
+            "drift_threshold_policy_authority_profile_id": (
+                BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID
             ),
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
@@ -828,12 +839,194 @@ class BioDataTransmitter:
             "semantic_thought_content_generated": False,
         }
 
+    def bind_drift_threshold_policy_authority(
+        self,
+        session: Dict[str, Any],
+        policy_sources: Sequence[Dict[str, Any]],
+        axis_thresholds: Dict[str, float] | None = None,
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        thresholds = self._normalize_series_drift_thresholds(axis_thresholds)
+        axis_threshold_digest = self._drift_threshold_policy_axis_digest(thresholds)
+        sources = self._normalize_drift_threshold_policy_sources(
+            policy_sources,
+            axis_threshold_digest,
+        )
+        source_digests = [source["authority_source_digest"] for source in sources]
+        source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID,
+                    "authority_source_digests": source_digests,
+                }
+            )
+        )
+        receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "authority_ref": f"drift-threshold-authority://biodata/{new_id('bdt-threshold-authority')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "axis_threshold_policy": "feature-window-series-drift-thresholds-v1",
+            "axis_thresholds": thresholds,
+            "axis_threshold_digest": axis_threshold_digest,
+            "required_authority_roles": list(DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES),
+            "authority_source_roles": [source["authority_role"] for source in sources],
+            "authority_sources": sources,
+            "authority_source_digest_set": source_digest_set,
+            "authority_quorum_status": "complete",
+            "threshold_policy_signature_bound": True,
+            "threshold_policy_authority_bound": True,
+            "storage_policy": "threshold-policy-ref+authority-source-digest-only",
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
+            "raw_authority_payload_stored": False,
+            "raw_reviewer_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        receipt["authority_receipt_digest"] = sha256_text(
+            canonical_json(self._drift_threshold_policy_authority_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_drift_threshold_policy_authority(
+        self,
+        session: Dict[str, Any],
+        axis_thresholds: Dict[str, float] | None,
+        authority_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        thresholds: Dict[str, float] = {}
+        try:
+            thresholds = self._normalize_series_drift_thresholds(axis_thresholds)
+        except ValueError as exc:
+            errors.append(str(exc))
+        if not isinstance(authority_receipt, dict):
+            errors.append("authority_receipt must be a mapping")
+            authority_receipt = {}
+        self._check_non_empty_string(
+            authority_receipt.get("authority_ref"),
+            "authority_receipt.authority_ref",
+            errors,
+        )
+        if authority_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("authority_receipt.schema_version mismatch")
+        if authority_receipt.get("profile_id") != BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID:
+            errors.append("authority_receipt.profile_id mismatch")
+        if authority_receipt.get("session_id") != session.get("session_id"):
+            errors.append("authority_receipt.session_id must match session.session_id")
+        if authority_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("authority_receipt.identity_id must match session.identity_id")
+        if authority_receipt.get("axis_threshold_policy") != "feature-window-series-drift-thresholds-v1":
+            errors.append("authority_receipt.axis_threshold_policy mismatch")
+        if authority_receipt.get("axis_thresholds") != thresholds:
+            errors.append("authority_receipt.axis_thresholds must match requested thresholds")
+
+        expected_axis_threshold_digest = (
+            self._drift_threshold_policy_axis_digest(thresholds)
+            if thresholds
+            else ""
+        )
+        axis_threshold_digest_bound = (
+            bool(expected_axis_threshold_digest)
+            and authority_receipt.get("axis_threshold_digest") == expected_axis_threshold_digest
+        )
+        if not axis_threshold_digest_bound:
+            errors.append("authority_receipt.axis_threshold_digest mismatch")
+        sources = authority_receipt.get("authority_sources", [])
+        normalized_sources: List[Dict[str, Any]] = []
+        try:
+            normalized_sources = self._normalize_drift_threshold_policy_sources(
+                sources,
+                expected_axis_threshold_digest,
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        expected_source_digests = [
+            source["authority_source_digest"] for source in normalized_sources
+        ]
+        expected_source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID,
+                    "authority_source_digests": expected_source_digests,
+                }
+            )
+        )
+        authority_source_digest_set_bound = (
+            authority_receipt.get("authority_source_digest_set")
+            == expected_source_digest_set
+        )
+        if not authority_source_digest_set_bound:
+            errors.append("authority_receipt.authority_source_digest_set mismatch")
+        if authority_receipt.get("authority_sources") != normalized_sources:
+            errors.append("authority_receipt.authority_sources mismatch")
+        required_authority_roles_bound = (
+            authority_receipt.get("required_authority_roles")
+            == list(DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES)
+            and authority_receipt.get("authority_source_roles")
+            == list(DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES)
+        )
+        if not required_authority_roles_bound:
+            errors.append("authority_receipt must bind clinical, jurisdiction, and guardian roles")
+        if authority_receipt.get("authority_quorum_status") != "complete":
+            errors.append("authority_receipt.authority_quorum_status must be complete")
+        if authority_receipt.get("threshold_policy_signature_bound") is not True:
+            errors.append("authority_receipt.threshold_policy_signature_bound must be true")
+        if authority_receipt.get("threshold_policy_authority_bound") is not True:
+            errors.append("authority_receipt.threshold_policy_authority_bound must be true")
+        expected_receipt_digest = sha256_text(
+            canonical_json(self._drift_threshold_policy_authority_digest_payload(authority_receipt))
+        )
+        authority_receipt_digest_bound = (
+            authority_receipt.get("authority_receipt_digest") == expected_receipt_digest
+        )
+        if not authority_receipt_digest_bound:
+            errors.append("authority_receipt.authority_receipt_digest mismatch")
+        for field_name in (
+            "raw_threshold_policy_payload_stored",
+            "raw_threshold_policy_signature_payload_stored",
+            "raw_authority_payload_stored",
+            "raw_reviewer_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if authority_receipt.get(field_name) is not False:
+                errors.append(f"authority_receipt.{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": authority_receipt.get("profile_id"),
+            "axis_threshold_digest_bound": axis_threshold_digest_bound,
+            "authority_source_digest_set_bound": authority_source_digest_set_bound,
+            "required_authority_roles_bound": required_authority_roles_bound,
+            "authority_quorum_status": authority_receipt.get("authority_quorum_status"),
+            "authority_receipt_digest_bound": authority_receipt_digest_bound,
+            "threshold_policy_signature_bound": (
+                authority_receipt.get("threshold_policy_signature_bound") is True
+            ),
+            "threshold_policy_authority_bound": (
+                authority_receipt.get("threshold_policy_authority_bound") is True
+            ),
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
+            "raw_authority_payload_stored": False,
+            "raw_reviewer_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def bind_feature_window_series_drift_gate(
         self,
         session: Dict[str, Any],
         series_profile: Dict[str, Any],
         calibration_profile: Dict[str, Any],
         axis_thresholds: Dict[str, float] | None = None,
+        threshold_policy_authority_receipt: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         self._check_session_mapping(session)
         thresholds = self._normalize_series_drift_thresholds(axis_thresholds)
@@ -842,6 +1035,33 @@ class BioDataTransmitter:
             series_profile,
             calibration_profile,
         )
+        authority_ref = ""
+        authority_digest = ""
+        authority_source_digest_set = ""
+        authority_status = "not-bound"
+        authority_bound = False
+        if threshold_policy_authority_receipt is not None:
+            authority_validation = self.validate_drift_threshold_policy_authority(
+                session,
+                thresholds,
+                threshold_policy_authority_receipt,
+            )
+            if not authority_validation["ok"]:
+                raise ValueError(
+                    "threshold_policy_authority_receipt is invalid: "
+                    + "; ".join(authority_validation["errors"])
+                )
+            authority_ref = str(threshold_policy_authority_receipt["authority_ref"])
+            authority_digest = str(
+                threshold_policy_authority_receipt["authority_receipt_digest"]
+            )
+            authority_source_digest_set = str(
+                threshold_policy_authority_receipt["authority_source_digest_set"]
+            )
+            authority_status = str(
+                threshold_policy_authority_receipt["authority_quorum_status"]
+            )
+            authority_bound = True
         axis_drift_summary = series_profile["axis_drift_summary"]
         drift_checks = []
         for axis_name in sorted(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS):
@@ -865,6 +1085,7 @@ class BioDataTransmitter:
                     "calibration_digest": calibration_profile["calibration_digest"],
                     "axis_thresholds": thresholds,
                     "axis_drift_checks": drift_checks,
+                    "threshold_policy_authority_digest": authority_digest,
                 }
             )
         )
@@ -893,6 +1114,11 @@ class BioDataTransmitter:
             "axis_thresholds": thresholds,
             "axis_drift_checks": drift_checks,
             "drift_threshold_digest": drift_threshold_digest,
+            "threshold_policy_authority_ref": authority_ref,
+            "threshold_policy_authority_digest": authority_digest,
+            "threshold_policy_source_digest_set": authority_source_digest_set,
+            "threshold_policy_authority_status": authority_status,
+            "threshold_policy_authority_bound": authority_bound,
             "drift_gate_status": drift_gate_status,
             "series_profile_bound": True,
             "calibration_profile_bound": True,
@@ -900,6 +1126,8 @@ class BioDataTransmitter:
             "raw_series_payload_stored": False,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -914,6 +1142,7 @@ class BioDataTransmitter:
         series_profile: Dict[str, Any],
         calibration_profile: Dict[str, Any],
         drift_gate_receipt: Dict[str, Any],
+        threshold_policy_authority_receipt: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         self._check_session_mapping_for_errors(session, errors)
@@ -965,6 +1194,63 @@ class BioDataTransmitter:
         drift_checks_bound = drift_gate_receipt.get("axis_drift_checks") == expected_checks
         if not drift_checks_bound:
             errors.append("drift_gate_receipt.axis_drift_checks mismatch")
+        authority_bound = drift_gate_receipt.get("threshold_policy_authority_bound") is True
+        authority_digest_bound = False
+        authority_source_digest_set_bound = False
+        authority_status = str(
+            drift_gate_receipt.get("threshold_policy_authority_status", "not-bound")
+        )
+        if authority_bound:
+            if authority_status != "complete":
+                errors.append("drift_gate_receipt.threshold_policy_authority_status must be complete")
+            for field_name in (
+                "threshold_policy_authority_ref",
+                "threshold_policy_authority_digest",
+                "threshold_policy_source_digest_set",
+            ):
+                self._check_non_empty_string(
+                    drift_gate_receipt.get(field_name),
+                    f"drift_gate_receipt.{field_name}",
+                    errors,
+                )
+            if threshold_policy_authority_receipt is not None:
+                authority_validation = self.validate_drift_threshold_policy_authority(
+                    session,
+                    thresholds,
+                    threshold_policy_authority_receipt,
+                )
+                if not authority_validation["ok"]:
+                    errors.extend(
+                        f"threshold_policy_authority_receipt.{error}"
+                        for error in authority_validation["errors"]
+                    )
+                authority_digest_bound = (
+                    drift_gate_receipt.get("threshold_policy_authority_ref")
+                    == threshold_policy_authority_receipt.get("authority_ref")
+                    and drift_gate_receipt.get("threshold_policy_authority_digest")
+                    == threshold_policy_authority_receipt.get("authority_receipt_digest")
+                )
+                authority_source_digest_set_bound = (
+                    drift_gate_receipt.get("threshold_policy_source_digest_set")
+                    == threshold_policy_authority_receipt.get("authority_source_digest_set")
+                )
+            else:
+                authority_digest_bound = bool(
+                    drift_gate_receipt.get("threshold_policy_authority_digest")
+                )
+                authority_source_digest_set_bound = bool(
+                    drift_gate_receipt.get("threshold_policy_source_digest_set")
+                )
+        else:
+            if authority_status != "not-bound":
+                errors.append("unbound threshold policy authority must use not-bound status")
+            for field_name in (
+                "threshold_policy_authority_ref",
+                "threshold_policy_authority_digest",
+                "threshold_policy_source_digest_set",
+            ):
+                if drift_gate_receipt.get(field_name, "") != "":
+                    errors.append(f"drift_gate_receipt.{field_name} must be empty when unbound")
         expected_threshold_digest = sha256_text(
             canonical_json(
                 {
@@ -973,6 +1259,10 @@ class BioDataTransmitter:
                     "calibration_digest": calibration_profile.get("calibration_digest"),
                     "axis_thresholds": thresholds,
                     "axis_drift_checks": expected_checks,
+                    "threshold_policy_authority_digest": drift_gate_receipt.get(
+                        "threshold_policy_authority_digest",
+                        "",
+                    ),
                 }
             )
         )
@@ -1028,6 +1318,8 @@ class BioDataTransmitter:
             "raw_series_payload_stored",
             "raw_calibration_payload_stored",
             "raw_drift_payload_stored",
+            "raw_threshold_policy_payload_stored",
+            "raw_threshold_policy_signature_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
         ):
@@ -1045,10 +1337,16 @@ class BioDataTransmitter:
             "drift_checks_bound": drift_checks_bound,
             "drift_threshold_digest_bound": drift_threshold_digest_bound,
             "drift_gate_digest_bound": drift_gate_digest_bound,
+            "threshold_policy_authority_bound": authority_bound,
+            "threshold_policy_authority_digest_bound": authority_digest_bound,
+            "threshold_policy_source_digest_set_bound": authority_source_digest_set_bound,
+            "threshold_policy_authority_status": authority_status,
             "drift_thresholds_bound": drift_gate_receipt.get("drift_thresholds_bound") is True,
             "raw_series_payload_stored": False,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -1494,6 +1792,11 @@ class BioDataTransmitter:
         drift_gate_status = "not-bound"
         drift_gate_bound = False
         drift_gate_ready = True
+        threshold_policy_authority_ref = ""
+        threshold_policy_authority_digest = ""
+        threshold_policy_source_digest_set = ""
+        threshold_policy_authority_status = "not-bound"
+        threshold_policy_authority_bound = False
         if feature_window_series_drift_gate_receipt is not None:
             self._validate_drift_gate_receipt_for_confidence(
                 session,
@@ -1508,6 +1811,36 @@ class BioDataTransmitter:
             drift_gate_status = str(feature_window_series_drift_gate_receipt["drift_gate_status"])
             drift_gate_bound = True
             drift_gate_ready = drift_gate_status == "pass"
+            threshold_policy_authority_ref = str(
+                feature_window_series_drift_gate_receipt.get(
+                    "threshold_policy_authority_ref",
+                    "",
+                )
+            )
+            threshold_policy_authority_digest = str(
+                feature_window_series_drift_gate_receipt.get(
+                    "threshold_policy_authority_digest",
+                    "",
+                )
+            )
+            threshold_policy_source_digest_set = str(
+                feature_window_series_drift_gate_receipt.get(
+                    "threshold_policy_source_digest_set",
+                    "",
+                )
+            )
+            threshold_policy_authority_status = str(
+                feature_window_series_drift_gate_receipt.get(
+                    "threshold_policy_authority_status",
+                    "not-bound",
+                )
+            )
+            threshold_policy_authority_bound = (
+                feature_window_series_drift_gate_receipt.get(
+                    "threshold_policy_authority_bound"
+                )
+                is True
+            )
         common_gate_ready = (
             calibration_profile.get("profile_id") == BDT_CALIBRATION_PROFILE_ID
             and calibration_profile.get("calibration_complete") is True
@@ -1573,6 +1906,21 @@ class BioDataTransmitter:
             "feature_window_series_drift_threshold_digest": drift_threshold_digest,
             "feature_window_series_drift_gate_status": drift_gate_status,
             "feature_window_series_drift_gate_bound": drift_gate_bound,
+            "feature_window_series_threshold_policy_authority_ref": (
+                threshold_policy_authority_ref
+            ),
+            "feature_window_series_threshold_policy_authority_digest": (
+                threshold_policy_authority_digest
+            ),
+            "feature_window_series_threshold_policy_source_digest_set": (
+                threshold_policy_source_digest_set
+            ),
+            "feature_window_series_threshold_policy_authority_status": (
+                threshold_policy_authority_status
+            ),
+            "feature_window_series_threshold_policy_authority_bound": (
+                threshold_policy_authority_bound
+            ),
             "identity_confirmation_gate_bound": any(
                 binding["target_gate"] == "identity-confirmation"
                 and binding["status"] == "pass"
@@ -1585,6 +1933,8 @@ class BioDataTransmitter:
             ),
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
             "raw_gate_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
@@ -1654,6 +2004,43 @@ class BioDataTransmitter:
             )
         elif drift_gate_status != "not-bound":
             errors.append("unbound feature-window series drift gate must use not-bound status")
+        authority_bound = (
+            gate_receipt.get("feature_window_series_threshold_policy_authority_bound")
+            is True
+        )
+        authority_status = str(
+            gate_receipt.get(
+                "feature_window_series_threshold_policy_authority_status",
+                "not-bound",
+            )
+        )
+        if authority_bound:
+            if not drift_gate_bound:
+                errors.append("threshold policy authority requires a bound drift gate")
+            if authority_status != "complete":
+                errors.append(
+                    "gate_receipt.feature_window_series_threshold_policy_authority_status must be complete"
+                )
+            for field_name in (
+                "feature_window_series_threshold_policy_authority_ref",
+                "feature_window_series_threshold_policy_authority_digest",
+                "feature_window_series_threshold_policy_source_digest_set",
+            ):
+                self._check_non_empty_string(
+                    gate_receipt.get(field_name),
+                    f"gate_receipt.{field_name}",
+                    errors,
+                )
+        else:
+            if authority_status != "not-bound":
+                errors.append("unbound threshold policy authority must use not-bound status")
+            for field_name in (
+                "feature_window_series_threshold_policy_authority_ref",
+                "feature_window_series_threshold_policy_authority_digest",
+                "feature_window_series_threshold_policy_source_digest_set",
+            ):
+                if gate_receipt.get(field_name, "") != "":
+                    errors.append(f"gate_receipt.{field_name} must be empty when unbound")
 
         bindings = gate_receipt.get("target_gate_bindings", [])
         if not isinstance(bindings, list) or not bindings:
@@ -1736,6 +2123,8 @@ class BioDataTransmitter:
         for field_name in (
             "raw_calibration_payload_stored",
             "raw_drift_payload_stored",
+            "raw_threshold_policy_payload_stored",
+            "raw_threshold_policy_signature_payload_stored",
             "raw_gate_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
@@ -1755,10 +2144,14 @@ class BioDataTransmitter:
             "gate_receipt_digest_bound": gate_receipt_digest_bound,
             "feature_window_series_drift_gate_bound": drift_gate_bound,
             "feature_window_series_drift_gate_status": drift_gate_status,
+            "feature_window_series_threshold_policy_authority_bound": authority_bound,
+            "feature_window_series_threshold_policy_authority_status": authority_status,
             "identity_confirmation_gate_bound": identity_confirmation_gate_bound,
             "sensory_loopback_gate_bound": sensory_loopback_gate_bound,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
             "raw_gate_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
@@ -1972,6 +2365,24 @@ class BioDataTransmitter:
             raise ValueError("drift_gate_receipt.calibration_digest must match calibration_profile")
         if drift_gate_receipt.get("drift_gate_status") != "pass":
             raise ValueError("drift_gate_receipt.drift_gate_status must be pass")
+        authority_bound = drift_gate_receipt.get("threshold_policy_authority_bound") is True
+        authority_status = str(
+            drift_gate_receipt.get("threshold_policy_authority_status", "not-bound")
+        )
+        if authority_bound:
+            if authority_status != "complete":
+                raise ValueError("drift_gate_receipt.threshold_policy_authority_status must be complete")
+            for field_name in (
+                "threshold_policy_authority_ref",
+                "threshold_policy_authority_digest",
+                "threshold_policy_source_digest_set",
+            ):
+                self._require_non_empty_string(
+                    drift_gate_receipt.get(field_name),
+                    f"drift_gate_receipt.{field_name}",
+                )
+        elif authority_status != "not-bound":
+            raise ValueError("unbound threshold policy authority must use not-bound status")
         expected_gate_digest = sha256_text(
             canonical_json(self._series_drift_gate_digest_payload(drift_gate_receipt))
         )
@@ -1981,6 +2392,8 @@ class BioDataTransmitter:
             "raw_series_payload_stored",
             "raw_calibration_payload_stored",
             "raw_drift_payload_stored",
+            "raw_threshold_policy_payload_stored",
+            "raw_threshold_policy_signature_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
         ):
@@ -2107,6 +2520,63 @@ class BioDataTransmitter:
             for source_type in CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES
         ]
 
+    def _normalize_drift_threshold_policy_sources(
+        self,
+        policy_sources: Sequence[Dict[str, Any]],
+        axis_threshold_digest: str,
+    ) -> List[Dict[str, Any]]:
+        if not isinstance(policy_sources, (list, tuple)):
+            raise ValueError("policy_sources must be a sequence")
+        self._require_non_empty_string(axis_threshold_digest, "axis_threshold_digest")
+        sources_by_role: Dict[str, Dict[str, Any]] = {}
+        for source in policy_sources:
+            if not isinstance(source, dict):
+                raise ValueError("each threshold policy source must be a mapping")
+            authority_role = str(source.get("authority_role", "")).strip().lower()
+            if authority_role not in DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES:
+                raise ValueError(f"unsupported threshold policy authority role: {authority_role}")
+            if authority_role in sources_by_role:
+                raise ValueError(f"duplicate threshold policy authority role: {authority_role}")
+            normalized_source: Dict[str, Any] = {"authority_role": authority_role}
+            for field_name in (
+                "authority_ref",
+                "policy_ref",
+                "signer_key_ref",
+                "signature_ref",
+                "jurisdiction",
+            ):
+                value = source.get(field_name)
+                self._require_non_empty_string(
+                    value,
+                    f"policy_sources.{authority_role}.{field_name}",
+                )
+                normalized_source[field_name] = str(value).strip()
+            source_digest_payload = {
+                "profile_id": BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID,
+                "axis_threshold_digest": axis_threshold_digest,
+                "authority_role": normalized_source["authority_role"],
+                "authority_ref": normalized_source["authority_ref"],
+                "policy_ref": normalized_source["policy_ref"],
+                "signer_key_ref": normalized_source["signer_key_ref"],
+                "signature_ref": normalized_source["signature_ref"],
+                "jurisdiction": normalized_source["jurisdiction"],
+            }
+            normalized_source["authority_source_digest"] = sha256_text(
+                canonical_json(source_digest_payload)
+            )
+            sources_by_role[authority_role] = normalized_source
+        missing_roles = [
+            role
+            for role in DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES
+            if role not in sources_by_role
+        ]
+        if missing_roles:
+            raise ValueError(f"missing threshold policy authority roles: {missing_roles}")
+        return [
+            sources_by_role[role]
+            for role in DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES
+        ]
+
     @staticmethod
     def _normalize_series_drift_thresholds(
         axis_thresholds: Dict[str, float] | None,
@@ -2200,6 +2670,26 @@ class BioDataTransmitter:
         payload = dict(verifier_receipt)
         payload.pop("phase_verifier_digest", None)
         return payload
+
+    @staticmethod
+    def _drift_threshold_policy_authority_digest_payload(
+        authority_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        payload = dict(authority_receipt)
+        payload.pop("authority_receipt_digest", None)
+        return payload
+
+    @staticmethod
+    def _drift_threshold_policy_axis_digest(axis_thresholds: Dict[str, float]) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID,
+                    "axis_threshold_policy": "feature-window-series-drift-thresholds-v1",
+                    "axis_thresholds": axis_thresholds,
+                }
+            )
+        )
 
     @staticmethod
     def _dataset_adapter_digest_payload(adapter_receipt: Dict[str, Any]) -> Dict[str, Any]:

@@ -181,6 +181,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["feature_window_series_drift_gate_latent_set_bound"])
         self.assertTrue(result["validation"]["feature_window_series_drift_threshold_digest_bound"])
         self.assertTrue(result["validation"]["feature_window_series_drift_gate_digest_bound"])
+        self.assertTrue(result["validation"]["drift_threshold_policy_authority_ok"])
+        self.assertTrue(result["validation"]["drift_threshold_policy_axis_digest_bound"])
+        self.assertTrue(
+            result["validation"]["feature_window_series_drift_threshold_authority_bound"]
+        )
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
         self.assertTrue(result["validation"]["calibration_digest_bound"])
@@ -201,6 +206,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["circadian_phase_verifier"]["raw_verifier_payload_stored"])
         self.assertFalse(result["feature_window_series_profile"]["raw_series_payload_stored"])
         self.assertFalse(result["feature_window_series_profile"]["raw_phase_verifier_payload_stored"])
+        self.assertFalse(result["drift_threshold_policy_authority"]["raw_threshold_policy_payload_stored"])
+        self.assertFalse(
+            result["drift_threshold_policy_authority"][
+                "raw_threshold_policy_signature_payload_stored"
+            ]
+        )
         self.assertFalse(result["feature_window_series_drift_gate"]["raw_drift_payload_stored"])
         self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
         self.assertEqual(2, result["feature_window_series_profile"]["window_count"])

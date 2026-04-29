@@ -27,6 +27,8 @@
   - 複数 dataset adapter receipt を ordered longitudinal / circadian latent series に束縛し、adapter digest set、latent digest set、phase refs、circadian verifier digest、axis drift summary を raw series payload 無しで保持する
 - `biodata_feature_window_series_drift_gate.schema`
   - feature-window series の axis drift summary を calibration confidence gate へ渡す前に bounded threshold で検査し、series/calibration digest と raw drift payload 非保存を保持する
+- `biodata_drift_threshold_policy_authority_receipt.schema`
+  - feature-window drift threshold を clinical reviewer / jurisdiction policy / Guardian authority refs と signer/signature digest set に束縛し、raw threshold policy / signature payload を保存しない
 - `biodata_body_state_latent.schema`
 - `biodata_signal_bundle.schema`
 - `biodata_transmitter_session.schema`

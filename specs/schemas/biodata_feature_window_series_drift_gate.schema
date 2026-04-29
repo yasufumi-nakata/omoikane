@@ -25,6 +25,11 @@ required:
   - axis_thresholds
   - axis_drift_checks
   - drift_threshold_digest
+  - threshold_policy_authority_ref
+  - threshold_policy_authority_digest
+  - threshold_policy_source_digest_set
+  - threshold_policy_authority_status
+  - threshold_policy_authority_bound
   - drift_gate_status
   - series_profile_bound
   - calibration_profile_bound
@@ -32,6 +37,8 @@ required:
   - raw_series_payload_stored
   - raw_calibration_payload_stored
   - raw_drift_payload_stored
+  - raw_threshold_policy_payload_stored
+  - raw_threshold_policy_signature_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
   - drift_gate_digest
@@ -137,6 +144,26 @@ properties:
             - blocked
   drift_threshold_digest:
     $ref: "#/$defs/sha256"
+  threshold_policy_authority_ref:
+    anyOf:
+      - type: string
+        pattern: "^drift-threshold-authority://biodata/bdt-threshold-authority-[a-f0-9]{12}$"
+      - const: ""
+  threshold_policy_authority_digest:
+    anyOf:
+      - $ref: "#/$defs/sha256"
+      - const: ""
+  threshold_policy_source_digest_set:
+    anyOf:
+      - $ref: "#/$defs/sha256"
+      - const: ""
+  threshold_policy_authority_status:
+    type: string
+    enum:
+      - complete
+      - not-bound
+  threshold_policy_authority_bound:
+    type: boolean
   drift_gate_status:
     enum:
       - pass
@@ -152,6 +179,10 @@ properties:
   raw_calibration_payload_stored:
     const: false
   raw_drift_payload_stored:
+    const: false
+  raw_threshold_policy_payload_stored:
+    const: false
+  raw_threshold_policy_signature_payload_stored:
     const: false
   subjective_equivalence_claimed:
     const: false

@@ -30,10 +30,17 @@ required:
   - feature_window_series_drift_threshold_digest
   - feature_window_series_drift_gate_status
   - feature_window_series_drift_gate_bound
+  - feature_window_series_threshold_policy_authority_ref
+  - feature_window_series_threshold_policy_authority_digest
+  - feature_window_series_threshold_policy_source_digest_set
+  - feature_window_series_threshold_policy_authority_status
+  - feature_window_series_threshold_policy_authority_bound
   - identity_confirmation_gate_bound
   - sensory_loopback_gate_bound
   - raw_calibration_payload_stored
   - raw_drift_payload_stored
+  - raw_threshold_policy_payload_stored
+  - raw_threshold_policy_signature_payload_stored
   - raw_gate_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
@@ -195,6 +202,28 @@ properties:
       - not-bound
   feature_window_series_drift_gate_bound:
     type: boolean
+  feature_window_series_threshold_policy_authority_ref:
+    anyOf:
+      - type: string
+        pattern: "^drift-threshold-authority://biodata/bdt-threshold-authority-[a-f0-9]{12}$"
+      - const: ""
+  feature_window_series_threshold_policy_authority_digest:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  feature_window_series_threshold_policy_source_digest_set:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  feature_window_series_threshold_policy_authority_status:
+    type: string
+    enum:
+      - complete
+      - not-bound
+  feature_window_series_threshold_policy_authority_bound:
+    type: boolean
   identity_confirmation_gate_bound:
     type: boolean
   sensory_loopback_gate_bound:
@@ -202,6 +231,10 @@ properties:
   raw_calibration_payload_stored:
     const: false
   raw_drift_payload_stored:
+    const: false
+  raw_threshold_policy_payload_stored:
+    const: false
+  raw_threshold_policy_signature_payload_stored:
     const: false
   raw_gate_payload_stored:
     const: false

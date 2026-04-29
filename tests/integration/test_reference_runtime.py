@@ -89,10 +89,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["feature_window_series_required_modalities_bound"])
         self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
         self.assertTrue(result["validation"]["feature_window_series_axis_drift_summary_bound"])
+        self.assertTrue(result["validation"]["drift_threshold_policy_authority_ok"])
+        self.assertTrue(result["validation"]["drift_threshold_policy_axis_digest_bound"])
+        self.assertTrue(
+            result["validation"]["drift_threshold_policy_source_digest_set_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["feature_window_series_drift_threshold_authority_bound"]
+        )
         self.assertFalse(result["validation"]["raw_dataset_payload_stored"])
         self.assertFalse(result["validation"]["raw_signal_samples_stored"])
         self.assertFalse(result["validation"]["raw_feature_window_payload_stored"])
         self.assertFalse(result["validation"]["raw_series_payload_stored"])
+        self.assertFalse(result["validation"]["raw_threshold_policy_payload_stored"])
+        self.assertFalse(
+            result["validation"]["raw_threshold_policy_signature_payload_stored"]
+        )
         self.assertFalse(result["validation"]["semantic_thought_content_generated"])
         self.assertFalse(result["validation"]["subjective_equivalence_claimed"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
@@ -108,6 +120,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["calibration_confidence_gate_modalities_bound"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_target_set_digest_bound"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_receipt_digest_bound"])
+        self.assertTrue(
+            result["validation"]["calibration_confidence_gate_threshold_policy_authority_bound"]
+        )
         self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
         self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
         self.assertFalse(result["validation"]["raw_gate_payload_stored"])

@@ -1,0 +1,169 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_drift_threshold_policy_authority_receipt.schema"
+title: BioDataDriftThresholdPolicyAuthorityReceipt
+description: >
+  Digest-only receipt that binds BioData feature-window drift thresholds to
+  clinical reviewer, jurisdiction policy, and Guardian authority refs before a
+  drift gate consumes those thresholds.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - authority_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - axis_threshold_policy
+  - axis_thresholds
+  - axis_threshold_digest
+  - required_authority_roles
+  - authority_source_roles
+  - authority_sources
+  - authority_source_digest_set
+  - authority_quorum_status
+  - threshold_policy_signature_bound
+  - threshold_policy_authority_bound
+  - storage_policy
+  - raw_threshold_policy_payload_stored
+  - raw_threshold_policy_signature_payload_stored
+  - raw_authority_payload_stored
+  - raw_reviewer_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - authority_receipt_digest
+properties:
+  schema_version:
+    const: "1.0"
+  authority_ref:
+    type: string
+    pattern: "^drift-threshold-authority://biodata/bdt-threshold-authority-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-drift-threshold-policy-authority-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  axis_threshold_policy:
+    const: feature-window-series-drift-thresholds-v1
+  axis_thresholds:
+    $ref: "#/$defs/axis_thresholds"
+  axis_threshold_digest:
+    $ref: "#/$defs/sha256"
+  required_authority_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/authority_role"
+  authority_source_roles:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/authority_role"
+  authority_sources:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - authority_role
+        - authority_ref
+        - policy_ref
+        - signer_key_ref
+        - signature_ref
+        - jurisdiction
+        - authority_source_digest
+      properties:
+        authority_role:
+          $ref: "#/$defs/authority_role"
+        authority_ref:
+          type: string
+          minLength: 1
+        policy_ref:
+          type: string
+          minLength: 1
+        signer_key_ref:
+          type: string
+          minLength: 1
+        signature_ref:
+          type: string
+          minLength: 1
+        jurisdiction:
+          type: string
+          minLength: 1
+        authority_source_digest:
+          $ref: "#/$defs/sha256"
+  authority_source_digest_set:
+    $ref: "#/$defs/sha256"
+  authority_quorum_status:
+    const: complete
+  threshold_policy_signature_bound:
+    const: true
+  threshold_policy_authority_bound:
+    const: true
+  storage_policy:
+    const: threshold-policy-ref+authority-source-digest-only
+  raw_threshold_policy_payload_stored:
+    const: false
+  raw_threshold_policy_signature_payload_stored:
+    const: false
+  raw_authority_payload_stored:
+    const: false
+  raw_reviewer_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  authority_receipt_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  authority_role:
+    type: string
+    enum:
+      - clinical-reviewer
+      - jurisdiction-policy
+      - guardian
+  axis_thresholds:
+    type: object
+    additionalProperties: false
+    required:
+      - heart_rate_bpm
+      - autonomic_arousal
+      - cortical_load_proxy
+      - valence_proxy
+      - thought_pressure_proxy
+      - interoceptive_confidence
+    properties:
+      heart_rate_bpm:
+        type: number
+        minimum: 0
+      autonomic_arousal:
+        type: number
+        minimum: 0
+      cortical_load_proxy:
+        type: number
+        minimum: 0
+      valence_proxy:
+        type: number
+        minimum: 0
+      thought_pressure_proxy:
+        type: number
+        minimum: 0
+      interoceptive_confidence:
+        type: number
+        minimum: 0

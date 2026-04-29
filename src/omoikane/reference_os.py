@@ -7832,11 +7832,43 @@ json.dump(response, sys.stdout)
                 circadian_phase_verifier,
             )
         )
+        drift_threshold_policy_authority = (
+            self.biodata_transmitter.bind_drift_threshold_policy_authority(
+                session,
+                policy_sources=[
+                    {
+                        "authority_role": "clinical-reviewer",
+                        "authority_ref": "clinical-reviewer://biodata-transmitter-demo/threshold-review",
+                        "policy_ref": "threshold-policy://biodata-transmitter-demo/clinical-review-v1",
+                        "signer_key_ref": "signer-key://biodata-transmitter-demo/clinical-reviewer",
+                        "signature_ref": "signature://biodata-transmitter-demo/clinical-threshold-policy",
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "authority_role": "jurisdiction-policy",
+                        "authority_ref": "jurisdiction-policy://biodata-transmitter-demo/jp-13",
+                        "policy_ref": "threshold-policy://biodata-transmitter-demo/jurisdiction-jp-13-v1",
+                        "signer_key_ref": "signer-key://biodata-transmitter-demo/jurisdiction-policy",
+                        "signature_ref": "signature://biodata-transmitter-demo/jurisdiction-threshold-policy",
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "authority_role": "guardian",
+                        "authority_ref": "guardian://biodata-transmitter-demo/integrity-guardian",
+                        "policy_ref": "threshold-policy://biodata-transmitter-demo/guardian-raw-payload-redaction-v1",
+                        "signer_key_ref": "signer-key://biodata-transmitter-demo/integrity-guardian",
+                        "signature_ref": "signature://biodata-transmitter-demo/guardian-threshold-policy",
+                        "jurisdiction": "project-guardian",
+                    },
+                ],
+            )
+        )
         feature_window_series_drift_gate = (
             self.biodata_transmitter.bind_feature_window_series_drift_gate(
                 session,
                 feature_window_series_profile,
                 calibration_profile,
+                threshold_policy_authority_receipt=drift_threshold_policy_authority,
             )
         )
         calibration_confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
@@ -7895,6 +7927,14 @@ json.dump(response, sys.stdout)
                 feature_window_series_profile,
                 calibration_profile,
                 feature_window_series_drift_gate,
+                drift_threshold_policy_authority,
+            )
+        )
+        drift_threshold_policy_authority_validation = (
+            self.biodata_transmitter.validate_drift_threshold_policy_authority(
+                session,
+                feature_window_series_drift_gate["axis_thresholds"],
+                drift_threshold_policy_authority,
             )
         )
         validation = dict(transmission_validation)
@@ -7906,6 +7946,7 @@ json.dump(response, sys.stdout)
             and feature_window_series_validation["ok"]
             and circadian_phase_verifier_validation["ok"]
             and feature_window_series_drift_gate_validation["ok"]
+            and drift_threshold_policy_authority_validation["ok"]
         )
         validation["dataset_adapter_ok"] = dataset_adapter_validation["ok"]
         validation["dataset_manifest_digest_bound"] = dataset_adapter_validation[
@@ -7989,6 +8030,40 @@ json.dump(response, sys.stdout)
         validation["feature_window_series_drift_gate_digest_bound"] = (
             feature_window_series_drift_gate_validation["drift_gate_digest_bound"]
         )
+        validation["drift_threshold_policy_authority_ok"] = (
+            drift_threshold_policy_authority_validation["ok"]
+        )
+        validation["drift_threshold_policy_axis_digest_bound"] = (
+            drift_threshold_policy_authority_validation["axis_threshold_digest_bound"]
+        )
+        validation["drift_threshold_policy_source_digest_set_bound"] = (
+            drift_threshold_policy_authority_validation[
+                "authority_source_digest_set_bound"
+            ]
+        )
+        validation["drift_threshold_policy_required_roles_bound"] = (
+            drift_threshold_policy_authority_validation["required_authority_roles_bound"]
+        )
+        validation["drift_threshold_policy_authority_digest_bound"] = (
+            drift_threshold_policy_authority_validation[
+                "authority_receipt_digest_bound"
+            ]
+        )
+        validation["feature_window_series_drift_threshold_authority_bound"] = (
+            feature_window_series_drift_gate_validation[
+                "threshold_policy_authority_bound"
+            ]
+        )
+        validation["feature_window_series_drift_threshold_authority_digest_bound"] = (
+            feature_window_series_drift_gate_validation[
+                "threshold_policy_authority_digest_bound"
+            ]
+        )
+        validation["feature_window_series_drift_threshold_authority_source_digest_bound"] = (
+            feature_window_series_drift_gate_validation[
+                "threshold_policy_source_digest_set_bound"
+            ]
+        )
         validation["raw_dataset_payload_stored"] = dataset_adapter_validation[
             "raw_dataset_payload_stored"
         ]
@@ -8007,6 +8082,16 @@ json.dump(response, sys.stdout)
         validation["raw_drift_payload_stored"] = feature_window_series_drift_gate_validation[
             "raw_drift_payload_stored"
         ]
+        validation["raw_threshold_policy_payload_stored"] = (
+            drift_threshold_policy_authority_validation[
+                "raw_threshold_policy_payload_stored"
+            ]
+        )
+        validation["raw_threshold_policy_signature_payload_stored"] = (
+            drift_threshold_policy_authority_validation[
+                "raw_threshold_policy_signature_payload_stored"
+            ]
+        )
         validation["calibration_profile_ok"] = calibration_validation["ok"]
         validation["multi_day_calibration_bound"] = calibration_validation[
             "multi_day_calibration_bound"
@@ -8050,6 +8135,11 @@ json.dump(response, sys.stdout)
         )
         validation["calibration_confidence_gate_series_drift_status"] = (
             confidence_gate_validation["feature_window_series_drift_gate_status"]
+        )
+        validation["calibration_confidence_gate_threshold_policy_authority_bound"] = (
+            confidence_gate_validation[
+                "feature_window_series_threshold_policy_authority_bound"
+            ]
         )
         validation["identity_confirmation_confidence_gate_bound"] = (
             confidence_gate_validation["identity_confirmation_gate_bound"]
@@ -8198,6 +8288,40 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="biodata_transmitter.drift_threshold_policy_authority_bound",
+            payload={
+                "authority_ref": drift_threshold_policy_authority["authority_ref"],
+                "authority_receipt_digest": drift_threshold_policy_authority[
+                    "authority_receipt_digest"
+                ],
+                "axis_threshold_digest": drift_threshold_policy_authority[
+                    "axis_threshold_digest"
+                ],
+                "authority_source_digest_set": drift_threshold_policy_authority[
+                    "authority_source_digest_set"
+                ],
+                "authority_quorum_status": drift_threshold_policy_authority[
+                    "authority_quorum_status"
+                ],
+                "raw_threshold_policy_payload_stored": (
+                    drift_threshold_policy_authority[
+                        "raw_threshold_policy_payload_stored"
+                    ]
+                ),
+                "raw_threshold_policy_signature_payload_stored": (
+                    drift_threshold_policy_authority[
+                        "raw_threshold_policy_signature_payload_stored"
+                    ]
+                ),
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-threshold-policy-authority",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="biodata_transmitter.feature_window_series_drift_gate_bound",
             payload={
                 "drift_gate_ref": feature_window_series_drift_gate["drift_gate_ref"],
@@ -8211,6 +8335,11 @@ json.dump(response, sys.stdout)
                 "drift_threshold_digest": feature_window_series_drift_gate[
                     "drift_threshold_digest"
                 ],
+                "threshold_policy_authority_digest": (
+                    feature_window_series_drift_gate[
+                        "threshold_policy_authority_digest"
+                    ]
+                ),
                 "drift_gate_status": feature_window_series_drift_gate[
                     "drift_gate_status"
                 ],
@@ -8298,6 +8427,11 @@ json.dump(response, sys.stdout)
                 "feature_window_series_drift_threshold_digest": calibration_confidence_gate[
                     "feature_window_series_drift_threshold_digest"
                 ],
+                "feature_window_series_threshold_policy_authority_digest": (
+                    calibration_confidence_gate[
+                        "feature_window_series_threshold_policy_authority_digest"
+                    ]
+                ),
                 "confidence_gate_status": calibration_confidence_gate[
                     "confidence_gate_status"
                 ],
@@ -8340,6 +8474,7 @@ json.dump(response, sys.stdout)
             ],
             "circadian_phase_verifier": circadian_phase_verifier,
             "feature_window_series_profile": feature_window_series_profile,
+            "drift_threshold_policy_authority": drift_threshold_policy_authority,
             "feature_window_series_drift_gate": feature_window_series_drift_gate,
             "latent_state": latent_state,
             "calibration_latent_states": [latent_state, day_two_latent_state],

@@ -244,16 +244,54 @@ class BioDataTransmitterTests(unittest.TestCase):
                 "calibration-day://unit/series-day-2",
             ],
         )
+        threshold_authority = transmitter.bind_drift_threshold_policy_authority(
+            session,
+            [
+                {
+                    "authority_role": "clinical-reviewer",
+                    "authority_ref": "clinical-reviewer://unit/threshold-review",
+                    "policy_ref": "threshold-policy://unit/clinical",
+                    "signer_key_ref": "signer-key://unit/clinical",
+                    "signature_ref": "signature://unit/clinical-threshold",
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "authority_role": "jurisdiction-policy",
+                    "authority_ref": "jurisdiction-policy://unit/jp-13",
+                    "policy_ref": "threshold-policy://unit/jurisdiction",
+                    "signer_key_ref": "signer-key://unit/jurisdiction",
+                    "signature_ref": "signature://unit/jurisdiction-threshold",
+                    "jurisdiction": "JP-13",
+                },
+                {
+                    "authority_role": "guardian",
+                    "authority_ref": "guardian://unit/integrity",
+                    "policy_ref": "threshold-policy://unit/guardian",
+                    "signer_key_ref": "signer-key://unit/guardian",
+                    "signature_ref": "signature://unit/guardian-threshold",
+                    "jurisdiction": "project-guardian",
+                },
+            ],
+        )
+        threshold_authority_validation = (
+            transmitter.validate_drift_threshold_policy_authority(
+                session,
+                None,
+                threshold_authority,
+            )
+        )
         drift_gate = transmitter.bind_feature_window_series_drift_gate(
             session,
             series,
             calibration,
+            threshold_policy_authority_receipt=threshold_authority,
         )
         drift_validation = transmitter.validate_feature_window_series_drift_gate(
             session,
             series,
             calibration,
             drift_gate,
+            threshold_authority,
         )
         confidence_gate = transmitter.bind_calibration_confidence_gate(
             session,
@@ -270,6 +308,17 @@ class BioDataTransmitterTests(unittest.TestCase):
             confidence_gate,
         )
 
+        self.assertTrue(threshold_authority_validation["ok"])
+        self.assertTrue(threshold_authority_validation["axis_threshold_digest_bound"])
+        self.assertTrue(
+            threshold_authority_validation["authority_source_digest_set_bound"]
+        )
+        self.assertTrue(
+            threshold_authority_validation["required_authority_roles_bound"]
+        )
+        self.assertTrue(
+            threshold_authority_validation["authority_receipt_digest_bound"]
+        )
         self.assertTrue(drift_validation["ok"])
         self.assertEqual("pass", drift_gate["drift_gate_status"])
         self.assertTrue(drift_validation["series_profile_bound"])
@@ -277,9 +326,23 @@ class BioDataTransmitterTests(unittest.TestCase):
         self.assertTrue(drift_validation["series_calibration_latent_set_bound"])
         self.assertTrue(drift_validation["drift_threshold_digest_bound"])
         self.assertTrue(drift_validation["drift_gate_digest_bound"])
+        self.assertTrue(drift_validation["threshold_policy_authority_bound"])
+        self.assertTrue(drift_validation["threshold_policy_authority_digest_bound"])
+        self.assertTrue(
+            drift_validation["threshold_policy_source_digest_set_bound"]
+        )
         self.assertFalse(drift_gate["raw_drift_payload_stored"])
+        self.assertFalse(threshold_authority["raw_threshold_policy_payload_stored"])
+        self.assertFalse(
+            threshold_authority["raw_threshold_policy_signature_payload_stored"]
+        )
         self.assertTrue(confidence_validation["ok"])
         self.assertTrue(confidence_validation["feature_window_series_drift_gate_bound"])
+        self.assertTrue(
+            confidence_validation[
+                "feature_window_series_threshold_policy_authority_bound"
+            ]
+        )
         self.assertEqual(
             "pass",
             confidence_validation["feature_window_series_drift_gate_status"],
@@ -323,6 +386,16 @@ class BioDataTransmitterTests(unittest.TestCase):
                 series,
                 calibration,
                 tampered_gate,
+                threshold_authority,
+            )["ok"]
+        )
+        tampered_authority = dict(threshold_authority)
+        tampered_authority["authority_source_digest_set"] = "0" * 64
+        self.assertFalse(
+            transmitter.validate_drift_threshold_policy_authority(
+                session,
+                None,
+                tampered_authority,
             )["ok"]
         )
         blocked_gate = transmitter.bind_feature_window_series_drift_gate(

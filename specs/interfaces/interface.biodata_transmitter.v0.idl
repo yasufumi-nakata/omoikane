@@ -16,6 +16,7 @@ imports:
   biodata_circadian_phase_verifier_receipt: ../schemas/biodata_circadian_phase_verifier_receipt.schema
   biodata_feature_window_series_profile: ../schemas/biodata_feature_window_series_profile.schema
   biodata_feature_window_series_drift_gate: ../schemas/biodata_feature_window_series_drift_gate.schema
+  biodata_drift_threshold_policy_authority_receipt: ../schemas/biodata_drift_threshold_policy_authority_receipt.schema
 operations:
   open_session:
     summary: Open one transmitter session for a single identity and explicit modality set.
@@ -220,13 +221,71 @@ operations:
             additionalProperties:
               type: number
               minimum: 0
+          threshold_policy_authority_receipt:
+            schema_ref: biodata_drift_threshold_policy_authority_receipt
     output:
       schema_ref: biodata_feature_window_series_drift_gate
     guarantees:
       - series_profile_digest and calibration_digest must both be bound
       - feature-window series latent digests must match the calibration source latent digests
       - axis_drift_checks must compare ordered series drift against bounded thresholds
+      - threshold policy authority refs must be digest-bound when supplied
       - raw series, calibration, and drift payload storage must remain false
+  bind_drift_threshold_policy_authority:
+    summary: Bind feature-window drift thresholds to clinical, jurisdiction, and Guardian authority refs.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - policy_sources
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          policy_sources:
+            type: array
+            minItems: 3
+            maxItems: 3
+            items:
+              type: object
+              required:
+                - authority_role
+                - authority_ref
+                - policy_ref
+                - signer_key_ref
+                - signature_ref
+                - jurisdiction
+              properties:
+                authority_role:
+                  type: string
+                  enum: [clinical-reviewer, jurisdiction-policy, guardian]
+                authority_ref:
+                  type: string
+                  minLength: 1
+                policy_ref:
+                  type: string
+                  minLength: 1
+                signer_key_ref:
+                  type: string
+                  minLength: 1
+                signature_ref:
+                  type: string
+                  minLength: 1
+                jurisdiction:
+                  type: string
+                  minLength: 1
+          axis_thresholds:
+            type: object
+            additionalProperties:
+              type: number
+              minimum: 0
+    output:
+      schema_ref: biodata_drift_threshold_policy_authority_receipt
+    guarantees:
+      - axis_threshold_digest must bind the exact threshold set consumed by the drift gate
+      - clinical reviewer, jurisdiction policy, and Guardian authority refs must all be present
+      - signer key refs and signature refs are retained only as digest-bound refs
+      - raw threshold policy, signature, authority, and reviewer payload storage must remain false
   encode_body_state:
     summary: Convert source biosignal features into a digest-bound internal body-state latent.
     input:
@@ -491,6 +550,8 @@ operations:
             schema_ref: biodata_calibration_profile
           drift_gate_receipt:
             schema_ref: biodata_feature_window_series_drift_gate
+          threshold_policy_authority_receipt:
+            schema_ref: biodata_drift_threshold_policy_authority_receipt
     output:
       inline_schema:
         type: object
@@ -515,7 +576,50 @@ operations:
             type: boolean
           drift_gate_digest_bound:
             type: boolean
+          threshold_policy_authority_bound:
+            type: boolean
           raw_drift_payload_stored:
+            const: false
+  validate_drift_threshold_policy_authority:
+    summary: Verify threshold authority quorum digest binding and raw-payload redaction.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - authority_receipt
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          axis_thresholds:
+            type: object
+            additionalProperties:
+              type: number
+              minimum: 0
+          authority_receipt:
+            schema_ref: biodata_drift_threshold_policy_authority_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - axis_threshold_digest_bound
+          - authority_source_digest_set_bound
+          - required_authority_roles_bound
+          - authority_receipt_digest_bound
+          - raw_threshold_policy_payload_stored
+        properties:
+          ok:
+            type: boolean
+          axis_threshold_digest_bound:
+            type: boolean
+          authority_source_digest_set_bound:
+            type: boolean
+          required_authority_roles_bound:
+            type: boolean
+          authority_receipt_digest_bound:
+            type: boolean
+          raw_threshold_policy_payload_stored:
             const: false
   validate_circadian_phase_verifier:
     summary: Verify circadian phase source quorum digest binding and raw-payload redaction.
@@ -629,6 +733,9 @@ events:
   biodata_transmitter.calibration_profile_bound:
     payload:
       schema_ref: biodata_calibration_profile
+  biodata_transmitter.drift_threshold_policy_authority_bound:
+    payload:
+      schema_ref: biodata_drift_threshold_policy_authority_receipt
   biodata_transmitter.calibration_confidence_gate_bound:
     payload:
       schema_ref: biodata_calibration_confidence_gate
@@ -646,3 +753,4 @@ compatibility:
     - Dataset feature-window adapters make external EEG/ECG/PPG/EDA/respiration corpora ingestible only as manifest digests, feature-window digests, and latent refs; raw samples are out of scope.
     - Circadian phase verifiers bind phase refs to external clock, sleep diary, and wearable evidence digests without storing raw phase evidence.
     - Feature-window series drift gates let calibration confidence gates consume current longitudinal evidence only through bounded, digest-only drift-threshold receipts.
+    - Drift threshold policy authority receipts bind clinical, jurisdiction, and Guardian threshold policy refs without storing raw policy or signature payloads.
