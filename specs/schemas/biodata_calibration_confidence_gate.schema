@@ -1,0 +1,161 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_calibration_confidence_gate.schema"
+title: BioDataCalibrationConfidenceGate
+description: >
+  Digest-only receipt that binds one BioData Transmitter calibration profile to
+  identity-confirmation and sensory-loopback confidence gates without storing raw
+  calibration or gate payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - gate_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - calibration_ref
+  - calibration_digest
+  - calibration_digest_bound
+  - source_latent_digest_set_digest
+  - source_modalities_required
+  - source_modalities_covered
+  - required_modalities_bound
+  - confidence_score
+  - target_gate_bindings
+  - target_gate_set_digest
+  - confidence_gate_status
+  - identity_confirmation_gate_bound
+  - sensory_loopback_gate_bound
+  - raw_calibration_payload_stored
+  - raw_gate_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - gate_receipt_digest
+properties:
+  schema_version:
+    const: "1.0"
+  gate_ref:
+    type: string
+    pattern: "^confidence-gate://biodata/bdt-confidence-gate-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-calibration-confidence-gate-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  calibration_ref:
+    type: string
+    pattern: "^calibration://biodata/bdt-calibration-[a-f0-9]{12}$"
+  calibration_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  calibration_digest_bound:
+    const: true
+  source_latent_digest_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_modalities_required:
+    type: array
+    minItems: 5
+    maxItems: 5
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - eeg
+        - ecg
+        - ppg
+        - eda
+        - respiration
+  source_modalities_covered:
+    type: array
+    minItems: 5
+    maxItems: 5
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - eeg
+        - ecg
+        - ppg
+        - eda
+        - respiration
+  required_modalities_bound:
+    const: true
+  confidence_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  target_gate_bindings:
+    type: array
+    minItems: 2
+    maxItems: 2
+    uniqueItems: true
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - target_gate
+        - target_ref
+        - minimum_confidence
+        - confidence_score
+        - calibration_ref
+        - calibration_digest
+        - status
+      properties:
+        target_gate:
+          type: string
+          enum:
+            - identity-confirmation
+            - sensory-loopback
+        target_ref:
+          type: string
+          minLength: 1
+        minimum_confidence:
+          type: number
+          minimum: 0
+          maximum: 1
+        confidence_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        calibration_ref:
+          type: string
+          pattern: "^calibration://biodata/bdt-calibration-[a-f0-9]{12}$"
+        calibration_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        status:
+          type: string
+          enum:
+            - pass
+            - fail
+  target_gate_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  confidence_gate_status:
+    type: string
+    enum:
+      - bound
+      - blocked
+  identity_confirmation_gate_bound:
+    type: boolean
+  sensory_loopback_gate_bound:
+    type: boolean
+  raw_calibration_payload_stored:
+    const: false
+  raw_gate_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  gate_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

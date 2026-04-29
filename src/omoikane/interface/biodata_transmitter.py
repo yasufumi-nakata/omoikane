@@ -12,10 +12,15 @@ BDT_PROFILE_ID = "person-bound-biodata-transmitter-v0"
 BDT_LATENT_PROFILE_ID = "physiology-latent-body-state-v0"
 BDT_GENERATOR_PROFILE_ID = "bounded-cross-modal-biosignal-generator-v0"
 BDT_CALIBRATION_PROFILE_ID = "multi-day-personal-biodata-calibration-v1"
+BDT_CONFIDENCE_GATE_PROFILE_ID = "biodata-calibration-confidence-gate-v1"
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
 DEFAULT_SOURCE_MODALITIES = ("eeg", "ecg", "ppg", "eda", "respiration")
 DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "affect", "thought")
 SUPPORTED_MODALITIES = set(DEFAULT_SOURCE_MODALITIES + DEFAULT_TARGET_MODALITIES)
+CONFIDENCE_GATE_TARGET_THRESHOLDS = {
+    "identity-confirmation": 0.8,
+    "sensory-loopback": 0.7,
+}
 REQUIRED_LITERATURE_REFS = (
     {
         "ref_id": "physionet-2000",
@@ -82,8 +87,10 @@ class BioDataTransmitter:
             "latent_profile_id": BDT_LATENT_PROFILE_ID,
             "generator_profile_id": BDT_GENERATOR_PROFILE_ID,
             "calibration_profile_id": BDT_CALIBRATION_PROFILE_ID,
+            "confidence_gate_profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
+            "confidence_gate_target_thresholds": dict(CONFIDENCE_GATE_TARGET_THRESHOLDS),
             "intermediate_representation": "internal-body-state-latent",
             "literature_refs": deepcopy(list(REQUIRED_LITERATURE_REFS)),
             "conflict_sink_url": BDT_CONFLICT_SINK_URL,
@@ -534,6 +541,246 @@ class BioDataTransmitter:
             "semantic_thought_content_generated": False,
         }
 
+    def bind_calibration_confidence_gate(
+        self,
+        session: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        target_gate_refs: Dict[str, str],
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        normalized_target_refs = self._normalize_confidence_gate_refs(target_gate_refs)
+        if calibration_profile.get("session_id") != session.get("session_id"):
+            raise ValueError("calibration_profile.session_id must match session.session_id")
+        if calibration_profile.get("identity_id") != session.get("identity_id"):
+            raise ValueError("calibration_profile.identity_id must match session.identity_id")
+        axis_baselines = calibration_profile.get("axis_baselines", {})
+        if not isinstance(axis_baselines, dict):
+            raise ValueError("calibration_profile.axis_baselines must be a mapping")
+        confidence_score = self._bounded_score(
+            axis_baselines.get("interoceptive_confidence"),
+            "calibration_profile.axis_baselines.interoceptive_confidence",
+        )
+        expected_calibration_digest = sha256_text(
+            canonical_json(self._calibration_digest_payload(calibration_profile))
+        )
+        calibration_digest_bound = (
+            calibration_profile.get("calibration_digest") == expected_calibration_digest
+        )
+        required_modalities_bound = sorted(calibration_profile.get("source_modalities_covered", [])) == sorted(
+            DEFAULT_SOURCE_MODALITIES
+        )
+        common_gate_ready = (
+            calibration_profile.get("profile_id") == BDT_CALIBRATION_PROFILE_ID
+            and calibration_profile.get("calibration_complete") is True
+            and calibration_digest_bound
+            and required_modalities_bound
+            and calibration_profile.get("raw_source_payload_stored") is False
+            and calibration_profile.get("raw_latent_payload_stored") is False
+            and calibration_profile.get("raw_calibration_payload_stored") is False
+            and calibration_profile.get("subjective_equivalence_claimed") is False
+            and calibration_profile.get("semantic_thought_content_generated") is False
+        )
+
+        target_gate_bindings: List[Dict[str, Any]] = []
+        for target_gate, target_ref in sorted(normalized_target_refs.items()):
+            minimum_confidence = CONFIDENCE_GATE_TARGET_THRESHOLDS[target_gate]
+            threshold_met = confidence_score >= minimum_confidence
+            binding = {
+                "target_gate": target_gate,
+                "target_ref": target_ref,
+                "minimum_confidence": minimum_confidence,
+                "confidence_score": confidence_score,
+                "calibration_ref": calibration_profile["calibration_ref"],
+                "calibration_digest": calibration_profile["calibration_digest"],
+                "status": "pass" if common_gate_ready and threshold_met else "fail",
+            }
+            target_gate_bindings.append(binding)
+
+        target_gate_set_digest = sha256_text(
+            canonical_json({"target_gate_bindings": target_gate_bindings})
+        )
+        gate_status = (
+            "bound"
+            if common_gate_ready and all(binding["status"] == "pass" for binding in target_gate_bindings)
+            else "blocked"
+        )
+        receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "gate_ref": f"confidence-gate://biodata/{new_id('bdt-confidence-gate')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "calibration_ref": calibration_profile["calibration_ref"],
+            "calibration_digest": calibration_profile["calibration_digest"],
+            "calibration_digest_bound": calibration_digest_bound,
+            "source_latent_digest_set_digest": calibration_profile[
+                "source_latent_digest_set_digest"
+            ],
+            "source_modalities_required": list(DEFAULT_SOURCE_MODALITIES),
+            "source_modalities_covered": sorted(calibration_profile["source_modalities_covered"]),
+            "required_modalities_bound": required_modalities_bound,
+            "confidence_score": confidence_score,
+            "target_gate_bindings": target_gate_bindings,
+            "target_gate_set_digest": target_gate_set_digest,
+            "confidence_gate_status": gate_status,
+            "identity_confirmation_gate_bound": any(
+                binding["target_gate"] == "identity-confirmation"
+                and binding["status"] == "pass"
+                for binding in target_gate_bindings
+            ),
+            "sensory_loopback_gate_bound": any(
+                binding["target_gate"] == "sensory-loopback"
+                and binding["status"] == "pass"
+                for binding in target_gate_bindings
+            ),
+            "raw_calibration_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        receipt["gate_receipt_digest"] = sha256_text(
+            canonical_json(self._confidence_gate_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_calibration_confidence_gate(
+        self,
+        session: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        gate_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_non_empty_string(session.get("session_id"), "session.session_id", errors)
+        self._check_non_empty_string(gate_receipt.get("gate_ref"), "gate_receipt.gate_ref", errors)
+        if gate_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("gate_receipt.schema_version mismatch")
+        if gate_receipt.get("profile_id") != BDT_CONFIDENCE_GATE_PROFILE_ID:
+            errors.append("gate_receipt.profile_id mismatch")
+        if gate_receipt.get("session_id") != session.get("session_id"):
+            errors.append("gate_receipt.session_id must match session.session_id")
+        if gate_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("gate_receipt.identity_id must match session.identity_id")
+        if gate_receipt.get("calibration_ref") != calibration_profile.get("calibration_ref"):
+            errors.append("gate_receipt.calibration_ref must match calibration_profile")
+        if gate_receipt.get("calibration_digest") != calibration_profile.get("calibration_digest"):
+            errors.append("gate_receipt.calibration_digest must match calibration_profile")
+
+        expected_calibration_digest = sha256_text(
+            canonical_json(self._calibration_digest_payload(calibration_profile))
+        )
+        calibration_digest_bound = (
+            calibration_profile.get("calibration_digest") == expected_calibration_digest
+            and gate_receipt.get("calibration_digest_bound") is True
+        )
+        if not calibration_digest_bound:
+            errors.append("gate_receipt must bind the calibration profile digest")
+        required_modalities_bound = (
+            gate_receipt.get("source_modalities_required") == list(DEFAULT_SOURCE_MODALITIES)
+            and sorted(gate_receipt.get("source_modalities_covered", []))
+            == sorted(DEFAULT_SOURCE_MODALITIES)
+            and gate_receipt.get("required_modalities_bound") is True
+        )
+        if not required_modalities_bound:
+            errors.append("gate_receipt must bind all required source modalities")
+
+        bindings = gate_receipt.get("target_gate_bindings", [])
+        if not isinstance(bindings, list) or not bindings:
+            errors.append("gate_receipt.target_gate_bindings must be a non-empty list")
+            bindings = []
+        valid_bindings = True
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                valid_bindings = False
+                continue
+            target_gate = binding.get("target_gate")
+            minimum_confidence = CONFIDENCE_GATE_TARGET_THRESHOLDS.get(str(target_gate))
+            expected_status = (
+                "pass"
+                if isinstance(minimum_confidence, (int, float))
+                and gate_receipt.get("confidence_score", 0) >= minimum_confidence
+                and calibration_digest_bound
+                and required_modalities_bound
+                else "fail"
+            )
+            if (
+                target_gate not in CONFIDENCE_GATE_TARGET_THRESHOLDS
+                or binding.get("minimum_confidence") != minimum_confidence
+                or binding.get("confidence_score") != gate_receipt.get("confidence_score")
+                or binding.get("calibration_ref") != calibration_profile.get("calibration_ref")
+                or binding.get("calibration_digest") != calibration_profile.get("calibration_digest")
+                or binding.get("status") != expected_status
+            ):
+                valid_bindings = False
+        expected_target_gate_set_digest = sha256_text(
+            canonical_json({"target_gate_bindings": bindings})
+        )
+        target_gate_set_digest_bound = (
+            gate_receipt.get("target_gate_set_digest") == expected_target_gate_set_digest
+        )
+        if not target_gate_set_digest_bound:
+            errors.append("gate_receipt.target_gate_set_digest mismatch")
+        if not valid_bindings:
+            errors.append("gate_receipt.target_gate_bindings contain invalid gate bindings")
+
+        expected_gate_status = (
+            "bound"
+            if valid_bindings
+            and calibration_digest_bound
+            and required_modalities_bound
+            and all(binding.get("status") == "pass" for binding in bindings)
+            else "blocked"
+        )
+        if gate_receipt.get("confidence_gate_status") != expected_gate_status:
+            errors.append("gate_receipt.confidence_gate_status mismatch")
+        expected_gate_digest = sha256_text(
+            canonical_json(self._confidence_gate_digest_payload(gate_receipt))
+        )
+        gate_receipt_digest_bound = gate_receipt.get("gate_receipt_digest") == expected_gate_digest
+        if not gate_receipt_digest_bound:
+            errors.append("gate_receipt.gate_receipt_digest mismatch")
+
+        identity_confirmation_gate_bound = any(
+            binding.get("target_gate") == "identity-confirmation"
+            and binding.get("status") == "pass"
+            for binding in bindings
+        )
+        sensory_loopback_gate_bound = any(
+            binding.get("target_gate") == "sensory-loopback"
+            and binding.get("status") == "pass"
+            for binding in bindings
+        )
+        if gate_receipt.get("identity_confirmation_gate_bound") != identity_confirmation_gate_bound:
+            errors.append("gate_receipt.identity_confirmation_gate_bound mismatch")
+        if gate_receipt.get("sensory_loopback_gate_bound") != sensory_loopback_gate_bound:
+            errors.append("gate_receipt.sensory_loopback_gate_bound mismatch")
+        for field_name in (
+            "raw_calibration_payload_stored",
+            "raw_gate_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if gate_receipt.get(field_name) is not False:
+                errors.append(f"gate_receipt.{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": gate_receipt.get("profile_id"),
+            "confidence_gate_status": gate_receipt.get("confidence_gate_status"),
+            "confidence_score": gate_receipt.get("confidence_score"),
+            "calibration_profile_bound": calibration_digest_bound,
+            "required_modalities_bound": required_modalities_bound,
+            "target_gate_set_digest_bound": target_gate_set_digest_bound,
+            "gate_receipt_digest_bound": gate_receipt_digest_bound,
+            "identity_confirmation_gate_bound": identity_confirmation_gate_bound,
+            "sensory_loopback_gate_bound": sensory_loopback_gate_bound,
+            "raw_calibration_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def validate_transmission(
         self,
         session: Dict[str, Any],
@@ -683,3 +930,43 @@ class BioDataTransmitter:
         payload = dict(calibration_profile)
         payload.pop("calibration_digest", None)
         return payload
+
+    @staticmethod
+    def _confidence_gate_digest_payload(gate_receipt: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(gate_receipt)
+        payload.pop("gate_receipt_digest", None)
+        return payload
+
+    @staticmethod
+    def _bounded_score(value: Any, field_name: str) -> float:
+        if not isinstance(value, (int, float)) or isinstance(value, bool):
+            raise ValueError(f"{field_name} must be a number between 0.0 and 1.0")
+        score = float(value)
+        if score < 0.0 or score > 1.0:
+            raise ValueError(f"{field_name} must be between 0.0 and 1.0")
+        return round(score, 3)
+
+    @staticmethod
+    def _check_session_mapping(session: Dict[str, Any]) -> None:
+        if not isinstance(session, dict):
+            raise ValueError("session must be a mapping")
+        if not isinstance(session.get("session_id"), str) or not session["session_id"].strip():
+            raise ValueError("session.session_id must be a non-empty string")
+        if not isinstance(session.get("identity_id"), str) or not session["identity_id"].strip():
+            raise ValueError("session.identity_id must be a non-empty string")
+
+    @staticmethod
+    def _normalize_confidence_gate_refs(target_gate_refs: Dict[str, str]) -> Dict[str, str]:
+        if not isinstance(target_gate_refs, dict) or not target_gate_refs:
+            raise ValueError("target_gate_refs must be a non-empty mapping")
+        normalized: Dict[str, str] = {}
+        for target_gate, target_ref in target_gate_refs.items():
+            gate_key = str(target_gate).strip().lower().replace("_", "-")
+            if gate_key not in CONFIDENCE_GATE_TARGET_THRESHOLDS:
+                raise ValueError(f"unsupported confidence gate target: {target_gate}")
+            if not isinstance(target_ref, str) or not target_ref.strip():
+                raise ValueError("target_gate_refs values must be non-empty strings")
+            normalized[gate_key] = target_ref.strip()
+        if set(normalized) != set(CONFIDENCE_GATE_TARGET_THRESHOLDS):
+            raise ValueError("target_gate_refs must include identity-confirmation and sensory-loopback")
+        return normalized

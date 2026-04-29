@@ -99,6 +99,89 @@ class BioDataTransmitterTests(unittest.TestCase):
                 ],
             )
 
+    def test_binds_calibration_to_identity_and_loopback_confidence_gates(self) -> None:
+        transmitter = BioDataTransmitter()
+        session = transmitter.open_session("identity-bdt-confidence-gate")
+        latent_day_one = transmitter.encode_body_state(
+            session["session_id"],
+            biosignal_features={
+                "eeg": {"alpha_power": 0.38, "theta_power": 0.29, "beta_power": 0.34},
+                "ecg": {"heart_rate_bpm": 76.0, "hrv_rmssd_ms": 44.0},
+                "ppg": {"pulse_rate_bpm": 75.6, "pulse_amplitude": 0.71},
+                "eda": {"skin_conductance_microsiemens": 5.2},
+                "respiration": {"rate_bpm": 16.2, "phase": "exhale"},
+            },
+            context_label="confidence-gate-day-one",
+        )
+        latent_day_two = transmitter.encode_body_state(
+            session["session_id"],
+            biosignal_features={
+                "eeg": {"alpha_power": 0.43, "theta_power": 0.25, "beta_power": 0.32},
+                "ecg": {"heart_rate_bpm": 72.4, "hrv_rmssd_ms": 49.0},
+                "ppg": {"pulse_rate_bpm": 72.0, "pulse_amplitude": 0.76},
+                "eda": {"skin_conductance_microsiemens": 4.6},
+                "respiration": {"rate_bpm": 14.8, "phase": "inhale"},
+            },
+            context_label="confidence-gate-day-two",
+        )
+        calibration = transmitter.build_calibration_profile(
+            session["session_id"],
+            [latent_day_one, latent_day_two],
+            [
+                "calibration-day://unit/gate-day-1",
+                "calibration-day://unit/gate-day-2",
+            ],
+        )
+
+        gate = transmitter.bind_calibration_confidence_gate(
+            session,
+            calibration,
+            {
+                "identity-confirmation": "identity-confirmation://unit/ascending",
+                "sensory-loopback": "sensory-loopback://unit/session",
+            },
+        )
+        validation = transmitter.validate_calibration_confidence_gate(
+            session,
+            calibration,
+            gate,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("bound", gate["confidence_gate_status"])
+        self.assertTrue(validation["calibration_profile_bound"])
+        self.assertTrue(validation["required_modalities_bound"])
+        self.assertTrue(validation["target_gate_set_digest_bound"])
+        self.assertTrue(validation["gate_receipt_digest_bound"])
+        self.assertTrue(validation["identity_confirmation_gate_bound"])
+        self.assertTrue(validation["sensory_loopback_gate_bound"])
+        self.assertFalse(gate["raw_calibration_payload_stored"])
+        self.assertFalse(gate["raw_gate_payload_stored"])
+
+        tampered = dict(gate)
+        tampered["target_gate_bindings"] = [dict(item) for item in gate["target_gate_bindings"]]
+        tampered["target_gate_bindings"][0]["status"] = "fail"
+        tampered_validation = transmitter.validate_calibration_confidence_gate(
+            session,
+            calibration,
+            tampered,
+        )
+        self.assertFalse(tampered_validation["ok"])
+        self.assertFalse(tampered_validation["target_gate_set_digest_bound"])
+
+        with self.assertRaisesRegex(ValueError, "unsupported confidence gate target"):
+            transmitter.bind_calibration_confidence_gate(
+                session,
+                calibration,
+                {"unbounded-upload": "identity-confirmation://unit/ascending"},
+            )
+        with self.assertRaisesRegex(ValueError, "identity-confirmation and sensory-loopback"):
+            transmitter.bind_calibration_confidence_gate(
+                session,
+                calibration,
+                {"identity-confirmation": "identity-confirmation://unit/ascending"},
+            )
+
     def test_rejects_unknown_modality_and_mismatched_latent(self) -> None:
         transmitter = BioDataTransmitter()
         session = transmitter.open_session("identity-bdt-2")

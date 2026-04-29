@@ -84,6 +84,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["axis_baselines_bound"])
         self.assertFalse(result["validation"]["raw_latent_payload_stored"])
         self.assertFalse(result["validation"]["raw_calibration_payload_stored"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_ok"])
+        self.assertEqual("bound", result["validation"]["calibration_confidence_gate_status"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_profile_bound"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_modalities_bound"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_target_set_digest_bound"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
+        self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
+        self.assertFalse(result["validation"]["raw_gate_payload_stored"])
         self.assertIn("thought", result["generated_bundle"]["signals"])
         self.assertFalse(
             result["generated_bundle"]["signals"]["thought"]["semantic_content_generated"]
@@ -104,6 +113,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-biodata-transmitter-calibration"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-confidence-gate"
             ],
         )
 

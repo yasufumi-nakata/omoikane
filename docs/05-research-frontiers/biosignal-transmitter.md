@@ -51,6 +51,8 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - generated target は ECG/PPG/respiration/EEG/affect/thought の bounded proxy に留める
 - 個人内 calibration は複数日の body-state latent digest set と day refs を
   `multi-day-personal-biodata-calibration-v1` に束縛し、raw source / latent / calibration payload は保存しない
+- calibration は `biodata-calibration-confidence-gate-v1` として identity confirmation /
+  sensory loopback に渡せるが、confidence input に留め、本人同一性や主観同一性の証明にはしない
 - thought は semantic content を生成しない
 - qualia equivalence と thought content の飛躍は
   `https://mind-upload.com/frontiers/biosignal-transmitter` の conflict sink ref に束縛する

@@ -10,6 +10,8 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
   avatar body の drift を検出する
 - `avatar_body_map_ref` と `proprioceptive_calibration_ref` により、
   canonical な body segment map と calibration snapshot を receipt/family へ束縛する
+- BioData Transmitter の confidence gate は body-state latent 由来の補助 confidence としてのみ扱い、
+  body-map calibration と Guardian hold / stabilization contract を置き換えない
 - artifact 本体は保持せず、`artifact_ref` と digest と summary のみを監査へ残す
 - coherent / guardian-hold / stabilize の複数 scene を
   bounded な artifact family として束ね、回復経路を digest-only で再監査できる

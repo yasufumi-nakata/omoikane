@@ -7763,6 +7763,16 @@ json.dump(response, sys.stdout)
                 "calibration-day://biodata-transmitter-demo/day-2",
             ],
         )
+        calibration_confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
+            session,
+            calibration_profile,
+            target_gate_refs={
+                "identity-confirmation": (
+                    "identity-confirmation://biodata-transmitter-demo/ascending-to-active"
+                ),
+                "sensory-loopback": "sensory-loopback://biodata-transmitter-demo/session-gate",
+            },
+        )
         transmission_validation = self.biodata_transmitter.validate_transmission(
             session,
             latent_state,
@@ -7773,8 +7783,19 @@ json.dump(response, sys.stdout)
             [latent_state, day_two_latent_state],
             calibration_profile,
         )
+        confidence_gate_validation = (
+            self.biodata_transmitter.validate_calibration_confidence_gate(
+                session,
+                calibration_profile,
+                calibration_confidence_gate,
+            )
+        )
         validation = dict(transmission_validation)
-        validation["ok"] = transmission_validation["ok"] and calibration_validation["ok"]
+        validation["ok"] = (
+            transmission_validation["ok"]
+            and calibration_validation["ok"]
+            and confidence_gate_validation["ok"]
+        )
         validation["calibration_profile_ok"] = calibration_validation["ok"]
         validation["multi_day_calibration_bound"] = calibration_validation[
             "multi_day_calibration_bound"
@@ -7793,6 +7814,34 @@ json.dump(response, sys.stdout)
         ]
         validation["raw_calibration_payload_stored"] = calibration_validation[
             "raw_calibration_payload_stored"
+        ]
+        validation["calibration_confidence_gate_ok"] = confidence_gate_validation["ok"]
+        validation["calibration_confidence_gate_status"] = confidence_gate_validation[
+            "confidence_gate_status"
+        ]
+        validation["calibration_confidence_score"] = confidence_gate_validation[
+            "confidence_score"
+        ]
+        validation["calibration_confidence_gate_profile_bound"] = (
+            confidence_gate_validation["calibration_profile_bound"]
+        )
+        validation["calibration_confidence_gate_modalities_bound"] = (
+            confidence_gate_validation["required_modalities_bound"]
+        )
+        validation["calibration_confidence_gate_target_set_digest_bound"] = (
+            confidence_gate_validation["target_gate_set_digest_bound"]
+        )
+        validation["calibration_confidence_gate_receipt_digest_bound"] = (
+            confidence_gate_validation["gate_receipt_digest_bound"]
+        )
+        validation["identity_confirmation_confidence_gate_bound"] = (
+            confidence_gate_validation["identity_confirmation_gate_bound"]
+        )
+        validation["sensory_loopback_confidence_gate_bound"] = (
+            confidence_gate_validation["sensory_loopback_gate_bound"]
+        )
+        validation["raw_gate_payload_stored"] = confidence_gate_validation[
+            "raw_gate_payload_stored"
         ]
 
         self.ledger.append(
@@ -7884,6 +7933,36 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.calibration_confidence_gate_bound",
+            payload={
+                "gate_ref": calibration_confidence_gate["gate_ref"],
+                "gate_receipt_digest": calibration_confidence_gate["gate_receipt_digest"],
+                "calibration_ref": calibration_confidence_gate["calibration_ref"],
+                "calibration_digest": calibration_confidence_gate["calibration_digest"],
+                "target_gate_set_digest": calibration_confidence_gate[
+                    "target_gate_set_digest"
+                ],
+                "confidence_gate_status": calibration_confidence_gate[
+                    "confidence_gate_status"
+                ],
+                "identity_confirmation_gate_bound": calibration_confidence_gate[
+                    "identity_confirmation_gate_bound"
+                ],
+                "sensory_loopback_gate_bound": calibration_confidence_gate[
+                    "sensory_loopback_gate_bound"
+                ],
+                "raw_gate_payload_stored": calibration_confidence_gate[
+                    "raw_gate_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-confidence-gate",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
 
         return {
             "identity": {
@@ -7895,6 +7974,7 @@ json.dump(response, sys.stdout)
             "latent_state": latent_state,
             "calibration_latent_states": [latent_state, day_two_latent_state],
             "calibration_profile": calibration_profile,
+            "calibration_confidence_gate": calibration_confidence_gate,
             "generated_bundle": generated_bundle,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),

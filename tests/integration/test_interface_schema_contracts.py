@@ -70,6 +70,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/biodata_calibration_profile.schema",
             result["calibration_profile"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/biodata_calibration_confidence_gate.schema",
+            result["calibration_confidence_gate"],
+        )
         for latent in result["calibration_latent_states"]:
             self._assert_schema_valid(
                 "specs/schemas/biodata_body_state_latent.schema",
@@ -79,7 +83,11 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["literature_backed_intermediate"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_ok"])
+        self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
+        self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
         self.assertFalse(result["validation"]["raw_calibration_payload_stored"])
+        self.assertFalse(result["validation"]["raw_gate_payload_stored"])
 
     def test_wms_demo_states_and_reconcile_match_public_schemas(self) -> None:
         result = self.runtime.run_wms_demo()

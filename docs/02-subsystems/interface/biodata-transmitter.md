@@ -34,6 +34,8 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
    semantic thought content 非生成を検証する
 5. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
 6. ContinuityLedger に session / latent / generated bundle / conflict sink / calibration binding を残す
+7. calibration profile を identity confirmation / sensory loopback の confidence gate へ
+   digest-only receipt として束縛する
 
 ## 中間表現
 
@@ -84,6 +86,7 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 5. **conflict sink** ── qualia equivalence と thought content の飛躍は mind-upload.com ref に束縛する
 6. **literature refs** ── 中間表現は少なくとも 5 件の文献 ref に束縛する
 7. **multi-day calibration** ── 個人内 calibration は 2 日以上の latent digest set と day refs だけを束ね、raw latent / raw calibration payload は保存しない
+8. **confidence gate** ── identity confirmation / sensory loopback へ渡す時は calibration digest、source modality coverage、target 別 confidence threshold を receipt で束縛し、raw gate payload は保存しない
 
 ## 個人内 calibration
 
@@ -95,6 +98,19 @@ raw calibration payload は保持しない。
 
 この profile は個人固有の baseline を上げるための reference artifact であり、
 主観同一性、qualia equivalence、semantic thought content の証明には使わない。
+
+## Confidence gate 連携
+
+`biodata-calibration-confidence-gate-v1` は、complete な calibration profile を
+identity confirmation と sensory loopback の入口へ渡すための digest-only bridge である。
+gate receipt は calibration ref / digest、source latent digest set、`eeg / ecg / ppg / eda /
+respiration` の coverage、target gate refs、target 別 threshold を束縛する。
+
+reference runtime では identity confirmation gate は `confidence_score >= 0.8`、
+sensory loopback gate は `confidence_score >= 0.7` を要求する。これを満たしても
+本人同一性や主観経験の証明にはせず、各 target の既存 Guardian / witness / body-map
+contract の confidence input としてのみ扱う。raw calibration payload と raw gate payload は
+保存しない。
 
 ## 関連
 

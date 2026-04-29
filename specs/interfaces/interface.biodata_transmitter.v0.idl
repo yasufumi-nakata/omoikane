@@ -11,6 +11,7 @@ imports:
   biodata_body_state_latent: ../schemas/biodata_body_state_latent.schema
   biodata_signal_bundle: ../schemas/biodata_signal_bundle.schema
   biodata_calibration_profile: ../schemas/biodata_calibration_profile.schema
+  biodata_calibration_confidence_gate: ../schemas/biodata_calibration_confidence_gate.schema
 operations:
   open_session:
     summary: Open one transmitter session for a single identity and explicit modality set.
@@ -209,6 +210,84 @@ operations:
             type: boolean
           raw_calibration_payload_stored:
             const: false
+  bind_calibration_confidence_gate:
+    summary: Bind one complete calibration profile to identity-confirmation and sensory-loopback confidence gates without raw payload storage.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - calibration_profile
+          - target_gate_refs
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          target_gate_refs:
+            type: object
+            minProperties: 2
+            maxProperties: 2
+            propertyNames:
+              enum:
+                - identity-confirmation
+                - sensory-loopback
+            additionalProperties:
+              type: string
+              minLength: 1
+    output:
+      schema_ref: biodata_calibration_confidence_gate
+    guarantees:
+      - calibration_digest_bound must prove the receipt is bound to the exact calibration profile
+      - source_modalities_covered must cover eeg, ecg, ppg, eda, and respiration before any target gate can pass
+      - identity-confirmation gates require confidence_score >= 0.8
+      - sensory-loopback gates require confidence_score >= 0.7
+      - raw calibration and gate payload storage must remain false
+  validate_calibration_confidence_gate:
+    summary: Verify calibration confidence-gate digest binding, target threshold checks, and raw-payload redaction.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - calibration_profile
+          - gate_receipt
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          gate_receipt:
+            schema_ref: biodata_calibration_confidence_gate
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - calibration_profile_bound
+          - required_modalities_bound
+          - target_gate_set_digest_bound
+          - gate_receipt_digest_bound
+          - identity_confirmation_gate_bound
+          - sensory_loopback_gate_bound
+          - raw_gate_payload_stored
+        properties:
+          ok:
+            type: boolean
+          calibration_profile_bound:
+            type: boolean
+          required_modalities_bound:
+            type: boolean
+          target_gate_set_digest_bound:
+            type: boolean
+          gate_receipt_digest_bound:
+            type: boolean
+          identity_confirmation_gate_bound:
+            type: boolean
+          sensory_loopback_gate_bound:
+            type: boolean
+          raw_gate_payload_stored:
+            const: false
 events:
   biodata_transmitter.body_state_encoded:
     payload:
@@ -219,6 +298,9 @@ events:
   biodata_transmitter.calibration_profile_bound:
     payload:
       schema_ref: biodata_calibration_profile
+  biodata_transmitter.calibration_confidence_gate_bound:
+    payload:
+      schema_ref: biodata_calibration_confidence_gate
 compatibility:
   stability: bootstrap
   notes:
@@ -226,3 +308,4 @@ compatibility:
     - The intermediate representation is a literature-backed physiological latent, not a claim of full qualia or semantic thought recovery.
     - Conflicting or under-evidenced claims are routed to mind-upload.com refs rather than treated as settled runtime facts.
     - Multi-day calibration profiles improve person-specific baselines but still do not claim subjective equivalence or semantic thought recovery.
+    - Calibration confidence gates may raise confidence for identity confirmation and sensory loopback only through digest-bound calibration receipts; they do not expose raw biosignal or gate payloads.

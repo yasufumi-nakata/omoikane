@@ -17,6 +17,7 @@
 - `bdb_cycle.schema`
 - `bdb_session.schema`
 - `biodata_calibration_profile.schema`
+- `biodata_calibration_confidence_gate.schema`
 - `biodata_body_state_latent.schema`
 - `biodata_signal_bundle.schema`
 - `biodata_transmitter_session.schema`

@@ -65,6 +65,9 @@
   `identity-witness-revocation-live-verifier-quorum-v1` が accepted revocation refs を
   JP-13 / US-CA の dual verifier quorum と
   `identity-witness-revocation-verifier-roster-policy-v1` の verifier roster に束縛した場合のみ許可する
+- BioData Transmitter の calibration confidence gate は body-state latent 由来の
+  digest-only confidence input として参照できるが、self-report、witness quorum、
+  registry / revocation verifier binding を置き換えない
 - witness registry の raw roster / raw revocation payload は保存せず、
   `registry_entry_digest`、`registry_snapshot_digest`、revocation verifier response digest set、
   `revocation_verifier_quorum_digest`、`revocation_verifier_roster_digest`、

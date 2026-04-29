@@ -20,10 +20,19 @@ expected:
   source_latent_digest_set_bound: true
   calibration_digest_bound: true
   axis_baselines_bound: true
+  calibration_confidence_gate_ok: true
+  calibration_confidence_gate_status: bound
+  calibration_confidence_gate_profile_bound: true
+  calibration_confidence_gate_modalities_bound: true
+  calibration_confidence_gate_target_set_digest_bound: true
+  calibration_confidence_gate_receipt_digest_bound: true
+  identity_confirmation_confidence_gate_bound: true
+  sensory_loopback_confidence_gate_bound: true
   raw_source_payload_stored: false
   raw_generated_waveform_stored: false
   raw_latent_payload_stored: false
   raw_calibration_payload_stored: false
+  raw_gate_payload_stored: false
   semantic_thought_content_generated: false
   subjective_equivalence_claimed: false
 metric: boolean
