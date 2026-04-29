@@ -9765,8 +9765,17 @@ json.dump(response, sys.stdout)
         observation = self.ewa.observe(handle["handle_id"])
         emergency_stop = self.ewa.emergency_stop(
             handle["handle_id"],
-            trigger_source="watchdog-timeout",
-            reason="latency watchdog exceeded bounded threshold during lantern reposition",
+            trigger_source="regulator-permit-revoked",
+            reason="regulator permit revocation readback forced safe stop during lantern reposition",
+            regulator_permit_revocation_ref=(
+                "permit-revocation://jp-13/lab-drone-arm-01/inspection-safe-reposition/v1"
+            ),
+            regulator_permit_revocation_digest=f"sha256:{'8' * 64}",
+            regulator_permit_revocation_status="revoked",
+            regulator_permit_revocation_verifier_ref=(
+                "verifier://jp-13/lab-robotics-permit-desk/revocation-live"
+            ),
+            regulator_permit_revocation_verified_at="2026-04-30T00:00:00+00:00",
         )
         emergency_stop_validation = self.ewa.validate_emergency_stop(emergency_stop)
         release = self.ewa.release(
@@ -9968,6 +9977,17 @@ json.dump(response, sys.stdout)
             == regulator_permit_quorum_receipt["receipt_id"]
             and emergency_stop["regulator_permit_quorum_receipt_digest"]
             == regulator_permit_quorum_receipt["receipt_digest"],
+            "emergency_stop_bound_to_regulator_permit_revocation": (
+                emergency_stop_validation["regulator_permit_revocation_stop_bound"]
+                and emergency_stop["trigger_source"] == "regulator-permit-revoked"
+                and emergency_stop["regulator_permit_revocation_trigger_status"]
+                == "revoked"
+                and emergency_stop["raw_regulator_permit_revocation_payload_stored"]
+                is False
+            ),
+            "emergency_stop_audit_bound_to_regulator_permit_revocation": (
+                handle_validation["regulator_permit_revocation_stop_bound"]
+            ),
             "release_after_stop": release["status"] == "released",
             "ok": handle_validation["ok"]
             and veto_handle_validation["ok"]

@@ -3,7 +3,8 @@ target: interface.ewa
 level: L6
 description: >
   External World Agent boundary が bounded hardware kill-switch wiring と
-  stop-signal bus を armed receipt に固定し、
+  stop-signal bus を regulator permit revocation を含む fixed trigger set の
+  armed receipt に固定し、
   authorization / approved command / emergency stop に同じ path digest を束縛できること
 inputs:
   - source: reference-runtime

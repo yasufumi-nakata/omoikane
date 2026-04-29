@@ -703,6 +703,12 @@ class CliIntegrationTests(unittest.TestCase):
             result["validation"]["emergency_stop_bound_to_production_connector_attestation"]
         )
         self.assertTrue(result["validation"]["release_after_stop"])
+        self.assertTrue(
+            result["validation"]["emergency_stop_bound_to_regulator_permit_revocation"]
+        )
+        self.assertTrue(
+            result["validation"]["emergency_stop_audit_bound_to_regulator_permit_revocation"]
+        )
         self.assertEqual("vetoed", result["veto"]["status"])
         self.assertIn("harm.human", result["veto"]["matched_tokens"])
         self.assertEqual(
@@ -713,7 +719,14 @@ class CliIntegrationTests(unittest.TestCase):
             result["authorization"]["authorization_id"],
             result["approved_command"]["approval_path"]["authorization_id"],
         )
-        self.assertEqual("watchdog-timeout", result["emergency_stop"]["trigger_source"])
+        self.assertEqual("regulator-permit-revoked", result["emergency_stop"]["trigger_source"])
+        self.assertEqual(
+            "revoked",
+            result["emergency_stop"]["regulator_permit_revocation_trigger_status"],
+        )
+        self.assertFalse(
+            result["emergency_stop"]["raw_regulator_permit_revocation_payload_stored"]
+        )
         self.assertEqual("released", result["release"]["status"])
         self.assertEqual("released", result["veto_release"]["status"])
         self.assertEqual(

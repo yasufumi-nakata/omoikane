@@ -336,8 +336,24 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(context["motor_plan_validation"]["plan_ready"])
         self.assertTrue(context["stop_signal_path_validation"]["ok"])
         self.assertTrue(context["stop_signal_path_validation"]["path_ready"])
+        self.assertEqual(5, context["stop_signal_path"]["redundant_channel_count"])
+        self.assertIn(
+            "regulator-permit-revoked",
+            {
+                binding["trigger_source"]
+                for binding in context["stop_signal_path"]["armed_trigger_bindings"]
+            },
+        )
         self.assertTrue(context["stop_signal_adapter_validation"]["ok"])
         self.assertTrue(context["stop_signal_adapter_validation"]["receipt_ready"])
+        self.assertEqual(
+            5,
+            context["stop_signal_adapter_receipt"]["trigger_binding_count"],
+        )
+        self.assertIn(
+            "regulator-permit-revoked",
+            context["stop_signal_adapter_receipt"]["covered_trigger_sources"],
+        )
         self.assertTrue(context["production_connector_validation"]["ok"])
         self.assertTrue(context["production_connector_validation"]["attestation_ready"])
         self.assertTrue(context["legal_execution_validation"]["ok"])
@@ -809,8 +825,15 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(stop_validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(stop_validation["production_connector_attestation_bound"])
         self.assertTrue(stop_validation["regulator_permit_quorum_bound"])
+        self.assertTrue(stop_validation["regulator_permit_revocation_stop_bound"])
         self.assertTrue(stop_validation["trigger_binding_matched"])
         self.assertEqual("watchdog-timeout", stop["trigger_source"])
+        self.assertEqual("not-applicable", stop["regulator_permit_revocation_trigger_status"])
+        self.assertEqual("", stop["regulator_permit_revocation_trigger_ref"])
+        self.assertEqual("", stop["regulator_permit_revocation_trigger_digest"])
+        self.assertEqual("", stop["regulator_permit_revocation_verifier_ref"])
+        self.assertEqual("", stop["regulator_permit_revocation_verified_at"])
+        self.assertFalse(stop["raw_regulator_permit_revocation_payload_stored"])
         self.assertEqual(approved["command_id"], stop["command_id"])
         self.assertEqual(approved["instruction_digest"], stop["bound_command_digest"])
         self.assertEqual(authorization["authorization_id"], stop["authorization_id"])
@@ -857,7 +880,90 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(validation["production_connector_attestation_bound"])
         self.assertTrue(validation["regulator_permit_quorum_bound"])
+        self.assertTrue(validation["regulator_permit_revocation_stop_bound"])
         self.assertTrue(validation["emergency_stop_release_sequence_valid"])
+
+    def test_regulator_permit_revocation_trigger_forces_digest_only_stop(self) -> None:
+        context = self._build_authorized_reversible_context()
+        controller = context["controller"]
+        handle = context["handle"]
+        authorization = context["authorization"]
+
+        approved = controller.command(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            intent_summary="reposition lantern for inspection without permanent change",
+            ethics_attestation_id="ethics://ewa/approved-001",
+            guardian_observed=True,
+            intent_confidence=0.94,
+            authorization_id=authorization["authorization_id"],
+        )
+        stop = controller.emergency_stop(
+            handle["handle_id"],
+            trigger_source="regulator-permit-revoked",
+            reason="regulator permit revocation readback forced safe stop",
+            regulator_permit_revocation_ref=(
+                "permit-revocation://jp-13/ewa-arm-01/reposition/v1"
+            ),
+            regulator_permit_revocation_digest=f"sha256:{'8' * 64}",
+            regulator_permit_revocation_status="revoked",
+            regulator_permit_revocation_verifier_ref=(
+                "verifier://jp-13/lab-robotics-permit-desk/revocation-live"
+            ),
+            regulator_permit_revocation_verified_at="2026-04-30T00:00:00+00:00",
+        )
+        stop_validation = controller.validate_emergency_stop(stop)
+
+        self.assertTrue(stop_validation["ok"])
+        self.assertTrue(stop_validation["regulator_permit_revocation_stop_bound"])
+        self.assertTrue(stop_validation["trigger_binding_matched"])
+        self.assertEqual("regulator-permit-revoked", stop["trigger_source"])
+        self.assertEqual(approved["command_id"], stop["command_id"])
+        self.assertEqual("revoked", stop["regulator_permit_revocation_trigger_status"])
+        self.assertEqual(
+            "permit-revocation://jp-13/ewa-arm-01/reposition/v1",
+            stop["regulator_permit_revocation_trigger_ref"],
+        )
+        self.assertEqual(
+            f"sha256:{'8' * 64}",
+            stop["regulator_permit_revocation_trigger_digest"],
+        )
+        self.assertEqual(
+            "verifier://jp-13/lab-robotics-permit-desk/revocation-live",
+            stop["regulator_permit_revocation_verifier_ref"],
+        )
+        self.assertEqual(
+            "2026-04-30T00:00:00+00:00",
+            stop["regulator_permit_revocation_verified_at"],
+        )
+        self.assertFalse(stop["raw_regulator_permit_revocation_payload_stored"])
+
+    def test_regulator_permit_revocation_trigger_requires_evidence(self) -> None:
+        context = self._build_authorized_reversible_context()
+        controller = context["controller"]
+        handle = context["handle"]
+        authorization = context["authorization"]
+
+        controller.command(
+            handle["handle_id"],
+            command_id="ewa-command-approve-001",
+            instruction="move the inspection arm two centimeters to reposition the lantern",
+            reversibility="reversible",
+            intent_summary="reposition lantern for inspection without permanent change",
+            ethics_attestation_id="ethics://ewa/approved-001",
+            guardian_observed=True,
+            intent_confidence=0.94,
+            authorization_id=authorization["authorization_id"],
+        )
+
+        with self.assertRaisesRegex(ValueError, "requires status=revoked"):
+            controller.emergency_stop(
+                handle["handle_id"],
+                trigger_source="regulator-permit-revoked",
+                reason="regulator permit revocation readback forced safe stop",
+            )
 
 
 if __name__ == "__main__":

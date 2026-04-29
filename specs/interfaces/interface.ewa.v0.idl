@@ -197,7 +197,7 @@ operations:
     guarantees:
       - read-only commands must not arm a stop-signal path
       - stop-signal path must bind one handle_id, device_id, command_id, motor_plan_id/digest, and safe_stop_policy_id before authorization
-      - armed_trigger_bindings must cover the fixed trigger set guardian-manual-stop, watchdog-timeout, sensor-drift, and emergency-disconnect
+      - armed_trigger_bindings must cover the fixed trigger set guardian-manual-stop, watchdog-timeout, sensor-drift, emergency-disconnect, and regulator-permit-revoked
       - stop_signal_bus_profile_id must equal bounded-hardware-kill-switch-bus-v1
   validate_stop_signal_path:
     summary: Validate one armed hardware kill-switch wiring and stop-signal bus receipt against the fixed emergency-stop policy.
@@ -279,7 +279,7 @@ operations:
     guarantees:
       - adapter receipt must bind path_id, path_digest, command_id, stop_signal_bus_ref, and interlock_controller_ref
       - firmware and PLC program digests must be verified sha256 refs
-      - observed_signal_bindings must cover the fixed four trigger sources as armed
+      - observed_signal_bindings must cover the fixed five trigger sources as armed
   validate_stop_signal_adapter_receipt:
     summary: Validate one PLC / firmware adapter receipt against its bound stop-signal path.
     input:
@@ -1097,9 +1097,25 @@ operations:
               - watchdog-timeout
               - sensor-drift
               - emergency-disconnect
+              - regulator-permit-revoked
           reason:
             type: string
             minLength: 8
+          regulator_permit_revocation_ref:
+            type: string
+          regulator_permit_revocation_digest:
+            type: string
+            pattern: "^$|^sha256:[a-f0-9]{64}$"
+          regulator_permit_revocation_status:
+            type: string
+            enum:
+              - not-applicable
+              - revoked
+          regulator_permit_revocation_verifier_ref:
+            type: string
+          regulator_permit_revocation_verified_at:
+            type: string
+            format: date-time
     output:
       schema_ref: ewa_emergency_stop
     guarantees:
@@ -1108,6 +1124,8 @@ operations:
       - emergency stop must bind the last authorization artifact when one was active
       - emergency stop must bind one armed stop_signal_path and the activated trigger channel that delivered the bus latch
       - emergency stop must bind the same regulator permit quorum receipt/digest that gated the active authorization
+      - regulator-permit-revoked emergency stop must bind revocation ref, sha256 digest, verifier ref, verified_at, and raw-payload-redaction status
+      - non-revocation emergency stop must keep regulator permit revocation evidence empty and status not-applicable
       - release_required must remain true until the handle is force-released
       - further actuation commands must fail closed until release completes
   validate_emergency_stop:
@@ -1133,7 +1151,10 @@ operations:
           - bus_delivery_latched
           - authorization_bound
           - stop_signal_path_bound
+          - stop_signal_adapter_receipt_bound
+          - production_connector_attestation_bound
           - regulator_permit_quorum_bound
+          - regulator_permit_revocation_stop_bound
           - trigger_binding_matched
           - release_required
           - errors
@@ -1152,7 +1173,13 @@ operations:
             type: boolean
           stop_signal_path_bound:
             type: boolean
+          stop_signal_adapter_receipt_bound:
+            type: boolean
+          production_connector_attestation_bound:
+            type: boolean
           regulator_permit_quorum_bound:
+            type: boolean
+          regulator_permit_revocation_stop_bound:
             type: boolean
           trigger_binding_matched:
             type: boolean
@@ -1235,5 +1262,5 @@ events:
 compatibility:
   stability: bootstrap
   notes:
-    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, production connector attestation, regulator permit verifier readback, network-attested guardian oversight gating, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
-    - Live regulator / vendor transcripts, installation documents, and site-specific firmware payloads stay outside this reference runtime; only digest-bound permit, connector, and stop-signal evidence is modeled here.
+    - This contract proves bounded safety gating, device-specific motor semantics, armed hardware kill-switch routing, production connector attestation, regulator permit verifier readback, permit revocation forced-stop binding, network-attested guardian oversight gating, and jurisdiction-bound legal preflight for physical actuation inside the reference runtime.
+    - Live regulator / vendor transcripts, revocation payloads, installation documents, and site-specific firmware payloads stay outside this reference runtime; only digest-bound permit, connector, and stop-signal evidence is modeled here.

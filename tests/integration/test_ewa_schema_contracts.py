@@ -48,6 +48,10 @@ class EWASchemaContractTests(unittest.TestCase):
         result = self.runtime.run_ewa_demo()
 
         self._assert_schema_valid(
+            "specs/schemas/ewa_stop_signal_path.schema",
+            result["stop_signal_path"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/ewa_stop_signal_adapter_receipt.schema",
             result["stop_signal_adapter_receipt"],
         )

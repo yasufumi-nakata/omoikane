@@ -4,7 +4,8 @@ title: EWAEmergencyStop
 description: >
   Latched emergency-stop receipt for one active External World Agent handle,
   binding the last actuation command, optional authorization artifact, safe-state
-  interlock, and forced-release requirement.
+  interlock, forced-release requirement, and digest-only regulator permit
+  revocation readback when revocation itself forces the stop.
 type: object
 additionalProperties: false
 required:
@@ -39,6 +40,12 @@ required:
   - regulator_permit_threshold_policy_digest
   - regulator_permit_verifier_roster_digest
   - regulator_permit_revocation_registry_digest
+  - regulator_permit_revocation_trigger_ref
+  - regulator_permit_revocation_trigger_digest
+  - regulator_permit_revocation_trigger_status
+  - regulator_permit_revocation_verifier_ref
+  - regulator_permit_revocation_verified_at
+  - raw_regulator_permit_revocation_payload_stored
   - kill_switch_wiring_ref
   - activated_binding_id
   - activated_channel_ref
@@ -83,6 +90,7 @@ properties:
       - watchdog-timeout
       - sensor-drift
       - emergency-disconnect
+      - regulator-permit-revoked
   reason:
     type: string
     minLength: 8
@@ -149,6 +157,22 @@ properties:
   regulator_permit_revocation_registry_digest:
     type: string
     pattern: "^sha256:[a-f0-9]{64}$"
+  regulator_permit_revocation_trigger_ref:
+    type: string
+  regulator_permit_revocation_trigger_digest:
+    type: string
+    pattern: "^$|^sha256:[a-f0-9]{64}$"
+  regulator_permit_revocation_trigger_status:
+    type: string
+    enum:
+      - not-applicable
+      - revoked
+  regulator_permit_revocation_verifier_ref:
+    type: string
+  regulator_permit_revocation_verified_at:
+    type: string
+  raw_regulator_permit_revocation_payload_stored:
+    const: false
   kill_switch_wiring_ref:
     type: string
     minLength: 1

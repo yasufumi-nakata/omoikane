@@ -84,8 +84,10 @@
 - `ethics_query.yaml`
 - `ethics_rule.schema`
 - `ewa_audit.schema`
+  - carries regulator permit revocation forced-stop evidence as digest-only fields when regulator-permit-revoked is the active trigger
 - `ewa_command.schema`
 - `ewa_emergency_stop.schema`
+  - includes regulator-permit-revoked as a first-class emergency-stop trigger with raw revocation payload redaction
 - `ewa_guardian_oversight_gate.schema`
 - `ewa_legal_execution.schema`
 - `ewa_motor_plan.schema`

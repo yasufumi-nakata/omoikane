@@ -95,22 +95,23 @@ properties:
     const: ready
   covered_trigger_sources:
     type: array
-    minItems: 4
-    maxItems: 4
+    minItems: 5
+    maxItems: 5
     uniqueItems: true
     items:
       enum:
         - emergency-disconnect
         - guardian-manual-stop
+        - regulator-permit-revoked
         - sensor-drift
         - watchdog-timeout
   trigger_binding_count:
     type: integer
-    const: 4
+    const: 5
   observed_signal_bindings:
     type: array
-    minItems: 4
-    maxItems: 4
+    minItems: 5
+    maxItems: 5
     items:
       type: object
       additionalProperties: false
@@ -131,6 +132,7 @@ properties:
           enum:
             - emergency-disconnect
             - guardian-manual-stop
+            - regulator-permit-revoked
             - sensor-drift
             - watchdog-timeout
         channel_ref:
@@ -183,9 +185,10 @@ examples:
     covered_trigger_sources:
       - emergency-disconnect
       - guardian-manual-stop
+      - regulator-permit-revoked
       - sensor-drift
       - watchdog-timeout
-    trigger_binding_count: 4
+    trigger_binding_count: 5
     observed_signal_bindings:
       - binding_id: ewa-stop-binding-0123456789ab
         trigger_source: emergency-disconnect
@@ -204,6 +207,14 @@ examples:
         plc_contact_state: closed-ready
         firmware_latch_confirmed: true
       - binding_id: ewa-stop-binding-2123456789ab
+        trigger_source: regulator-permit-revoked
+        channel_ref: stop-channel://ewa-stop-path-0123456789ab/permit-revocation-trip
+        signal_path_ref: stop-signal://ewa-stop-path-0123456789ab/permit-revocation-monitor
+        interlock_ref: interlock://lab-drone-arm-01/safety-plc/permit-revocation-relay
+        observed_signal_state: armed
+        plc_contact_state: closed-ready
+        firmware_latch_confirmed: true
+      - binding_id: ewa-stop-binding-3123456789ab
         trigger_source: sensor-drift
         channel_ref: stop-channel://ewa-stop-path-0123456789ab/sensor-drift-trip
         signal_path_ref: stop-signal://ewa-stop-path-0123456789ab/sensor-monitor
@@ -211,7 +222,7 @@ examples:
         observed_signal_state: armed
         plc_contact_state: closed-ready
         firmware_latch_confirmed: true
-      - binding_id: ewa-stop-binding-3123456789ab
+      - binding_id: ewa-stop-binding-4123456789ab
         trigger_source: watchdog-timeout
         channel_ref: stop-channel://ewa-stop-path-0123456789ab/watchdog-trip
         signal_path_ref: stop-signal://ewa-stop-path-0123456789ab/watchdog-monitor

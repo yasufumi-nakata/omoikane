@@ -73,8 +73,8 @@ properties:
     minLength: 1
   armed_trigger_bindings:
     type: array
-    minItems: 4
-    maxItems: 4
+    minItems: 5
+    maxItems: 5
     items:
       type: object
       additionalProperties: false
@@ -97,6 +97,7 @@ properties:
             - watchdog-timeout
             - sensor-drift
             - emergency-disconnect
+            - regulator-permit-revoked
         channel_ref:
           type: string
           minLength: 1
@@ -114,7 +115,7 @@ properties:
           const: armed
   redundant_channel_count:
     type: integer
-    const: 4
+    const: 5
   armed_at:
     type: string
     format: date-time

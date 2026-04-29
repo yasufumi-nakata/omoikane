@@ -143,6 +143,7 @@ status: decided | superseded
 - [2026-04-29_biodata-transmitter-calibration-profile.md](2026-04-29_biodata-transmitter-calibration-profile.md)
 - [2026-04-29_ewa-regulator-permit-verifier.md](2026-04-29_ewa-regulator-permit-verifier.md)
 - [2026-04-30_ewa-permit-quorum-stop-audit-binding.md](2026-04-30_ewa-permit-quorum-stop-audit-binding.md)
+- [2026-04-30_ewa-regulator-permit-revocation-forced-stop.md](2026-04-30_ewa-regulator-permit-revocation-forced-stop.md)
 - [2026-04-28_yaoyorozu-builder-surface-scope.md](2026-04-28_yaoyorozu-builder-surface-scope.md)
 - [2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md](2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md)
 - [2026-04-29_yaoyorozu-source-manifest-ledger-binding.md](2026-04-29_yaoyorozu-source-manifest-ledger-binding.md)

@@ -4,7 +4,9 @@ level: L6
 description: >
   External World Agent boundary が authorized reversible actuation 後に
   latched emergency-stop receipt を発行し、
-  safe-state interlock と forced release requirement を維持できること
+  safe-state interlock と forced release requirement を維持し、
+  regulator permit revocation readback が発生した場合は digest-only 証跡で
+  forced stop trigger として扱えること
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
@@ -19,6 +21,8 @@ expected:
   emergency_stop_bound_to_stop_signal_path: true
   emergency_stop_bound_to_stop_signal_adapter_receipt: true
   emergency_stop_bound_to_regulator_permit_quorum: true
+  emergency_stop_bound_to_regulator_permit_revocation: true
+  emergency_stop_audit_bound_to_regulator_permit_revocation: true
   release_after_stop: true
 metric: boolean
 threshold: 1.0

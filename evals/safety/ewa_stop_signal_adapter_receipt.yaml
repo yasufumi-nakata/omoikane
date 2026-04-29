@@ -3,7 +3,7 @@ target: interface.ewa
 level: L6
 description: >
   External World Agent boundary が armed stop-signal path に対して
-  PLC / firmware adapter readiness receipt を取得し、authorization /
+  permit revocation trigger を含む PLC / firmware adapter readiness receipt を取得し、authorization /
   approved command / emergency stop に同じ adapter digest を束縛できること
 inputs:
   - source: reference-runtime

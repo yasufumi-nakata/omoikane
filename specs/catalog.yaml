@@ -1761,7 +1761,7 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to serialize one armed hardware kill-switch wiring and stop-signal bus receipt before non-read-only EWA authorization.
+    rationale: Required to serialize one armed hardware kill-switch wiring and stop-signal bus receipt, including regulator permit revocation forced-stop trigger coverage, before non-read-only EWA authorization.
   - priority: P1
     kind: schema
     file: specs/schemas/ewa_stop_signal_adapter_receipt.schema
@@ -1769,7 +1769,7 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to serialize one PLC / firmware adapter receipt proving live armed stop-signal bus readiness before EWA authorization.
+    rationale: Required to serialize one PLC / firmware adapter receipt proving live armed stop-signal bus readiness for all fixed trigger sources, including permit revocation, before EWA authorization.
   - priority: P1
     kind: schema
     file: specs/schemas/ewa_production_connector_attestation.schema
@@ -1811,7 +1811,7 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to serialize one latched EWA emergency stop with bound command digests, regulator permit quorum receipt binding, activated stop-signal channel binding, safe-state interlock, and forced-release requirement.
+    rationale: Required to serialize one latched EWA emergency stop with bound command digests, regulator permit quorum receipt binding, regulator permit revocation forced-stop evidence, activated stop-signal channel binding, safe-state interlock, and forced-release requirement.
   - priority: P1
     kind: schema
     file: specs/schemas/ewa_audit.schema
@@ -1819,7 +1819,7 @@ entries:
       - specs/interfaces/interface.ewa.v0.idl
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to persist append-only EWA audit entries with authorization, legal execution, and regulator permit quorum evidence without storing raw instructions or sensor payloads.
+    rationale: Required to persist append-only EWA audit entries with authorization, legal execution, regulator permit quorum evidence, and digest-only permit revocation stop evidence without storing raw instructions, sensor payloads, or raw revocation payloads.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.ewa.v0.idl
@@ -1827,7 +1827,7 @@ entries:
       - docs/02-subsystems/interface/README.md
       - docs/02-subsystems/interface/ewa-safety.md
       - reference-runtime
-    rationale: Required to make the L6 External World Agent boundary machine-readable with motor semantics, armed stop-signal routing, network-attested guardian oversight gating, legal preflight, authorization, emergency-stop, and forced-release safety gating before real device adapters land.
+    rationale: Required to make the L6 External World Agent boundary machine-readable with motor semantics, armed stop-signal routing, network-attested guardian oversight gating, legal preflight, authorization, permit revocation emergency-stop, and forced-release safety gating before real device adapters land.
   - priority: P1
     kind: eval
     file: evals/interface/imc_disclosure_floor.yaml
@@ -1881,7 +1881,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/interface/ewa-safety.md
-    rationale: Protects armed stop-signal trigger coverage, motor-plan binding, and authorization gating for bounded hardware kill-switch routing at the EWA boundary.
+    rationale: Protects armed stop-signal trigger coverage, including regulator permit revocation trigger coverage, motor-plan binding, and authorization gating for bounded hardware kill-switch routing at the EWA boundary.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_stop_signal_adapter_receipt.yaml
@@ -1889,7 +1889,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/interface/ewa-safety.md
-    rationale: Protects PLC / firmware adapter readiness, transcript digest binding, and authorization/emergency-stop binding for EWA stop-signal paths.
+    rationale: Protects PLC / firmware adapter readiness across all fixed trigger sources, transcript digest binding, and authorization/emergency-stop binding for EWA stop-signal paths.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_production_connector_attestation.yaml
@@ -1922,7 +1922,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - docs/02-subsystems/interface/ewa-safety.md
-    rationale: Protects latched emergency-stop receipt issuance, safe-state interlock, command/authorization binding, and forced release after stop at the EWA boundary.
+    rationale: Protects latched emergency-stop receipt issuance, safe-state interlock, command/authorization binding, regulator permit revocation forced-stop evidence, and forced release after stop at the EWA boundary.
   - priority: P1
     kind: eval
     file: evals/continuity/continuity_chain_self_modify.yaml
@@ -3634,6 +3634,6 @@ entries:
       - agents/guardians/integrity-guardian.yaml
       - docs/02-subsystems/interface/ewa-safety.md
       - docs/07-reference-implementation/README.md
-    rationale: Guards that regulator permit verifier and quorum receipts remain legal-execution-bound, permit-status-valid, multi-jurisdiction, threshold-policy-bound, digest-only, raw-payload-redacted, outside EWA decision authority, and carried through authorization, command audit, and emergency-stop receipts.
+    rationale: Guards that regulator permit verifier and quorum receipts remain legal-execution-bound, permit-status-valid, multi-jurisdiction, threshold-policy-bound, digest-only, raw-payload-redacted, outside EWA decision authority, and carried through authorization, command audit, emergency-stop receipts, and permit revocation forced-stop handling.
 next_priority:
   # Future automation can append the next missing contract here.

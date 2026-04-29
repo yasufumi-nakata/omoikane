@@ -5,7 +5,8 @@ description: >
   External World Agent boundary が jurisdiction-bound legal execution を
   regulator permit API readback receipt と multi-jurisdiction quorum receipt に
   digest-only で束縛し、raw permit / raw regulator response / raw threshold
-  policy / raw roster payload を保存せず、verifier を decision authority に昇格させないこと。
+  policy / raw roster payload を保存せず、verifier を decision authority に昇格させず、
+  実行中の permit revocation readback を forced stop trigger として digest-only に束縛すること。
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
@@ -23,6 +24,8 @@ expected:
   authorization_regulator_permit_quorum_ready: true
   approved_command_regulator_permit_quorum_bound: true
   emergency_stop_bound_to_regulator_permit_quorum: true
+  emergency_stop_bound_to_regulator_permit_revocation: true
+  emergency_stop_audit_bound_to_regulator_permit_revocation: true
 metric: boolean
 threshold: 1.0
 ethics_check: true

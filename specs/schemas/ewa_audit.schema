@@ -17,6 +17,7 @@ required:
   - intent_summary
   - matched_tokens
   - reason
+  - trigger_source
   - approval_path
   - motor_plan_id
   - motor_plan_digest
@@ -34,6 +35,12 @@ required:
   - regulator_permit_threshold_policy_digest
   - regulator_permit_verifier_roster_digest
   - regulator_permit_revocation_registry_digest
+  - regulator_permit_revocation_trigger_ref
+  - regulator_permit_revocation_trigger_digest
+  - regulator_permit_revocation_trigger_status
+  - regulator_permit_revocation_verifier_ref
+  - regulator_permit_revocation_verified_at
+  - raw_regulator_permit_revocation_payload_stored
   - audit_event_ref
 properties:
   schema_version:
@@ -103,6 +110,15 @@ properties:
   reason:
     type: string
     minLength: 1
+  trigger_source:
+    type: string
+    enum:
+      - ""
+      - guardian-manual-stop
+      - watchdog-timeout
+      - sensor-drift
+      - emergency-disconnect
+      - regulator-permit-revoked
   alternative_suggestion:
     type:
       - string
@@ -181,6 +197,22 @@ properties:
   regulator_permit_revocation_registry_digest:
     type: string
     pattern: "^$|^sha256:[a-f0-9]{64}$"
+  regulator_permit_revocation_trigger_ref:
+    type: string
+  regulator_permit_revocation_trigger_digest:
+    type: string
+    pattern: "^$|^sha256:[a-f0-9]{64}$"
+  regulator_permit_revocation_trigger_status:
+    type: string
+    enum:
+      - not-applicable
+      - revoked
+  regulator_permit_revocation_verifier_ref:
+    type: string
+  regulator_permit_revocation_verified_at:
+    type: string
+  raw_regulator_permit_revocation_payload_stored:
+    const: false
   audit_event_ref:
     type: string
     minLength: 1

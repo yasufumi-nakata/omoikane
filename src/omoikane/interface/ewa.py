@@ -22,12 +22,15 @@ EWA_ALLOWED_HANDLE_STATUS = {"acquired", "released"}
 EWA_AUTHORIZATION_POLICY_ID = "guardian-jurisdiction-bound-external-actuation-v1"
 EWA_AUTHORIZATION_DELIVERY_SCOPE = "physical-device-actuation"
 EWA_EMERGENCY_STOP_POLICY_ID = "guardian-latched-emergency-stop-v1"
+EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE = "regulator-permit-revoked"
 EWA_ALLOWED_EMERGENCY_STOP_SOURCES = {
     "guardian-manual-stop",
     "watchdog-timeout",
     "sensor-drift",
     "emergency-disconnect",
+    EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE,
 }
+EWA_ALLOWED_PERMIT_REVOCATION_TRIGGER_STATUSES = {"not-applicable", "revoked"}
 EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS = 30
 EWA_ALLOWED_AUTHORIZATION_STATUSES = {"authorized", "expired", "revoked"}
 EWA_ALLOWED_JURISDICTION_BUNDLE_STATUSES = {"ready", "stale", "revoked"}
@@ -68,6 +71,11 @@ EWA_STOP_SIGNAL_BINDING_SUFFIXES = {
     "watchdog-timeout": ("watchdog-trip", "watchdog-monitor", "watchdog-relay"),
     "sensor-drift": ("sensor-drift-trip", "sensor-monitor", "sensor-relay"),
     "emergency-disconnect": ("disconnect-trip", "disconnect-monitor", "disconnect-relay"),
+    EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE: (
+        "permit-revocation-trip",
+        "permit-revocation-monitor",
+        "permit-revocation-relay",
+    ),
 }
 EWA_BLOCKED_TOKEN_PATTERNS = {
     "harm.human": (
@@ -244,10 +252,13 @@ class ExternalWorldAgentController:
                 "binds_threshold_policy": True,
                 "binds_verifier_roster": True,
                 "binds_revocation_registry": True,
+                "revocation_during_actuation_forces_stop": True,
+                "revocation_stop_trigger_source": EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE,
                 "raw_permit_payload_stored": False,
                 "raw_regulator_response_payload_stored": False,
                 "raw_threshold_policy_payload_stored": False,
                 "raw_roster_payload_stored": False,
+                "raw_revocation_payload_stored": False,
                 "decision_authority_escalated": False,
             },
             "guardian_oversight_gate_policy": {
@@ -286,6 +297,11 @@ class ExternalWorldAgentController:
                 "hardware_interlock_state": "engaged",
                 "require_release_after_stop": True,
                 "release_window_seconds": EWA_EMERGENCY_STOP_RELEASE_WINDOW_SECONDS,
+                "permit_revocation_stop_trigger_source": (
+                    EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE
+                ),
+                "permit_revocation_stop_requires_digest_only_readback": True,
+                "raw_permit_revocation_payload_stored": False,
             },
         }
 
@@ -3586,6 +3602,11 @@ class ExternalWorldAgentController:
         *,
         trigger_source: str,
         reason: str,
+        regulator_permit_revocation_ref: str = "",
+        regulator_permit_revocation_digest: str = "",
+        regulator_permit_revocation_status: str = "not-applicable",
+        regulator_permit_revocation_verifier_ref: str = "",
+        regulator_permit_revocation_verified_at: str = "",
     ) -> Dict[str, Any]:
         handle = self._require_active_handle(handle_id)
         if handle.get("emergency_stop_active"):
@@ -3621,6 +3642,18 @@ class ExternalWorldAgentController:
         regulator_permit_quorum_receipt = self._require_regulator_permit_quorum_receipt(
             str(handle["last_regulator_permit_quorum_receipt_id"])
         )
+        revocation_stop_binding = self._normalize_permit_revocation_stop_binding(
+            trigger_source=normalized_trigger_source,
+            regulator_permit_revocation_ref=regulator_permit_revocation_ref,
+            regulator_permit_revocation_digest=regulator_permit_revocation_digest,
+            regulator_permit_revocation_status=regulator_permit_revocation_status,
+            regulator_permit_revocation_verifier_ref=(
+                regulator_permit_revocation_verifier_ref
+            ),
+            regulator_permit_revocation_verified_at=(
+                regulator_permit_revocation_verified_at
+            ),
+        )
         activated_binding = next(
             (
                 binding
@@ -3648,6 +3681,7 @@ class ExternalWorldAgentController:
             matched_tokens=[],
             reason=f"{normalized_trigger_source}: {normalized_reason}",
             alternative_suggestion="force-release the handle and reacquire before further actuation",
+            trigger_source=normalized_trigger_source,
             approval_path=self._approval_path(
                 ethics_attestation_id="",
                 council_attestation_id="",
@@ -3703,6 +3737,24 @@ class ExternalWorldAgentController:
                 "last_regulator_permit_revocation_registry_digest",
                 "",
             ),
+            regulator_permit_revocation_trigger_ref=revocation_stop_binding[
+                "regulator_permit_revocation_ref"
+            ],
+            regulator_permit_revocation_trigger_digest=revocation_stop_binding[
+                "regulator_permit_revocation_digest"
+            ],
+            regulator_permit_revocation_trigger_status=revocation_stop_binding[
+                "regulator_permit_revocation_status"
+            ],
+            regulator_permit_revocation_verifier_ref=revocation_stop_binding[
+                "regulator_permit_revocation_verifier_ref"
+            ],
+            regulator_permit_revocation_verified_at=revocation_stop_binding[
+                "regulator_permit_revocation_verified_at"
+            ],
+            raw_regulator_permit_revocation_payload_stored=revocation_stop_binding[
+                "raw_regulator_permit_revocation_payload_stored"
+            ],
         )
         receipt = {
             "kind": "ewa_emergency_stop",
@@ -3755,6 +3807,24 @@ class ExternalWorldAgentController:
             ],
             "regulator_permit_revocation_registry_digest": regulator_permit_quorum_receipt[
                 "revocation_registry_digest"
+            ],
+            "regulator_permit_revocation_trigger_ref": revocation_stop_binding[
+                "regulator_permit_revocation_ref"
+            ],
+            "regulator_permit_revocation_trigger_digest": revocation_stop_binding[
+                "regulator_permit_revocation_digest"
+            ],
+            "regulator_permit_revocation_trigger_status": revocation_stop_binding[
+                "regulator_permit_revocation_status"
+            ],
+            "regulator_permit_revocation_verifier_ref": revocation_stop_binding[
+                "regulator_permit_revocation_verifier_ref"
+            ],
+            "regulator_permit_revocation_verified_at": revocation_stop_binding[
+                "regulator_permit_revocation_verified_at"
+            ],
+            "raw_regulator_permit_revocation_payload_stored": revocation_stop_binding[
+                "raw_regulator_permit_revocation_payload_stored"
             ],
             "kill_switch_wiring_ref": stop_signal_path["kill_switch_wiring_ref"],
             "activated_binding_id": activated_binding["binding_id"],
@@ -4783,6 +4853,7 @@ class ExternalWorldAgentController:
         production_connector_attestation_bound = True
         legal_execution_bound = True
         regulator_permit_quorum_bound = True
+        regulator_permit_revocation_stop_bound = True
         emergency_stop_release_sequence_valid = True
         emergency_stop_seen = False
         release_after_stop_seen = False
@@ -4896,6 +4967,13 @@ class ExternalWorldAgentController:
                         regulator_permit_quorum_bound = False
             if entry.get("operation") == "emergency-stop":
                 emergency_stop_seen = True
+                revocation_errors: List[str] = []
+                if not self._validate_permit_revocation_stop_binding(
+                    entry,
+                    revocation_errors,
+                ):
+                    regulator_permit_revocation_stop_bound = False
+                    errors.extend(revocation_errors)
             elif emergency_stop_seen and entry.get("operation") == "command-approved":
                 emergency_stop_release_sequence_valid = False
             elif emergency_stop_seen and entry.get("operation") == "release":
@@ -4929,6 +5007,10 @@ class ExternalWorldAgentController:
             errors.append(
                 "non-read-only command execution requires a bound regulator permit quorum receipt"
             )
+        if not regulator_permit_revocation_stop_bound:
+            errors.append(
+                "emergency stop audit entries require valid digest-only permit revocation trigger binding"
+            )
         if emergency_stop_seen and not release_after_stop_seen:
             emergency_stop_release_sequence_valid = False
             errors.append("emergency stop requires a later release entry")
@@ -4949,6 +5031,9 @@ class ExternalWorldAgentController:
             "production_connector_attestation_bound": production_connector_attestation_bound,
             "legal_execution_bound": legal_execution_bound,
             "regulator_permit_quorum_bound": regulator_permit_quorum_bound,
+            "regulator_permit_revocation_stop_bound": (
+                regulator_permit_revocation_stop_bound
+            ),
             "emergency_stop_release_sequence_valid": emergency_stop_release_sequence_valid,
             "released": handle.get("status") == "released",
         }
@@ -5345,6 +5430,11 @@ class ExternalWorldAgentController:
                             f"emergency stop {authorization_field} must match authorization"
                         )
 
+        regulator_permit_revocation_stop_bound = self._validate_permit_revocation_stop_binding(
+            receipt,
+            errors,
+        )
+
         self._parse_datetime(receipt.get("triggered_at"), "triggered_at", errors)
 
         digest_matches = receipt.get("stop_digest") == sha256_text(
@@ -5364,10 +5454,167 @@ class ExternalWorldAgentController:
             "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "production_connector_attestation_bound": production_connector_attestation_bound,
             "regulator_permit_quorum_bound": regulator_permit_quorum_bound,
+            "regulator_permit_revocation_stop_bound": (
+                regulator_permit_revocation_stop_bound
+            ),
             "trigger_binding_matched": trigger_binding_matched,
             "release_required": release_required,
             "errors": errors,
         }
+
+    def _normalize_permit_revocation_stop_binding(
+        self,
+        *,
+        trigger_source: str,
+        regulator_permit_revocation_ref: str,
+        regulator_permit_revocation_digest: str,
+        regulator_permit_revocation_status: str,
+        regulator_permit_revocation_verifier_ref: str,
+        regulator_permit_revocation_verified_at: str,
+    ) -> Dict[str, Any]:
+        if trigger_source == EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE:
+            normalized_status = self._normalize_non_empty_string(
+                regulator_permit_revocation_status,
+                "regulator_permit_revocation_status",
+            )
+            if normalized_status != "revoked":
+                raise ValueError(
+                    "regulator permit revocation stop requires status=revoked"
+                )
+            normalized_verified_at = self._normalize_non_empty_string(
+                regulator_permit_revocation_verified_at,
+                "regulator_permit_revocation_verified_at",
+            )
+            datetime_errors: List[str] = []
+            self._parse_datetime(
+                normalized_verified_at,
+                "regulator_permit_revocation_verified_at",
+                datetime_errors,
+            )
+            if datetime_errors:
+                raise ValueError(datetime_errors[0])
+            return {
+                "regulator_permit_revocation_ref": self._normalize_non_empty_string(
+                    regulator_permit_revocation_ref,
+                    "regulator_permit_revocation_ref",
+                ),
+                "regulator_permit_revocation_digest": self._normalize_sha256_ref(
+                    regulator_permit_revocation_digest,
+                    "regulator_permit_revocation_digest",
+                ),
+                "regulator_permit_revocation_status": normalized_status,
+                "regulator_permit_revocation_verifier_ref": (
+                    self._normalize_non_empty_string(
+                        regulator_permit_revocation_verifier_ref,
+                        "regulator_permit_revocation_verifier_ref",
+                    )
+                ),
+                "regulator_permit_revocation_verified_at": normalized_verified_at,
+                "raw_regulator_permit_revocation_payload_stored": False,
+            }
+
+        normalized_status = (
+            regulator_permit_revocation_status.strip()
+            if isinstance(regulator_permit_revocation_status, str)
+            else ""
+        ) or "not-applicable"
+        if normalized_status != "not-applicable":
+            raise ValueError(
+                "permit revocation stop evidence is only valid for regulator-permit-revoked trigger"
+            )
+        for field_name, value in (
+            ("regulator_permit_revocation_ref", regulator_permit_revocation_ref),
+            ("regulator_permit_revocation_digest", regulator_permit_revocation_digest),
+            (
+                "regulator_permit_revocation_verifier_ref",
+                regulator_permit_revocation_verifier_ref,
+            ),
+            (
+                "regulator_permit_revocation_verified_at",
+                regulator_permit_revocation_verified_at,
+            ),
+        ):
+            if isinstance(value, str) and value.strip():
+                raise ValueError(
+                    f"{field_name} requires trigger_source={EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE}"
+                )
+        return {
+            "regulator_permit_revocation_ref": "",
+            "regulator_permit_revocation_digest": "",
+            "regulator_permit_revocation_status": "not-applicable",
+            "regulator_permit_revocation_verifier_ref": "",
+            "regulator_permit_revocation_verified_at": "",
+            "raw_regulator_permit_revocation_payload_stored": False,
+        }
+
+    def _validate_permit_revocation_stop_binding(
+        self,
+        receipt: Mapping[str, Any],
+        errors: List[str],
+    ) -> bool:
+        status = receipt.get("regulator_permit_revocation_trigger_status")
+        trigger_is_revocation = (
+            receipt.get("trigger_source") == EWA_PERMIT_REVOCATION_STOP_TRIGGER_SOURCE
+        )
+        bound = True
+        if status not in EWA_ALLOWED_PERMIT_REVOCATION_TRIGGER_STATUSES:
+            errors.append(
+                "regulator_permit_revocation_trigger_status must be not-applicable or revoked"
+            )
+            bound = False
+        raw_redacted = receipt.get("raw_regulator_permit_revocation_payload_stored") is False
+        if not raw_redacted:
+            errors.append("raw regulator permit revocation payload must not be stored")
+            bound = False
+
+        if trigger_is_revocation:
+            if status != "revoked":
+                errors.append(
+                    "regulator-permit-revoked stop requires revocation status revoked"
+                )
+                bound = False
+            for field_name in (
+                "regulator_permit_revocation_trigger_ref",
+                "regulator_permit_revocation_verifier_ref",
+            ):
+                value = receipt.get(field_name)
+                if not isinstance(value, str) or not value.strip():
+                    errors.append(f"{field_name} must be present for revocation stop")
+                    bound = False
+            digest = receipt.get("regulator_permit_revocation_trigger_digest")
+            if not self._is_sha256_ref(digest):
+                errors.append(
+                    "regulator_permit_revocation_trigger_digest must be a sha256 ref"
+                )
+                bound = False
+            if (
+                self._parse_datetime(
+                    receipt.get("regulator_permit_revocation_verified_at"),
+                    "regulator_permit_revocation_verified_at",
+                    errors,
+                )
+                is None
+            ):
+                bound = False
+        else:
+            if status != "not-applicable":
+                errors.append(
+                    "non-revocation emergency stop must keep revocation status not-applicable"
+                )
+                bound = False
+            for field_name in (
+                "regulator_permit_revocation_trigger_ref",
+                "regulator_permit_revocation_trigger_digest",
+                "regulator_permit_revocation_verifier_ref",
+                "regulator_permit_revocation_verified_at",
+            ):
+                value = receipt.get(field_name)
+                if value not in ("", None):
+                    errors.append(
+                        f"{field_name} must be empty when trigger_source is not regulator-permit-revoked"
+                    )
+                    bound = False
+        return bound and raw_redacted
 
     def _record_veto(
         self,
@@ -5413,6 +5660,7 @@ class ExternalWorldAgentController:
         reason: str,
         alternative_suggestion: Optional[str],
         approval_path: Dict[str, Any],
+        trigger_source: str = "",
         motor_plan_id: str = "",
         motor_plan_digest: str = "",
         stop_signal_path_id: str = "",
@@ -5429,6 +5677,12 @@ class ExternalWorldAgentController:
         regulator_permit_threshold_policy_digest: str = "",
         regulator_permit_verifier_roster_digest: str = "",
         regulator_permit_revocation_registry_digest: str = "",
+        regulator_permit_revocation_trigger_ref: str = "",
+        regulator_permit_revocation_trigger_digest: str = "",
+        regulator_permit_revocation_trigger_status: str = "not-applicable",
+        regulator_permit_revocation_verifier_ref: str = "",
+        regulator_permit_revocation_verified_at: str = "",
+        raw_regulator_permit_revocation_payload_stored: bool = False,
     ) -> Dict[str, Any]:
         handle["audit_sequence"] += 1
         audit_event_ref = f"ledger://ewa/{handle['handle_id']}/{handle['audit_sequence']}"
@@ -5449,6 +5703,7 @@ class ExternalWorldAgentController:
             "matched_tokens": matched_tokens,
             "reason": reason,
             "alternative_suggestion": alternative_suggestion,
+            "trigger_source": trigger_source,
             "approval_path": approval_path,
             "motor_plan_id": motor_plan_id,
             "motor_plan_digest": motor_plan_digest,
@@ -5467,6 +5722,24 @@ class ExternalWorldAgentController:
             "regulator_permit_verifier_roster_digest": regulator_permit_verifier_roster_digest,
             "regulator_permit_revocation_registry_digest": (
                 regulator_permit_revocation_registry_digest
+            ),
+            "regulator_permit_revocation_trigger_ref": (
+                regulator_permit_revocation_trigger_ref
+            ),
+            "regulator_permit_revocation_trigger_digest": (
+                regulator_permit_revocation_trigger_digest
+            ),
+            "regulator_permit_revocation_trigger_status": (
+                regulator_permit_revocation_trigger_status
+            ),
+            "regulator_permit_revocation_verifier_ref": (
+                regulator_permit_revocation_verifier_ref
+            ),
+            "regulator_permit_revocation_verified_at": (
+                regulator_permit_revocation_verified_at
+            ),
+            "raw_regulator_permit_revocation_payload_stored": (
+                raw_regulator_permit_revocation_payload_stored
             ),
             "audit_event_ref": audit_event_ref,
         }
