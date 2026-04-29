@@ -1072,6 +1072,11 @@ calibration digest を raw source / latent / calibration payload なしで返す
 identity confirmation と sensory loopback の confidence gate refs へ digest-only に束縛される。
 gate receipt は full modality coverage、target 別 confidence threshold、
 calibration digest、gate receipt digest を検証し、raw gate payload は保存しない。
+sensory loopback 側では、この gate を
+`biodata-calibration-gated-drift-threshold-v1` として受け取り、
+`confidence_score >= 0.7` の時だけ body-map drift threshold を最大 `0.04`
+まで補正する。これは body-map calibration、Guardian hold、stabilization を
+置き換えるものではなく、raw calibration / gate payload は保存しない。
 
 `imc-demo` は L6 Inter-Mind Channel の reference contract
 (`interface.imc.v0`) を JSON で可視化し、
@@ -1318,10 +1323,14 @@ engine transaction log の `approval_fanout_bound` entry と同じ fan-out diges
 `avatar_body_map_ref` / `proprioceptive_calibration_ref` /
 `body_map_alignment_ref` にも束縛され、
 weighted `body_map_alignment` から導出される
-`latency_budget_ms=90.0` と `body_coherence_score<=0.20` の範囲では
+`latency_budget_ms=90.0` と、BioData calibration confidence gate で
+最大 `0.04` だけ補正された applied body drift threshold の範囲では
 `delivered` になり、
 high-drift bundle が `guardian-hold` と `safe baseline` に落ちた後、
 `stabilize` で active session へ復帰すること、
+calibration confidence gate ref / digest / score / threshold adjustment が
+session と receipt と artifact family scene summary に digest-only で残り、
+raw calibration / gate payload を保存しないこと、
 さらに `qualia_binding_ref` が surrogate tick ref に束縛され、
 coherent / held / stabilized の 3 scene が
 `multi-scene-artifact-family-v1` で 1 つの digest-only artifact family に束縛されつつ、

@@ -27,6 +27,18 @@ required:
   - attenuation_latency_ms
   - coherence_drift_threshold
   - hold_drift_threshold
+  - calibration_confidence_policy_id
+  - calibration_confidence_gate_ref
+  - calibration_confidence_gate_digest
+  - calibration_confidence_score
+  - calibration_confidence_minimum
+  - calibration_confidence_gate_status
+  - calibration_confidence_gate_bound
+  - calibration_threshold_adjustment
+  - calibration_adjusted_coherence_drift_threshold
+  - calibration_adjusted_hold_drift_threshold
+  - raw_calibration_payload_stored
+  - raw_gate_payload_stored
   - body_map_profile
   - avatar_body_map_ref
   - body_map_anchor_refs
@@ -118,6 +130,41 @@ properties:
     const: 0.2
   hold_drift_threshold:
     const: 0.35
+  calibration_confidence_policy_id:
+    const: biodata-calibration-gated-drift-threshold-v1
+  calibration_confidence_gate_ref:
+    type: string
+  calibration_confidence_gate_digest:
+    type: string
+  calibration_confidence_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  calibration_confidence_minimum:
+    const: 0.7
+  calibration_confidence_gate_status:
+    type: string
+    enum:
+      - bound
+      - not-bound
+  calibration_confidence_gate_bound:
+    type: boolean
+  calibration_threshold_adjustment:
+    type: number
+    minimum: 0
+    maximum: 0.04
+  calibration_adjusted_coherence_drift_threshold:
+    type: number
+    minimum: 0.2
+    maximum: 0.24
+  calibration_adjusted_hold_drift_threshold:
+    type: number
+    minimum: 0.35
+    maximum: 0.39
+  raw_calibration_payload_stored:
+    const: false
+  raw_gate_payload_stored:
+    const: false
   body_map_profile:
     const: avatar-proprioceptive-map-v1
   avatar_body_map_ref:

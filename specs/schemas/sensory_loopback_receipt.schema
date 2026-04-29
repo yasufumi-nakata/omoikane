@@ -20,6 +20,18 @@ required:
   - body_map_profile
   - avatar_body_map_ref
   - proprioceptive_calibration_ref
+  - calibration_confidence_policy_id
+  - calibration_confidence_gate_ref
+  - calibration_confidence_gate_digest
+  - calibration_confidence_score
+  - calibration_confidence_minimum
+  - calibration_confidence_gate_status
+  - calibration_confidence_gate_bound
+  - calibration_threshold_adjustment
+  - applied_coherence_drift_threshold
+  - applied_hold_drift_threshold
+  - raw_calibration_payload_stored
+  - raw_gate_payload_stored
   - body_map_alignment_ref
   - body_map_alignment
   - classification
@@ -96,6 +108,41 @@ properties:
   proprioceptive_calibration_ref:
     type: string
     minLength: 1
+  calibration_confidence_policy_id:
+    const: biodata-calibration-gated-drift-threshold-v1
+  calibration_confidence_gate_ref:
+    type: string
+  calibration_confidence_gate_digest:
+    type: string
+  calibration_confidence_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  calibration_confidence_minimum:
+    const: 0.7
+  calibration_confidence_gate_status:
+    type: string
+    enum:
+      - bound
+      - not-bound
+  calibration_confidence_gate_bound:
+    type: boolean
+  calibration_threshold_adjustment:
+    type: number
+    minimum: 0
+    maximum: 0.04
+  applied_coherence_drift_threshold:
+    type: number
+    minimum: 0.2
+    maximum: 0.24
+  applied_hold_drift_threshold:
+    type: number
+    minimum: 0.35
+    maximum: 0.39
+  raw_calibration_payload_stored:
+    const: false
+  raw_gate_payload_stored:
+    const: false
   body_map_alignment_ref:
     type: string
     minLength: 1

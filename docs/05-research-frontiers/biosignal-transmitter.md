@@ -53,6 +53,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
   `multi-day-personal-biodata-calibration-v1` に束縛し、raw source / latent / calibration payload は保存しない
 - calibration は `biodata-calibration-confidence-gate-v1` として identity confirmation /
   sensory loopback に渡せるが、confidence input に留め、本人同一性や主観同一性の証明にはしない
+- sensory loopback 側では `biodata-calibration-gated-drift-threshold-v1` として
+  body-map drift threshold の最大 `0.04` の補助補正だけに使い、Guardian hold /
+  body-map calibration / stabilization は置き換えない
 - thought は semantic content を生成しない
 - qualia equivalence と thought content の飛躍は
   `https://mind-upload.com/frontiers/biosignal-transmitter` の conflict sink ref に束縛する

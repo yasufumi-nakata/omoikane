@@ -18,6 +18,7 @@
 - `bdb_session.schema`
 - `biodata_calibration_profile.schema`
 - `biodata_calibration_confidence_gate.schema`
+  - identity confirmation / sensory loopback への digest-only confidence gate を保持し、Sensory Loopback 側の bounded drift-threshold adjustment は raw gate payload 無しで session / receipt / artifact family scene summary に反映される
 - `biodata_body_state_latent.schema`
 - `biodata_signal_bundle.schema`
 - `biodata_transmitter_session.schema`

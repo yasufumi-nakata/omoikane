@@ -123,7 +123,9 @@ threshold policy receipt と raw SLO payload 無しで quorum を検証する。
 
 ### Sensory Loopback Guard
 coherent avatar feedback の body coherence、high-drift bundle の guardian hold、
-safe baseline からの stabilize 復帰、qualia binding ref をまとめて確認する。
+safe baseline からの stabilize 復帰、BioData calibration confidence gate による
+bounded threshold adjustment、raw gate/calibration payload redaction、
+qualia binding ref をまとめて確認する。
 
 ### Sensory Loopback Public Schema Contract
 `sensory-loopback-demo --json` が self-only と shared loopback の session /

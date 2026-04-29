@@ -11720,12 +11720,97 @@ json.dump(response, sys.stdout)
             objects=["avatar-atrium", "mirror-surface", "haptic-floor"],
         )
         world_state = self.wms.snapshot(world_session["session_id"])
+        biodata_session = self.biodata_transmitter.open_session(
+            identity.identity_id,
+            source_modalities=["eeg", "ecg", "ppg", "eda", "respiration"],
+            target_modalities=["ecg", "ppg", "respiration", "eeg", "affect", "thought"],
+        )
+        calibration_latent_day_1 = self.biodata_transmitter.encode_body_state(
+            biodata_session["session_id"],
+            biosignal_features={
+                "eeg": {
+                    "alpha_power": 0.41,
+                    "theta_power": 0.27,
+                    "beta_power": 0.33,
+                },
+                "ecg": {
+                    "heart_rate_bpm": 73.5,
+                    "hrv_rmssd_ms": 46.0,
+                },
+                "ppg": {
+                    "pulse_rate_bpm": 73.1,
+                    "pulse_amplitude": 0.74,
+                },
+                "eda": {
+                    "skin_conductance_microsiemens": 4.8,
+                },
+                "respiration": {
+                    "rate_bpm": 15.4,
+                    "phase": "exhale",
+                },
+            },
+            context_label="loopback-body-map-calibration-day-1",
+        )
+        calibration_latent_day_2 = self.biodata_transmitter.encode_body_state(
+            biodata_session["session_id"],
+            biosignal_features={
+                "eeg": {
+                    "alpha_power": 0.44,
+                    "theta_power": 0.24,
+                    "beta_power": 0.31,
+                },
+                "ecg": {
+                    "heart_rate_bpm": 71.8,
+                    "hrv_rmssd_ms": 50.2,
+                },
+                "ppg": {
+                    "pulse_rate_bpm": 71.4,
+                    "pulse_amplitude": 0.78,
+                },
+                "eda": {
+                    "skin_conductance_microsiemens": 4.2,
+                },
+                "respiration": {
+                    "rate_bpm": 14.7,
+                    "phase": "inhale",
+                },
+            },
+            context_label="loopback-body-map-calibration-day-2",
+        )
+        calibration_profile = self.biodata_transmitter.build_calibration_profile(
+            biodata_session["session_id"],
+            [calibration_latent_day_1, calibration_latent_day_2],
+            calibration_day_refs=[
+                "calibration-day://sensory-loopback-demo/day-1",
+                "calibration-day://sensory-loopback-demo/day-2",
+            ],
+        )
+        calibration_confidence_gate = (
+            self.biodata_transmitter.bind_calibration_confidence_gate(
+                biodata_session,
+                calibration_profile,
+                target_gate_refs={
+                    "identity-confirmation": (
+                        "identity-confirmation://sensory-loopback-demo/ascending-to-active"
+                    ),
+                    "sensory-loopback": "sensory-loopback://atrium/self-body/session-gate",
+                },
+            )
+        )
+        calibration_gate_validation = (
+            self.biodata_transmitter.validate_calibration_confidence_gate(
+                biodata_session,
+                calibration_profile,
+                calibration_confidence_gate,
+            )
+        )
         session = self.sensory_loopback.open_session(
             identity_id=identity.identity_id,
             world_state_ref=f"wms://state/{world_state['state_id']}",
             body_anchor_ref="avatar://atrium/self-body/core",
             avatar_body_map_ref="avatar-body-map://atrium/self-body/v1",
             proprioceptive_calibration_ref="calibration://atrium/self-body/v1",
+            calibration_confidence_gate=calibration_confidence_gate,
         )
 
         coherent_tick = self.qualia.append(
@@ -11771,6 +11856,16 @@ json.dump(response, sys.stdout)
                 "world_state_ref": session["world_state_ref"],
                 "body_anchor_ref": session["body_anchor_ref"],
                 "allowed_channels": session["allowed_channels"],
+                "calibration_confidence_gate_ref": session[
+                    "calibration_confidence_gate_ref"
+                ],
+                "calibration_confidence_gate_digest": session[
+                    "calibration_confidence_gate_digest"
+                ],
+                "calibration_threshold_adjustment": session[
+                    "calibration_threshold_adjustment"
+                ],
+                "raw_gate_payload_stored": session["raw_gate_payload_stored"],
             },
             actor="SensoryLoopbackService",
             category="interface-sensory-loopback",
@@ -12115,6 +12210,11 @@ json.dump(response, sys.stdout)
             },
             "profile": self.sensory_loopback.reference_profile(),
             "schema_contracts": schema_contracts,
+            "biodata_calibration": {
+                "calibration_profile": calibration_profile,
+                "confidence_gate": calibration_confidence_gate,
+                "validation": calibration_gate_validation,
+            },
             "world_state": world_state,
             "session": final_session,
             "receipts": {
@@ -12170,6 +12270,16 @@ json.dump(response, sys.stdout)
             },
             "validation": {
                 **session_validation,
+                "ok": session_validation["ok"]
+                and coherent_validation["ok"]
+                and degraded_validation["ok"]
+                and stabilized_validation["ok"]
+                and artifact_family_validation["ok"]
+                and shared_session_validation["ok"]
+                and shared_aligned_validation["ok"]
+                and shared_mediated_validation["ok"]
+                and shared_artifact_family_validation["ok"]
+                and calibration_gate_validation["ok"],
                 "coherent_ok": coherent_validation["ok"],
                 "degraded_ok": degraded_validation["ok"],
                 "stabilized_ok": stabilized_validation["ok"],
@@ -12191,6 +12301,32 @@ json.dump(response, sys.stdout)
                 "proprioceptive_calibration_bound": final_session[
                     "proprioceptive_calibration_ref"
                 ].startswith("calibration://"),
+                "biodata_calibration_confidence_gate_ok": calibration_gate_validation["ok"],
+                "biodata_calibration_confidence_gate_bound": session_validation[
+                    "calibration_confidence_gate_bound"
+                ]
+                and coherent_validation["calibration_confidence_gate_bound"]
+                and degraded_validation["calibration_confidence_gate_bound"]
+                and stabilized_validation["calibration_confidence_gate_bound"],
+                "biodata_calibration_threshold_adjusted": session_validation[
+                    "calibration_confidence_threshold_adjusted"
+                ]
+                and coherent_validation["calibration_confidence_threshold_adjusted"]
+                and degraded_validation["calibration_confidence_threshold_adjusted"]
+                and stabilized_validation["calibration_confidence_threshold_adjusted"],
+                "biodata_calibration_gate_digest_bound": session_validation[
+                    "calibration_confidence_gate_digest_bound"
+                ]
+                and coherent_validation["calibration_confidence_gate_digest_bound"]
+                and degraded_validation["calibration_confidence_gate_digest_bound"]
+                and stabilized_validation["calibration_confidence_gate_digest_bound"],
+                "biodata_calibration_raw_payload_redacted": final_session[
+                    "raw_calibration_payload_stored"
+                ]
+                is False
+                and final_session["raw_gate_payload_stored"] is False
+                and coherent["raw_calibration_payload_stored"] is False
+                and coherent["raw_gate_payload_stored"] is False,
                 "alignment_ref_bound": coherent["body_map_alignment_ref"].startswith("alignment://")
                 and degraded["body_map_alignment_ref"].startswith("alignment://")
                 and stabilized["body_map_alignment_ref"].startswith("alignment://"),

@@ -35,6 +35,49 @@ operations:
           proprioceptive_calibration_ref:
             type: string
             minLength: 1
+          calibration_confidence_gate:
+            type: object
+            description: Optional BioData calibration confidence gate receipt used only to adjust drift thresholds without replacing body-map calibration or Guardian hold.
+            required:
+              - profile_id
+              - gate_ref
+              - gate_receipt_digest
+              - confidence_gate_status
+              - confidence_score
+              - sensory_loopback_gate_bound
+              - target_gate_bindings
+              - raw_calibration_payload_stored
+              - raw_gate_payload_stored
+              - subjective_equivalence_claimed
+              - semantic_thought_content_generated
+            properties:
+              profile_id:
+                const: biodata-calibration-confidence-gate-v1
+              gate_ref:
+                type: string
+                minLength: 1
+              gate_receipt_digest:
+                type: string
+                minLength: 32
+              confidence_gate_status:
+                const: bound
+              confidence_score:
+                type: number
+                minimum: 0.7
+                maximum: 1
+              sensory_loopback_gate_bound:
+                const: true
+              target_gate_bindings:
+                type: array
+                minItems: 1
+              raw_calibration_payload_stored:
+                const: false
+              raw_gate_payload_stored:
+                const: false
+              subjective_equivalence_claimed:
+                const: false
+              semantic_thought_content_generated:
+                const: false
           participant_identity_ids:
             type: array
             minItems: 1
@@ -64,6 +107,9 @@ operations:
     guarantees:
       - loopback sessions must bind to one world_state_ref before any delivery occurs
       - loopback sessions must bind to one avatar_body_map_ref and one proprioceptive_calibration_ref before delivery occurs
+      - an optional biodata-calibration-confidence-gate-v1 receipt may adjust body drift thresholds by at most 0.04 when the sensory-loopback target passes
+      - the calibration confidence gate is advisory input only and may not replace body-map calibration, Guardian observation, Guardian hold, or stabilization
+      - raw calibration and raw gate payloads must remain redacted when the confidence gate is bound
       - channels must cover at least 2 modalities to claim body-coherent feedback
       - participant_identity_ids with more than 1 entry require shared_imc_session_id and bind guardian-mediated arbitration metadata
       - shared_collective_id may only appear when shared_imc_session_id is also bound
@@ -166,8 +212,8 @@ operations:
       schema_ref: sensory_loopback_receipt
     guarantees:
       - body_coherence_score must be derived from the weighted body_map_alignment payload
-      - coherent bundles must remain within 90ms latency and 0.20 body drift
-      - degraded bundles require guardian observation before attenuation or hold
+      - coherent bundles must remain within 90ms latency and the applied body drift threshold, defaulting to 0.20 and allowing only bounded BioData calibration confidence adjustment
+      - degraded bundles require guardian observation before attenuation or hold even when calibration confidence is bound
       - shared-space bundles must bind one owner_identity_id and complete participant attention/presence maps
       - conflicting participant_attention_targets require guardian observation and must emit guardian-mediated or guardian-hold arbitration_status
       - guardian-hold receipts must apply safe baseline and flag council review

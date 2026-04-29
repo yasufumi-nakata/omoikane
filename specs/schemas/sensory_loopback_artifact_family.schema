@@ -148,6 +148,41 @@ properties:
         proprioceptive_calibration_ref:
           type: string
           minLength: 1
+        calibration_confidence_gate_ref:
+          type: string
+        calibration_confidence_gate_digest:
+          type: string
+        calibration_confidence_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        calibration_confidence_minimum:
+          const: 0.7
+        calibration_confidence_gate_status:
+          type: string
+          enum:
+            - bound
+            - not-bound
+        calibration_confidence_gate_bound:
+          type: boolean
+        calibration_confidence_policy_id:
+          const: biodata-calibration-gated-drift-threshold-v1
+        calibration_threshold_adjustment:
+          type: number
+          minimum: 0
+          maximum: 0.04
+        applied_coherence_drift_threshold:
+          type: number
+          minimum: 0.2
+          maximum: 0.24
+        applied_hold_drift_threshold:
+          type: number
+          minimum: 0.35
+          maximum: 0.39
+        raw_calibration_payload_stored:
+          const: false
+        raw_gate_payload_stored:
+          const: false
         body_map_alignment_ref:
           type: string
           minLength: 1
@@ -199,6 +234,18 @@ properties:
         - body_coherence_score
         - avatar_body_map_ref
         - proprioceptive_calibration_ref
+        - calibration_confidence_gate_ref
+        - calibration_confidence_gate_digest
+        - calibration_confidence_score
+        - calibration_confidence_minimum
+        - calibration_confidence_gate_status
+        - calibration_confidence_gate_bound
+        - calibration_confidence_policy_id
+        - calibration_threshold_adjustment
+        - applied_coherence_drift_threshold
+        - applied_hold_drift_threshold
+        - raw_calibration_payload_stored
+        - raw_gate_payload_stored
         - body_map_alignment_ref
         - qualia_binding_ref
         - attention_target
@@ -275,6 +322,18 @@ examples:
         body_coherence_score: 0.06
         avatar_body_map_ref: avatar-body-map://atrium/collective/v1
         proprioceptive_calibration_ref: calibration://atrium/collective/v1
+        calibration_confidence_gate_ref: confidence-gate://biodata/example
+        calibration_confidence_gate_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+        calibration_confidence_score: 1.0
+        calibration_confidence_minimum: 0.7
+        calibration_confidence_gate_status: bound
+        calibration_confidence_gate_bound: true
+        calibration_confidence_policy_id: biodata-calibration-gated-drift-threshold-v1
+        calibration_threshold_adjustment: 0.03
+        applied_coherence_drift_threshold: 0.23
+        applied_hold_drift_threshold: 0.38
+        raw_calibration_payload_stored: false
+        raw_gate_payload_stored: false
         body_map_alignment_ref: alignment://atrium/collective/aligned-v1
         qualia_binding_ref: qualia://tick/tick-1111
         attention_target: avatar://atrium/collective/core
@@ -300,6 +359,18 @@ examples:
         body_coherence_score: 0.08
         avatar_body_map_ref: avatar-body-map://atrium/collective/v1
         proprioceptive_calibration_ref: calibration://atrium/collective/v1
+        calibration_confidence_gate_ref: confidence-gate://biodata/example
+        calibration_confidence_gate_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+        calibration_confidence_score: 1.0
+        calibration_confidence_minimum: 0.7
+        calibration_confidence_gate_status: bound
+        calibration_confidence_gate_bound: true
+        calibration_confidence_policy_id: biodata-calibration-gated-drift-threshold-v1
+        calibration_threshold_adjustment: 0.03
+        applied_coherence_drift_threshold: 0.23
+        applied_hold_drift_threshold: 0.38
+        raw_calibration_payload_stored: false
+        raw_gate_payload_stored: false
         body_map_alignment_ref: alignment://atrium/collective/arbitrated-v1
         qualia_binding_ref: qualia://tick/tick-2222
         attention_target: avatar://atrium/collective/perimeter

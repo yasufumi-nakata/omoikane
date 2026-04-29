@@ -31,6 +31,9 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | attenuation_latency_ms | `140.0` |
 | coherence_drift_threshold | `0.20` |
 | hold_drift_threshold | `0.35` |
+| calibration_confidence_policy | `biodata-calibration-gated-drift-threshold-v1` |
+| calibration_confidence_minimum | `0.70` |
+| calibration_threshold_adjustment_cap | `0.04` |
 | body_schema_mode | `virtual-self-anchor-v1` |
 | body_map_profile | `avatar-proprioceptive-map-v1` |
 | proprioceptive_calibration_policy | `ref-bound-avatar-map-v1` |
@@ -55,6 +58,7 @@ sensory_loopback.open_session:
     body_anchor_ref: <avatar body anchor>
     avatar_body_map_ref: <canonical avatar body map ref>
     proprioceptive_calibration_ref: <latest calibration snapshot ref>
+    calibration_confidence_gate: <optional biodata-calibration-confidence-gate-v1 receipt>
     participant_identity_ids: [<identity ref>, ...]
     shared_imc_session_id: <imc session ref>
     shared_collective_id: <collective ref>
@@ -111,6 +115,12 @@ sensory_loopback.capture_artifact_family:
 | shared space で participant target が衝突 | `guardian_observed=true` のときのみ `arbitration_status=guardian-mediated or guardian-hold` |
 
 degraded bundle は Guardian observe が無い限り reject する。
+BioData calibration confidence gate が `sensory-loopback` target で pass している時は、
+`confidence_score - 0.70` から最大 `0.04` の範囲で coherent / hold drift threshold を
+補正する。ただしこれは confidence input であり、`avatar_body_map_ref` /
+`proprioceptive_calibration_ref` / Guardian hold / stabilization を置き換えない。
+gate ref、gate digest、confidence score、applied threshold だけを session / receipt /
+artifact family scene summary に残し、raw calibration payload と raw gate payload は保存しない。
 
 ## 不変条件
 
@@ -139,7 +149,8 @@ degraded bundle は Guardian observe が無い限り reject する。
   session、receipt、artifact family を public schema path へ束縛し、
   integration test が各 payload を schema に直接通す
 - `evals/interface/sensory_loopback_guard.yaml` で
-  body coherence guard、avatar body-map calibration binding、qualia binding を固定
+  body coherence guard、avatar body-map calibration binding、BioData calibration confidence
+  threshold adjustment、raw gate/calibration payload redaction、qualia binding を固定
 - `evals/interface/sensory_loopback_artifact_family.yaml` で
   family scene 順序、guardian intervention 数、final session binding、
   body-map binding を固定

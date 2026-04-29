@@ -680,6 +680,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["qualia_binding_bound"])
         self.assertTrue(result["validation"]["body_map_bound"])
         self.assertTrue(result["validation"]["proprioceptive_calibration_bound"])
+        self.assertTrue(result["validation"]["biodata_calibration_confidence_gate_ok"])
+        self.assertTrue(result["validation"]["biodata_calibration_confidence_gate_bound"])
+        self.assertTrue(result["validation"]["biodata_calibration_threshold_adjusted"])
+        self.assertTrue(result["validation"]["biodata_calibration_gate_digest_bound"])
+        self.assertTrue(result["validation"]["biodata_calibration_raw_payload_redacted"])
         self.assertTrue(result["validation"]["alignment_ref_bound"])
         self.assertTrue(result["validation"]["artifact_family_body_map_bound"])
         self.assertTrue(result["validation"]["shared_loopback_ok"])
@@ -691,6 +696,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["shared_loopback_family_tracked"])
         self.assertEqual("active", result["session"]["status"])
         self.assertTrue(result["session"]["avatar_body_map_ref"].startswith("avatar-body-map://"))
+        self.assertEqual("bound", result["session"]["calibration_confidence_gate_status"])
+        self.assertGreater(
+            result["session"]["calibration_adjusted_coherence_drift_threshold"],
+            result["session"]["coherence_drift_threshold"],
+        )
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["artifact_family"]["final_session_status"])

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import unittest
 
+from omoikane.interface.biodata_transmitter import BioDataTransmitter
 from omoikane.interface.sensory_loopback import SensoryLoopbackService
 
 
@@ -53,6 +54,91 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertTrue(receipt_validation["ok"])
         self.assertTrue(receipt_validation["body_map_bound"])
         self.assertTrue(receipt_validation["calibration_bound"])
+
+    def test_biodata_calibration_confidence_adjusts_drift_threshold_digest_only(self) -> None:
+        biodata = BioDataTransmitter()
+        bio_session = biodata.open_session("identity://loopback-primary")
+        latent_day_1 = biodata.encode_body_state(
+            bio_session["session_id"],
+            biosignal_features={
+                "eeg": {"alpha_power": 0.42, "theta_power": 0.25, "beta_power": 0.32},
+                "ecg": {"heart_rate_bpm": 72.0, "hrv_rmssd_ms": 48.0},
+                "ppg": {"pulse_rate_bpm": 71.8, "pulse_amplitude": 0.75},
+                "eda": {"skin_conductance_microsiemens": 4.4},
+                "respiration": {"rate_bpm": 15.0, "phase": "inhale"},
+            },
+            context_label="loopback-calibration-day-1",
+        )
+        latent_day_2 = biodata.encode_body_state(
+            bio_session["session_id"],
+            biosignal_features={
+                "eeg": {"alpha_power": 0.44, "theta_power": 0.24, "beta_power": 0.31},
+                "ecg": {"heart_rate_bpm": 70.0, "hrv_rmssd_ms": 51.0},
+                "ppg": {"pulse_rate_bpm": 69.7, "pulse_amplitude": 0.78},
+                "eda": {"skin_conductance_microsiemens": 4.0},
+                "respiration": {"rate_bpm": 14.4, "phase": "exhale"},
+            },
+            context_label="loopback-calibration-day-2",
+        )
+        calibration = biodata.build_calibration_profile(
+            bio_session["session_id"],
+            [latent_day_1, latent_day_2],
+            calibration_day_refs=[
+                "calibration-day://loopback/day-1",
+                "calibration-day://loopback/day-2",
+            ],
+        )
+        confidence_gate = biodata.bind_calibration_confidence_gate(
+            bio_session,
+            calibration,
+            target_gate_refs={
+                "identity-confirmation": "identity-confirmation://loopback/unit",
+                "sensory-loopback": "sensory-loopback://loopback/unit",
+            },
+        )
+        service = SensoryLoopbackService()
+        session = service.open_session(
+            identity_id="identity://loopback-primary",
+            world_state_ref="wms://state/calibrated",
+            body_anchor_ref="avatar://body/core",
+            avatar_body_map_ref="avatar-body-map://body/v1",
+            proprioceptive_calibration_ref="calibration://body/v1",
+            calibration_confidence_gate=confidence_gate,
+        )
+
+        receipt = service.deliver_bundle(
+            session["session_id"],
+            scene_summary="calibration confidence keeps a borderline body-map drift inside bounds",
+            artifact_refs={
+                "visual": "artifact://visual/borderline",
+                "auditory": "artifact://auditory/borderline",
+                "haptic": "artifact://haptic/borderline",
+            },
+            latency_ms=52.0,
+            body_map_alignment_ref="alignment://body/borderline-v1",
+            body_map_alignment={
+                "core": 0.78,
+                "left-hand": 0.78,
+                "right-hand": 0.78,
+                "stance": 0.78,
+            },
+            attention_target="avatar://body/core",
+            guardian_observed=True,
+            qualia_binding_ref="qualia://tick/borderline",
+        )
+        snapshot = service.snapshot(session["session_id"])
+        session_validation = service.validate_session(snapshot)
+        receipt_validation = service.validate_receipt(receipt)
+
+        self.assertEqual("delivered", receipt["delivery_status"])
+        self.assertEqual(0.22, receipt["body_coherence_score"])
+        self.assertEqual(0.23, snapshot["calibration_adjusted_coherence_drift_threshold"])
+        self.assertEqual(confidence_gate["gate_ref"], receipt["calibration_confidence_gate_ref"])
+        self.assertTrue(session_validation["calibration_confidence_gate_bound"])
+        self.assertTrue(session_validation["calibration_confidence_threshold_adjusted"])
+        self.assertTrue(receipt_validation["calibration_confidence_gate_digest_bound"])
+        self.assertFalse(receipt["raw_calibration_payload_stored"])
+        self.assertFalse(receipt["raw_gate_payload_stored"])
 
     def test_high_drift_bundle_triggers_guardian_hold_until_stabilized(self) -> None:
         service = SensoryLoopbackService()

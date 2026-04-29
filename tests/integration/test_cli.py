@@ -730,6 +730,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("stabilized", result["receipts"]["stabilized"]["delivery_status"])
         self.assertTrue(result["validation"]["body_map_bound"])
         self.assertTrue(result["validation"]["proprioceptive_calibration_bound"])
+        self.assertTrue(result["validation"]["biodata_calibration_confidence_gate_ok"])
+        self.assertTrue(result["validation"]["biodata_calibration_confidence_gate_bound"])
+        self.assertTrue(result["validation"]["biodata_calibration_threshold_adjusted"])
+        self.assertTrue(result["validation"]["biodata_calibration_raw_payload_redacted"])
         self.assertTrue(result["validation"]["alignment_ref_bound"])
         self.assertTrue(result["validation"]["artifact_family_ok"])
         self.assertTrue(result["validation"]["shared_loopback_ok"])
@@ -742,6 +746,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["session"]["status"])
+        self.assertEqual("bound", result["session"]["calibration_confidence_gate_status"])
+        self.assertGreater(
+            result["session"]["calibration_adjusted_coherence_drift_threshold"],
+            result["session"]["coherence_drift_threshold"],
+        )
         self.assertEqual("collective-shared", result["shared_loopback"]["session"]["shared_space_mode"])
         self.assertEqual(
             "guardian-mediated",

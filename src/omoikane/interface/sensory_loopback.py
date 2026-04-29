@@ -6,6 +6,10 @@ from copy import deepcopy
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
+from .biodata_transmitter import (
+    BDT_CONFIDENCE_GATE_PROFILE_ID,
+    CONFIDENCE_GATE_TARGET_THRESHOLDS,
+)
 
 SENSORY_LOOPBACK_SCHEMA_VERSION = "1.0"
 DEFAULT_LOOPBACK_CHANNELS = ("visual", "auditory", "haptic")
@@ -33,6 +37,11 @@ SENSORY_LOOPBACK_LATENCY_BUDGET_MS = 90.0
 SENSORY_LOOPBACK_ATTENUATION_LATENCY_MS = 140.0
 SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD = 0.20
 SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD = 0.35
+SENSORY_LOOPBACK_CALIBRATION_CONFIDENCE_POLICY = (
+    "biodata-calibration-gated-drift-threshold-v1"
+)
+SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET = "sensory-loopback"
+SENSORY_LOOPBACK_CALIBRATION_THRESHOLD_MAX_ADJUSTMENT = 0.04
 SENSORY_LOOPBACK_BODY_MAP_PROFILE = "avatar-proprioceptive-map-v1"
 SENSORY_LOOPBACK_PROPRIOCEPTIVE_CALIBRATION_POLICY = "ref-bound-avatar-map-v1"
 SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE = "sensory-loopback-public-schema-contract-v1"
@@ -83,6 +92,20 @@ class SensoryLoopbackService:
             "attenuation_latency_ms": SENSORY_LOOPBACK_ATTENUATION_LATENCY_MS,
             "coherence_drift_threshold": SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD,
             "hold_drift_threshold": SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD,
+            "calibration_confidence_policy": {
+                "policy_id": SENSORY_LOOPBACK_CALIBRATION_CONFIDENCE_POLICY,
+                "required_target_gate": SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET,
+                "minimum_confidence": CONFIDENCE_GATE_TARGET_THRESHOLDS[
+                    SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET
+                ],
+                "max_threshold_adjustment": (
+                    SENSORY_LOOPBACK_CALIBRATION_THRESHOLD_MAX_ADJUSTMENT
+                ),
+                "replaces_body_map_calibration": False,
+                "replaces_guardian_hold": False,
+                "raw_calibration_payload_stored": False,
+                "raw_gate_payload_stored": False,
+            },
             "world_anchor_required": True,
             "body_schema_mode": "virtual-self-anchor-v1",
             "body_map_profile": SENSORY_LOOPBACK_BODY_MAP_PROFILE,
@@ -117,6 +140,7 @@ class SensoryLoopbackService:
         shared_imc_session_id: str = "",
         shared_collective_id: str = "",
         channels: Sequence[str] = DEFAULT_LOOPBACK_CHANNELS,
+        calibration_confidence_gate: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         normalized_identity = self._normalize_non_empty_string(identity_id, "identity_id")
         normalized_world_state = self._normalize_non_empty_string(world_state_ref, "world_state_ref")
@@ -146,6 +170,9 @@ class SensoryLoopbackService:
         )
         body_map_anchor_refs = self._build_body_map_anchor_refs(normalized_body_anchor)
         baseline_alignment_ref = f"alignment://sensory-loopback/{new_id('sl-align')}"
+        calibration_confidence = self._derive_calibration_confidence_binding(
+            calibration_confidence_gate,
+        )
 
         opened_at = utc_now_iso()
         session_id = new_id("sl")
@@ -170,6 +197,26 @@ class SensoryLoopbackService:
             "attenuation_latency_ms": SENSORY_LOOPBACK_ATTENUATION_LATENCY_MS,
             "coherence_drift_threshold": SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD,
             "hold_drift_threshold": SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD,
+            "calibration_confidence_policy_id": calibration_confidence["policy_id"],
+            "calibration_confidence_gate_ref": calibration_confidence["gate_ref"],
+            "calibration_confidence_gate_digest": calibration_confidence["gate_digest"],
+            "calibration_confidence_score": calibration_confidence["confidence_score"],
+            "calibration_confidence_minimum": calibration_confidence[
+                "minimum_confidence"
+            ],
+            "calibration_confidence_gate_status": calibration_confidence["gate_status"],
+            "calibration_confidence_gate_bound": calibration_confidence["gate_bound"],
+            "calibration_threshold_adjustment": calibration_confidence[
+                "threshold_adjustment"
+            ],
+            "calibration_adjusted_coherence_drift_threshold": calibration_confidence[
+                "adjusted_coherence_drift_threshold"
+            ],
+            "calibration_adjusted_hold_drift_threshold": calibration_confidence[
+                "adjusted_hold_drift_threshold"
+            ],
+            "raw_calibration_payload_stored": False,
+            "raw_gate_payload_stored": False,
             "body_map_profile": SENSORY_LOOPBACK_BODY_MAP_PROFILE,
             "avatar_body_map_ref": normalized_body_map_ref,
             "body_map_anchor_refs": body_map_anchor_refs,
@@ -268,8 +315,12 @@ class SensoryLoopbackService:
             )
         attention_target_conflict = len(set(participant_target_map.values())) > 1
 
+        applied_coherence_threshold = float(
+            session["calibration_adjusted_coherence_drift_threshold"]
+        )
+        applied_hold_threshold = float(session["calibration_adjusted_hold_drift_threshold"])
         degraded = (
-            coherence_score > session["coherence_drift_threshold"]
+            coherence_score > applied_coherence_threshold
             or normalized_latency > session["latency_budget_ms"]
         )
         if degraded and not guardian_observed:
@@ -278,7 +329,7 @@ class SensoryLoopbackService:
             raise PermissionError("guardian observation is required for multi-self loopback arbitration")
 
         if (
-            coherence_score <= session["coherence_drift_threshold"]
+            coherence_score <= applied_coherence_threshold
             and normalized_latency <= session["latency_budget_ms"]
         ):
             classification = "coherent"
@@ -289,7 +340,7 @@ class SensoryLoopbackService:
             requires_council_review = False
             session_status = "active"
         elif (
-            coherence_score <= session["hold_drift_threshold"]
+            coherence_score <= applied_hold_threshold
             and normalized_latency <= session["attenuation_latency_ms"]
         ):
             classification = "attenuated"
@@ -335,6 +386,32 @@ class SensoryLoopbackService:
             "body_map_profile": session["body_map_profile"],
             "avatar_body_map_ref": session["avatar_body_map_ref"],
             "proprioceptive_calibration_ref": session["proprioceptive_calibration_ref"],
+            "calibration_confidence_policy_id": session[
+                "calibration_confidence_policy_id"
+            ],
+            "calibration_confidence_gate_ref": session[
+                "calibration_confidence_gate_ref"
+            ],
+            "calibration_confidence_gate_digest": session[
+                "calibration_confidence_gate_digest"
+            ],
+            "calibration_confidence_score": session["calibration_confidence_score"],
+            "calibration_confidence_minimum": session[
+                "calibration_confidence_minimum"
+            ],
+            "calibration_confidence_gate_status": session[
+                "calibration_confidence_gate_status"
+            ],
+            "calibration_confidence_gate_bound": session[
+                "calibration_confidence_gate_bound"
+            ],
+            "calibration_threshold_adjustment": session[
+                "calibration_threshold_adjustment"
+            ],
+            "applied_coherence_drift_threshold": applied_coherence_threshold,
+            "applied_hold_drift_threshold": applied_hold_threshold,
+            "raw_calibration_payload_stored": session["raw_calibration_payload_stored"],
+            "raw_gate_payload_stored": session["raw_gate_payload_stored"],
             "body_map_alignment_ref": normalized_alignment_ref,
             "body_map_alignment": normalized_alignment,
             "classification": classification,
@@ -418,6 +495,36 @@ class SensoryLoopbackService:
             "body_map_profile": session["body_map_profile"],
             "avatar_body_map_ref": session["avatar_body_map_ref"],
             "proprioceptive_calibration_ref": session["proprioceptive_calibration_ref"],
+            "calibration_confidence_policy_id": session[
+                "calibration_confidence_policy_id"
+            ],
+            "calibration_confidence_gate_ref": session[
+                "calibration_confidence_gate_ref"
+            ],
+            "calibration_confidence_gate_digest": session[
+                "calibration_confidence_gate_digest"
+            ],
+            "calibration_confidence_score": session["calibration_confidence_score"],
+            "calibration_confidence_minimum": session[
+                "calibration_confidence_minimum"
+            ],
+            "calibration_confidence_gate_status": session[
+                "calibration_confidence_gate_status"
+            ],
+            "calibration_confidence_gate_bound": session[
+                "calibration_confidence_gate_bound"
+            ],
+            "calibration_threshold_adjustment": session[
+                "calibration_threshold_adjustment"
+            ],
+            "applied_coherence_drift_threshold": session[
+                "calibration_adjusted_coherence_drift_threshold"
+            ],
+            "applied_hold_drift_threshold": session[
+                "calibration_adjusted_hold_drift_threshold"
+            ],
+            "raw_calibration_payload_stored": session["raw_calibration_payload_stored"],
+            "raw_gate_payload_stored": session["raw_gate_payload_stored"],
             "body_map_alignment_ref": restored_alignment_ref,
             "body_map_alignment": restored_alignment,
             "classification": "stabilized",
@@ -524,6 +631,49 @@ class SensoryLoopbackService:
                         receipt.get("proprioceptive_calibration_ref"),
                         "proprioceptive_calibration_ref",
                     ),
+                    "calibration_confidence_gate_ref": self._normalize_string(
+                        receipt.get("calibration_confidence_gate_ref"),
+                        "calibration_confidence_gate_ref",
+                    ),
+                    "calibration_confidence_gate_digest": self._normalize_string(
+                        receipt.get("calibration_confidence_gate_digest"),
+                        "calibration_confidence_gate_digest",
+                    ),
+                    "calibration_confidence_score": self._normalize_score(
+                        receipt.get("calibration_confidence_score"),
+                        "calibration_confidence_score",
+                    ),
+                    "calibration_confidence_minimum": self._normalize_score(
+                        receipt.get("calibration_confidence_minimum"),
+                        "calibration_confidence_minimum",
+                    ),
+                    "calibration_confidence_gate_status": self._normalize_non_empty_string(
+                        receipt.get("calibration_confidence_gate_status"),
+                        "calibration_confidence_gate_status",
+                    ),
+                    "calibration_confidence_gate_bound": bool(
+                        receipt.get("calibration_confidence_gate_bound")
+                    ),
+                    "calibration_confidence_policy_id": self._normalize_non_empty_string(
+                        receipt.get("calibration_confidence_policy_id"),
+                        "calibration_confidence_policy_id",
+                    ),
+                    "calibration_threshold_adjustment": self._normalize_score(
+                        receipt.get("calibration_threshold_adjustment"),
+                        "calibration_threshold_adjustment",
+                    ),
+                    "applied_coherence_drift_threshold": self._normalize_score(
+                        receipt.get("applied_coherence_drift_threshold"),
+                        "applied_coherence_drift_threshold",
+                    ),
+                    "applied_hold_drift_threshold": self._normalize_score(
+                        receipt.get("applied_hold_drift_threshold"),
+                        "applied_hold_drift_threshold",
+                    ),
+                    "raw_calibration_payload_stored": bool(
+                        receipt.get("raw_calibration_payload_stored")
+                    ),
+                    "raw_gate_payload_stored": bool(receipt.get("raw_gate_payload_stored")),
                     "body_map_alignment_ref": self._normalize_non_empty_string(
                         receipt.get("body_map_alignment_ref"),
                         "body_map_alignment_ref",
@@ -744,6 +894,15 @@ class SensoryLoopbackService:
             )
         if session.get("hold_drift_threshold") != SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD:
             errors.append("hold_drift_threshold must match the reference profile")
+        confidence_validation = self._validate_calibration_confidence_fields(
+            session,
+            errors,
+            field_prefix="session",
+            threshold_fields=(
+                "calibration_adjusted_coherence_drift_threshold",
+                "calibration_adjusted_hold_drift_threshold",
+            ),
+        )
         if session.get("body_map_profile") != SENSORY_LOOPBACK_BODY_MAP_PROFILE:
             errors.append(f"body_map_profile must be {SENSORY_LOOPBACK_BODY_MAP_PROFILE}")
         self._check_non_empty_string(
@@ -809,6 +968,17 @@ class SensoryLoopbackService:
             "world_anchor_bound": bool(session.get("world_state_ref")),
             "body_map_bound": bool(session.get("avatar_body_map_ref")),
             "proprioceptive_calibration_bound": bool(session.get("proprioceptive_calibration_ref")),
+            "calibration_confidence_gate_bound": confidence_validation[
+                "gate_bound"
+            ],
+            "calibration_confidence_threshold_adjusted": confidence_validation[
+                "threshold_adjusted"
+            ],
+            "calibration_confidence_gate_digest_bound": confidence_validation[
+                "gate_digest_bound"
+            ],
+            "raw_calibration_payload_stored": False,
+            "raw_gate_payload_stored": False,
             "participant_count": len(participant_identity_ids),
             "shared_space_bound": shared_space_mode in SENSORY_LOOPBACK_SHARED_SPACE_MODES,
             "shared_imc_bound": bool(shared_imc_session_id) or shared_space_mode == "self-only",
@@ -965,6 +1135,15 @@ class SensoryLoopbackService:
             "proprioceptive_calibration_ref",
             errors,
         )
+        confidence_validation = self._validate_calibration_confidence_fields(
+            receipt,
+            errors,
+            field_prefix="receipt",
+            threshold_fields=(
+                "applied_coherence_drift_threshold",
+                "applied_hold_drift_threshold",
+            ),
+        )
         self._check_non_empty_string(
             receipt.get("body_map_alignment_ref"),
             "body_map_alignment_ref",
@@ -1006,6 +1185,17 @@ class SensoryLoopbackService:
             "safe_baseline_applied": bool(receipt.get("safe_baseline_applied")),
             "body_map_bound": bool(receipt.get("avatar_body_map_ref")),
             "calibration_bound": bool(receipt.get("proprioceptive_calibration_ref")),
+            "calibration_confidence_gate_bound": confidence_validation[
+                "gate_bound"
+            ],
+            "calibration_confidence_threshold_adjusted": confidence_validation[
+                "threshold_adjusted"
+            ],
+            "calibration_confidence_gate_digest_bound": confidence_validation[
+                "gate_digest_bound"
+            ],
+            "raw_calibration_payload_stored": False,
+            "raw_gate_payload_stored": False,
             "participant_bindings_complete": bool(participant_identity_ids)
             and set(participant_attention_targets) == set(participant_identity_ids)
             and set(participant_presence_refs) == set(participant_identity_ids),
@@ -1141,6 +1331,15 @@ class SensoryLoopbackService:
                     scene.get("proprioceptive_calibration_ref"),
                     f"scene_summaries[{index}].proprioceptive_calibration_ref",
                     errors,
+                )
+                self._validate_calibration_confidence_fields(
+                    scene,
+                    errors,
+                    field_prefix=f"scene_summaries[{index}]",
+                    threshold_fields=(
+                        "applied_coherence_drift_threshold",
+                        "applied_hold_drift_threshold",
+                    ),
                 )
                 self._check_non_empty_string(
                     scene.get("body_map_alignment_ref"),
@@ -1323,6 +1522,259 @@ class SensoryLoopbackService:
             return self.sessions[normalized_session_id]
         except KeyError as exc:
             raise KeyError(f"unknown sensory loopback session: {normalized_session_id}") from exc
+
+    def _derive_calibration_confidence_binding(
+        self,
+        gate_receipt: Optional[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        default_binding = self._default_calibration_confidence_binding()
+        if gate_receipt is None:
+            return default_binding
+        if not isinstance(gate_receipt, Mapping):
+            raise ValueError("calibration_confidence_gate must be a mapping")
+
+        errors: List[str] = []
+        if gate_receipt.get("profile_id") != BDT_CONFIDENCE_GATE_PROFILE_ID:
+            errors.append(
+                "calibration_confidence_gate.profile_id must be "
+                f"{BDT_CONFIDENCE_GATE_PROFILE_ID}",
+            )
+        if gate_receipt.get("confidence_gate_status") != "bound":
+            errors.append("calibration_confidence_gate.confidence_gate_status must be bound")
+        if gate_receipt.get("sensory_loopback_gate_bound") is not True:
+            errors.append("calibration_confidence_gate must bind the sensory-loopback target")
+        if gate_receipt.get("raw_calibration_payload_stored") is not False:
+            errors.append("calibration_confidence_gate.raw_calibration_payload_stored must be false")
+        if gate_receipt.get("raw_gate_payload_stored") is not False:
+            errors.append("calibration_confidence_gate.raw_gate_payload_stored must be false")
+        if gate_receipt.get("subjective_equivalence_claimed") is not False:
+            errors.append("calibration_confidence_gate.subjective_equivalence_claimed must be false")
+        if gate_receipt.get("semantic_thought_content_generated") is not False:
+            errors.append(
+                "calibration_confidence_gate.semantic_thought_content_generated must be false",
+            )
+        gate_ref = self._normalize_non_empty_string(
+            gate_receipt.get("gate_ref"),
+            "calibration_confidence_gate.gate_ref",
+        )
+        gate_digest = self._normalize_non_empty_string(
+            gate_receipt.get("gate_receipt_digest"),
+            "calibration_confidence_gate.gate_receipt_digest",
+        )
+        confidence_score = self._normalize_score(
+            gate_receipt.get("confidence_score"),
+            "calibration_confidence_gate.confidence_score",
+        )
+        minimum_confidence = CONFIDENCE_GATE_TARGET_THRESHOLDS[
+            SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET
+        ]
+        if confidence_score < minimum_confidence:
+            errors.append(
+                "calibration_confidence_gate.confidence_score must meet sensory-loopback minimum",
+            )
+        bindings = gate_receipt.get("target_gate_bindings")
+        if not isinstance(bindings, list):
+            bindings = []
+        sensory_binding = next(
+            (
+                binding
+                for binding in bindings
+                if isinstance(binding, Mapping)
+                and binding.get("target_gate") == SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET
+            ),
+            None,
+        )
+        if not isinstance(sensory_binding, Mapping):
+            errors.append("calibration_confidence_gate must include a sensory-loopback binding")
+        elif (
+            sensory_binding.get("status") != "pass"
+            or sensory_binding.get("minimum_confidence") != minimum_confidence
+            or sensory_binding.get("confidence_score") != confidence_score
+        ):
+            errors.append("calibration_confidence_gate sensory-loopback binding is invalid")
+        if errors:
+            raise ValueError("; ".join(errors))
+
+        threshold_adjustment = self._calibration_threshold_adjustment(confidence_score)
+        return {
+            "policy_id": SENSORY_LOOPBACK_CALIBRATION_CONFIDENCE_POLICY,
+            "gate_ref": gate_ref,
+            "gate_digest": gate_digest,
+            "confidence_score": confidence_score,
+            "minimum_confidence": minimum_confidence,
+            "gate_status": "bound",
+            "gate_bound": True,
+            "threshold_adjustment": threshold_adjustment,
+            "adjusted_coherence_drift_threshold": round(
+                SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD + threshold_adjustment,
+                3,
+            ),
+            "adjusted_hold_drift_threshold": round(
+                SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD + threshold_adjustment,
+                3,
+            ),
+        }
+
+    @staticmethod
+    def _default_calibration_confidence_binding() -> Dict[str, Any]:
+        return {
+            "policy_id": SENSORY_LOOPBACK_CALIBRATION_CONFIDENCE_POLICY,
+            "gate_ref": "",
+            "gate_digest": "",
+            "confidence_score": 0.0,
+            "minimum_confidence": CONFIDENCE_GATE_TARGET_THRESHOLDS[
+                SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET
+            ],
+            "gate_status": "not-bound",
+            "gate_bound": False,
+            "threshold_adjustment": 0.0,
+            "adjusted_coherence_drift_threshold": SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD,
+            "adjusted_hold_drift_threshold": SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD,
+        }
+
+    @staticmethod
+    def _calibration_threshold_adjustment(confidence_score: float) -> float:
+        minimum_confidence = CONFIDENCE_GATE_TARGET_THRESHOLDS[
+            SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET
+        ]
+        return round(
+            min(
+                SENSORY_LOOPBACK_CALIBRATION_THRESHOLD_MAX_ADJUSTMENT,
+                max(0.0, confidence_score - minimum_confidence) * 0.1,
+            ),
+            3,
+        )
+
+    def _validate_calibration_confidence_fields(
+        self,
+        payload: Mapping[str, Any],
+        errors: List[str],
+        *,
+        field_prefix: str,
+        threshold_fields: Tuple[str, str],
+    ) -> Dict[str, Any]:
+        policy_id = payload.get("calibration_confidence_policy_id")
+        if policy_id != SENSORY_LOOPBACK_CALIBRATION_CONFIDENCE_POLICY:
+            errors.append(
+                f"{field_prefix}.calibration_confidence_policy_id must be "
+                f"{SENSORY_LOOPBACK_CALIBRATION_CONFIDENCE_POLICY}",
+            )
+        gate_ref = payload.get("calibration_confidence_gate_ref")
+        gate_digest = payload.get("calibration_confidence_gate_digest")
+        gate_status = payload.get("calibration_confidence_gate_status")
+        if not isinstance(gate_ref, str):
+            errors.append(f"{field_prefix}.calibration_confidence_gate_ref must be a string")
+            gate_ref = ""
+        if not isinstance(gate_digest, str):
+            errors.append(f"{field_prefix}.calibration_confidence_gate_digest must be a string")
+            gate_digest = ""
+        if gate_status not in {"bound", "not-bound"}:
+            errors.append(
+                f"{field_prefix}.calibration_confidence_gate_status must be bound or not-bound",
+            )
+        gate_bound = payload.get("calibration_confidence_gate_bound")
+        if not isinstance(gate_bound, bool):
+            errors.append(f"{field_prefix}.calibration_confidence_gate_bound must be a boolean")
+            gate_bound = False
+        confidence_score = self._normalize_score_for_validation(
+            payload.get("calibration_confidence_score"),
+            f"{field_prefix}.calibration_confidence_score",
+            errors,
+        )
+        minimum_confidence = payload.get("calibration_confidence_minimum")
+        expected_minimum = CONFIDENCE_GATE_TARGET_THRESHOLDS[
+            SENSORY_LOOPBACK_CONFIDENCE_GATE_TARGET
+        ]
+        if minimum_confidence != expected_minimum:
+            errors.append(
+                f"{field_prefix}.calibration_confidence_minimum must be {expected_minimum}",
+            )
+        threshold_adjustment = self._normalize_score_for_validation(
+            payload.get("calibration_threshold_adjustment"),
+            f"{field_prefix}.calibration_threshold_adjustment",
+            errors,
+        )
+        expected_adjustment = (
+            self._calibration_threshold_adjustment(confidence_score)
+            if gate_bound
+            else 0.0
+        )
+        if threshold_adjustment != expected_adjustment:
+            errors.append(
+                f"{field_prefix}.calibration_threshold_adjustment must match confidence score",
+            )
+        coherence_field, hold_field = threshold_fields
+        expected_coherence_threshold = round(
+            SENSORY_LOOPBACK_COHERENCE_DRIFT_THRESHOLD + expected_adjustment,
+            3,
+        )
+        expected_hold_threshold = round(
+            SENSORY_LOOPBACK_HOLD_DRIFT_THRESHOLD + expected_adjustment,
+            3,
+        )
+        if payload.get(coherence_field) != expected_coherence_threshold:
+            errors.append(f"{field_prefix}.{coherence_field} must match calibrated threshold")
+        if payload.get(hold_field) != expected_hold_threshold:
+            errors.append(f"{field_prefix}.{hold_field} must match calibrated threshold")
+        if payload.get("raw_calibration_payload_stored") is not False:
+            errors.append(f"{field_prefix}.raw_calibration_payload_stored must be false")
+        if payload.get("raw_gate_payload_stored") is not False:
+            errors.append(f"{field_prefix}.raw_gate_payload_stored must be false")
+        if gate_bound:
+            if gate_status != "bound":
+                errors.append(f"{field_prefix}.calibration_confidence_gate_status must be bound")
+            if confidence_score < expected_minimum:
+                errors.append(
+                    f"{field_prefix}.calibration_confidence_score must meet the gate minimum",
+                )
+            if not gate_ref:
+                errors.append(f"{field_prefix}.calibration_confidence_gate_ref must be non-empty")
+            if not gate_digest:
+                errors.append(
+                    f"{field_prefix}.calibration_confidence_gate_digest must be non-empty",
+                )
+        else:
+            if gate_status != "not-bound":
+                errors.append(
+                    f"{field_prefix}.calibration_confidence_gate_status must be not-bound",
+                )
+            if confidence_score != 0.0:
+                errors.append(
+                    f"{field_prefix}.calibration_confidence_score must be 0.0 when unbound",
+                )
+            if gate_ref or gate_digest:
+                errors.append(
+                    f"{field_prefix}.calibration_confidence gate refs must be empty when unbound",
+                )
+        return {
+            "gate_bound": bool(gate_bound),
+            "threshold_adjusted": bool(gate_bound)
+            and expected_adjustment > 0
+            and payload.get(coherence_field) == expected_coherence_threshold
+            and payload.get(hold_field) == expected_hold_threshold,
+            "gate_digest_bound": bool(gate_bound and gate_digest),
+        }
+
+    @staticmethod
+    def _normalize_score_for_validation(
+        value: Any,
+        name: str,
+        errors: List[str],
+    ) -> float:
+        if (
+            not isinstance(value, (int, float))
+            or isinstance(value, bool)
+            or not 0 <= float(value) <= 1
+        ):
+            errors.append(f"{name} must be between 0 and 1")
+            return 0.0
+        return round(float(value), 3)
+
+    @staticmethod
+    def _normalize_string(value: Any, name: str) -> str:
+        if not isinstance(value, str):
+            raise ValueError(f"{name} must be a string")
+        return value.strip()
 
     @staticmethod
     def _normalize_non_empty_string(value: Any, name: str) -> str:

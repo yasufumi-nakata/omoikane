@@ -19,6 +19,9 @@ expected:
   qualia_binding_bound: true
   body_map_bound: true
   proprioceptive_calibration_bound: true
+  biodata_calibration_confidence_gate_bound: true
+  biodata_calibration_threshold_adjusted: true
+  biodata_calibration_raw_payload_redacted: true
   alignment_ref_bound: true
 metric: boolean
 threshold: 1.0
