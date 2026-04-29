@@ -575,9 +575,23 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["legal_execution_ok"])
         self.assertTrue(result["validation"]["legal_execution_bound"])
         self.assertTrue(result["validation"]["regulator_permit_verifier_ok"])
+        self.assertTrue(result["validation"]["backup_regulator_permit_verifier_ok"])
         self.assertTrue(result["validation"]["regulator_permit_verifier_ready"])
         self.assertTrue(result["validation"]["regulator_permit_legal_execution_bound"])
         self.assertTrue(result["validation"]["regulator_permit_raw_payload_redacted"])
+        self.assertTrue(result["validation"]["regulator_permit_quorum_ok"])
+        self.assertTrue(result["validation"]["regulator_permit_quorum_ready"])
+        self.assertTrue(
+            result["validation"]["regulator_permit_quorum_multi_jurisdiction_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["regulator_permit_quorum_threshold_policy_bound"]
+        )
+        self.assertTrue(result["validation"]["regulator_permit_quorum_roster_bound"])
+        self.assertTrue(
+            result["validation"]["regulator_permit_quorum_revocation_registry_bound"]
+        )
+        self.assertTrue(result["validation"]["regulator_permit_quorum_raw_payload_redacted"])
         self.assertTrue(result["validation"]["guardian_oversight_gate_ok"])
         self.assertTrue(result["validation"]["guardian_oversight_gate_bound"])
         self.assertTrue(result["validation"]["reviewer_network_attested"])
@@ -589,6 +603,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["authorization_production_connector_attestation_ready"]
         )
+        self.assertTrue(result["validation"]["authorization_regulator_permit_quorum_ready"])
         self.assertTrue(result["validation"]["authorization_guardian_oversight_gate_ready"])
         self.assertEqual("physical-device-actuation", result["validation"]["authorization_delivery_scope"])
         self.assertEqual("executed", result["approved_command"]["status"])
@@ -607,6 +622,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             result["legal_execution"]["execution_id"],
             result["regulator_permit_verifier_receipt"]["legal_execution_id"],
+        )
+        self.assertEqual(
+            result["legal_execution"]["execution_id"],
+            result["regulator_permit_quorum_receipt"]["legal_execution_id"],
+        )
+        self.assertEqual(
+            ["JP-13", "SG-01"],
+            result["regulator_permit_quorum_receipt"]["accepted_verifier_jurisdictions"],
         )
         self.assertEqual(
             result["guardian_oversight_gate"]["gate_id"],
@@ -658,7 +681,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-plan"])
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["interface-ewa-legal"])
         self.assertEqual(
-            1,
+            2,
             result["ledger_verification"]["category_counts"]["interface-ewa-regulator-permit"],
         )
         self.assertEqual(

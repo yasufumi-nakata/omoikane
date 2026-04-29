@@ -3608,7 +3608,21 @@ entries:
       - agents/guardians/integrity-guardian.yaml
       - docs/02-subsystems/interface/ewa-safety.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to serialize digest-only regulator permit API readback against one EWA legal execution without storing raw permit or regulator response payloads or escalating verifier decision authority.
+    rationale: Required to serialize digest-only regulator permit API readback against one EWA legal execution with permit class and verifier jurisdiction binding, without storing raw permit or regulator response payloads or escalating verifier decision authority.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/ewa_regulator_permit_quorum_receipt.schema
+    consumers:
+      - specs/interfaces/interface.ewa.v0.idl
+      - specs/schemas/external_actuation_authorization.schema
+      - reference-runtime
+      - tests/integration/test_ewa_schema_contracts.py
+      - tests/unit/test_ewa.py
+      - evals/safety/ewa_regulator_permit_verifier.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/interface/ewa-safety.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to serialize a multi-jurisdiction regulator permit quorum receipt that binds accepted permit readbacks, permit-class threshold policy, verifier roster, and revocation registry before EWA authorization can proceed.
   - priority: P1
     kind: eval
     file: evals/safety/ewa_regulator_permit_verifier.yaml
@@ -3620,6 +3634,6 @@ entries:
       - agents/guardians/integrity-guardian.yaml
       - docs/02-subsystems/interface/ewa-safety.md
       - docs/07-reference-implementation/README.md
-    rationale: Guards that regulator permit verifier receipts remain legal-execution-bound, permit-status-valid, digest-only, raw-payload-redacted, and outside EWA decision authority.
+    rationale: Guards that regulator permit verifier and quorum receipts remain legal-execution-bound, permit-status-valid, multi-jurisdiction, threshold-policy-bound, digest-only, raw-payload-redacted, and outside EWA decision authority.
 next_priority:
   # Future automation can append the next missing contract here.

@@ -64,6 +64,14 @@ class EWASchemaContractTests(unittest.TestCase):
             result["regulator_permit_verifier_receipt"],
         )
         self._assert_schema_valid(
+            "specs/schemas/ewa_regulator_permit_verifier_receipt.schema",
+            result["backup_regulator_permit_verifier_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/ewa_regulator_permit_quorum_receipt.schema",
+            result["regulator_permit_quorum_receipt"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/ewa_emergency_stop.schema",
             result["emergency_stop"],
         )

@@ -12,6 +12,7 @@ imports:
   ewa_production_connector_attestation: ../schemas/ewa_production_connector_attestation.schema
   ewa_legal_execution: ../schemas/ewa_legal_execution.schema
   ewa_regulator_permit_verifier_receipt: ../schemas/ewa_regulator_permit_verifier_receipt.schema
+  ewa_regulator_permit_quorum_receipt: ../schemas/ewa_regulator_permit_quorum_receipt.schema
   ewa_guardian_oversight_gate: ../schemas/ewa_guardian_oversight_gate.schema
   ewa_emergency_stop: ../schemas/ewa_emergency_stop.schema
   external_actuation_authorization: ../schemas/external_actuation_authorization.schema
@@ -585,12 +586,18 @@ operations:
           permit_scope_ref:
             type: string
             minLength: 1
+          permit_class:
+            type: string
+            minLength: 1
           permit_status:
             type: string
             enum:
               - valid
               - expired
               - revoked
+          verifier_jurisdiction:
+            type: string
+            minLength: 1
           regulator_api_endpoint_ref:
             type: string
             minLength: 1
@@ -614,7 +621,7 @@ operations:
     guarantees:
       - permit_status must be valid before the receipt is accepted
       - receipt must bind legal_execution_id/digest, jurisdiction, legal_basis_ref, and jurisdiction bundle refs
-      - regulator API endpoint, response digest, API certificate, and verifier key must be digest-bound without raw permit or response payload retention
+      - regulator API endpoint, response digest, API certificate, verifier jurisdiction, permit class, and verifier key must be digest-bound without raw permit or response payload retention
       - the verifier receipt must not become decision authority for authorization
   validate_regulator_permit_verifier_receipt:
     summary: Validate one regulator permit verifier receipt against its bound EWA legal execution.
@@ -658,6 +665,122 @@ operations:
           regulator_transport_verified:
             type: boolean
           permit_response_digest_matches:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+              minLength: 1
+  verify_regulator_permit_quorum:
+    summary: Bind multiple permit readback receipts into a permit-class quorum before EWA authorization continues.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - legal_execution
+          - permit_receipts
+          - threshold_policy_ref
+          - threshold_policy_digest
+          - verifier_roster_ref
+          - verifier_roster_digest
+          - revocation_registry_ref
+          - revocation_registry_digest
+        properties:
+          legal_execution:
+            schema_ref: ewa_legal_execution
+          permit_receipts:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: ewa_regulator_permit_verifier_receipt
+          permit_class:
+            type: string
+            minLength: 1
+          required_verifier_count:
+            type: integer
+            minimum: 2
+          required_verifier_jurisdictions:
+            type: array
+            minItems: 2
+            items:
+              type: string
+              minLength: 1
+          threshold_policy_ref:
+            type: string
+            minLength: 1
+          threshold_policy_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          verifier_roster_ref:
+            type: string
+            minLength: 1
+          verifier_roster_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+          revocation_registry_ref:
+            type: string
+            minLength: 1
+          revocation_registry_digest:
+            type: string
+            pattern: "^sha256:[a-f0-9]{64}$"
+    output:
+      schema_ref: ewa_regulator_permit_quorum_receipt
+    guarantees:
+      - accepted permit receipts must be valid, legal-execution-bound, and permit-class-matched
+      - quorum_status must be complete only when required verifier count and jurisdiction coverage are satisfied
+      - threshold policy, verifier roster, and revocation registry must be digest-bound without raw payload retention
+      - the quorum receipt is a hard input to external_actuation_authorization but not a decision authority
+  validate_regulator_permit_quorum_receipt:
+    summary: Validate one permit-class quorum against the bound EWA legal execution.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - quorum_receipt
+          - legal_execution
+        properties:
+          quorum_receipt:
+            schema_ref: ewa_regulator_permit_quorum_receipt
+          legal_execution:
+            schema_ref: ewa_legal_execution
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - receipt_ready
+          - legal_execution_bound
+          - accepted_receipt_entries_valid
+          - multi_jurisdiction_bound
+          - threshold_policy_bound
+          - verifier_roster_bound
+          - revocation_registry_bound
+          - quorum_complete
+          - raw_payload_redacted
+          - errors
+        properties:
+          ok:
+            type: boolean
+          receipt_ready:
+            type: boolean
+          legal_execution_bound:
+            type: boolean
+          accepted_receipt_entries_valid:
+            type: boolean
+          multi_jurisdiction_bound:
+            type: boolean
+          threshold_policy_bound:
+            type: boolean
+          verifier_roster_bound:
+            type: boolean
+          revocation_registry_bound:
+            type: boolean
+          quorum_complete:
             type: boolean
           raw_payload_redacted:
             type: boolean
@@ -742,7 +865,7 @@ operations:
               type: string
               minLength: 1
   authorize:
-    summary: Bind one non-read-only actuation command to its motor plan and legal execution receipts before execution.
+    summary: Bind one non-read-only actuation command to its motor plan, permit quorum, and legal execution receipts before execution.
     input:
       inline_schema:
         type: object
@@ -754,6 +877,7 @@ operations:
           - stop_signal_adapter_receipt
           - production_connector_attestation
           - legal_execution
+          - regulator_permit_quorum_receipt
           - guardian_oversight_gate
         properties:
           command:
@@ -768,6 +892,8 @@ operations:
             schema_ref: ewa_production_connector_attestation
           legal_execution:
             schema_ref: ewa_legal_execution
+          regulator_permit_quorum_receipt:
+            schema_ref: ewa_regulator_permit_quorum_receipt
           guardian_oversight_gate:
             schema_ref: ewa_guardian_oversight_gate
           valid_for_seconds:
@@ -779,7 +905,7 @@ operations:
     guarantees:
       - read-only commands must not request actuation authorization
       - authorization must retain only instruction_digest and intent_summary_digest, never raw instruction text
-      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, stop_signal_adapter_receipt_id/digest, production_connector_attestation_id/digest, legal_execution_id/digest, guardian_oversight_gate_id/digest, and approval path
+      - authorization must bind one handle_id, device_id, command_id, reversibility, jurisdiction, legal basis, motor_plan_id/digest, stop_signal_path_id/digest, stop_signal_adapter_receipt_id/digest, production_connector_attestation_id/digest, legal_execution_id/digest, regulator permit quorum receipt/digest, guardian_oversight_gate_id/digest, and approval path
       - legal execution valid_until must cover the requested authorization window before authorization is issued
   command:
     summary: Execute one bounded EWA command or emit an EthicsVeto when blocked.
@@ -790,7 +916,7 @@ operations:
     guarantees:
       - matched blocked tokens must veto and recommend Council escalation
       - non-read-only commands require one active authorization_id whose digests match the command payload
-      - non-read-only audit entries must remain bound to one motor_plan receipt, one stop_signal_path receipt, one stop_signal_adapter receipt, one production connector attestation, one legal_execution receipt, and one guardian oversight-gated authorization artifact
+      - non-read-only audit entries must remain bound to one motor_plan receipt, one stop_signal_path receipt, one stop_signal_adapter receipt, one production connector attestation, one legal_execution receipt, one regulator permit quorum-gated authorization artifact, and one guardian oversight-gated authorization artifact
       - reversible commands require Guardian observation
       - partial-reversible commands require Council majority attestation
       - irreversible commands require unanimous Council attestation, Guardian observation, and explicit self consent
@@ -825,11 +951,13 @@ operations:
           - stop_signal_adapter_receipt_ready
           - production_connector_attestation_ready
           - legal_execution_ready
+          - regulator_permit_quorum_ready
           - motor_plan_bound
           - stop_signal_path_bound
           - stop_signal_adapter_receipt_bound
           - production_connector_attestation_bound
           - legal_execution_bound
+          - regulator_permit_quorum_bound
           - window_open
           - status_authorized
           - delivery_scope
@@ -857,6 +985,8 @@ operations:
             type: boolean
           legal_execution_ready:
             type: boolean
+          regulator_permit_quorum_ready:
+            type: boolean
           motor_plan_bound:
             type: boolean
           stop_signal_path_bound:
@@ -866,6 +996,8 @@ operations:
           production_connector_attestation_bound:
             type: boolean
           legal_execution_bound:
+            type: boolean
+          regulator_permit_quorum_bound:
             type: boolean
           window_open:
             type: boolean

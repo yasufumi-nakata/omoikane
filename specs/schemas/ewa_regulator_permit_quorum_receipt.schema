@@ -1,0 +1,227 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ewa_regulator_permit_quorum_receipt.schema"
+title: EWARegulatorPermitQuorumReceipt
+description: >
+  Digest-only quorum receipt proving that one EWA legal execution has enough
+  regulator permit readbacks for a permit class before external actuation
+  authorization can proceed, without storing raw permit, response, policy, or
+  roster payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - profile_id
+  - threshold_policy_id
+  - legal_execution_id
+  - legal_execution_digest
+  - legal_execution_profile_id
+  - handle_id
+  - device_id
+  - command_id
+  - jurisdiction
+  - delivery_scope
+  - legal_basis_ref
+  - jurisdiction_bundle_ref
+  - jurisdiction_bundle_digest
+  - permit_class
+  - required_verifier_count
+  - accepted_verifier_count
+  - required_verifier_jurisdictions
+  - accepted_verifier_jurisdictions
+  - quorum_status
+  - accepted_receipts
+  - accepted_receipt_digest_set
+  - permit_authority_refs
+  - permit_record_digest_set
+  - permit_response_digest_set
+  - verifier_key_digest_set
+  - threshold_policy_ref
+  - threshold_policy_digest
+  - verifier_roster_ref
+  - verifier_roster_digest
+  - revocation_registry_ref
+  - revocation_registry_digest
+  - quorum_digest
+  - raw_permit_payload_stored
+  - raw_regulator_response_payload_stored
+  - raw_threshold_policy_payload_stored
+  - raw_roster_payload_stored
+  - decision_authority_escalated
+  - verified_at
+  - receipt_digest
+properties:
+  kind:
+    const: ewa_regulator_permit_verifier_quorum
+  schema_version:
+    const: "1.0"
+  receipt_id:
+    type: string
+    pattern: "^ewa-permit-quorum-[a-f0-9]{12}$"
+  profile_id:
+    const: ewa-regulator-permit-verifier-quorum-v1
+  threshold_policy_id:
+    const: ewa-regulator-permit-class-threshold-policy-v1
+  legal_execution_id:
+    type: string
+    minLength: 8
+  legal_execution_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  legal_execution_profile_id:
+    const: ewa-jurisdiction-legal-execution-v1
+  handle_id:
+    type: string
+    minLength: 8
+  device_id:
+    type: string
+    minLength: 1
+  command_id:
+    type: string
+    minLength: 1
+  jurisdiction:
+    type: string
+    minLength: 1
+  delivery_scope:
+    const: physical-device-actuation
+  legal_basis_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_ref:
+    type: string
+    minLength: 1
+  jurisdiction_bundle_digest:
+    type: string
+    minLength: 1
+  permit_class:
+    type: string
+    minLength: 1
+  required_verifier_count:
+    type: integer
+    minimum: 2
+  accepted_verifier_count:
+    type: integer
+    minimum: 2
+  required_verifier_jurisdictions:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  accepted_verifier_jurisdictions:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  quorum_status:
+    const: complete
+  accepted_receipts:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - receipt_id
+        - receipt_digest
+        - permit_authority_ref
+        - permit_record_digest
+        - permit_response_digest
+        - verifier_key_digest
+        - verifier_jurisdiction
+        - permit_status
+      properties:
+        receipt_id:
+          type: string
+          pattern: "^ewa-permit-[a-f0-9]{12}$"
+        receipt_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        permit_authority_ref:
+          type: string
+          minLength: 1
+        permit_record_digest:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        permit_response_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        verifier_key_digest:
+          type: string
+          pattern: "^sha256:[a-f0-9]{64}$"
+        verifier_jurisdiction:
+          type: string
+          minLength: 1
+        permit_status:
+          const: valid
+  accepted_receipt_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  permit_authority_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+  permit_record_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^sha256:[a-f0-9]{64}$"
+  permit_response_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  verifier_key_digest_set:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^sha256:[a-f0-9]{64}$"
+  threshold_policy_ref:
+    type: string
+    minLength: 1
+  threshold_policy_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  verifier_roster_ref:
+    type: string
+    minLength: 1
+  verifier_roster_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  revocation_registry_ref:
+    type: string
+    minLength: 1
+  revocation_registry_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  quorum_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  raw_permit_payload_stored:
+    const: false
+  raw_regulator_response_payload_stored:
+    const: false
+  raw_threshold_policy_payload_stored:
+    const: false
+  raw_roster_payload_stored:
+    const: false
+  decision_authority_escalated:
+    const: false
+  verified_at:
+    type: string
+    format: date-time
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

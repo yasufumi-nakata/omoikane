@@ -165,6 +165,8 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             permit_record_ref="permit://jp-13/ewa-arm-01/reposition/v1",
             permit_record_digest=f"sha256:{'a' * 64}",
             permit_scope_ref="permit-scope://physical-device-actuation/inspection-arm",
+            permit_class="lab-inspection-physical-actuation",
+            verifier_jurisdiction="JP-13",
             regulator_api_endpoint_ref="https://regulator.invalid/jp-13/ewa/permits/readback",
             regulator_api_response_digest=f"sha256:{'b' * 64}",
             regulator_api_certificate_ref="cert://jp-13/lab-robotics-permit-desk/api",
@@ -172,9 +174,50 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             verifier_key_ref="verifier-key://jp-13/lab-robotics-permit-desk/2026q2",
             verifier_key_digest=f"sha256:{'d' * 64}",
         )
+        backup_regulator_permit_verifier_receipt = controller.verify_regulator_permit(
+            legal_execution["execution_id"],
+            permit_authority_ref="authority://sg-01/lab-robotics-permit-mirror",
+            permit_record_ref="permit://sg-01/ewa-arm-01/reposition/v1",
+            permit_record_digest=f"sha256:{'1' * 64}",
+            permit_scope_ref="permit-scope://physical-device-actuation/inspection-arm",
+            permit_class="lab-inspection-physical-actuation",
+            verifier_jurisdiction="SG-01",
+            regulator_api_endpoint_ref="https://regulator.invalid/sg-01/ewa/permits/readback",
+            regulator_api_response_digest=f"sha256:{'2' * 64}",
+            regulator_api_certificate_ref="cert://sg-01/lab-robotics-permit-mirror/api",
+            regulator_api_certificate_digest=f"sha256:{'3' * 64}",
+            verifier_key_ref="verifier-key://sg-01/lab-robotics-permit-mirror/2026q2",
+            verifier_key_digest=f"sha256:{'4' * 64}",
+        )
         regulator_permit_validation = controller.validate_regulator_permit_verifier_receipt(
             regulator_permit_verifier_receipt,
             legal_execution=legal_execution,
+        )
+        backup_regulator_permit_validation = (
+            controller.validate_regulator_permit_verifier_receipt(
+                backup_regulator_permit_verifier_receipt,
+                legal_execution=legal_execution,
+            )
+        )
+        regulator_permit_quorum_receipt = controller.verify_regulator_permit_quorum(
+            legal_execution["execution_id"],
+            permit_receipt_ids=[
+                regulator_permit_verifier_receipt["receipt_id"],
+                backup_regulator_permit_verifier_receipt["receipt_id"],
+            ],
+            permit_class="lab-inspection-physical-actuation",
+            threshold_policy_ref="policy://ewa/regulator-permit/lab-inspection-actuation-threshold/v1",
+            threshold_policy_digest=f"sha256:{'5' * 64}",
+            verifier_roster_ref="roster://ewa/regulator-permit/lab-inspection/2026q2",
+            verifier_roster_digest=f"sha256:{'6' * 64}",
+            revocation_registry_ref="revocation://ewa/regulator-permit/lab-inspection/current",
+            revocation_registry_digest=f"sha256:{'7' * 64}",
+        )
+        regulator_permit_quorum_validation = (
+            controller.validate_regulator_permit_quorum_receipt(
+                regulator_permit_quorum_receipt,
+                legal_execution=legal_execution,
+            )
         )
         oversight_event = self._build_network_oversight_event(
             command_id="ewa-command-approve-001",
@@ -208,6 +251,9 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
                 "attestation_id"
             ],
             legal_execution_id=legal_execution["execution_id"],
+            regulator_permit_quorum_receipt_id=regulator_permit_quorum_receipt[
+                "receipt_id"
+            ],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
             intent_confidence=0.94,
@@ -219,6 +265,7 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             stop_signal_adapter_receipt=stop_signal_adapter_receipt,
             production_connector_attestation=production_connector_attestation,
             legal_execution=legal_execution,
+            regulator_permit_quorum_receipt=regulator_permit_quorum_receipt,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
@@ -241,7 +288,13 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
             "regulator_permit_verifier_receipt": regulator_permit_verifier_receipt,
+            "backup_regulator_permit_verifier_receipt": (
+                backup_regulator_permit_verifier_receipt
+            ),
             "regulator_permit_validation": regulator_permit_validation,
+            "backup_regulator_permit_validation": backup_regulator_permit_validation,
+            "regulator_permit_quorum_receipt": regulator_permit_quorum_receipt,
+            "regulator_permit_quorum_validation": regulator_permit_quorum_validation,
             "oversight_event": oversight_event,
             "guardian_oversight_gate": guardian_oversight_gate,
             "guardian_oversight_gate_validation": guardian_oversight_gate_validation,
@@ -293,6 +346,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(context["regulator_permit_validation"]["receipt_ready"])
         self.assertTrue(context["regulator_permit_validation"]["legal_execution_bound"])
         self.assertTrue(context["regulator_permit_validation"]["raw_payload_redacted"])
+        self.assertTrue(context["backup_regulator_permit_validation"]["ok"])
+        self.assertTrue(context["regulator_permit_quorum_validation"]["ok"])
+        self.assertTrue(context["regulator_permit_quorum_validation"]["receipt_ready"])
+        self.assertTrue(context["regulator_permit_quorum_validation"]["multi_jurisdiction_bound"])
+        self.assertTrue(context["regulator_permit_quorum_validation"]["threshold_policy_bound"])
+        self.assertTrue(context["regulator_permit_quorum_validation"]["verifier_roster_bound"])
+        self.assertTrue(context["regulator_permit_quorum_validation"]["revocation_registry_bound"])
+        self.assertTrue(context["regulator_permit_quorum_validation"]["raw_payload_redacted"])
         self.assertTrue(context["guardian_oversight_gate_validation"]["ok"])
         self.assertTrue(context["guardian_oversight_gate_validation"]["gate_ready"])
         self.assertTrue(authorization_validation["ok"])
@@ -301,12 +362,14 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertTrue(authorization_validation["stop_signal_adapter_receipt_ready"])
         self.assertTrue(authorization_validation["production_connector_attestation_ready"])
         self.assertTrue(authorization_validation["legal_execution_ready"])
+        self.assertTrue(authorization_validation["regulator_permit_quorum_ready"])
         self.assertTrue(authorization_validation["guardian_oversight_gate_ready"])
         self.assertTrue(authorization_validation["motor_plan_bound"])
         self.assertTrue(authorization_validation["stop_signal_path_bound"])
         self.assertTrue(authorization_validation["stop_signal_adapter_receipt_bound"])
         self.assertTrue(authorization_validation["production_connector_attestation_bound"])
         self.assertTrue(authorization_validation["legal_execution_bound"])
+        self.assertTrue(authorization_validation["regulator_permit_quorum_bound"])
         self.assertTrue(authorization_validation["guardian_oversight_gate_bound"])
         self.assertTrue(authorization_validation["reviewer_network_attested"])
         self.assertEqual("physical-device-actuation", authorization_validation["delivery_scope"])
@@ -428,6 +491,21 @@ class ExternalWorldAgentControllerTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertFalse(validation["receipt_ready"])
         self.assertFalse(validation["permit_response_digest_matches"])
+
+    def test_regulator_permit_quorum_rejects_missing_jurisdiction(self) -> None:
+        context = self._build_authorized_reversible_context()
+        controller = context["controller"]
+        quorum = dict(context["regulator_permit_quorum_receipt"])
+        quorum["accepted_verifier_jurisdictions"] = ["JP-13"]
+
+        validation = controller.validate_regulator_permit_quorum_receipt(
+            quorum,
+            legal_execution=context["legal_execution"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["receipt_ready"])
+        self.assertFalse(validation["multi_jurisdiction_bound"])
 
     def test_non_read_only_command_without_authorization_is_vetoed(self) -> None:
         controller = ExternalWorldAgentController()

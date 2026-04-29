@@ -1219,9 +1219,17 @@ fixed 5-control preflight を固定したうえで、
 `profile_id=ewa-regulator-permit-verifier-v1` /
 `transport_profile_id=digest-only-regulator-api-readback-v1` /
 legal execution digest、permit authority、permit record digest、
-regulator API response digest、API certificate digest、verifier key digest、
-raw permit / response payload redaction、decision authority 非昇格を
+permit class、verifier jurisdiction、regulator API response digest、
+API certificate digest、verifier key digest、raw permit / response payload
+redaction、decision authority 非昇格を
 同じ jurisdiction-bound preflight に束縛したうえで、
+`ewa_regulator_permit_quorum_receipt` が
+`profile_id=ewa-regulator-permit-verifier-quorum-v1` /
+`threshold_policy_id=ewa-regulator-permit-class-threshold-policy-v1` /
+JP-13 と SG-01 の accepted receipt digest set、permit class、
+threshold policy digest、verifier roster digest、revocation registry digest、
+raw policy / roster payload redaction、decision authority 非昇格を束縛し、
+`external_actuation_authorization` の hard input として要求されたうえで、
 network-attested `ewa_guardian_oversight_gate` が
 `guardian_role=integrity` / `oversight_category=attest` /
 `oversight_event_id` / `reviewer_binding_count` /
@@ -1231,7 +1239,8 @@ matched reviewer `verification_id` / `network_receipt_id` /
 `instruction_digest` / `intent_summary_digest` / `motor_plan_id` / `stop_signal_path_id` /
 `stop_signal_adapter_receipt_id` /
 `production_connector_attestation_id` /
-`legal_execution_id` / `guardian_verification_ref` /
+`legal_execution_id` / `regulator_permit_quorum_receipt_id` /
+`guardian_verification_ref` /
 `guardian_oversight_gate_id` / `jurisdiction_bundle_status=ready` を固定したうえで、
 reversible command に Guardian observe を要求しつつ、
 `watchdog-timeout` emergency stop が

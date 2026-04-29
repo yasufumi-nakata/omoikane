@@ -105,6 +105,7 @@ oversight_scope_refs:
   - specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema
   - specs/schemas/yaoyorozu_research_evidence_synthesis.schema
   - specs/schemas/ewa_regulator_permit_verifier_receipt.schema
+  - specs/schemas/ewa_regulator_permit_quorum_receipt.schema
   - evals/continuity/gap_report_scan_receipt.yaml
   - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
   - evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
@@ -122,7 +123,7 @@ when_to_invoke: |
   - BioData Transmitter の source feature digest、body-state latent digest、generated bundle digest、multi-day calibration digest、confidence gate digest、literature refs、mind-upload.com conflict sink、raw biosignal / latent / calibration / gate payload 非保存、semantic thought content 非生成を検証する時
   - Sensory Loopback の BioData calibration confidence gate が bounded drift-threshold adjustment だけに使われ、body-map calibration / Guardian hold / stabilization を置き換えず、raw calibration / gate payload を保存していないことを検証する時
   - Yaoyorozu researcher evidence verifier の live transport quorum / signed response / freshness window を検証する時
-  - EWA regulator permit verifier が legal execution digest、permit status、regulator API response digest、API certificate digest、verifier key digest に束縛され、raw permit / response payload と decision authority を保持しないことを検証する時
+  - EWA regulator permit verifier / quorum が legal execution digest、permit status、regulator API response digest、API certificate digest、verifier key digest、multi-jurisdiction threshold policy、verifier roster、revocation registry に束縛され、raw permit / response / policy / roster payload と decision authority を保持しないことを検証する時
   - MemoryCrystal replication の key succession receipt が 3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref、JP-13 signer roster policy digest、identity-guardian / integrity-guardian signature digest、JP-13 + SG-01 multi-jurisdiction signer roster quorum digest、quorum threshold policy registry digest と authority signature digest に束縛され、raw key / raw shard / raw jurisdiction policy / raw quorum threshold policy / raw signer roster payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal receipt が coldstore / trustee の renewed media proof、readback digest、migration attestation digest、3650 日 refresh interval、1000 年 target horizon に束縛され、raw media / raw readback payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal cadence policy が identity cadence class、JP-13 / SG-01 jurisdiction cadence policy digest、target refresh interval、effective refresh / revocation window に束縛され、raw identity / jurisdiction cadence payload を保存していないことを検証する時

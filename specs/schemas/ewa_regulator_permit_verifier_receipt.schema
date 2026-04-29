@@ -28,7 +28,9 @@ required:
   - permit_record_ref
   - permit_record_digest
   - permit_scope_ref
+  - permit_class
   - permit_status
+  - verifier_jurisdiction
   - regulator_api_endpoint_ref
   - regulator_api_response_digest
   - regulator_api_certificate_ref
@@ -96,8 +98,14 @@ properties:
   permit_scope_ref:
     type: string
     minLength: 1
+  permit_class:
+    type: string
+    minLength: 1
   permit_status:
     const: valid
+  verifier_jurisdiction:
+    type: string
+    minLength: 1
   regulator_api_endpoint_ref:
     type: string
     minLength: 1

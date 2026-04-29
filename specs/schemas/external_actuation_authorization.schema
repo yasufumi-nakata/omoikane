@@ -4,7 +4,8 @@ title: ExternalActuationAuthorization
 description: >
   Guardian-reviewed, jurisdiction-bound authorization artifact for one non-read-only
   physical-world actuation command without storing raw instruction text, while binding
-  device-specific motor semantics and jurisdiction-specific legal execution receipts.
+  device-specific motor semantics, regulator permit quorum, and jurisdiction-specific
+  legal execution receipts.
 type: object
 additionalProperties: false
 required:
@@ -49,6 +50,14 @@ required:
   - legal_execution_id
   - legal_execution_digest
   - legal_execution_profile_id
+  - regulator_permit_quorum_receipt_id
+  - regulator_permit_quorum_receipt_digest
+  - regulator_permit_quorum_profile_id
+  - regulator_permit_quorum_status
+  - regulator_permit_threshold_policy_id
+  - regulator_permit_threshold_policy_digest
+  - regulator_permit_verifier_roster_digest
+  - regulator_permit_revocation_registry_digest
   - guardian_oversight_gate_id
   - guardian_oversight_gate_digest
   - guardian_oversight_event_id
@@ -193,6 +202,27 @@ properties:
   legal_execution_profile_id:
     type: string
     const: ewa-jurisdiction-legal-execution-v1
+  regulator_permit_quorum_receipt_id:
+    type: string
+    pattern: "^ewa-permit-quorum-[a-f0-9]{12}$"
+  regulator_permit_quorum_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  regulator_permit_quorum_profile_id:
+    const: ewa-regulator-permit-verifier-quorum-v1
+  regulator_permit_quorum_status:
+    const: complete
+  regulator_permit_threshold_policy_id:
+    const: ewa-regulator-permit-class-threshold-policy-v1
+  regulator_permit_threshold_policy_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  regulator_permit_verifier_roster_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
+  regulator_permit_revocation_registry_digest:
+    type: string
+    pattern: "^sha256:[a-f0-9]{64}$"
   guardian_oversight_gate_id:
     type: string
     minLength: 8

@@ -9631,6 +9631,8 @@ json.dump(response, sys.stdout)
             permit_record_ref="permit://jp-13/lab-drone-arm-01/inspection-safe-reposition/v1",
             permit_record_digest=f"sha256:{'e' * 64}",
             permit_scope_ref="permit-scope://physical-device-actuation/lab-inspection",
+            permit_class="lab-inspection-physical-actuation",
+            verifier_jurisdiction="JP-13",
             regulator_api_endpoint_ref="https://regulator.invalid/jp-13/ewa/permits/readback",
             regulator_api_response_digest=f"sha256:{'f' * 64}",
             regulator_api_certificate_ref="cert://jp-13/lab-robotics-permit-desk/api",
@@ -9638,9 +9640,50 @@ json.dump(response, sys.stdout)
             verifier_key_ref="verifier-key://jp-13/lab-robotics-permit-desk/2026q2",
             verifier_key_digest=f"sha256:{'b' * 64}",
         )
+        backup_regulator_permit_verifier_receipt = self.ewa.verify_regulator_permit(
+            legal_execution["execution_id"],
+            permit_authority_ref="authority://sg-01/lab-robotics-permit-mirror",
+            permit_record_ref="permit://sg-01/lab-drone-arm-01/inspection-safe-reposition/v1",
+            permit_record_digest=f"sha256:{'1' * 64}",
+            permit_scope_ref="permit-scope://physical-device-actuation/lab-inspection",
+            permit_class="lab-inspection-physical-actuation",
+            verifier_jurisdiction="SG-01",
+            regulator_api_endpoint_ref="https://regulator.invalid/sg-01/ewa/permits/readback",
+            regulator_api_response_digest=f"sha256:{'2' * 64}",
+            regulator_api_certificate_ref="cert://sg-01/lab-robotics-permit-mirror/api",
+            regulator_api_certificate_digest=f"sha256:{'3' * 64}",
+            verifier_key_ref="verifier-key://sg-01/lab-robotics-permit-mirror/2026q2",
+            verifier_key_digest=f"sha256:{'4' * 64}",
+        )
         regulator_permit_validation = self.ewa.validate_regulator_permit_verifier_receipt(
             regulator_permit_verifier_receipt,
             legal_execution=legal_execution,
+        )
+        backup_regulator_permit_validation = (
+            self.ewa.validate_regulator_permit_verifier_receipt(
+                backup_regulator_permit_verifier_receipt,
+                legal_execution=legal_execution,
+            )
+        )
+        regulator_permit_quorum_receipt = self.ewa.verify_regulator_permit_quorum(
+            legal_execution["execution_id"],
+            permit_receipt_ids=[
+                regulator_permit_verifier_receipt["receipt_id"],
+                backup_regulator_permit_verifier_receipt["receipt_id"],
+            ],
+            permit_class="lab-inspection-physical-actuation",
+            threshold_policy_ref="policy://ewa/regulator-permit/lab-inspection-actuation-threshold/v1",
+            threshold_policy_digest=f"sha256:{'5' * 64}",
+            verifier_roster_ref="roster://ewa/regulator-permit/lab-inspection/2026q2",
+            verifier_roster_digest=f"sha256:{'6' * 64}",
+            revocation_registry_ref="revocation://ewa/regulator-permit/lab-inspection/current",
+            revocation_registry_digest=f"sha256:{'7' * 64}",
+        )
+        regulator_permit_quorum_validation = (
+            self.ewa.validate_regulator_permit_quorum_receipt(
+                regulator_permit_quorum_receipt,
+                legal_execution=legal_execution,
+            )
         )
         guardian_oversight_event = self.oversight.record(
             guardian_role="integrity",
@@ -9684,6 +9727,9 @@ json.dump(response, sys.stdout)
                 "attestation_id"
             ],
             legal_execution_id=legal_execution["execution_id"],
+            regulator_permit_quorum_receipt_id=regulator_permit_quorum_receipt[
+                "receipt_id"
+            ],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
             intent_confidence=0.96,
@@ -9696,6 +9742,7 @@ json.dump(response, sys.stdout)
             stop_signal_adapter_receipt=stop_signal_adapter_receipt,
             production_connector_attestation=production_connector_attestation,
             legal_execution=legal_execution,
+            regulator_permit_quorum_receipt=regulator_permit_quorum_receipt,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
@@ -9782,6 +9829,9 @@ json.dump(response, sys.stdout)
             "legal_execution_bound": handle_validation["legal_execution_bound"]
             and authorization_validation["legal_execution_bound"],
             "regulator_permit_verifier_ok": regulator_permit_validation["ok"],
+            "backup_regulator_permit_verifier_ok": backup_regulator_permit_validation[
+                "ok"
+            ],
             "regulator_permit_verifier_ready": regulator_permit_validation[
                 "receipt_ready"
             ],
@@ -9791,6 +9841,25 @@ json.dump(response, sys.stdout)
             "regulator_permit_raw_payload_redacted": regulator_permit_validation[
                 "raw_payload_redacted"
             ],
+            "regulator_permit_quorum_ok": regulator_permit_quorum_validation["ok"],
+            "regulator_permit_quorum_ready": regulator_permit_quorum_validation[
+                "receipt_ready"
+            ],
+            "regulator_permit_quorum_multi_jurisdiction_bound": (
+                regulator_permit_quorum_validation["multi_jurisdiction_bound"]
+            ),
+            "regulator_permit_quorum_threshold_policy_bound": (
+                regulator_permit_quorum_validation["threshold_policy_bound"]
+            ),
+            "regulator_permit_quorum_roster_bound": regulator_permit_quorum_validation[
+                "verifier_roster_bound"
+            ],
+            "regulator_permit_quorum_revocation_registry_bound": (
+                regulator_permit_quorum_validation["revocation_registry_bound"]
+            ),
+            "regulator_permit_quorum_raw_payload_redacted": (
+                regulator_permit_quorum_validation["raw_payload_redacted"]
+            ),
             "guardian_oversight_gate_ok": guardian_oversight_gate_validation["ok"],
             "guardian_oversight_gate_bound": authorization_validation[
                 "guardian_oversight_gate_bound"
@@ -9839,6 +9908,9 @@ json.dump(response, sys.stdout)
             ],
             "authorization_production_connector_attestation_ready": authorization_validation[
                 "production_connector_attestation_ready"
+            ],
+            "authorization_regulator_permit_quorum_ready": authorization_validation[
+                "regulator_permit_quorum_ready"
             ],
             "authorization_guardian_oversight_gate_ready": authorization_validation[
                 "guardian_oversight_gate_ready"
@@ -9891,6 +9963,8 @@ json.dump(response, sys.stdout)
             and production_connector_validation["ok"]
             and legal_execution_validation["ok"]
             and regulator_permit_validation["ok"]
+            and backup_regulator_permit_validation["ok"]
+            and regulator_permit_quorum_validation["ok"]
             and guardian_oversight_gate_validation["ok"]
             and authorization_validation["ok"]
             and emergency_stop_validation["ok"],
@@ -9960,6 +10034,16 @@ json.dump(response, sys.stdout)
             identity_id=identity.identity_id,
             event_type="ewa.regulator_permit.verified",
             payload=regulator_permit_verifier_receipt,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-regulator-permit",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ewa.regulator_permit.quorum_verified",
+            payload=regulator_permit_quorum_receipt,
             actor="ExternalWorldAgentController",
             category="interface-ewa-regulator-permit",
             layer="L6",
@@ -10076,7 +10160,13 @@ json.dump(response, sys.stdout)
             "legal_execution": legal_execution,
             "legal_execution_validation": legal_execution_validation,
             "regulator_permit_verifier_receipt": regulator_permit_verifier_receipt,
+            "backup_regulator_permit_verifier_receipt": (
+                backup_regulator_permit_verifier_receipt
+            ),
             "regulator_permit_validation": regulator_permit_validation,
+            "backup_regulator_permit_validation": backup_regulator_permit_validation,
+            "regulator_permit_quorum_receipt": regulator_permit_quorum_receipt,
+            "regulator_permit_quorum_validation": regulator_permit_quorum_validation,
             "reviewers": {
                 "alpha": reviewer_alpha,
                 "beta": reviewer_beta,
@@ -13674,6 +13764,50 @@ json.dump(response, sys.stdout)
             escalation_contact="mailto:procedural-actuation@example.invalid",
             valid_for_seconds=360,
         )
+        regulator_permit_verifier_receipt = self.ewa.verify_regulator_permit(
+            legal_execution["execution_id"],
+            permit_authority_ref="authority://jp-13/procedural-actuation-permit-desk",
+            permit_record_ref="permit://jp-13/lab-drone-arm-03/procedural-actuation/v1",
+            permit_record_digest=f"sha256:{'8' * 64}",
+            permit_scope_ref="permit-scope://physical-device-actuation/procedural-bridge",
+            permit_class="lab-inspection-physical-actuation",
+            verifier_jurisdiction="JP-13",
+            regulator_api_endpoint_ref="https://regulator.invalid/jp-13/ewa/procedural-permits/readback",
+            regulator_api_response_digest=f"sha256:{'9' * 64}",
+            regulator_api_certificate_ref="cert://jp-13/procedural-actuation-permit-desk/api",
+            regulator_api_certificate_digest=f"sha256:{'a' * 64}",
+            verifier_key_ref="verifier-key://jp-13/procedural-actuation-permit-desk/2026q2",
+            verifier_key_digest=f"sha256:{'b' * 64}",
+        )
+        backup_regulator_permit_verifier_receipt = self.ewa.verify_regulator_permit(
+            legal_execution["execution_id"],
+            permit_authority_ref="authority://sg-01/procedural-actuation-permit-mirror",
+            permit_record_ref="permit://sg-01/lab-drone-arm-03/procedural-actuation/v1",
+            permit_record_digest=f"sha256:{'c' * 64}",
+            permit_scope_ref="permit-scope://physical-device-actuation/procedural-bridge",
+            permit_class="lab-inspection-physical-actuation",
+            verifier_jurisdiction="SG-01",
+            regulator_api_endpoint_ref="https://regulator.invalid/sg-01/ewa/procedural-permits/readback",
+            regulator_api_response_digest=f"sha256:{'d' * 64}",
+            regulator_api_certificate_ref="cert://sg-01/procedural-actuation-permit-mirror/api",
+            regulator_api_certificate_digest=f"sha256:{'e' * 64}",
+            verifier_key_ref="verifier-key://sg-01/procedural-actuation-permit-mirror/2026q2",
+            verifier_key_digest=f"sha256:{'f' * 64}",
+        )
+        regulator_permit_quorum_receipt = self.ewa.verify_regulator_permit_quorum(
+            legal_execution["execution_id"],
+            permit_receipt_ids=[
+                regulator_permit_verifier_receipt["receipt_id"],
+                backup_regulator_permit_verifier_receipt["receipt_id"],
+            ],
+            permit_class="lab-inspection-physical-actuation",
+            threshold_policy_ref="policy://ewa/regulator-permit/procedural-actuation-threshold/v1",
+            threshold_policy_digest=f"sha256:{'1' * 64}",
+            verifier_roster_ref="roster://ewa/regulator-permit/procedural-actuation/2026q2",
+            verifier_roster_digest=f"sha256:{'2' * 64}",
+            revocation_registry_ref="revocation://ewa/regulator-permit/procedural-actuation/current",
+            revocation_registry_digest=f"sha256:{'3' * 64}",
+        )
         guardian_oversight_event = self.oversight.record(
             guardian_role="integrity",
             category="attest",
@@ -13708,6 +13842,9 @@ json.dump(response, sys.stdout)
                 "attestation_id"
             ],
             legal_execution_id=legal_execution["execution_id"],
+            regulator_permit_quorum_receipt_id=regulator_permit_quorum_receipt[
+                "receipt_id"
+            ],
             guardian_oversight_gate_id=guardian_oversight_gate["gate_id"],
             guardian_observed=True,
             intent_confidence=0.97,
@@ -13720,6 +13857,7 @@ json.dump(response, sys.stdout)
             stop_signal_adapter_receipt=stop_signal_adapter_receipt,
             production_connector_attestation=production_connector_attestation,
             legal_execution=legal_execution,
+            regulator_permit_quorum_receipt=regulator_permit_quorum_receipt,
             guardian_oversight_gate=guardian_oversight_gate,
             handle_id=handle["handle_id"],
             device_id=handle["device_id"],
@@ -13811,6 +13949,16 @@ json.dump(response, sys.stdout)
             payload=legal_execution,
             actor="ExternalWorldAgentController",
             category="interface-ewa-legal",
+            layer="L6",
+            signature_roles=["guardian", "third_party"],
+            substrate="robotic-actuator",
+        )
+        self.ledger.append(
+            identity_id=identity_id,
+            event_type="ewa.regulator_permit.quorum_verified",
+            payload=regulator_permit_quorum_receipt,
+            actor="ExternalWorldAgentController",
+            category="interface-ewa-regulator-permit",
             layer="L6",
             signature_roles=["guardian", "third_party"],
             substrate="robotic-actuator",
@@ -13910,6 +14058,11 @@ json.dump(response, sys.stdout)
                     "beta": reviewer_beta,
                 },
                 "legal_execution": legal_execution,
+                "regulator_permit_verifier_receipt": regulator_permit_verifier_receipt,
+                "backup_regulator_permit_verifier_receipt": (
+                    backup_regulator_permit_verifier_receipt
+                ),
+                "regulator_permit_quorum_receipt": regulator_permit_quorum_receipt,
                 "guardian_oversight_event": guardian_oversight_event,
                 "guardian_oversight_gate": guardian_oversight_gate,
                 "authorization": authorization,

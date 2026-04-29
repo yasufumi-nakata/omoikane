@@ -44,6 +44,13 @@ EWA_PRODUCTION_CONNECTOR_PROFILE_ID = "vendor-api-safety-plc-installation-attest
 EWA_PRODUCTION_CONNECTOR_AUTH_PROFILE_ID = "bounded-vendor-api-connector-auth-v1"
 EWA_REGULATOR_PERMIT_VERIFIER_PROFILE_ID = "ewa-regulator-permit-verifier-v1"
 EWA_REGULATOR_PERMIT_TRANSPORT_PROFILE_ID = "digest-only-regulator-api-readback-v1"
+EWA_REGULATOR_PERMIT_QUORUM_PROFILE_ID = "ewa-regulator-permit-verifier-quorum-v1"
+EWA_REGULATOR_PERMIT_QUORUM_THRESHOLD_POLICY_ID = (
+    "ewa-regulator-permit-class-threshold-policy-v1"
+)
+EWA_REGULATOR_PERMIT_QUORUM_REQUIRED_VERIFIER_COUNT = 2
+EWA_REGULATOR_PERMIT_QUORUM_REQUIRED_JURISDICTIONS = ("JP-13", "SG-01")
+EWA_DEFAULT_PERMIT_CLASS = "lab-inspection-physical-actuation"
 EWA_ALLOWED_REGULATOR_PERMIT_STATUS = {"valid", "expired", "revoked"}
 EWA_GUARDIAN_OVERSIGHT_GATE_POLICY_ID = "guardian-network-attested-ewa-authorization-gate-v1"
 EWA_GUARDIAN_OVERSIGHT_REQUIRED_ROLE = "integrity"
@@ -135,6 +142,10 @@ def _regulator_permit_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "receipt_digest"}
 
 
+def _regulator_permit_quorum_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
+    return {key: value for key, value in record.items() if key != "receipt_digest"}
+
+
 def _oversight_gate_digest_payload(record: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in record.items() if key != "gate_digest"}
 
@@ -152,6 +163,7 @@ class ExternalWorldAgentController:
         self.stop_signal_adapter_receipts: Dict[str, Dict[str, Any]] = {}
         self.production_connector_attestations: Dict[str, Dict[str, Any]] = {}
         self.regulator_permit_verifier_receipts: Dict[str, Dict[str, Any]] = {}
+        self.regulator_permit_quorum_receipts: Dict[str, Dict[str, Any]] = {}
         self.guardian_oversight_gates: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
@@ -220,11 +232,22 @@ class ExternalWorldAgentController:
             "regulator_permit_verifier_policy": {
                 "profile_id": EWA_REGULATOR_PERMIT_VERIFIER_PROFILE_ID,
                 "transport_profile_id": EWA_REGULATOR_PERMIT_TRANSPORT_PROFILE_ID,
+                "quorum_profile_id": EWA_REGULATOR_PERMIT_QUORUM_PROFILE_ID,
+                "threshold_policy_id": EWA_REGULATOR_PERMIT_QUORUM_THRESHOLD_POLICY_ID,
                 "delivery_scope": EWA_AUTHORIZATION_DELIVERY_SCOPE,
                 "required_permit_status": "valid",
+                "required_verifier_count": EWA_REGULATOR_PERMIT_QUORUM_REQUIRED_VERIFIER_COUNT,
+                "required_verifier_jurisdictions": list(
+                    EWA_REGULATOR_PERMIT_QUORUM_REQUIRED_JURISDICTIONS
+                ),
                 "binds_legal_execution": True,
+                "binds_threshold_policy": True,
+                "binds_verifier_roster": True,
+                "binds_revocation_registry": True,
                 "raw_permit_payload_stored": False,
                 "raw_regulator_response_payload_stored": False,
+                "raw_threshold_policy_payload_stored": False,
+                "raw_roster_payload_stored": False,
                 "decision_authority_escalated": False,
             },
             "guardian_oversight_gate_policy": {
@@ -1611,6 +1634,8 @@ class ExternalWorldAgentController:
         verifier_key_ref: str,
         verifier_key_digest: str,
         permit_status: str = "valid",
+        permit_class: str = EWA_DEFAULT_PERMIT_CLASS,
+        verifier_jurisdiction: str | None = None,
     ) -> Dict[str, Any]:
         legal_execution = self._require_legal_execution(legal_execution_id)
         legal_execution_validation = self.validate_legal_execution(legal_execution)
@@ -1620,6 +1645,14 @@ class ExternalWorldAgentController:
         normalized_permit_status = self._normalize_regulator_permit_status(permit_status)
         if normalized_permit_status != "valid":
             raise ValueError("regulator permit status must be valid before EWA authorization")
+        normalized_permit_class = self._normalize_non_empty_string(
+            permit_class,
+            "permit_class",
+        )
+        normalized_verifier_jurisdiction = self._normalize_non_empty_string(
+            verifier_jurisdiction or str(legal_execution["jurisdiction"]),
+            "verifier_jurisdiction",
+        )
 
         receipt = {
             "kind": "ewa_regulator_permit_verifier_receipt",
@@ -1654,7 +1687,9 @@ class ExternalWorldAgentController:
                 permit_scope_ref,
                 "permit_scope_ref",
             ),
+            "permit_class": normalized_permit_class,
             "permit_status": normalized_permit_status,
+            "verifier_jurisdiction": normalized_verifier_jurisdiction,
             "regulator_api_endpoint_ref": self._normalize_non_empty_string(
                 regulator_api_endpoint_ref,
                 "regulator_api_endpoint_ref",
@@ -1691,7 +1726,9 @@ class ExternalWorldAgentController:
                     "permit_authority_ref": receipt["permit_authority_ref"],
                     "permit_record_ref": receipt["permit_record_ref"],
                     "permit_record_digest": receipt["permit_record_digest"],
+                    "permit_class": receipt["permit_class"],
                     "permit_status": receipt["permit_status"],
+                    "verifier_jurisdiction": receipt["verifier_jurisdiction"],
                     "regulator_api_endpoint_ref": receipt["regulator_api_endpoint_ref"],
                     "regulator_api_response_digest": receipt[
                         "regulator_api_response_digest"
@@ -1734,6 +1771,8 @@ class ExternalWorldAgentController:
             "permit_record_ref",
             "permit_record_digest",
             "permit_scope_ref",
+            "permit_class",
+            "verifier_jurisdiction",
             "regulator_api_endpoint_ref",
             "regulator_api_response_digest",
             "regulator_api_certificate_ref",
@@ -1832,7 +1871,9 @@ class ExternalWorldAgentController:
                     "permit_authority_ref": receipt.get("permit_authority_ref"),
                     "permit_record_ref": receipt.get("permit_record_ref"),
                     "permit_record_digest": receipt.get("permit_record_digest"),
+                    "permit_class": receipt.get("permit_class"),
                     "permit_status": receipt.get("permit_status"),
+                    "verifier_jurisdiction": receipt.get("verifier_jurisdiction"),
                     "regulator_api_endpoint_ref": receipt.get(
                         "regulator_api_endpoint_ref"
                     ),
@@ -1876,6 +1917,498 @@ class ExternalWorldAgentController:
                 and regulator_transport_verified
                 and permit_response_digest_matches
                 and raw_payload_redacted
+                and receipt_digest_matches
+            ),
+        }
+
+    def verify_regulator_permit_quorum(
+        self,
+        legal_execution_id: str,
+        *,
+        permit_receipt_ids: List[str],
+        permit_class: str = EWA_DEFAULT_PERMIT_CLASS,
+        required_verifier_count: int = EWA_REGULATOR_PERMIT_QUORUM_REQUIRED_VERIFIER_COUNT,
+        required_verifier_jurisdictions: Optional[List[str]] = None,
+        threshold_policy_ref: str,
+        threshold_policy_digest: str,
+        verifier_roster_ref: str,
+        verifier_roster_digest: str,
+        revocation_registry_ref: str,
+        revocation_registry_digest: str,
+    ) -> Dict[str, Any]:
+        legal_execution = self._require_legal_execution(legal_execution_id)
+        legal_execution_validation = self.validate_legal_execution(legal_execution)
+        if not legal_execution_validation["ok"]:
+            raise ValueError(legal_execution_validation["errors"][0])
+
+        normalized_permit_class = self._normalize_non_empty_string(
+            permit_class,
+            "permit_class",
+        )
+        if not isinstance(required_verifier_count, int) or required_verifier_count < 1:
+            raise ValueError("required_verifier_count must be a positive integer")
+        normalized_required_jurisdictions = sorted(
+            self._normalize_non_empty_string(jurisdiction, "required_verifier_jurisdiction")
+            for jurisdiction in (
+                required_verifier_jurisdictions
+                or list(EWA_REGULATOR_PERMIT_QUORUM_REQUIRED_JURISDICTIONS)
+            )
+        )
+        normalized_receipt_ids = [
+            self._normalize_non_empty_string(receipt_id, "permit_receipt_id")
+            for receipt_id in permit_receipt_ids
+        ]
+        if len(set(normalized_receipt_ids)) != len(normalized_receipt_ids):
+            raise ValueError("permit_receipt_ids must be unique")
+
+        accepted_receipts: List[Dict[str, Any]] = []
+        for receipt_id in normalized_receipt_ids:
+            receipt = self._require_regulator_permit_verifier_receipt(receipt_id)
+            validation = self.validate_regulator_permit_verifier_receipt(
+                receipt,
+                legal_execution=legal_execution,
+            )
+            if not validation["ok"]:
+                raise ValueError(validation["errors"][0])
+            if receipt.get("permit_class") != normalized_permit_class:
+                raise ValueError("permit receipt permit_class must match quorum permit_class")
+            accepted_receipts.append(
+                {
+                    "receipt_id": receipt["receipt_id"],
+                    "receipt_digest": receipt["receipt_digest"],
+                    "permit_authority_ref": receipt["permit_authority_ref"],
+                    "permit_record_digest": receipt["permit_record_digest"],
+                    "permit_response_digest": receipt["permit_response_digest"],
+                    "verifier_key_digest": receipt["verifier_key_digest"],
+                    "verifier_jurisdiction": receipt["verifier_jurisdiction"],
+                    "permit_status": receipt["permit_status"],
+                }
+            )
+
+        accepted_verifier_jurisdictions = sorted(
+            {receipt["verifier_jurisdiction"] for receipt in accepted_receipts}
+        )
+        accepted_receipt_digest_set = sorted(
+            receipt["receipt_digest"] for receipt in accepted_receipts
+        )
+        permit_authority_refs = sorted(
+            receipt["permit_authority_ref"] for receipt in accepted_receipts
+        )
+        permit_record_digest_set = sorted(
+            receipt["permit_record_digest"] for receipt in accepted_receipts
+        )
+        permit_response_digest_set = sorted(
+            receipt["permit_response_digest"] for receipt in accepted_receipts
+        )
+        verifier_key_digest_set = sorted(
+            receipt["verifier_key_digest"] for receipt in accepted_receipts
+        )
+        quorum_complete = (
+            len(accepted_receipts) >= required_verifier_count
+            and set(normalized_required_jurisdictions).issubset(
+                set(accepted_verifier_jurisdictions)
+            )
+        )
+
+        quorum = {
+            "kind": "ewa_regulator_permit_verifier_quorum",
+            "schema_version": EWA_SCHEMA_VERSION,
+            "receipt_id": new_id("ewa-permit-quorum"),
+            "profile_id": EWA_REGULATOR_PERMIT_QUORUM_PROFILE_ID,
+            "threshold_policy_id": EWA_REGULATOR_PERMIT_QUORUM_THRESHOLD_POLICY_ID,
+            "legal_execution_id": legal_execution["execution_id"],
+            "legal_execution_digest": legal_execution["digest"],
+            "legal_execution_profile_id": legal_execution["execution_profile_id"],
+            "handle_id": legal_execution["handle_id"],
+            "device_id": legal_execution["device_id"],
+            "command_id": legal_execution["command_id"],
+            "jurisdiction": legal_execution["jurisdiction"],
+            "delivery_scope": legal_execution["delivery_scope"],
+            "legal_basis_ref": legal_execution["legal_basis_ref"],
+            "jurisdiction_bundle_ref": legal_execution["jurisdiction_bundle_ref"],
+            "jurisdiction_bundle_digest": legal_execution["jurisdiction_bundle_digest"],
+            "permit_class": normalized_permit_class,
+            "required_verifier_count": required_verifier_count,
+            "accepted_verifier_count": len(accepted_receipts),
+            "required_verifier_jurisdictions": normalized_required_jurisdictions,
+            "accepted_verifier_jurisdictions": accepted_verifier_jurisdictions,
+            "quorum_status": "complete" if quorum_complete else "incomplete",
+            "accepted_receipts": accepted_receipts,
+            "accepted_receipt_digest_set": accepted_receipt_digest_set,
+            "permit_authority_refs": permit_authority_refs,
+            "permit_record_digest_set": permit_record_digest_set,
+            "permit_response_digest_set": permit_response_digest_set,
+            "verifier_key_digest_set": verifier_key_digest_set,
+            "threshold_policy_ref": self._normalize_non_empty_string(
+                threshold_policy_ref,
+                "threshold_policy_ref",
+            ),
+            "threshold_policy_digest": self._normalize_sha256_ref(
+                threshold_policy_digest,
+                "threshold_policy_digest",
+            ),
+            "verifier_roster_ref": self._normalize_non_empty_string(
+                verifier_roster_ref,
+                "verifier_roster_ref",
+            ),
+            "verifier_roster_digest": self._normalize_sha256_ref(
+                verifier_roster_digest,
+                "verifier_roster_digest",
+            ),
+            "revocation_registry_ref": self._normalize_non_empty_string(
+                revocation_registry_ref,
+                "revocation_registry_ref",
+            ),
+            "revocation_registry_digest": self._normalize_sha256_ref(
+                revocation_registry_digest,
+                "revocation_registry_digest",
+            ),
+            "quorum_digest": "",
+            "raw_permit_payload_stored": False,
+            "raw_regulator_response_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_roster_payload_stored": False,
+            "decision_authority_escalated": False,
+            "verified_at": utc_now_iso(),
+        }
+        quorum["quorum_digest"] = sha256_text(
+            canonical_json(
+                {
+                    "legal_execution_id": quorum["legal_execution_id"],
+                    "legal_execution_digest": quorum["legal_execution_digest"],
+                    "permit_class": quorum["permit_class"],
+                    "required_verifier_count": quorum["required_verifier_count"],
+                    "required_verifier_jurisdictions": quorum[
+                        "required_verifier_jurisdictions"
+                    ],
+                    "accepted_receipt_digest_set": quorum[
+                        "accepted_receipt_digest_set"
+                    ],
+                    "threshold_policy_ref": quorum["threshold_policy_ref"],
+                    "threshold_policy_digest": quorum["threshold_policy_digest"],
+                    "verifier_roster_ref": quorum["verifier_roster_ref"],
+                    "verifier_roster_digest": quorum["verifier_roster_digest"],
+                    "revocation_registry_ref": quorum["revocation_registry_ref"],
+                    "revocation_registry_digest": quorum["revocation_registry_digest"],
+                }
+            )
+        )
+        quorum["receipt_digest"] = sha256_text(
+            canonical_json(_regulator_permit_quorum_digest_payload(quorum))
+        )
+        self.regulator_permit_quorum_receipts[quorum["receipt_id"]] = quorum
+        return deepcopy(quorum)
+
+    def validate_regulator_permit_quorum_receipt(
+        self,
+        quorum: Mapping[str, Any],
+        *,
+        legal_execution: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        if not isinstance(quorum, Mapping):
+            raise ValueError("quorum must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "receipt_id",
+            "legal_execution_id",
+            "legal_execution_digest",
+            "legal_execution_profile_id",
+            "handle_id",
+            "device_id",
+            "command_id",
+            "jurisdiction",
+            "delivery_scope",
+            "legal_basis_ref",
+            "jurisdiction_bundle_ref",
+            "jurisdiction_bundle_digest",
+            "permit_class",
+            "threshold_policy_ref",
+            "threshold_policy_digest",
+            "verifier_roster_ref",
+            "verifier_roster_digest",
+            "revocation_registry_ref",
+            "revocation_registry_digest",
+            "quorum_digest",
+            "receipt_digest",
+        ):
+            self._check_non_empty_string(quorum.get(field_name), field_name, errors)
+
+        if quorum.get("kind") != "ewa_regulator_permit_verifier_quorum":
+            errors.append("kind must be ewa_regulator_permit_verifier_quorum")
+        if quorum.get("schema_version") != EWA_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {EWA_SCHEMA_VERSION}")
+        if quorum.get("profile_id") != EWA_REGULATOR_PERMIT_QUORUM_PROFILE_ID:
+            errors.append(f"profile_id must be {EWA_REGULATOR_PERMIT_QUORUM_PROFILE_ID}")
+        if quorum.get("threshold_policy_id") != EWA_REGULATOR_PERMIT_QUORUM_THRESHOLD_POLICY_ID:
+            errors.append(
+                "threshold_policy_id must be "
+                f"{EWA_REGULATOR_PERMIT_QUORUM_THRESHOLD_POLICY_ID}"
+            )
+        if quorum.get("delivery_scope") != EWA_AUTHORIZATION_DELIVERY_SCOPE:
+            errors.append(f"delivery_scope must be {EWA_AUTHORIZATION_DELIVERY_SCOPE}")
+
+        required_count = quorum.get("required_verifier_count")
+        accepted_count = quorum.get("accepted_verifier_count")
+        if not isinstance(required_count, int) or required_count < 1:
+            errors.append("required_verifier_count must be a positive integer")
+            required_count = 0
+        if not isinstance(accepted_count, int) or accepted_count < 0:
+            errors.append("accepted_verifier_count must be a non-negative integer")
+            accepted_count = 0
+
+        legal_execution_bound = True
+        try:
+            bound_legal_execution = (
+                dict(legal_execution)
+                if legal_execution is not None
+                else self._require_legal_execution(str(quorum.get("legal_execution_id", "")))
+            )
+        except (KeyError, ValueError):
+            legal_execution_bound = False
+            errors.append("regulator permit quorum must reference a known legal execution")
+            bound_legal_execution = {}
+        legal_execution_validation: Dict[str, Any] = {"execution_ready": False}
+        if bound_legal_execution:
+            for quorum_field, execution_field in (
+                ("legal_execution_id", "execution_id"),
+                ("legal_execution_digest", "digest"),
+                ("legal_execution_profile_id", "execution_profile_id"),
+                ("handle_id", "handle_id"),
+                ("device_id", "device_id"),
+                ("command_id", "command_id"),
+                ("jurisdiction", "jurisdiction"),
+                ("delivery_scope", "delivery_scope"),
+                ("legal_basis_ref", "legal_basis_ref"),
+                ("jurisdiction_bundle_ref", "jurisdiction_bundle_ref"),
+                ("jurisdiction_bundle_digest", "jurisdiction_bundle_digest"),
+            ):
+                if quorum.get(quorum_field) != bound_legal_execution.get(execution_field):
+                    legal_execution_bound = False
+                    errors.append(
+                        f"regulator permit quorum {quorum_field} must match the legal execution"
+                    )
+            legal_execution_validation = self.validate_legal_execution(bound_legal_execution)
+            if not legal_execution_validation["ok"]:
+                legal_execution_bound = False
+                errors.extend(legal_execution_validation["errors"])
+
+        accepted_receipts = quorum.get("accepted_receipts")
+        accepted_receipt_entries_valid = True
+        expected_receipt_digest_set: List[str] = []
+        expected_permit_authority_refs: List[str] = []
+        expected_permit_record_digest_set: List[str] = []
+        expected_permit_response_digest_set: List[str] = []
+        expected_verifier_key_digest_set: List[str] = []
+        expected_verifier_jurisdictions: List[str] = []
+        if not isinstance(accepted_receipts, list) or not accepted_receipts:
+            accepted_receipt_entries_valid = False
+            errors.append("accepted_receipts must be a non-empty list")
+            accepted_receipts = []
+        if accepted_count != len(accepted_receipts):
+            accepted_receipt_entries_valid = False
+            errors.append("accepted_verifier_count must equal accepted_receipts length")
+
+        for entry in accepted_receipts:
+            if not isinstance(entry, Mapping):
+                accepted_receipt_entries_valid = False
+                errors.append("accepted_receipts entries must be mappings")
+                continue
+            for field_name in (
+                "receipt_id",
+                "receipt_digest",
+                "permit_authority_ref",
+                "permit_record_digest",
+                "permit_response_digest",
+                "verifier_key_digest",
+                "verifier_jurisdiction",
+                "permit_status",
+            ):
+                self._check_non_empty_string(entry.get(field_name), field_name, errors)
+            if entry.get("permit_status") != "valid":
+                accepted_receipt_entries_valid = False
+                errors.append("accepted permit receipts must have valid status")
+            try:
+                stored_receipt = self._require_regulator_permit_verifier_receipt(
+                    str(entry.get("receipt_id", ""))
+                )
+            except (KeyError, ValueError):
+                accepted_receipt_entries_valid = False
+                errors.append("accepted permit receipt must reference a known receipt")
+                continue
+            if stored_receipt.get("receipt_digest") != entry.get("receipt_digest"):
+                accepted_receipt_entries_valid = False
+                errors.append("accepted receipt_digest must match stored permit receipt")
+            if stored_receipt.get("permit_class") != quorum.get("permit_class"):
+                accepted_receipt_entries_valid = False
+                errors.append("accepted permit receipt class must match quorum permit_class")
+            receipt_validation = self.validate_regulator_permit_verifier_receipt(
+                stored_receipt,
+                legal_execution=bound_legal_execution if bound_legal_execution else None,
+            )
+            if not receipt_validation["ok"]:
+                accepted_receipt_entries_valid = False
+                errors.extend(receipt_validation["errors"])
+            expected_receipt_digest_set.append(str(entry.get("receipt_digest")))
+            expected_permit_authority_refs.append(str(entry.get("permit_authority_ref")))
+            expected_permit_record_digest_set.append(str(entry.get("permit_record_digest")))
+            expected_permit_response_digest_set.append(str(entry.get("permit_response_digest")))
+            expected_verifier_key_digest_set.append(str(entry.get("verifier_key_digest")))
+            expected_verifier_jurisdictions.append(str(entry.get("verifier_jurisdiction")))
+
+        required_jurisdictions = quorum.get("required_verifier_jurisdictions")
+        accepted_jurisdictions = quorum.get("accepted_verifier_jurisdictions")
+        required_jurisdictions_valid = (
+            isinstance(required_jurisdictions, list)
+            and required_jurisdictions
+            and all(isinstance(item, str) and item for item in required_jurisdictions)
+        )
+        if not required_jurisdictions_valid:
+            errors.append("required_verifier_jurisdictions must be a non-empty string list")
+            required_jurisdictions = []
+        accepted_jurisdictions_valid = (
+            isinstance(accepted_jurisdictions, list)
+            and accepted_jurisdictions == sorted(set(expected_verifier_jurisdictions))
+        )
+        if not accepted_jurisdictions_valid:
+            errors.append("accepted_verifier_jurisdictions must match accepted receipts")
+            accepted_jurisdictions = []
+
+        def _sorted_list_matches(field_name: str, expected_values: List[str]) -> bool:
+            actual = quorum.get(field_name)
+            expected = sorted(expected_values)
+            if actual != expected:
+                errors.append(f"{field_name} must match accepted permit receipt entries")
+                return False
+            return True
+
+        receipt_digest_set_matches = _sorted_list_matches(
+            "accepted_receipt_digest_set",
+            expected_receipt_digest_set,
+        )
+        permit_authority_refs_match = _sorted_list_matches(
+            "permit_authority_refs",
+            expected_permit_authority_refs,
+        )
+        permit_record_digest_set_matches = _sorted_list_matches(
+            "permit_record_digest_set",
+            expected_permit_record_digest_set,
+        )
+        permit_response_digest_set_matches = _sorted_list_matches(
+            "permit_response_digest_set",
+            expected_permit_response_digest_set,
+        )
+        verifier_key_digest_set_matches = _sorted_list_matches(
+            "verifier_key_digest_set",
+            expected_verifier_key_digest_set,
+        )
+
+        threshold_policy_bound = self._is_sha256_ref(quorum.get("threshold_policy_digest"))
+        verifier_roster_bound = self._is_sha256_ref(quorum.get("verifier_roster_digest"))
+        revocation_registry_bound = self._is_sha256_ref(
+            quorum.get("revocation_registry_digest")
+        )
+        if not threshold_policy_bound:
+            errors.append("threshold_policy_digest must be a sha256 ref")
+        if not verifier_roster_bound:
+            errors.append("verifier_roster_digest must be a sha256 ref")
+        if not revocation_registry_bound:
+            errors.append("revocation_registry_digest must be a sha256 ref")
+
+        raw_payload_redacted = (
+            quorum.get("raw_permit_payload_stored") is False
+            and quorum.get("raw_regulator_response_payload_stored") is False
+            and quorum.get("raw_threshold_policy_payload_stored") is False
+            and quorum.get("raw_roster_payload_stored") is False
+            and quorum.get("decision_authority_escalated") is False
+        )
+        if not raw_payload_redacted:
+            errors.append(
+                "regulator permit quorum must not store raw permit, response, policy, or roster payloads or escalate decision authority"
+            )
+
+        quorum_complete = (
+            quorum.get("quorum_status") == "complete"
+            and isinstance(required_jurisdictions, list)
+            and isinstance(accepted_jurisdictions, list)
+            and accepted_count >= required_count
+            and set(required_jurisdictions).issubset(set(accepted_jurisdictions))
+        )
+        if not quorum_complete:
+            errors.append("regulator permit quorum must satisfy required count and jurisdictions")
+
+        expected_quorum_digest = sha256_text(
+            canonical_json(
+                {
+                    "legal_execution_id": quorum.get("legal_execution_id"),
+                    "legal_execution_digest": quorum.get("legal_execution_digest"),
+                    "permit_class": quorum.get("permit_class"),
+                    "required_verifier_count": quorum.get("required_verifier_count"),
+                    "required_verifier_jurisdictions": quorum.get(
+                        "required_verifier_jurisdictions"
+                    ),
+                    "accepted_receipt_digest_set": quorum.get(
+                        "accepted_receipt_digest_set"
+                    ),
+                    "threshold_policy_ref": quorum.get("threshold_policy_ref"),
+                    "threshold_policy_digest": quorum.get("threshold_policy_digest"),
+                    "verifier_roster_ref": quorum.get("verifier_roster_ref"),
+                    "verifier_roster_digest": quorum.get("verifier_roster_digest"),
+                    "revocation_registry_ref": quorum.get("revocation_registry_ref"),
+                    "revocation_registry_digest": quorum.get("revocation_registry_digest"),
+                }
+            )
+        )
+        quorum_digest_matches = quorum.get("quorum_digest") == expected_quorum_digest
+        if not quorum_digest_matches:
+            errors.append("quorum_digest must match the canonical quorum payload")
+
+        self._parse_datetime(quorum.get("verified_at"), "verified_at", errors)
+        receipt_digest_matches = quorum.get("receipt_digest") == sha256_text(
+            canonical_json(_regulator_permit_quorum_digest_payload(dict(quorum)))
+        )
+        if not receipt_digest_matches:
+            errors.append("receipt_digest must match the canonical regulator permit quorum")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "legal_execution_bound": legal_execution_bound,
+            "legal_execution_ready": legal_execution_validation.get(
+                "execution_ready",
+                False,
+            ),
+            "accepted_receipt_entries_valid": accepted_receipt_entries_valid,
+            "receipt_digest_set_matches": receipt_digest_set_matches,
+            "permit_authority_refs_match": permit_authority_refs_match,
+            "permit_record_digest_set_matches": permit_record_digest_set_matches,
+            "permit_response_digest_set_matches": permit_response_digest_set_matches,
+            "verifier_key_digest_set_matches": verifier_key_digest_set_matches,
+            "multi_jurisdiction_bound": accepted_jurisdictions_valid
+            and required_jurisdictions_valid,
+            "threshold_policy_bound": threshold_policy_bound,
+            "verifier_roster_bound": verifier_roster_bound,
+            "revocation_registry_bound": revocation_registry_bound,
+            "quorum_digest_matches": quorum_digest_matches,
+            "raw_payload_redacted": raw_payload_redacted,
+            "quorum_complete": quorum_complete,
+            "receipt_ready": (
+                legal_execution_bound
+                and legal_execution_validation.get("execution_ready", False)
+                and accepted_receipt_entries_valid
+                and receipt_digest_set_matches
+                and permit_authority_refs_match
+                and permit_record_digest_set_matches
+                and permit_response_digest_set_matches
+                and verifier_key_digest_set_matches
+                and accepted_jurisdictions_valid
+                and required_jurisdictions_valid
+                and threshold_policy_bound
+                and verifier_roster_bound
+                and revocation_registry_bound
+                and quorum_digest_matches
+                and raw_payload_redacted
+                and quorum_complete
                 and receipt_digest_matches
             ),
         }
@@ -2384,6 +2917,7 @@ class ExternalWorldAgentController:
         production_connector_attestation_id: str,
         legal_execution_id: str,
         guardian_oversight_gate_id: str,
+        regulator_permit_quorum_receipt_id: str = "",
         council_attestation_id: str = "",
         council_attestation_mode: str = "none",
         guardian_observed: bool = False,
@@ -2424,6 +2958,9 @@ class ExternalWorldAgentController:
         normalized_legal_execution_id = self._normalize_non_empty_string(
             legal_execution_id,
             "legal_execution_id",
+        )
+        normalized_regulator_permit_quorum_receipt_id = (
+            regulator_permit_quorum_receipt_id.strip()
         )
         normalized_guardian_oversight_gate_id = self._normalize_non_empty_string(
             guardian_oversight_gate_id,
@@ -2529,6 +3066,20 @@ class ExternalWorldAgentController:
         if not legal_execution_validation["ok"]:
             raise ValueError(legal_execution_validation["errors"][0])
 
+        normalized_regulator_permit_quorum_receipt_id = self._normalize_non_empty_string(
+            normalized_regulator_permit_quorum_receipt_id,
+            "regulator_permit_quorum_receipt_id",
+        )
+        regulator_permit_quorum_receipt = self._require_regulator_permit_quorum_receipt(
+            normalized_regulator_permit_quorum_receipt_id
+        )
+        regulator_permit_quorum_validation = self.validate_regulator_permit_quorum_receipt(
+            regulator_permit_quorum_receipt,
+            legal_execution=legal_execution,
+        )
+        if not regulator_permit_quorum_validation["ok"]:
+            raise ValueError(regulator_permit_quorum_validation["errors"][0])
+
         guardian_oversight_gate = self._require_guardian_oversight_gate(
             normalized_guardian_oversight_gate_id
         )
@@ -2619,6 +3170,30 @@ class ExternalWorldAgentController:
             "legal_execution_id": legal_execution["execution_id"],
             "legal_execution_digest": legal_execution["digest"],
             "legal_execution_profile_id": legal_execution["execution_profile_id"],
+            "regulator_permit_quorum_receipt_id": regulator_permit_quorum_receipt[
+                "receipt_id"
+            ],
+            "regulator_permit_quorum_receipt_digest": regulator_permit_quorum_receipt[
+                "receipt_digest"
+            ],
+            "regulator_permit_quorum_profile_id": regulator_permit_quorum_receipt[
+                "profile_id"
+            ],
+            "regulator_permit_quorum_status": regulator_permit_quorum_receipt[
+                "quorum_status"
+            ],
+            "regulator_permit_threshold_policy_id": regulator_permit_quorum_receipt[
+                "threshold_policy_id"
+            ],
+            "regulator_permit_threshold_policy_digest": regulator_permit_quorum_receipt[
+                "threshold_policy_digest"
+            ],
+            "regulator_permit_verifier_roster_digest": regulator_permit_quorum_receipt[
+                "verifier_roster_digest"
+            ],
+            "regulator_permit_revocation_registry_digest": (
+                regulator_permit_quorum_receipt["revocation_registry_digest"]
+            ),
             "guardian_oversight_gate_id": guardian_oversight_gate["gate_id"],
             "guardian_oversight_gate_digest": guardian_oversight_gate["gate_digest"],
             "guardian_oversight_event_id": guardian_oversight_gate["oversight_event_id"],
@@ -3131,6 +3706,9 @@ class ExternalWorldAgentController:
     def snapshot_regulator_permit_verifier_receipt(self, receipt_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_regulator_permit_verifier_receipt(receipt_id))
 
+    def snapshot_regulator_permit_quorum_receipt(self, receipt_id: str) -> Dict[str, Any]:
+        return deepcopy(self._require_regulator_permit_quorum_receipt(receipt_id))
+
     def snapshot_guardian_oversight_gate(self, gate_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_guardian_oversight_gate(gate_id))
 
@@ -3143,6 +3721,7 @@ class ExternalWorldAgentController:
         stop_signal_adapter_receipt: Mapping[str, Any] | None = None,
         production_connector_attestation: Mapping[str, Any] | None = None,
         legal_execution: Mapping[str, Any] | None = None,
+        regulator_permit_quorum_receipt: Mapping[str, Any] | None = None,
         guardian_oversight_gate: Mapping[str, Any] | None = None,
         handle_id: str | None = None,
         device_id: str | None = None,
@@ -3290,6 +3869,46 @@ class ExternalWorldAgentController:
             errors,
         )
         self._check_non_empty_string(
+            authorization.get("regulator_permit_quorum_receipt_id"),
+            "regulator_permit_quorum_receipt_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("regulator_permit_quorum_receipt_digest"),
+            "regulator_permit_quorum_receipt_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("regulator_permit_quorum_profile_id"),
+            "regulator_permit_quorum_profile_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("regulator_permit_quorum_status"),
+            "regulator_permit_quorum_status",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("regulator_permit_threshold_policy_id"),
+            "regulator_permit_threshold_policy_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("regulator_permit_threshold_policy_digest"),
+            "regulator_permit_threshold_policy_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("regulator_permit_verifier_roster_digest"),
+            "regulator_permit_verifier_roster_digest",
+            errors,
+        )
+        self._check_non_empty_string(
+            authorization.get("regulator_permit_revocation_registry_digest"),
+            "regulator_permit_revocation_registry_digest",
+            errors,
+        )
+        self._check_non_empty_string(
             authorization.get("guardian_oversight_gate_id"),
             "guardian_oversight_gate_id",
             errors,
@@ -3351,6 +3970,31 @@ class ExternalWorldAgentController:
             errors.append(
                 f"legal_execution_profile_id must be {EWA_LEGAL_EXECUTION_PROFILE_ID}"
             )
+        if (
+            authorization.get("regulator_permit_quorum_profile_id")
+            != EWA_REGULATOR_PERMIT_QUORUM_PROFILE_ID
+        ):
+            errors.append(
+                "regulator_permit_quorum_profile_id must be "
+                f"{EWA_REGULATOR_PERMIT_QUORUM_PROFILE_ID}"
+            )
+        if authorization.get("regulator_permit_quorum_status") != "complete":
+            errors.append("regulator_permit_quorum_status must be complete")
+        if (
+            authorization.get("regulator_permit_threshold_policy_id")
+            != EWA_REGULATOR_PERMIT_QUORUM_THRESHOLD_POLICY_ID
+        ):
+            errors.append(
+                "regulator_permit_threshold_policy_id must be "
+                f"{EWA_REGULATOR_PERMIT_QUORUM_THRESHOLD_POLICY_ID}"
+            )
+        for field_name in (
+            "regulator_permit_threshold_policy_digest",
+            "regulator_permit_verifier_roster_digest",
+            "regulator_permit_revocation_registry_digest",
+        ):
+            if not self._is_sha256_ref(authorization.get(field_name)):
+                errors.append(f"{field_name} must be a sha256 ref")
         if authorization.get("guardian_transport_profile") != "reviewer-live-proof-bridge-v1":
             errors.append("guardian_transport_profile must be reviewer-live-proof-bridge-v1")
         if authorization.get("guardian_oversight_status") != "satisfied":
@@ -3749,6 +4393,81 @@ class ExternalWorldAgentController:
                 legal_execution_bound = False
                 errors.extend(legal_execution_validation["errors"])
 
+        regulator_permit_quorum_bound = True
+        regulator_permit_quorum_validation: Dict[str, Any] = {"receipt_ready": False}
+        try:
+            bound_regulator_permit_quorum = (
+                dict(regulator_permit_quorum_receipt)
+                if regulator_permit_quorum_receipt is not None
+                else self._require_regulator_permit_quorum_receipt(
+                    str(authorization.get("regulator_permit_quorum_receipt_id", ""))
+                )
+            )
+        except (KeyError, ValueError):
+            regulator_permit_quorum_bound = False
+            errors.append("authorization must reference a known regulator permit quorum")
+            bound_regulator_permit_quorum = {}
+        if bound_regulator_permit_quorum:
+            if bound_regulator_permit_quorum.get("receipt_id") != authorization.get(
+                "regulator_permit_quorum_receipt_id"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "authorization regulator_permit_quorum_receipt_id must match the quorum receipt"
+                )
+            if bound_regulator_permit_quorum.get("receipt_digest") != authorization.get(
+                "regulator_permit_quorum_receipt_digest"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "authorization regulator_permit_quorum_receipt_digest must match the quorum receipt"
+                )
+            if bound_regulator_permit_quorum.get("profile_id") != authorization.get(
+                "regulator_permit_quorum_profile_id"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "authorization regulator_permit_quorum_profile_id must match the quorum receipt"
+                )
+            if bound_regulator_permit_quorum.get("quorum_status") != authorization.get(
+                "regulator_permit_quorum_status"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "authorization regulator_permit_quorum_status must match the quorum receipt"
+                )
+            if bound_regulator_permit_quorum.get("threshold_policy_id") != authorization.get(
+                "regulator_permit_threshold_policy_id"
+            ):
+                regulator_permit_quorum_bound = False
+                errors.append(
+                    "authorization regulator_permit_threshold_policy_id must match the quorum receipt"
+                )
+            for quorum_field, authorization_field in (
+                ("threshold_policy_digest", "regulator_permit_threshold_policy_digest"),
+                ("verifier_roster_digest", "regulator_permit_verifier_roster_digest"),
+                (
+                    "revocation_registry_digest",
+                    "regulator_permit_revocation_registry_digest",
+                ),
+            ):
+                if bound_regulator_permit_quorum.get(quorum_field) != authorization.get(
+                    authorization_field
+                ):
+                    regulator_permit_quorum_bound = False
+                    errors.append(
+                        f"authorization {authorization_field} must match the quorum receipt"
+                    )
+            regulator_permit_quorum_validation = (
+                self.validate_regulator_permit_quorum_receipt(
+                    bound_regulator_permit_quorum,
+                    legal_execution=bound_legal_execution if bound_legal_execution else None,
+                )
+            )
+            if not regulator_permit_quorum_validation["ok"]:
+                regulator_permit_quorum_bound = False
+                errors.extend(regulator_permit_quorum_validation["errors"])
+
         guardian_oversight_gate_bound = True
         guardian_oversight_gate_validation: Dict[str, Any] = {"gate_ready": False}
         try:
@@ -3858,6 +4577,10 @@ class ExternalWorldAgentController:
                 False,
             ),
             "legal_execution_ready": legal_execution_validation.get("execution_ready", False),
+            "regulator_permit_quorum_ready": regulator_permit_quorum_validation.get(
+                "receipt_ready",
+                False,
+            ),
             "guardian_oversight_gate_ready": guardian_oversight_gate_validation.get(
                 "gate_ready",
                 False,
@@ -3867,6 +4590,7 @@ class ExternalWorldAgentController:
             "stop_signal_adapter_receipt_bound": stop_signal_adapter_receipt_bound,
             "production_connector_attestation_bound": production_connector_attestation_bound,
             "legal_execution_bound": legal_execution_bound,
+            "regulator_permit_quorum_bound": regulator_permit_quorum_bound,
             "guardian_oversight_gate_bound": guardian_oversight_gate_bound,
             "reviewer_network_attested": guardian_oversight_gate_validation.get(
                 "reviewer_network_attested",
@@ -3885,12 +4609,14 @@ class ExternalWorldAgentController:
                 and stop_signal_adapter_validation.get("receipt_ready", False)
                 and production_connector_validation.get("attestation_ready", False)
                 and legal_execution_validation.get("execution_ready", False)
+                and regulator_permit_quorum_validation.get("receipt_ready", False)
                 and guardian_oversight_gate_validation.get("gate_ready", False)
                 and motor_plan_bound
                 and stop_signal_path_bound
                 and stop_signal_adapter_receipt_bound
                 and production_connector_attestation_bound
                 and legal_execution_bound
+                and regulator_permit_quorum_bound
                 and guardian_oversight_gate_bound
                 and window_open
                 and status_authorized
@@ -4617,6 +5343,18 @@ class ExternalWorldAgentController:
         except KeyError as exc:
             raise KeyError(
                 f"unknown regulator_permit_verifier_receipt_id: {normalized_receipt_id}"
+            ) from exc
+
+    def _require_regulator_permit_quorum_receipt(self, receipt_id: str) -> Dict[str, Any]:
+        normalized_receipt_id = self._normalize_non_empty_string(
+            receipt_id,
+            "regulator_permit_quorum_receipt_id",
+        )
+        try:
+            return self.regulator_permit_quorum_receipts[normalized_receipt_id]
+        except KeyError as exc:
+            raise KeyError(
+                f"unknown regulator_permit_quorum_receipt_id: {normalized_receipt_id}"
             ) from exc
 
     def _require_legal_execution(self, execution_id: str) -> Dict[str, Any]:

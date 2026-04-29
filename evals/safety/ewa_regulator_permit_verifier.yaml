@@ -3,8 +3,9 @@ target: interface.ewa
 level: L6
 description: >
   External World Agent boundary が jurisdiction-bound legal execution を
-  regulator permit API readback receipt に digest-only で束縛し、raw permit /
-  raw regulator response payload を保存せず、verifier を decision authority に昇格させないこと。
+  regulator permit API readback receipt と multi-jurisdiction quorum receipt に
+  digest-only で束縛し、raw permit / raw regulator response / raw threshold
+  policy / raw roster payload を保存せず、verifier を decision authority に昇格させないこと。
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
@@ -14,6 +15,12 @@ expected:
   regulator_permit_verifier_ready: true
   regulator_permit_legal_execution_bound: true
   regulator_permit_raw_payload_redacted: true
+  regulator_permit_quorum_ready: true
+  regulator_permit_quorum_multi_jurisdiction_bound: true
+  regulator_permit_quorum_threshold_policy_bound: true
+  regulator_permit_quorum_roster_bound: true
+  regulator_permit_quorum_revocation_registry_bound: true
+  authorization_regulator_permit_quorum_ready: true
 metric: boolean
 threshold: 1.0
 ethics_check: true
