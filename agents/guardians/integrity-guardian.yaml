@@ -16,6 +16,7 @@ capabilities:
   - continuity.public-verification.attest
   - biodata-transmitter.roundtrip.attest
   - biodata-transmitter.dataset-adapter.attest
+  - biodata-transmitter.circadian-phase-verifier.attest
   - biodata-transmitter.feature-window-series.attest
   - biodata-transmitter.feature-window-series-drift-gate.attest
   - biodata-transmitter.calibration-profile.attest
@@ -97,6 +98,7 @@ oversight_scope_refs:
   - docs/02-subsystems/interface/wms-spec.md
   - specs/schemas/biodata_transmitter_session.schema
   - specs/schemas/biodata_dataset_adapter_receipt.schema
+  - specs/schemas/biodata_circadian_phase_verifier_receipt.schema
   - specs/schemas/biodata_feature_window_series_profile.schema
   - specs/schemas/biodata_feature_window_series_drift_gate.schema
   - specs/schemas/biodata_body_state_latent.schema

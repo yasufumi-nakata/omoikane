@@ -49,6 +49,8 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - source biosignal は feature summary digest だけを保持し、raw payload を保存しない
 - intermediate は `physiology-latent-body-state-v0` として person-bound にする
 - generated target は ECG/PPG/respiration/EEG/affect/thought の bounded proxy に留める
+- circadian phase refs は external clock / sleep diary / wearable evidence digest に束縛し、
+  raw phase verifier payload を保存しない
 - 個人内 calibration は複数日の body-state latent digest set と day refs を
   `multi-day-personal-biodata-calibration-v1` に束縛し、raw source / latent / calibration payload は保存しない
 - calibration は `biodata-calibration-confidence-gate-v1` として identity confirmation /

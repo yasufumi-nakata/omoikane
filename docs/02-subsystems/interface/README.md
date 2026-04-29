@@ -10,8 +10,8 @@
 - affect は valence/arousal proxy、thought は attention-pressure proxy までに制限
 - 主観同一性や thought content の飛躍は `mind-upload.com` conflict sink ref に分離
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json`
-  で literature-backed intermediate、target biosignal generation、raw payload redaction、
-  conflict sink binding をまとめて検証する
+  で literature-backed intermediate、dataset adapter、circadian phase verifier、
+  target biosignal generation、raw payload redaction、conflict sink binding をまとめて検証する
 
 ### Biological-Digital Bridge (BDB)
 - BCI（脳-コンピュータ・インタフェース）

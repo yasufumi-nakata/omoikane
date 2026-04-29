@@ -21,8 +21,10 @@
   - identity confirmation / sensory loopback への digest-only confidence gate を保持し、Sensory Loopback 側の bounded drift-threshold adjustment は raw gate payload 無しで session / receipt / artifact family scene summary に反映される
 - `biodata_dataset_adapter_receipt.schema`
   - external EEG/ECG/PPG/EDA/respiration dataset window を manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset / signal sample / feature-window payload を保存しない
+- `biodata_circadian_phase_verifier_receipt.schema`
+  - feature-window series の circadian phase refs を external clock / sleep diary / wearable evidence digest へ束縛し、raw phase verifier payload を保存しない
 - `biodata_feature_window_series_profile.schema`
-  - 複数 dataset adapter receipt を ordered longitudinal / circadian latent series に束縛し、adapter digest set、latent digest set、phase refs、axis drift summary を raw series payload 無しで保持する
+  - 複数 dataset adapter receipt を ordered longitudinal / circadian latent series に束縛し、adapter digest set、latent digest set、phase refs、circadian verifier digest、axis drift summary を raw series payload 無しで保持する
 - `biodata_feature_window_series_drift_gate.schema`
   - feature-window series の axis drift summary を calibration confidence gate へ渡す前に bounded threshold で検査し、series/calibration digest と raw drift payload 非保存を保持する
 - `biodata_body_state_latent.schema`

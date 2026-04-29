@@ -28,6 +28,13 @@ expected:
   feature_window_series_latent_digest_set_bound: true
   feature_window_series_required_modalities_bound: true
   feature_window_series_circadian_profile_bound: true
+  circadian_phase_verifier_ok: true
+  circadian_phase_verifier_phase_digest_bound: true
+  circadian_phase_verifier_source_digest_bound: true
+  circadian_phase_verifier_quorum_status: complete
+  circadian_phase_verifier_digest_bound: true
+  feature_window_series_circadian_verifier_bound: true
+  feature_window_series_circadian_verifier_digest_bound: true
   feature_window_series_axis_drift_summary_bound: true
   feature_window_series_drift_gate_ok: true
   feature_window_series_drift_gate_status: pass
@@ -57,6 +64,7 @@ expected:
   raw_signal_samples_stored: false
   raw_feature_window_payload_stored: false
   raw_latent_payload_stored: false
+  raw_phase_verifier_payload_stored: false
   raw_series_payload_stored: false
   raw_drift_payload_stored: false
   raw_calibration_payload_stored: false

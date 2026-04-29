@@ -1,0 +1,137 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_circadian_phase_verifier_receipt.schema"
+title: BioDataCircadianPhaseVerifierReceipt
+description: >
+  Digest-only receipt that binds BioData feature-window circadian phase refs to
+  an external clock, a redacted sleep diary, and wearable phase evidence before
+  those phase refs are consumed by a longitudinal feature-window series profile.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - phase_verifier_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - circadian_phase_refs
+  - phase_ref_digest_set
+  - required_source_types
+  - verifier_source_types
+  - verifier_sources
+  - verifier_source_digest_set
+  - verifier_quorum_status
+  - phase_alignment_policy
+  - phase_verifier_bound
+  - storage_policy
+  - raw_clock_payload_stored
+  - raw_sleep_diary_payload_stored
+  - raw_wearable_payload_stored
+  - raw_phase_payload_stored
+  - raw_verifier_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - phase_verifier_digest
+properties:
+  schema_version:
+    const: "1.0"
+  phase_verifier_ref:
+    type: string
+    pattern: "^circadian-phase-verifier://biodata/bdt-phase-verifier-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-circadian-phase-verifier-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  circadian_phase_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  phase_ref_digest_set:
+    $ref: "#/$defs/sha256"
+  required_source_types:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  verifier_source_types:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  verifier_sources:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - source_type
+        - source_ref
+        - evidence_ref
+        - verifier_key_ref
+        - source_digest
+      properties:
+        source_type:
+          $ref: "#/$defs/source_type"
+        source_ref:
+          type: string
+          minLength: 1
+        evidence_ref:
+          type: string
+          minLength: 1
+        verifier_key_ref:
+          type: string
+          minLength: 1
+        source_digest:
+          $ref: "#/$defs/sha256"
+  verifier_source_digest_set:
+    $ref: "#/$defs/sha256"
+  verifier_quorum_status:
+    const: complete
+  phase_alignment_policy:
+    const: external-clock-sleep-diary-wearable-quorum-v1
+  phase_verifier_bound:
+    const: true
+  storage_policy:
+    const: phase-ref+verifier-source-digest-only
+  raw_clock_payload_stored:
+    const: false
+  raw_sleep_diary_payload_stored:
+    const: false
+  raw_wearable_payload_stored:
+    const: false
+  raw_phase_payload_stored:
+    const: false
+  raw_verifier_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  phase_verifier_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    enum:
+      - external-clock
+      - sleep-diary
+      - wearable

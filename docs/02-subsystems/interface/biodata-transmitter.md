@@ -29,15 +29,16 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 
 1. source modalities と target modalities を固定した BDT session を開く
 2. external dataset manifest と feature-window summary を digest-only adapter receipt に束縛する
-3. 複数日の adapter receipt と body-state latent を longitudinal / circadian feature-window series profile に束縛する
-4. EEG/ECG/PPG/EDA/respiration features から body-state latent を作る
-5. latent digest に束縛した ECG/PPG/respiration/EEG/affect/thought proxy を生成する
-6. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
+3. external clock / sleep diary / wearable evidence で circadian phase refs を digest-only verifier receipt に束縛する
+4. 複数日の adapter receipt と body-state latent を longitudinal / circadian feature-window series profile に束縛する
+5. EEG/ECG/PPG/EDA/respiration features から body-state latent を作る
+6. latent digest に束縛した ECG/PPG/respiration/EEG/affect/thought proxy を生成する
+7. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
    semantic thought content 非生成を検証する
-7. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
-8. feature-window series の axis drift を bounded threshold receipt に束縛し、calibration confidence gate へ渡す
-9. ContinuityLedger に session / dataset adapter / feature-window series / drift gate / latent / generated bundle / conflict sink / calibration binding を残す
-10. calibration profile と feature-window drift gate を identity confirmation / sensory loopback の confidence gate へ
+8. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
+9. feature-window series の axis drift を bounded threshold receipt に束縛し、calibration confidence gate へ渡す
+10. ContinuityLedger に session / dataset adapter / circadian phase verifier / feature-window series / drift gate / latent / generated bundle / conflict sink / calibration binding を残す
+11. calibration profile と feature-window drift gate を identity confirmation / sensory loopback の confidence gate へ
     digest-only receipt として束縛する
 
 ## 中間表現
@@ -91,8 +92,9 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 7. **multi-day calibration** ── 個人内 calibration は 2 日以上の latent digest set と day refs だけを束ね、raw latent / raw calibration payload は保存しない
 8. **confidence gate** ── identity confirmation / sensory loopback へ渡す時は calibration digest、source modality coverage、target 別 confidence threshold を receipt で束縛し、raw gate payload は保存しない
 9. **dataset adapter** ── 実 dataset は manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset payload、raw signal samples、raw feature-window payload は保存しない
-10. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
-11. **series drift gate** ── calibration confidence gate が current series を参照する時は、series profile digest、calibration digest、axis drift threshold digest を直接束縛し、raw drift payload は保存しない
+10. **circadian phase verifier** ── phase refs は external clock / sleep diary / wearable evidence digest に束縛し、raw clock / diary / wearable / phase verifier payload は保存しない
+11. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、circadian verifier digest、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
+12. **series drift gate** ── calibration confidence gate が current series を参照する時は、series profile digest、calibration digest、axis drift threshold digest を直接束縛し、raw drift payload は保存しない
 
 ## 個人内 calibration
 
@@ -136,7 +138,12 @@ raw feature-window payload は保存しない。dataset の存在や主観同一
 `biodata-feature-window-series-profile-v1` は、2 件以上の dataset adapter receipt と
 対応する body-state latent を ordered series として束ねる。profile は adapter receipt
 digest set、latent digest set、window refs、dataset refs、circadian phase refs、
-source modality coverage、axis drift summary を持つ。
+source modality coverage、circadian phase verifier digest、axis drift summary を持つ。
+
+`biodata-circadian-phase-verifier-v1` は、その phase refs を外部 clock、sleep diary、
+wearable summary の 3 source digest へ束縛する。verifier は phase ref digest set と
+verifier source digest set だけを保持し、raw clock payload、raw sleep diary payload、
+raw wearable payload、raw phase payload、raw verifier payload は保存しない。
 
 axis drift は heart rate、autonomic arousal、cortical load、valence、thought pressure、
 interoceptive confidence の first / last / min / max / delta / direction だけを返す。

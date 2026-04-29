@@ -13,6 +13,7 @@ imports:
   biodata_calibration_profile: ../schemas/biodata_calibration_profile.schema
   biodata_calibration_confidence_gate: ../schemas/biodata_calibration_confidence_gate.schema
   biodata_dataset_adapter_receipt: ../schemas/biodata_dataset_adapter_receipt.schema
+  biodata_circadian_phase_verifier_receipt: ../schemas/biodata_circadian_phase_verifier_receipt.schema
   biodata_feature_window_series_profile: ../schemas/biodata_feature_window_series_profile.schema
   biodata_feature_window_series_drift_gate: ../schemas/biodata_feature_window_series_drift_gate.schema
 operations:
@@ -109,6 +110,55 @@ operations:
       - source_feature_digest and latent_digest must match the generated body-state latent
       - full confidence-gate readiness requires eeg, ecg, ppg, eda, and respiration feature-window coverage
       - raw dataset payload, raw signal samples, and raw feature-window payload storage must remain false
+  bind_circadian_phase_verifier:
+    summary: Bind circadian phase refs to external clock, sleep diary, and wearable evidence before series use.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - circadian_phase_refs
+          - verifier_sources
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          circadian_phase_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          verifier_sources:
+            type: array
+            minItems: 3
+            maxItems: 3
+            items:
+              type: object
+              required:
+                - source_type
+                - source_ref
+                - evidence_ref
+                - verifier_key_ref
+              properties:
+                source_type:
+                  type: string
+                  enum: [external-clock, sleep-diary, wearable]
+                source_ref:
+                  type: string
+                  minLength: 1
+                evidence_ref:
+                  type: string
+                  minLength: 1
+                verifier_key_ref:
+                  type: string
+                  minLength: 1
+    output:
+      schema_ref: biodata_circadian_phase_verifier_receipt
+    guarantees:
+      - phase_ref_digest_set must bind the ordered circadian phase refs
+      - verifier_source_digest_set must bind external clock, sleep diary, and wearable evidence refs
+      - raw clock, sleep diary, wearable, phase, and verifier payload storage must remain false
   build_feature_window_series_profile:
     summary: Aggregate two or more dataset adapter receipts into a digest-only longitudinal / circadian latent series.
     input:
@@ -139,11 +189,14 @@ operations:
             items:
               type: string
               minLength: 1
+          circadian_phase_verifier_receipt:
+            schema_ref: biodata_circadian_phase_verifier_receipt
     output:
       schema_ref: biodata_feature_window_series_profile
     guarantees:
       - adapter_receipt_digests and latent_digests must be ordered and digest-bound
       - circadian_phase_refs must contain at least two unique phase refs
+      - circadian_phase_verifier_digest must be bound when external phase evidence is supplied
       - axis_drift_summary must be derived from body-state latent axes, not raw source payload
       - raw dataset, signal sample, feature-window, latent, and series payload storage must remain false
   bind_feature_window_series_drift_gate:
@@ -464,6 +517,50 @@ operations:
             type: boolean
           raw_drift_payload_stored:
             const: false
+  validate_circadian_phase_verifier:
+    summary: Verify circadian phase source quorum digest binding and raw-payload redaction.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - circadian_phase_refs
+          - verifier_receipt
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          circadian_phase_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          verifier_receipt:
+            schema_ref: biodata_circadian_phase_verifier_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - phase_ref_digest_set_bound
+          - verifier_source_digest_set_bound
+          - required_source_types_bound
+          - phase_verifier_digest_bound
+          - raw_verifier_payload_stored
+        properties:
+          ok:
+            type: boolean
+          phase_ref_digest_set_bound:
+            type: boolean
+          verifier_source_digest_set_bound:
+            type: boolean
+          required_source_types_bound:
+            type: boolean
+          phase_verifier_digest_bound:
+            type: boolean
+          raw_verifier_payload_stored:
+            const: false
   validate_dataset_adapter_receipt:
     summary: Verify dataset manifest digest binding, latent binding, modality coverage, and raw-payload redaction.
     input:
@@ -520,6 +617,9 @@ events:
   biodata_transmitter.dataset_feature_window_adapted:
     payload:
       schema_ref: biodata_dataset_adapter_receipt
+  biodata_transmitter.circadian_phase_verifier_bound:
+    payload:
+      schema_ref: biodata_circadian_phase_verifier_receipt
   biodata_transmitter.body_state_encoded:
     payload:
       schema_ref: biodata_body_state_latent
@@ -544,4 +644,5 @@ compatibility:
     - Multi-day calibration profiles improve person-specific baselines but still do not claim subjective equivalence or semantic thought recovery.
     - Calibration confidence gates may raise confidence for identity confirmation and sensory loopback only through digest-bound calibration receipts; they do not expose raw biosignal or gate payloads.
     - Dataset feature-window adapters make external EEG/ECG/PPG/EDA/respiration corpora ingestible only as manifest digests, feature-window digests, and latent refs; raw samples are out of scope.
+    - Circadian phase verifiers bind phase refs to external clock, sleep diary, and wearable evidence digests without storing raw phase evidence.
     - Feature-window series drift gates let calibration confidence gates consume current longitudinal evidence only through bounded, digest-only drift-threshold receipts.

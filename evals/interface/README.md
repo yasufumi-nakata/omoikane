@@ -12,6 +12,7 @@ L6 interface 境界の reference runtime 評価。
 EEG/ECG/PPG/EDA/respiration features を internal body-state latent に束ね、
 ECG/PPG/respiration/EEG/affect/thought proxy を生成し、literature refs、
 mind-upload.com conflict sink、external dataset feature-window adapter receipt、
+external clock / sleep diary / wearable circadian phase verifier、
 longitudinal / circadian feature-window series profile、multi-day calibration digest、
 raw payload redaction、semantic thought content 非生成を確認する。
 

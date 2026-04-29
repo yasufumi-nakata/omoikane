@@ -164,22 +164,58 @@ class BioDataTransmitterTests(unittest.TestCase):
             context_label="feature-series-day-two",
         )
 
+        phase_refs = [
+            "circadian-phase://unit/day-1/evening",
+            "circadian-phase://unit/day-2/morning",
+        ]
+        phase_verifier = transmitter.bind_circadian_phase_verifier(
+            session,
+            phase_refs,
+            [
+                {
+                    "source_type": "external-clock",
+                    "source_ref": "clock://unit/lab-clock",
+                    "evidence_ref": "clock-evidence://unit/phase-digest",
+                    "verifier_key_ref": "verifier-key://unit/lab-clock",
+                },
+                {
+                    "source_type": "sleep-diary",
+                    "source_ref": "sleep-diary://unit/redacted-diary",
+                    "evidence_ref": "sleep-diary-evidence://unit/phase-entry",
+                    "verifier_key_ref": "verifier-key://unit/sleep-diary",
+                },
+                {
+                    "source_type": "wearable",
+                    "source_ref": "wearable://unit/actigraphy",
+                    "evidence_ref": "wearable-evidence://unit/phase-epoch",
+                    "verifier_key_ref": "verifier-key://unit/wearable",
+                },
+            ],
+        )
+        verifier_validation = transmitter.validate_circadian_phase_verifier(
+            session,
+            phase_refs,
+            phase_verifier,
+        )
         series = transmitter.build_feature_window_series_profile(
             session,
             [day_one["adapter_receipt"], day_two["adapter_receipt"]],
             [day_one["latent_state"], day_two["latent_state"]],
-            [
-                "circadian-phase://unit/day-1/evening",
-                "circadian-phase://unit/day-2/morning",
-            ],
+            phase_refs,
+            phase_verifier,
         )
         validation = transmitter.validate_feature_window_series_profile(
             session,
             [day_one["adapter_receipt"], day_two["adapter_receipt"]],
             [day_one["latent_state"], day_two["latent_state"]],
             series,
+            phase_verifier,
         )
 
+        self.assertTrue(verifier_validation["ok"])
+        self.assertTrue(verifier_validation["phase_ref_digest_set_bound"])
+        self.assertTrue(verifier_validation["verifier_source_digest_set_bound"])
+        self.assertTrue(verifier_validation["phase_verifier_digest_bound"])
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["series_digest_set_bound"])
         self.assertTrue(validation["series_profile_digest_bound"])
@@ -187,13 +223,17 @@ class BioDataTransmitterTests(unittest.TestCase):
         self.assertTrue(validation["latent_digest_set_bound"])
         self.assertTrue(validation["required_modalities_bound"])
         self.assertTrue(validation["circadian_profile_bound"])
+        self.assertTrue(validation["circadian_phase_verifier_bound"])
+        self.assertTrue(validation["circadian_phase_verifier_digest_bound"])
         self.assertTrue(validation["axis_drift_summary_bound"])
         self.assertEqual(2, series["window_count"])
         self.assertEqual(
             "decreased",
             series["axis_drift_summary"]["heart_rate_bpm"]["direction"],
         )
+        self.assertFalse(phase_verifier["raw_verifier_payload_stored"])
         self.assertFalse(series["raw_series_payload_stored"])
+        self.assertFalse(series["raw_phase_verifier_payload_stored"])
         self.assertFalse(series["raw_latent_payload_stored"])
 
         calibration = transmitter.build_calibration_profile(
@@ -253,6 +293,16 @@ class BioDataTransmitterTests(unittest.TestCase):
                 [day_one["adapter_receipt"], day_two["adapter_receipt"]],
                 [day_one["latent_state"], day_two["latent_state"]],
                 tampered,
+                phase_verifier,
+            )["ok"]
+        )
+        tampered_verifier = dict(phase_verifier)
+        tampered_verifier["phase_ref_digest_set"] = "0" * 64
+        self.assertFalse(
+            transmitter.validate_circadian_phase_verifier(
+                session,
+                phase_refs,
+                tampered_verifier,
             )["ok"]
         )
         with self.assertRaisesRegex(ValueError, "at least two unique phases"):

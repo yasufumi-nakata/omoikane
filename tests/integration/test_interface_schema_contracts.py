@@ -68,6 +68,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 receipt,
             )
         self._assert_schema_valid(
+            "specs/schemas/biodata_circadian_phase_verifier_receipt.schema",
+            result["circadian_phase_verifier"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/biodata_feature_window_series_profile.schema",
             result["feature_window_series_profile"],
         )
@@ -108,6 +112,18 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["feature_window_series_latent_digest_set_bound"])
         self.assertTrue(result["validation"]["feature_window_series_required_modalities_bound"])
         self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
+        self.assertTrue(result["validation"]["circadian_phase_verifier_ok"])
+        self.assertTrue(result["validation"]["circadian_phase_verifier_phase_digest_bound"])
+        self.assertTrue(result["validation"]["circadian_phase_verifier_source_digest_bound"])
+        self.assertEqual(
+            "complete",
+            result["validation"]["circadian_phase_verifier_quorum_status"],
+        )
+        self.assertTrue(result["validation"]["circadian_phase_verifier_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_circadian_verifier_bound"])
+        self.assertTrue(
+            result["validation"]["feature_window_series_circadian_verifier_digest_bound"]
+        )
         self.assertTrue(result["validation"]["feature_window_series_axis_drift_summary_bound"])
         self.assertTrue(result["validation"]["feature_window_series_drift_gate_ok"])
         self.assertTrue(result["validation"]["feature_window_series_drift_gate_series_bound"])
@@ -124,6 +140,7 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["validation"]["raw_calibration_payload_stored"])
         self.assertFalse(result["validation"]["raw_drift_payload_stored"])
         self.assertFalse(result["validation"]["raw_gate_payload_stored"])
+        self.assertFalse(result["validation"]["raw_phase_verifier_payload_stored"])
         self.assertFalse(result["validation"]["raw_series_payload_stored"])
 
     def test_wms_demo_states_and_reconcile_match_public_schemas(self) -> None:

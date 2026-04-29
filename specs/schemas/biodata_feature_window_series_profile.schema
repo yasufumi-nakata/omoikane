@@ -29,6 +29,11 @@ required:
   - circadian_phase_refs
   - circadian_phase_summary
   - circadian_profile_bound
+  - circadian_phase_verifier_ref
+  - circadian_phase_verifier_digest
+  - circadian_phase_verifier_source_digest_set
+  - circadian_phase_verifier_status
+  - circadian_phase_verifier_bound
   - axis_drift_summary
   - drift_policy
   - storage_policy
@@ -40,6 +45,7 @@ required:
   - raw_feature_window_payload_stored
   - raw_latent_payload_stored
   - raw_series_payload_stored
+  - raw_phase_verifier_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
   - series_profile_digest
@@ -162,6 +168,26 @@ properties:
           minimum: 0
   circadian_profile_bound:
     const: true
+  circadian_phase_verifier_ref:
+    anyOf:
+      - type: string
+        pattern: "^circadian-phase-verifier://biodata/bdt-phase-verifier-[a-f0-9]{12}$"
+      - const: ""
+  circadian_phase_verifier_digest:
+    anyOf:
+      - $ref: "#/$defs/sha256"
+      - const: ""
+  circadian_phase_verifier_source_digest_set:
+    anyOf:
+      - $ref: "#/$defs/sha256"
+      - const: ""
+  circadian_phase_verifier_status:
+    type: string
+    enum:
+      - complete
+      - not-bound
+  circadian_phase_verifier_bound:
+    type: boolean
   axis_drift_summary:
     type: object
     additionalProperties: false
@@ -188,7 +214,7 @@ properties:
   drift_policy:
     const: ordered-feature-window-latent-drift-digest-only-v1
   storage_policy:
-    const: adapter-receipt-digest+latent-digest+phase-ref-only
+    const: adapter-receipt-digest+latent-digest+phase-verifier-ref-only
   literature_refs:
     type: array
     minItems: 5
@@ -210,6 +236,8 @@ properties:
   raw_latent_payload_stored:
     const: false
   raw_series_payload_stored:
+    const: false
+  raw_phase_verifier_payload_stored:
     const: false
   subjective_equivalence_claimed:
     const: false

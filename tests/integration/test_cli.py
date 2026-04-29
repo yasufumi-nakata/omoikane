@@ -159,6 +159,18 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["feature_window_series_digest_set_bound"])
         self.assertTrue(result["validation"]["feature_window_series_profile_digest_bound"])
         self.assertTrue(result["validation"]["feature_window_series_circadian_profile_bound"])
+        self.assertTrue(result["validation"]["circadian_phase_verifier_ok"])
+        self.assertTrue(result["validation"]["circadian_phase_verifier_phase_digest_bound"])
+        self.assertTrue(result["validation"]["circadian_phase_verifier_source_digest_bound"])
+        self.assertEqual(
+            "complete",
+            result["validation"]["circadian_phase_verifier_quorum_status"],
+        )
+        self.assertTrue(result["validation"]["circadian_phase_verifier_digest_bound"])
+        self.assertTrue(result["validation"]["feature_window_series_circadian_verifier_bound"])
+        self.assertTrue(
+            result["validation"]["feature_window_series_circadian_verifier_digest_bound"]
+        )
         self.assertTrue(result["validation"]["feature_window_series_drift_gate_ok"])
         self.assertEqual(
             "pass",
@@ -186,7 +198,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(result["dataset_adapter_receipt"]["raw_dataset_payload_stored"])
         self.assertFalse(result["dataset_adapter_receipt"]["raw_signal_samples_stored"])
         self.assertFalse(result["dataset_adapter_receipt"]["raw_feature_window_payload_stored"])
+        self.assertFalse(result["circadian_phase_verifier"]["raw_verifier_payload_stored"])
         self.assertFalse(result["feature_window_series_profile"]["raw_series_payload_stored"])
+        self.assertFalse(result["feature_window_series_profile"]["raw_phase_verifier_payload_stored"])
         self.assertFalse(result["feature_window_series_drift_gate"]["raw_drift_payload_stored"])
         self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
         self.assertEqual(2, result["feature_window_series_profile"]["window_count"])

@@ -7795,15 +7795,41 @@ json.dump(response, sys.stdout)
                 "calibration-day://biodata-transmitter-demo/day-2",
             ],
         )
+        circadian_phase_refs = [
+            "circadian-phase://biodata-transmitter-demo/day-1/evening",
+            "circadian-phase://biodata-transmitter-demo/day-2/morning",
+        ]
+        circadian_phase_verifier = self.biodata_transmitter.bind_circadian_phase_verifier(
+            session,
+            circadian_phase_refs,
+            [
+                {
+                    "source_type": "external-clock",
+                    "source_ref": "clock://biodata-transmitter-demo/lab-clock",
+                    "evidence_ref": "clock-evidence://biodata-transmitter-demo/phase-window-digest",
+                    "verifier_key_ref": "verifier-key://biodata-transmitter-demo/lab-clock",
+                },
+                {
+                    "source_type": "sleep-diary",
+                    "source_ref": "sleep-diary://biodata-transmitter-demo/redacted-diary",
+                    "evidence_ref": "sleep-diary-evidence://biodata-transmitter-demo/phase-entry-digest",
+                    "verifier_key_ref": "verifier-key://biodata-transmitter-demo/sleep-diary",
+                },
+                {
+                    "source_type": "wearable",
+                    "source_ref": "wearable://biodata-transmitter-demo/actigraphy-summary",
+                    "evidence_ref": "wearable-evidence://biodata-transmitter-demo/phase-epoch-digest",
+                    "verifier_key_ref": "verifier-key://biodata-transmitter-demo/wearable",
+                },
+            ],
+        )
         feature_window_series_profile = (
             self.biodata_transmitter.build_feature_window_series_profile(
                 session,
                 [dataset_adapter_receipt, day_two_dataset_adapter_receipt],
                 [latent_state, day_two_latent_state],
-                [
-                    "circadian-phase://biodata-transmitter-demo/day-1/evening",
-                    "circadian-phase://biodata-transmitter-demo/day-2/morning",
-                ],
+                circadian_phase_refs,
+                circadian_phase_verifier,
             )
         )
         feature_window_series_drift_gate = (
@@ -7853,6 +7879,14 @@ json.dump(response, sys.stdout)
                 [dataset_adapter_receipt, day_two_dataset_adapter_receipt],
                 [latent_state, day_two_latent_state],
                 feature_window_series_profile,
+                circadian_phase_verifier,
+            )
+        )
+        circadian_phase_verifier_validation = (
+            self.biodata_transmitter.validate_circadian_phase_verifier(
+                session,
+                circadian_phase_refs,
+                circadian_phase_verifier,
             )
         )
         feature_window_series_drift_gate_validation = (
@@ -7870,6 +7904,7 @@ json.dump(response, sys.stdout)
             and confidence_gate_validation["ok"]
             and dataset_adapter_validation["ok"]
             and feature_window_series_validation["ok"]
+            and circadian_phase_verifier_validation["ok"]
             and feature_window_series_drift_gate_validation["ok"]
         )
         validation["dataset_adapter_ok"] = dataset_adapter_validation["ok"]
@@ -7909,6 +7944,27 @@ json.dump(response, sys.stdout)
         validation["feature_window_series_circadian_profile_bound"] = (
             feature_window_series_validation["circadian_profile_bound"]
         )
+        validation["circadian_phase_verifier_ok"] = (
+            circadian_phase_verifier_validation["ok"]
+        )
+        validation["circadian_phase_verifier_phase_digest_bound"] = (
+            circadian_phase_verifier_validation["phase_ref_digest_set_bound"]
+        )
+        validation["circadian_phase_verifier_source_digest_bound"] = (
+            circadian_phase_verifier_validation["verifier_source_digest_set_bound"]
+        )
+        validation["circadian_phase_verifier_quorum_status"] = (
+            circadian_phase_verifier_validation["verifier_quorum_status"]
+        )
+        validation["circadian_phase_verifier_digest_bound"] = (
+            circadian_phase_verifier_validation["phase_verifier_digest_bound"]
+        )
+        validation["feature_window_series_circadian_verifier_bound"] = (
+            feature_window_series_validation["circadian_phase_verifier_bound"]
+        )
+        validation["feature_window_series_circadian_verifier_digest_bound"] = (
+            feature_window_series_validation["circadian_phase_verifier_digest_bound"]
+        )
         validation["feature_window_series_axis_drift_summary_bound"] = (
             feature_window_series_validation["axis_drift_summary_bound"]
         )
@@ -7945,6 +8001,9 @@ json.dump(response, sys.stdout)
         validation["raw_series_payload_stored"] = feature_window_series_validation[
             "raw_series_payload_stored"
         ]
+        validation["raw_phase_verifier_payload_stored"] = (
+            circadian_phase_verifier_validation["raw_verifier_payload_stored"]
+        )
         validation["raw_drift_payload_stored"] = feature_window_series_drift_gate_validation[
             "raw_drift_payload_stored"
         ]
@@ -8069,6 +8128,12 @@ json.dump(response, sys.stdout)
                 "circadian_profile_bound": feature_window_series_profile[
                     "circadian_profile_bound"
                 ],
+                "circadian_phase_verifier_digest": feature_window_series_profile[
+                    "circadian_phase_verifier_digest"
+                ],
+                "circadian_phase_verifier_bound": feature_window_series_profile[
+                    "circadian_phase_verifier_bound"
+                ],
                 "required_modalities_bound": feature_window_series_profile[
                     "required_modalities_bound"
                 ],
@@ -8078,6 +8143,33 @@ json.dump(response, sys.stdout)
             },
             actor="BioDataTransmitter",
             category="interface-biodata-transmitter-feature-window-series",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.circadian_phase_verifier_bound",
+            payload={
+                "phase_verifier_ref": circadian_phase_verifier["phase_verifier_ref"],
+                "phase_verifier_digest": circadian_phase_verifier[
+                    "phase_verifier_digest"
+                ],
+                "phase_ref_digest_set": circadian_phase_verifier[
+                    "phase_ref_digest_set"
+                ],
+                "verifier_source_digest_set": circadian_phase_verifier[
+                    "verifier_source_digest_set"
+                ],
+                "verifier_quorum_status": circadian_phase_verifier[
+                    "verifier_quorum_status"
+                ],
+                "raw_verifier_payload_stored": circadian_phase_verifier[
+                    "raw_verifier_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-circadian-phase-verifier",
             layer="L6",
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
@@ -8246,6 +8338,7 @@ json.dump(response, sys.stdout)
                 dataset_adapter_receipt,
                 day_two_dataset_adapter_receipt,
             ],
+            "circadian_phase_verifier": circadian_phase_verifier,
             "feature_window_series_profile": feature_window_series_profile,
             "feature_window_series_drift_gate": feature_window_series_drift_gate,
             "latent_state": latent_state,

@@ -14,6 +14,7 @@ BDT_GENERATOR_PROFILE_ID = "bounded-cross-modal-biosignal-generator-v0"
 BDT_CALIBRATION_PROFILE_ID = "multi-day-personal-biodata-calibration-v1"
 BDT_CONFIDENCE_GATE_PROFILE_ID = "biodata-calibration-confidence-gate-v1"
 BDT_DATASET_ADAPTER_PROFILE_ID = "biodata-dataset-feature-window-adapter-v1"
+BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID = "biodata-circadian-phase-verifier-v1"
 BDT_FEATURE_WINDOW_SERIES_PROFILE_ID = "biodata-feature-window-series-profile-v1"
 BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID = "biodata-feature-window-series-drift-gate-v1"
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
@@ -32,6 +33,7 @@ FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS = {
     "thought_pressure_proxy": 0.18,
     "interoceptive_confidence": 0.05,
 }
+CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES = ("external-clock", "sleep-diary", "wearable")
 REQUIRED_LITERATURE_REFS = (
     {
         "ref_id": "physionet-2000",
@@ -100,6 +102,7 @@ class BioDataTransmitter:
             "calibration_profile_id": BDT_CALIBRATION_PROFILE_ID,
             "confidence_gate_profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
             "dataset_adapter_profile_id": BDT_DATASET_ADAPTER_PROFILE_ID,
+            "circadian_phase_verifier_profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
             "feature_window_series_profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
             "feature_window_series_drift_gate_profile_id": (
                 BDT_FEATURE_WINDOW_SERIES_DRIFT_GATE_PROFILE_ID
@@ -321,6 +324,7 @@ class BioDataTransmitter:
         adapter_receipts: Sequence[Dict[str, Any]],
         latent_states: Sequence[Dict[str, Any]],
         circadian_phase_refs: Sequence[str],
+        circadian_phase_verifier_receipt: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         self._check_session_mapping(session)
         if not isinstance(adapter_receipts, (list, tuple)) or len(adapter_receipts) < 2:
@@ -395,6 +399,30 @@ class BioDataTransmitter:
             "latent_digests": latent_digests,
             "circadian_phase_refs": normalized_phase_refs,
         }
+        phase_verifier_ref = ""
+        phase_verifier_digest = ""
+        phase_verifier_source_digest_set = ""
+        phase_verifier_status = "not-bound"
+        phase_verifier_bound = False
+        if circadian_phase_verifier_receipt is not None:
+            verifier_validation = self.validate_circadian_phase_verifier(
+                session,
+                normalized_phase_refs,
+                circadian_phase_verifier_receipt,
+            )
+            if not verifier_validation["ok"]:
+                raise ValueError(
+                    "circadian_phase_verifier_receipt is invalid: "
+                    + "; ".join(verifier_validation["errors"])
+                )
+            phase_verifier_ref = str(circadian_phase_verifier_receipt["phase_verifier_ref"])
+            phase_verifier_digest = str(circadian_phase_verifier_receipt["phase_verifier_digest"])
+            phase_verifier_source_digest_set = str(
+                circadian_phase_verifier_receipt["verifier_source_digest_set"]
+            )
+            phase_verifier_status = str(circadian_phase_verifier_receipt["verifier_quorum_status"])
+            phase_verifier_bound = True
+        digest_set_payload["circadian_phase_verifier_digest"] = phase_verifier_digest
         drift_summary = {
             axis_name: self._summarize_axis_drift(values)
             for axis_name, values in axis_samples.items()
@@ -421,9 +449,14 @@ class BioDataTransmitter:
             "circadian_phase_refs": normalized_phase_refs,
             "circadian_phase_summary": phase_summaries,
             "circadian_profile_bound": len(set(normalized_phase_refs)) >= 2,
+            "circadian_phase_verifier_ref": phase_verifier_ref,
+            "circadian_phase_verifier_digest": phase_verifier_digest,
+            "circadian_phase_verifier_source_digest_set": phase_verifier_source_digest_set,
+            "circadian_phase_verifier_status": phase_verifier_status,
+            "circadian_phase_verifier_bound": phase_verifier_bound,
             "axis_drift_summary": drift_summary,
             "drift_policy": "ordered-feature-window-latent-drift-digest-only-v1",
-            "storage_policy": "adapter-receipt-digest+latent-digest+phase-ref-only",
+            "storage_policy": "adapter-receipt-digest+latent-digest+phase-verifier-ref-only",
             "literature_refs": deepcopy(session["literature_refs"]),
             "conflict_refs": deepcopy(session["conflict_refs"]),
             "mind_upload_conflict_sink_url": session["mind_upload_conflict_sink_url"],
@@ -432,6 +465,7 @@ class BioDataTransmitter:
             "raw_feature_window_payload_stored": False,
             "raw_latent_payload_stored": False,
             "raw_series_payload_stored": False,
+            "raw_phase_verifier_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -446,6 +480,7 @@ class BioDataTransmitter:
         adapter_receipts: Sequence[Dict[str, Any]],
         latent_states: Sequence[Dict[str, Any]],
         series_profile: Dict[str, Any],
+        circadian_phase_verifier_receipt: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         self._check_session_mapping_for_errors(session, errors)
@@ -469,6 +504,10 @@ class BioDataTransmitter:
                     "adapter_receipt_digests": adapter_receipt_digests,
                     "latent_digests": latent_digests,
                     "circadian_phase_refs": phase_refs,
+                    "circadian_phase_verifier_digest": series_profile.get(
+                        "circadian_phase_verifier_digest",
+                        "",
+                    ),
                 }
             )
         )
@@ -499,6 +538,54 @@ class BioDataTransmitter:
         )
         if not circadian_profile_bound:
             errors.append("series_profile.circadian_profile_bound must be true")
+        phase_verifier_bound = series_profile.get("circadian_phase_verifier_bound") is True
+        phase_verifier_status = str(
+            series_profile.get("circadian_phase_verifier_status", "not-bound")
+        )
+        phase_verifier_digest_bound = False
+        if phase_verifier_bound:
+            if phase_verifier_status != "complete":
+                errors.append("series_profile.circadian_phase_verifier_status must be complete")
+            self._check_non_empty_string(
+                series_profile.get("circadian_phase_verifier_ref"),
+                "series_profile.circadian_phase_verifier_ref",
+                errors,
+            )
+            self._check_non_empty_string(
+                series_profile.get("circadian_phase_verifier_digest"),
+                "series_profile.circadian_phase_verifier_digest",
+                errors,
+            )
+            self._check_non_empty_string(
+                series_profile.get("circadian_phase_verifier_source_digest_set"),
+                "series_profile.circadian_phase_verifier_source_digest_set",
+                errors,
+            )
+            if circadian_phase_verifier_receipt is not None:
+                verifier_validation = self.validate_circadian_phase_verifier(
+                    session,
+                    phase_refs,
+                    circadian_phase_verifier_receipt,
+                )
+                if not verifier_validation["ok"]:
+                    errors.extend(
+                        f"circadian_phase_verifier_receipt.{error}"
+                        for error in verifier_validation["errors"]
+                    )
+                phase_verifier_digest_bound = (
+                    series_profile.get("circadian_phase_verifier_ref")
+                    == circadian_phase_verifier_receipt.get("phase_verifier_ref")
+                    and series_profile.get("circadian_phase_verifier_digest")
+                    == circadian_phase_verifier_receipt.get("phase_verifier_digest")
+                    and series_profile.get("circadian_phase_verifier_source_digest_set")
+                    == circadian_phase_verifier_receipt.get("verifier_source_digest_set")
+                )
+            else:
+                phase_verifier_digest_bound = bool(
+                    series_profile.get("circadian_phase_verifier_digest")
+                )
+        elif phase_verifier_status != "not-bound":
+            errors.append("unbound circadian phase verifier must use not-bound status")
         axis_drift_summary = series_profile.get("axis_drift_summary", {})
         axis_drift_summary_bound = (
             isinstance(axis_drift_summary, dict)
@@ -523,6 +610,7 @@ class BioDataTransmitter:
             "raw_feature_window_payload_stored",
             "raw_latent_payload_stored",
             "raw_series_payload_stored",
+            "raw_phase_verifier_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
         ):
@@ -552,12 +640,190 @@ class BioDataTransmitter:
             "latent_digest_set_bound": series_profile.get("latent_digests") == latent_digests,
             "required_modalities_bound": required_modalities_bound,
             "circadian_profile_bound": circadian_profile_bound,
+            "circadian_phase_verifier_bound": phase_verifier_bound,
+            "circadian_phase_verifier_digest_bound": phase_verifier_digest_bound,
             "axis_drift_summary_bound": axis_drift_summary_bound,
             "raw_dataset_payload_stored": False,
             "raw_signal_samples_stored": False,
             "raw_feature_window_payload_stored": False,
             "raw_latent_payload_stored": False,
             "raw_series_payload_stored": False,
+            "raw_phase_verifier_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
+    def bind_circadian_phase_verifier(
+        self,
+        session: Dict[str, Any],
+        circadian_phase_refs: Sequence[str],
+        verifier_sources: Sequence[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        phase_refs = self._normalize_circadian_phase_refs(circadian_phase_refs)
+        sources = self._normalize_circadian_verifier_sources(verifier_sources, phase_refs)
+        source_digests = [source["source_digest"] for source in sources]
+        phase_ref_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
+                    "circadian_phase_refs": phase_refs,
+                }
+            )
+        )
+        verifier_source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
+                    "source_digests": source_digests,
+                }
+            )
+        )
+        receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "phase_verifier_ref": f"circadian-phase-verifier://biodata/{new_id('bdt-phase-verifier')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "circadian_phase_refs": phase_refs,
+            "phase_ref_digest_set": phase_ref_digest_set,
+            "required_source_types": list(CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES),
+            "verifier_source_types": [source["source_type"] for source in sources],
+            "verifier_sources": sources,
+            "verifier_source_digest_set": verifier_source_digest_set,
+            "verifier_quorum_status": "complete",
+            "phase_alignment_policy": "external-clock-sleep-diary-wearable-quorum-v1",
+            "phase_verifier_bound": True,
+            "storage_policy": "phase-ref+verifier-source-digest-only",
+            "raw_clock_payload_stored": False,
+            "raw_sleep_diary_payload_stored": False,
+            "raw_wearable_payload_stored": False,
+            "raw_phase_payload_stored": False,
+            "raw_verifier_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        receipt["phase_verifier_digest"] = sha256_text(
+            canonical_json(self._circadian_phase_verifier_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_circadian_phase_verifier(
+        self,
+        session: Dict[str, Any],
+        circadian_phase_refs: Sequence[str],
+        verifier_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        phase_refs: List[str] = []
+        try:
+            phase_refs = self._normalize_circadian_phase_refs(circadian_phase_refs)
+        except ValueError as exc:
+            errors.append(str(exc))
+        if not isinstance(verifier_receipt, dict):
+            errors.append("verifier_receipt must be a mapping")
+            verifier_receipt = {}
+        self._check_non_empty_string(
+            verifier_receipt.get("phase_verifier_ref"),
+            "verifier_receipt.phase_verifier_ref",
+            errors,
+        )
+        if verifier_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("verifier_receipt.schema_version mismatch")
+        if verifier_receipt.get("profile_id") != BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID:
+            errors.append("verifier_receipt.profile_id mismatch")
+        if verifier_receipt.get("session_id") != session.get("session_id"):
+            errors.append("verifier_receipt.session_id must match session.session_id")
+        if verifier_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("verifier_receipt.identity_id must match session.identity_id")
+        if verifier_receipt.get("circadian_phase_refs") != phase_refs:
+            errors.append("verifier_receipt.circadian_phase_refs must match requested phases")
+        expected_phase_ref_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
+                    "circadian_phase_refs": phase_refs,
+                }
+            )
+        )
+        phase_ref_digest_set_bound = (
+            verifier_receipt.get("phase_ref_digest_set") == expected_phase_ref_digest_set
+        )
+        if not phase_ref_digest_set_bound:
+            errors.append("verifier_receipt.phase_ref_digest_set mismatch")
+        sources = verifier_receipt.get("verifier_sources", [])
+        normalized_sources: List[Dict[str, Any]] = []
+        try:
+            normalized_sources = self._normalize_circadian_verifier_sources(
+                sources,
+                phase_refs,
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        expected_source_digests = [source["source_digest"] for source in normalized_sources]
+        expected_source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
+                    "source_digests": expected_source_digests,
+                }
+            )
+        )
+        source_digest_set_bound = (
+            verifier_receipt.get("verifier_source_digest_set") == expected_source_digest_set
+        )
+        if not source_digest_set_bound:
+            errors.append("verifier_receipt.verifier_source_digest_set mismatch")
+        if verifier_receipt.get("verifier_sources") != normalized_sources:
+            errors.append("verifier_receipt.verifier_sources mismatch")
+        required_source_types_bound = (
+            verifier_receipt.get("required_source_types")
+            == list(CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES)
+            and verifier_receipt.get("verifier_source_types")
+            == list(CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES)
+        )
+        if not required_source_types_bound:
+            errors.append("verifier_receipt must bind external-clock, sleep-diary, and wearable sources")
+        if verifier_receipt.get("verifier_quorum_status") != "complete":
+            errors.append("verifier_receipt.verifier_quorum_status must be complete")
+        if verifier_receipt.get("phase_verifier_bound") is not True:
+            errors.append("verifier_receipt.phase_verifier_bound must be true")
+        expected_digest = sha256_text(
+            canonical_json(self._circadian_phase_verifier_digest_payload(verifier_receipt))
+        )
+        phase_verifier_digest_bound = (
+            verifier_receipt.get("phase_verifier_digest") == expected_digest
+        )
+        if not phase_verifier_digest_bound:
+            errors.append("verifier_receipt.phase_verifier_digest mismatch")
+        for field_name in (
+            "raw_clock_payload_stored",
+            "raw_sleep_diary_payload_stored",
+            "raw_wearable_payload_stored",
+            "raw_phase_payload_stored",
+            "raw_verifier_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if verifier_receipt.get(field_name) is not False:
+                errors.append(f"verifier_receipt.{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": verifier_receipt.get("profile_id"),
+            "phase_ref_digest_set_bound": phase_ref_digest_set_bound,
+            "verifier_source_digest_set_bound": source_digest_set_bound,
+            "required_source_types_bound": required_source_types_bound,
+            "verifier_quorum_status": verifier_receipt.get("verifier_quorum_status"),
+            "phase_verifier_digest_bound": phase_verifier_digest_bound,
+            "raw_clock_payload_stored": False,
+            "raw_sleep_diary_payload_stored": False,
+            "raw_wearable_payload_stored": False,
+            "raw_phase_payload_stored": False,
+            "raw_verifier_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -1783,6 +2049,64 @@ class BioDataTransmitter:
         normalized["modality_file_refs"] = normalized_refs
         return normalized
 
+    def _normalize_circadian_phase_refs(
+        self,
+        circadian_phase_refs: Sequence[str],
+    ) -> List[str]:
+        if not isinstance(circadian_phase_refs, (list, tuple)) or len(circadian_phase_refs) < 2:
+            raise ValueError("circadian_phase_refs must contain at least two phase refs")
+        normalized: List[str] = []
+        for phase_ref in circadian_phase_refs:
+            self._require_non_empty_string(phase_ref, "circadian_phase_ref")
+            normalized.append(str(phase_ref).strip())
+        if len(set(normalized)) < 2:
+            raise ValueError("circadian_phase_refs must cover at least two unique phases")
+        return normalized
+
+    def _normalize_circadian_verifier_sources(
+        self,
+        verifier_sources: Sequence[Dict[str, Any]],
+        circadian_phase_refs: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        if not isinstance(verifier_sources, (list, tuple)):
+            raise ValueError("verifier_sources must be a sequence")
+        sources_by_type: Dict[str, Dict[str, Any]] = {}
+        phase_refs = [str(item).strip() for item in circadian_phase_refs]
+        for source in verifier_sources:
+            if not isinstance(source, dict):
+                raise ValueError("each verifier source must be a mapping")
+            source_type = str(source.get("source_type", "")).strip().lower()
+            if source_type not in CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES:
+                raise ValueError(f"unsupported circadian verifier source type: {source_type}")
+            if source_type in sources_by_type:
+                raise ValueError(f"duplicate circadian verifier source type: {source_type}")
+            normalized_source: Dict[str, Any] = {"source_type": source_type}
+            for field_name in ("source_ref", "evidence_ref", "verifier_key_ref"):
+                value = source.get(field_name)
+                self._require_non_empty_string(value, f"verifier_sources.{source_type}.{field_name}")
+                normalized_source[field_name] = str(value).strip()
+            source_digest_payload = {
+                "profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
+                "circadian_phase_refs": phase_refs,
+                "source_type": normalized_source["source_type"],
+                "source_ref": normalized_source["source_ref"],
+                "evidence_ref": normalized_source["evidence_ref"],
+                "verifier_key_ref": normalized_source["verifier_key_ref"],
+            }
+            normalized_source["source_digest"] = sha256_text(canonical_json(source_digest_payload))
+            sources_by_type[source_type] = normalized_source
+        missing_source_types = [
+            source_type
+            for source_type in CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES
+            if source_type not in sources_by_type
+        ]
+        if missing_source_types:
+            raise ValueError(f"missing circadian verifier source types: {missing_source_types}")
+        return [
+            sources_by_type[source_type]
+            for source_type in CIRCADIAN_PHASE_VERIFIER_SOURCE_TYPES
+        ]
+
     @staticmethod
     def _normalize_series_drift_thresholds(
         axis_thresholds: Dict[str, float] | None,
@@ -1867,6 +2191,14 @@ class BioDataTransmitter:
     def _series_drift_gate_digest_payload(drift_gate_receipt: Dict[str, Any]) -> Dict[str, Any]:
         payload = dict(drift_gate_receipt)
         payload.pop("drift_gate_digest", None)
+        return payload
+
+    @staticmethod
+    def _circadian_phase_verifier_digest_payload(
+        verifier_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        payload = dict(verifier_receipt)
+        payload.pop("phase_verifier_digest", None)
         return payload
 
     @staticmethod

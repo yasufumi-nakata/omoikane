@@ -1074,8 +1074,12 @@ raw dataset payload、raw signal samples、raw feature-window payload は保存�
 さらに複数日の adapter receipt と body-state latent は
 `biodata-feature-window-series-profile-v1` により ordered longitudinal / circadian
 series へ束縛される。series profile は adapter receipt digest set、latent digest set、
-circadian phase refs、axis drift summary、required modality coverage を返し、
-raw dataset / sample / feature-window / latent / series payload は保存しない。
+circadian phase refs、circadian phase verifier digest、axis drift summary、
+required modality coverage を返し、raw dataset / sample / feature-window / latent /
+phase verifier / series payload は保存しない。
+circadian phase refs は `biodata-circadian-phase-verifier-v1` により external clock、
+sleep diary、wearable evidence refs の source digest set へ束縛され、raw clock /
+sleep diary / wearable / phase payload は保存しない。
 さらに 2 日分の body-state latent を
 `multi-day-personal-biodata-calibration-v1` calibration profile に束ね、
 source latent digest set、calibration day refs、axis baseline mean、
