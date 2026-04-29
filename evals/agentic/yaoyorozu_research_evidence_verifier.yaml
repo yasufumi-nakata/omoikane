@@ -1,16 +1,35 @@
 id: eval-agentic-yaoyorozu-research-evidence-verifier
-title: Yaoyorozu research evidence verifier readback
+title: Yaoyorozu research evidence verifier transport quorum
 surface: agentic.yaoyorozu
 profile: repo-local-research-evidence-verifier-v1
 must:
   - verifier receipt must bind the source exchange ref and researcher_agent_id
   - evidence_refs must match the nested researcher report evidence refs
   - expected and observed repo-local evidence digests must match for every evidence item
+  - live verifier transport receipts must bind literature-index and publisher-record classes
+  - verifier quorum must cover JP-13 and US-CA jurisdictions with threshold 2
+  - signed response envelope refs and 900 second freshness windows must be bound
+  - verifier transport quorum digest must be derived from transport receipt digests
   - verifier_digest must bind the verifier receipt
-  - raw evidence payloads, network payloads, and decision authority must remain absent
+  - raw evidence, network response, signature payloads, and decision authority must remain absent
 expected:
-  transport_profile: repo-local-digest-readback-v1
+  transport_profile: digest-only-live-research-evidence-verifier-quorum-v1
+  verifier_network_scope: digest-only-research-evidence-verifier-transport
+  verifier_quorum_policy_id: research-evidence-live-verifier-quorum-policy-v1
+  required_verifier_classes:
+    - literature-index
+    - publisher-record
+  required_verifier_jurisdictions:
+    - JP-13
+    - US-CA
+  verifier_quorum_threshold: 2
+  verifier_quorum_status: complete
   verifier_status: verified
+  signed_response_envelope_bound: true
+  freshness_window_seconds: 900
+  freshness_window_bound: true
   raw_evidence_payload_stored: false
   network_payload_stored: false
+  raw_verifier_response_payload_stored: false
+  raw_verifier_signature_payload_stored: false
   decision_authority_claimed: false

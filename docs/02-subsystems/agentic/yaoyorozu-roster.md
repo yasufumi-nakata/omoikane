@@ -134,10 +134,13 @@ Council session schema を再利用しない。researcher output は claim ceili
 advisory-only implication、raw research payload 非保存、decision authority 不保持を
 schema contract として返す。
 各 exchange は `yaoyorozu_research_evidence_verifier_receipt` により
-repo-local evidence ref の expected / observed digest readback を束縛し、
-raw evidence payload や network payload を保存しない。
+repo-local evidence ref の expected / observed digest readback に加え、
+literature-index / publisher-record の live verifier transport quorum、
+JP-13 / US-CA threshold、signed response envelope、900 秒 freshness window を束縛し、
+raw evidence payload、raw verifier response、raw signature payload を保存しない。
 複数 researcher の exchange は `yaoyorozu_research_evidence_synthesis` により
-exchange digest set / evidence digest set / verifier digest set / Council session ref へ束縛され、
+exchange digest set / evidence digest set / verifier digest set / verifier quorum digest set /
+Council session ref へ束縛され、
 raw exchange payload と raw research payload を保存しないまま Council deliberation の
 advisory input に縮約される。
 

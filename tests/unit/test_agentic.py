@@ -4384,6 +4384,53 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             validation["errors"],
         )
 
+    def test_research_evidence_exchange_rejects_verifier_quorum_tamper(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["research_evidence_exchange"]))
+        receipt = tampered["evidence_verifier_receipt"]
+        receipt["accepted_verifier_jurisdictions"] = ["JP-13"]
+        receipt["verifier_quorum_status"] = "incomplete"
+        receipt["verifier_transport_receipts"] = receipt["verifier_transport_receipts"][:1]
+        receipt["verifier_transport_receipt_digests"] = (
+            receipt["verifier_transport_receipt_digests"][:1]
+        )
+
+        validation = runtime.yaoyorozu.validate_research_evidence_exchange(
+            tampered,
+            result["registry"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["evidence_verifier_bound"])
+        self.assertFalse(validation["evidence_verifier_quorum_bound"])
+        self.assertFalse(validation["evidence_verifier_transport_bound"])
+        self.assertIn(
+            "evidence verifier receipt must bind exchange evidence readback",
+            validation["errors"],
+        )
+
+    def test_research_evidence_exchange_rejects_verifier_raw_payload_tamper(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["research_evidence_exchange"]))
+        receipt = tampered["evidence_verifier_receipt"]
+        receipt["raw_verifier_response_payload_stored"] = True
+        receipt["verifier_transport_receipts"][0]["raw_response_payload_stored"] = True
+
+        validation = runtime.yaoyorozu.validate_research_evidence_exchange(
+            tampered,
+            result["registry"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["evidence_verifier_bound"])
+        self.assertTrue(validation["evidence_verifier_raw_response_payload_stored"])
+        self.assertIn(
+            "evidence verifier receipt must bind exchange evidence readback",
+            validation["errors"],
+        )
+
     def test_worker_dispatch_receipt_rejects_tampered_preseed_oversight_event(self) -> None:
         runtime = OmoikaneReferenceOS()
         result = runtime.run_yaoyorozu_demo()

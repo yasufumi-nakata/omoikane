@@ -13,6 +13,7 @@
 - 自分の解釈と確立事実を区別する
 - 入力は `research_evidence_request.schema`、出力は `research_evidence_report.schema` に従う
 - evidence item は source ref と digest で示し、raw research payload を保持しない
+- evidence digest は live verifier transport quorum の対象となるため、raw source 本文ではなく ref / digest / source class / claim scope だけを返す
 - claim ceiling、uncertainty、competing explanations を明示し、advisory-only implication に留める
 
 ## 出力先

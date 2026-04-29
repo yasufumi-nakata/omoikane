@@ -7,6 +7,7 @@ must:
   - synthesis exchange_refs and exchange_digests match the source exchange receipts
   - synthesis evidence_digest_set is derived from the nested researcher reports
   - synthesis evidence verifier refs and digest set are derived from source exchange verifier receipts
+  - synthesis evidence verifier quorum digest set is derived from source exchange transport quorums
   - claim ceiling remains implementation-advisory and all implications remain advisory-only
   - raw exchange payloads and raw research payloads are not stored
   - synthesis receipt is appended to ContinuityLedger with council and guardian signature roles
@@ -18,6 +19,7 @@ expected:
   continuity_ledger_signature_roles:
     - council
     - guardian
+  verifier_quorums_bound: true
   raw_exchange_payload_stored: false
   raw_research_payload_stored: false
   decision_authority_claimed: false

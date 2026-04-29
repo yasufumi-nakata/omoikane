@@ -42,9 +42,10 @@
   public verification bundle を materialize し、
   researcher request/report も `repo-local-research-evidence-exchange-v1`
   として source digest、request/report digest、repo-local evidence digest、
-  repo-local verifier readback digest、
+  repo-local verifier readback digest、live verifier transport quorum digest、
   Council+Guardian 署名付き ContinuityLedger entry に束縛し、
-  raw evidence / raw research / network payload と decision authority を持たないことを検証し、
+  raw evidence / raw research / raw verifier response / raw signature payload と
+  decision authority を持たないことを検証し、
   `self-modify-patch-v1` / `memory-edit-v1` / `fork-request-v1` / `inter-mind-negotiation-v1` の
   Council convocation / builder handoff plan を materialize し、
   convocation 側でも `workspace_discovery_binding` により accepted workspace set と profile policy を再束縛し、
@@ -159,3 +160,4 @@ CouncilMessage:
 - [trust-management.md](trust-management.md) ── Agent 信頼スコア
 # workspace-enacted: patch-1f3d61f787a9 target=docs/02-subsystems/agentic/README.md
 # workspace-enacted: patch-3458c4abda70 target=docs/02-subsystems/agentic/README.md
+# workspace-enacted: patch-9c8b30e6bb69 target=docs/02-subsystems/agentic/README.md

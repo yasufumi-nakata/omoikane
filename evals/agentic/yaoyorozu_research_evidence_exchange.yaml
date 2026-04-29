@@ -7,6 +7,7 @@ must:
   - request_digest and report_digest bind nested advisory request/report payloads
   - evidence refs resolve to repo-local docs or research paths and bind sha256 digests
   - evidence verifier receipt independently binds expected and observed repo-local digests
+  - evidence verifier receipt binds a live transport quorum, signed responses, and freshness windows
   - claim ceiling remains implementation-advisory and all implications remain advisory-only
   - raw research payloads are not stored and researcher decision authority is not claimed
   - exchange receipt is appended to ContinuityLedger with council and guardian signature roles
@@ -22,4 +23,10 @@ expected:
   raw_research_payload_stored: false
   raw_evidence_payload_stored: false
   network_payload_stored: false
+  live_verifier_transport_bound: true
+  verifier_quorum_bound: true
+  signed_response_envelope_bound: true
+  freshness_window_bound: true
+  raw_verifier_response_payload_stored: false
+  raw_verifier_signature_payload_stored: false
   decision_authority_claimed: false

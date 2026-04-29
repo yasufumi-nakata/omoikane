@@ -193,8 +193,14 @@ properties:
       - evidence_digests_bound
       - evidence_verifier_bound
       - evidence_verifier_digest_bound
+      - evidence_verifier_transport_bound
+      - evidence_verifier_quorum_bound
+      - evidence_verifier_signed_response_envelope_bound
+      - evidence_verifier_freshness_window_bound
       - evidence_verifier_raw_payload_stored
       - evidence_verifier_network_payload_stored
+      - evidence_verifier_raw_response_payload_stored
+      - evidence_verifier_raw_signature_payload_stored
       - request_forbids_authority
       - advisory_only
       - raw_research_payload_stored
@@ -227,9 +233,21 @@ properties:
         const: true
       evidence_verifier_digest_bound:
         const: true
+      evidence_verifier_transport_bound:
+        const: true
+      evidence_verifier_quorum_bound:
+        const: true
+      evidence_verifier_signed_response_envelope_bound:
+        const: true
+      evidence_verifier_freshness_window_bound:
+        const: true
       evidence_verifier_raw_payload_stored:
         const: false
       evidence_verifier_network_payload_stored:
+        const: false
+      evidence_verifier_raw_response_payload_stored:
+        const: false
+      evidence_verifier_raw_signature_payload_stored:
         const: false
       request_forbids_authority:
         const: true
@@ -286,7 +304,9 @@ examples:
       verifier_ref: research-evidence-verifier://yaoyorozu-research-evidence-verifier-012345abcdef
       verified_at: "2026-04-29T00:00:00+00:00"
       profile_id: repo-local-research-evidence-verifier-v1
-      transport_profile: repo-local-digest-readback-v1
+      transport_profile: digest-only-live-research-evidence-verifier-quorum-v1
+      verifier_network_scope: digest-only-research-evidence-verifier-transport
+      verifier_quorum_policy_id: research-evidence-live-verifier-quorum-policy-v1
       exchange_ref: research-evidence-exchange://yaoyorozu-research-evidence-exchange-012345abcdef
       researcher_agent_id: neuroscience-scout
       evidence_refs:
@@ -301,8 +321,62 @@ examples:
       evidence_digest_set_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       verified_evidence_count: 1
       verifier_status: verified
+      required_verifier_classes: [literature-index, publisher-record]
+      accepted_verifier_classes: [literature-index, publisher-record]
+      required_verifier_jurisdictions: [JP-13, US-CA]
+      accepted_verifier_jurisdictions: [JP-13, US-CA]
+      verifier_quorum_threshold: 2
+      verifier_quorum_status: complete
+      verifier_transport_receipts:
+        - kind: yaoyorozu_research_evidence_verifier_transport_receipt
+          verifier_ref: verifier://research-evidence/literature-index/neuroscience-scout/v1
+          verifier_endpoint: https://verifier.research.example.invalid/literature-index/jp-13
+          verifier_class: literature-index
+          jurisdiction: JP-13
+          checked_at_ref: timestamp://yaoyorozu/research-evidence/verifier/literature-index/jp-13
+          response_ref: response://yaoyorozu/research-evidence/literature-index/jp-13/verified/v1
+          response_digest: 8123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          signed_response_envelope_ref: signed-envelope://yaoyorozu/research-evidence/literature-index/jp-13/v1
+          response_signing_key_ref: key://research-evidence-verifier/literature-index/jp-13/v1
+          freshness_window_seconds: 900
+          covered_evidence_refs:
+            - docs/05-research-frontiers/scan-fidelity.md
+          covered_evidence_digest_set_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          observed_evidence_digest_set_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          verifier_status: verified
+          raw_response_payload_stored: false
+          raw_signature_payload_stored: false
+          transport_digest: 9123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        - kind: yaoyorozu_research_evidence_verifier_transport_receipt
+          verifier_ref: verifier://research-evidence/publisher-record/neuroscience-scout/v1
+          verifier_endpoint: https://verifier.research.example.invalid/publisher-record/us-ca
+          verifier_class: publisher-record
+          jurisdiction: US-CA
+          checked_at_ref: timestamp://yaoyorozu/research-evidence/verifier/publisher-record/us-ca
+          response_ref: response://yaoyorozu/research-evidence/publisher-record/us-ca/verified/v1
+          response_digest: a123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          signed_response_envelope_ref: signed-envelope://yaoyorozu/research-evidence/publisher-record/us-ca/v1
+          response_signing_key_ref: key://research-evidence-verifier/publisher-record/us-ca/v1
+          freshness_window_seconds: 900
+          covered_evidence_refs:
+            - docs/05-research-frontiers/scan-fidelity.md
+          covered_evidence_digest_set_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          observed_evidence_digest_set_digest: 6123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          verifier_status: verified
+          raw_response_payload_stored: false
+          raw_signature_payload_stored: false
+          transport_digest: b123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      verifier_transport_receipt_digests:
+        - 9123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+        - b123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      verifier_transport_quorum_digest: c123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      signed_response_envelope_bound: true
+      freshness_window_seconds: 900
+      freshness_window_bound: true
       raw_evidence_payload_stored: false
       network_payload_stored: false
+      raw_verifier_response_payload_stored: false
+      raw_verifier_signature_payload_stored: false
       decision_authority_claimed: false
       verifier_digest: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       validation:
@@ -310,9 +384,15 @@ examples:
         exchange_bound: true
         evidence_ref_set_bound: true
         evidence_digest_set_bound: true
+        live_verifier_transport_bound: true
+        verifier_quorum_bound: true
+        signed_response_envelope_bound: true
+        freshness_window_bound: true
         verifier_digest_bound: true
         raw_evidence_payload_stored: false
         network_payload_stored: false
+        raw_verifier_response_payload_stored: false
+        raw_verifier_signature_payload_stored: false
         decision_authority_claimed: false
         errors: []
     claim_ceiling: implementation-advisory
@@ -395,8 +475,14 @@ examples:
       evidence_digests_bound: true
       evidence_verifier_bound: true
       evidence_verifier_digest_bound: true
+      evidence_verifier_transport_bound: true
+      evidence_verifier_quorum_bound: true
+      evidence_verifier_signed_response_envelope_bound: true
+      evidence_verifier_freshness_window_bound: true
       evidence_verifier_raw_payload_stored: false
       evidence_verifier_network_payload_stored: false
+      evidence_verifier_raw_response_payload_stored: false
+      evidence_verifier_raw_signature_payload_stored: false
       request_forbids_authority: true
       advisory_only: true
       raw_research_payload_stored: false

@@ -52,7 +52,7 @@ reference runtime では `PYTHONPATH=src python3 -m omoikane.cli yaoyorozu-demo 
 (`yaoyorozu_workspace_discovery`) と trust-bound registry snapshot と
 self+guardian 署名付き source manifest ContinuityLedger binding と
 raw payload 非露出の source manifest public verification bundle と
-repo-local verifier readback 付き Council+Guardian 署名 researcher evidence exchange binding と
+live verifier quorum 付き Council+Guardian 署名 researcher evidence exchange binding と
 複数 researcher exchange を束ねる advisory-only synthesis receipt と
 `self-modify-patch-v1` 向け Council / builder handoff plan に materialize され、
 `memory-edit-v1` では `review_budget=2` / `runtime+eval+docs` required、

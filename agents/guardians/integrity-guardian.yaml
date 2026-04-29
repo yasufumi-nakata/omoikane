@@ -103,6 +103,7 @@ when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
+  - Yaoyorozu researcher evidence verifier の live transport quorum / signed response / freshness window を検証する時
   - MemoryCrystal replication の key succession receipt が 3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref、JP-13 signer roster policy digest、identity-guardian / integrity-guardian signature digest、JP-13 + SG-01 multi-jurisdiction signer roster quorum digest、quorum threshold policy registry digest と authority signature digest に束縛され、raw key / raw shard / raw jurisdiction policy / raw quorum threshold policy / raw signer roster payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal receipt が coldstore / trustee の renewed media proof、readback digest、migration attestation digest、3650 日 refresh interval、1000 年 target horizon に束縛され、raw media / raw readback payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal cadence policy が identity cadence class、JP-13 / SG-01 jurisdiction cadence policy digest、target refresh interval、effective refresh / revocation window に束縛され、raw identity / jurisdiction cadence payload を保存していないことを検証する時
@@ -136,7 +137,7 @@ when_to_invoke: |
   - Yaoyorozu councilor source definition が deliberation_scope_refs と deliberation_policy_ref を registry entry へ保持し、raw deliberation transcript ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が Council schema ではなく research_evidence_request / research_evidence_report schema に固定されていることを検証する時
-  - Yaoyorozu researcher evidence verifier receipt が expected / observed repo-local evidence digest readback に束縛され、raw evidence payload / network payload / decision authority を持たないことを検証する時
+  - Yaoyorozu researcher evidence verifier receipt が expected / observed digest readback と live verifier quorum に束縛され、raw evidence / raw response / raw signature payload と decision authority を持たないことを検証する時
   - Yaoyorozu researcher request/report exchange が source digest、evidence digest、Council+Guardian 署名付き ledger entry に束縛され、raw research payload と decision authority を持たないことを検証する時
   - Yaoyorozu 複数 researcher exchange synthesis が exchange digest set、evidence digest set、Council+Guardian 署名付き ledger entry に束縛され、raw exchange / raw research payload と decision authority を持たないことを検証する時
   - Yaoyorozu registry snapshot が raw agents/**/*.yaml source set を digest-only manifest に束縛し、raw source payload を保存していないことを検証する時

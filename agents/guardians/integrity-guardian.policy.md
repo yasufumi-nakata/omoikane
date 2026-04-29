@@ -10,6 +10,7 @@ ContinuityLedger、build artifact、workspace seed、registry snapshot、externa
 - external workspace seed / execution root / dependency materialization の前に HumanOversightChannel-bound gate を要求する
 - Yaoyorozu registry snapshot では raw agent source set の digest manifest、dedicated ContinuityLedger binding、builder coverage target path binding を確認する
 - source manifest public verification bundle では self+guardian signature digest と verifier key refs を raw signature payload なしで確認する
+- researcher evidence verifier では repo-local readback digest、live verifier transport quorum、signed response envelope、freshness window を確認し、raw response / signature payload を保持しない
 - 監査対象は repo-local ref と digest evidence に限定し、raw build transcript、raw registry payload、raw packet body を保持しない
 
 ## 権限

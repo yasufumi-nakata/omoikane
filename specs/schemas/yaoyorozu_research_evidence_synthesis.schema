@@ -28,6 +28,8 @@ required:
   - evidence_verifier_refs
   - evidence_verifier_digests
   - evidence_verifier_digest_set_digest
+  - evidence_verifier_quorum_digests
+  - evidence_verifier_quorum_digest_set_digest
   - claim_ceiling
   - synthesis_summary
   - advisory_design_implications
@@ -159,6 +161,15 @@ properties:
   evidence_verifier_digest_set_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  evidence_verifier_quorum_digests:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  evidence_verifier_quorum_digest_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
   claim_ceiling:
     const: implementation-advisory
   synthesis_summary:
@@ -248,6 +259,7 @@ properties:
       - exchange_digests_bound
       - evidence_digest_set_bound
       - evidence_verifiers_bound
+      - evidence_verifier_quorums_bound
       - advisory_only
       - raw_exchange_payload_stored
       - raw_research_payload_stored
@@ -275,6 +287,8 @@ properties:
       evidence_digest_set_bound:
         const: true
       evidence_verifiers_bound:
+        const: true
+      evidence_verifier_quorums_bound:
         const: true
       advisory_only:
         const: true

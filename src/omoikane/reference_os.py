@@ -4415,6 +4415,26 @@ json.dump(response, sys.stdout)
                         "evidence_verifier_digest_bound"
                     ]
                 ),
+                "research_evidence_verifier_transport_bound": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_transport_bound"
+                    ]
+                ),
+                "research_evidence_verifier_quorum_bound": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_quorum_bound"
+                    ]
+                ),
+                "research_evidence_verifier_signed_response_envelope_bound": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_signed_response_envelope_bound"
+                    ]
+                ),
+                "research_evidence_verifier_freshness_window_bound": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_freshness_window_bound"
+                    ]
+                ),
                 "research_evidence_verifier_raw_payload_stored": (
                     research_evidence_exchange_validation[
                         "evidence_verifier_raw_payload_stored"
@@ -4423,6 +4443,16 @@ json.dump(response, sys.stdout)
                 "research_evidence_verifier_network_payload_stored": (
                     research_evidence_exchange_validation[
                         "evidence_verifier_network_payload_stored"
+                    ]
+                ),
+                "research_evidence_verifier_raw_response_payload_stored": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_raw_response_payload_stored"
+                    ]
+                ),
+                "research_evidence_verifier_raw_signature_payload_stored": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_raw_signature_payload_stored"
                     ]
                 ),
                 "research_evidence_advisory_only": research_evidence_exchange_validation[
@@ -4465,6 +4495,11 @@ json.dump(response, sys.stdout)
                 ),
                 "research_evidence_synthesis_verifiers_bound": (
                     research_evidence_synthesis_validation["evidence_verifiers_bound"]
+                ),
+                "research_evidence_synthesis_verifier_quorums_bound": (
+                    research_evidence_synthesis_validation[
+                        "evidence_verifier_quorums_bound"
+                    ]
                 ),
                 "research_evidence_synthesis_advisory_only": (
                     research_evidence_synthesis_validation["advisory_only"]

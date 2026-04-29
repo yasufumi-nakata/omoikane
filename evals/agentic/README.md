@@ -93,7 +93,10 @@ verifier key ref を raw payload なしで外部 reviewer へ投影できるこ�
 
 ### Yaoyorozu Research Evidence Verifier
 researcher exchange が repo-local evidence ref を expected / observed digest readback に束縛し、
-raw evidence payload、network payload、decision authority を保持しないこと。
+さらに literature-index / publisher-record の live verifier transport quorum、
+JP-13 / US-CA threshold、signed response envelope、900 秒 freshness window を
+raw evidence / raw network response / raw signature payload なしで保持し、
+decision authority を保持しないこと。
 
 ### Yaoyorozu External Workspace Execution
 workspace discovery により選ばれた non-source candidate workspace へ

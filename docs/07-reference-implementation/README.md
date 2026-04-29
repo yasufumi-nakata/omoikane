@@ -534,14 +534,19 @@ machine-readable にすること、
 同じ demo が選定 researcher の request/report を
 `repo-local-research-evidence-exchange-v1` として実際に生成し、
 researcher source digest、request/report digest、repo-local evidence digest、
-`repo-local-research-evidence-verifier-v1` の repo-local readback verifier receipt、
+`repo-local-research-evidence-verifier-v1` の digest readback と
+`digest-only-live-research-evidence-verifier-quorum-v1` の verifier transport quorum、
+literature-index / publisher-record class、JP-13 / US-CA threshold、
+signed response envelope、900 秒 freshness window、
 Council+Guardian 署名付き ContinuityLedger entry ref/hash/payload ref に束縛し、
-raw evidence / raw research / network payload 非保存と decision authority 不保持を
+raw evidence / raw research / raw verifier response / raw signature payload 非保存と
+decision authority 不保持を
 runtime validation で確認すること、
 さらに複数 researcher exchange を
 `repo-local-research-evidence-synthesis-v1` として束ね、
 distinct researcher、exchange digest set、evidence digest set、verifier digest set、
-Council session ref、Council+Guardian 署名付き ContinuityLedger entry を
+verifier quorum digest set、Council session ref、
+Council+Guardian 署名付き ContinuityLedger entry を
 単一の advisory-only synthesis receipt に固定し、
 raw exchange / raw research payload 非保存と decision authority 不保持を
 Council deliberation 前の reviewer-facing artifact として確認すること、
