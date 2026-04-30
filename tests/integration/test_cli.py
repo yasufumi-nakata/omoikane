@@ -89,12 +89,18 @@ class CliIntegrationTests(unittest.TestCase):
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
+        self.assertTrue(result["validation"]["remote_ready_for_main_checkout"])
+        self.assertTrue(result["validation"]["remote_branch_pr_metadata_bound"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertEqual(
             "parallel-codex-worker-result-ingestion-v1",
             result["ready_receipt"]["profile_id"],
         )
         self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
+        self.assertEqual(
+            "remote-branch-pr-worker-result",
+            result["remote_receipt"]["source_system"],
+        )
         self.assertEqual(
             "yaoyorozu-worker-dispatch",
             result["yaoyorozu_bridge_receipt"]["source_system"],

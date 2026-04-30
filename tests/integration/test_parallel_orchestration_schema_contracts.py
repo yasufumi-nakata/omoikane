@@ -54,15 +54,27 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self._assert_schema_valid(
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
+            result["remote_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_worker_result_receipt.schema",
             result["blocked_receipt"],
         )
         self._assert_schema_valid(
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
             result["yaoyorozu_bridge_receipt"],
         )
-        self.assertEqual(3, len(result["schema_contracts"]))
+        self.assertEqual(4, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
+        self.assertTrue(result["validation"]["remote_ready_for_main_checkout"])
+        self.assertTrue(result["validation"]["remote_branch_pr_metadata_bound"])
+        self.assertTrue(result["validation"]["remote_review_authority_digest_bound"])
+        self.assertTrue(
+            result["validation"]["remote_accepted_source_policy_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["remote_worker_identity_evidence_bound"])
+        self.assertTrue(result["validation"]["remote_raw_metadata_payload_redacted"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]

@@ -55,16 +55,77 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["changed_file_manifest_digest_bound"])
         self.assertTrue(validation["verification_manifest_digest_bound"])
         self.assertTrue(validation["worker_identity_evidence_bound"])
+        self.assertTrue(validation["remote_metadata_bound"])
         self.assertTrue(receipt["worker_identity_evidence_bound"])
         self.assertEqual(
             "signed-worker-identity-evidence-v1",
             receipt["worker_identity_profile"],
         )
+        self.assertEqual("not-applicable", receipt["remote_metadata_profile"])
         self.assertTrue(validation["receipt_digest_bound"])
         self.assertFalse(receipt["raw_patch_payload_stored"])
         self.assertFalse(receipt["raw_worker_identity_payload_stored"])
+        self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
         self.assertFalse(receipt["raw_transcript_payload_stored"])
         self.assertFalse(receipt["raw_verification_payload_stored"])
+
+    def test_remote_branch_pr_worker_result_requires_review_metadata(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-remote-pr-worker",
+            worker_role="external",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=[
+                "src/omoikane/self_construction/",
+                "specs/schemas/",
+                "tests/unit/",
+            ],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+                "specs/schemas/parallel_codex_worker_result_receipt.schema",
+                "tests/unit/test_parallel_orchestration.py",
+            ],
+            verification_results=_verification_results(),
+            result_summary="Remote worker result carries branch and PR metadata.",
+            source_system="remote-branch-pr-worker-result",
+            remote_branch_ref="refs/remotes/origin/codex/remote-worker-metadata",
+            remote_pr_ref="pull-request://omoikane/128",
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("accept-ready", receipt["integration_decision"])
+        self.assertEqual("remote-branch-pr-metadata-binding-v1", receipt["remote_metadata_profile"])
+        self.assertEqual(
+            "integrity-guardian-remote-review-authority-v1",
+            receipt["remote_review_authority_profile"],
+        )
+        self.assertTrue(receipt["remote_metadata_bound"])
+        self.assertTrue(validation["remote_metadata_bound"])
+        self.assertTrue(validation["remote_metadata_digest_bound"])
+        self.assertTrue(validation["worker_identity_evidence_bound"])
+        self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
+
+    def test_remote_branch_pr_worker_result_without_pr_metadata_blocks(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-remote-pr-worker",
+            worker_role="external",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=["src/omoikane/self_construction/parallel_orchestration.py"],
+            verification_results=_verification_results(),
+            result_summary="Remote worker result is missing PR metadata.",
+            source_system="remote-branch-pr-worker-result",
+            remote_branch_ref="refs/remotes/origin/codex/remote-worker-metadata",
+        )
+
+        self.assertEqual("blocked", receipt["integration_decision"])
+        self.assertIn(
+            "remote PR metadata requires remote_pr_ref",
+            receipt["blocking_reasons"],
+        )
 
     def test_stale_worker_result_is_schema_bound_but_blocked(self) -> None:
         receipt = self.service.ingest_worker_result(

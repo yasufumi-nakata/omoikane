@@ -20,6 +20,18 @@ PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE = (
     "digest-bound-worker-identity-signature-v1"
 )
 PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE = "integrity-guardian"
+PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM = "remote-branch-pr-worker-result"
+PARALLEL_CODEX_REMOTE_METADATA_PROFILE = "remote-branch-pr-metadata-binding-v1"
+PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE = "not-applicable"
+PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE = (
+    "integrity-guardian-remote-review-authority-v1"
+)
+PARALLEL_CODEX_ACCEPTED_SOURCE_POLICY_REF = (
+    "policy://parallel-codex/accepted-source-systems/v1"
+)
+PARALLEL_CODEX_DEFAULT_REMOTE_REVIEW_AUTHORITY_REF = (
+    "review-authority://integrity-guardian/remote-worker-review-v1"
+)
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
     "PYTHONPATH=src python3 -m unittest discover -s tests -t .",
@@ -76,6 +88,11 @@ class ParallelCodexOrchestrationPolicy:
     reference_runbook_ref: str = PARALLEL_CODEX_REFERENCE_RUNBOOK_REF
     required_verifications: tuple[str, ...] = PARALLEL_CODEX_REQUIRED_VERIFICATIONS
     allowed_workspace_prefixes: tuple[str, ...] = PARALLEL_CODEX_ALLOWED_WORKSPACE_PREFIXES
+    accepted_source_systems: tuple[str, ...] = (
+        "direct-worker-result",
+        "yaoyorozu-worker-dispatch",
+        PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM,
+    )
 
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -85,10 +102,7 @@ class ParallelCodexOrchestrationPolicy:
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
             "allowed_workspace_prefixes": list(self.allowed_workspace_prefixes),
-            "accepted_source_systems": [
-                "direct-worker-result",
-                "yaoyorozu-worker-dispatch",
-            ],
+            "accepted_source_systems": list(self.accepted_source_systems),
             "worker_identity_profile": PARALLEL_CODEX_WORKER_IDENTITY_PROFILE,
             "worker_identity_signature_profile": (
                 PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE
@@ -96,9 +110,15 @@ class ParallelCodexOrchestrationPolicy:
             "worker_identity_signature_role": (
                 PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE
             ),
+            "remote_metadata_profile": PARALLEL_CODEX_REMOTE_METADATA_PROFILE,
+            "remote_review_authority_profile": (
+                PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE
+            ),
+            "accepted_source_policy_ref": PARALLEL_CODEX_ACCEPTED_SOURCE_POLICY_REF,
             "raw_patch_payload_stored": False,
             "raw_upstream_payload_stored": False,
             "raw_worker_identity_payload_stored": False,
+            "raw_remote_metadata_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -134,6 +154,13 @@ class ParallelCodexOrchestrationService:
         upstream_receipt_digest: str = "",
         upstream_patch_candidate_receipt_refs: Sequence[str] = (),
         upstream_patch_candidate_receipt_digests: Sequence[str] = (),
+        remote_branch_ref: str = "",
+        remote_pr_ref: str = "",
+        remote_review_authority_ref: str = "",
+        remote_review_authority_digest: str = "",
+        accepted_source_policy_ref: str = "",
+        accepted_source_policy_digest: str = "",
+        remote_metadata_digest: str = "",
     ) -> Dict[str, Any]:
         normalized_source_system = source_system.strip() or "direct-worker-result"
         normalized_scope = _dedupe_strings(ownership_scope)
@@ -187,6 +214,16 @@ class ParallelCodexOrchestrationService:
             normalized_worker_identity_signature_digest
             == expected_worker_identity_signature_digest
         )
+        remote_metadata = self._normalize_remote_metadata(
+            source_system=normalized_source_system,
+            remote_branch_ref=remote_branch_ref,
+            remote_pr_ref=remote_pr_ref,
+            remote_review_authority_ref=remote_review_authority_ref,
+            remote_review_authority_digest=remote_review_authority_digest,
+            accepted_source_policy_ref=accepted_source_policy_ref,
+            accepted_source_policy_digest=accepted_source_policy_digest,
+            remote_metadata_digest=remote_metadata_digest,
+        )
 
         receipt = {
             "kind": "parallel_codex_worker_result_receipt",
@@ -197,6 +234,7 @@ class ParallelCodexOrchestrationService:
             "integration_policy_profile": self._policy.profile_id,
             "reference_runbook_ref": self._policy.reference_runbook_ref,
             "source_system": normalized_source_system,
+            **remote_metadata,
             "worker_identity_profile": PARALLEL_CODEX_WORKER_IDENTITY_PROFILE,
             "worker_identity_ref": normalized_worker_identity_ref,
             "worker_identity_digest": normalized_worker_identity_digest,
@@ -249,6 +287,7 @@ class ParallelCodexOrchestrationService:
             "raw_patch_payload_stored": False,
             "raw_upstream_payload_stored": False,
             "raw_worker_identity_payload_stored": False,
+            "raw_remote_metadata_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
             "receipt_digest": "",
@@ -352,6 +391,29 @@ class ParallelCodexOrchestrationService:
             receipt.get("verification_manifest_digest")
             == self._verification_manifest_digest(verification_results)
         )
+        remote_metadata_digest_bound = (
+            receipt.get("remote_metadata_digest")
+            == self._remote_metadata_digest(
+                source_system=str(receipt.get("source_system", "")),
+                remote_metadata_profile=str(
+                    receipt.get("remote_metadata_profile", ""),
+                ),
+                remote_branch_ref=str(receipt.get("remote_branch_ref", "")),
+                remote_pr_ref=str(receipt.get("remote_pr_ref", "")),
+                remote_review_authority_ref=str(
+                    receipt.get("remote_review_authority_ref", ""),
+                ),
+                remote_review_authority_digest=str(
+                    receipt.get("remote_review_authority_digest", ""),
+                ),
+                accepted_source_policy_ref=str(
+                    receipt.get("accepted_source_policy_ref", ""),
+                ),
+                accepted_source_policy_digest=str(
+                    receipt.get("accepted_source_policy_digest", ""),
+                ),
+            )
+        )
         receipt_digest_bound = receipt.get("receipt_digest") == self._receipt_digest(
             receipt,
         )
@@ -361,6 +423,9 @@ class ParallelCodexOrchestrationService:
         )
         raw_worker_identity_payload_redacted = (
             receipt.get("raw_worker_identity_payload_stored") is False
+        )
+        raw_remote_metadata_payload_redacted = (
+            receipt.get("raw_remote_metadata_payload_stored") is False
         )
         raw_transcript_payload_redacted = (
             receipt.get("raw_transcript_payload_stored") is False
@@ -411,6 +476,15 @@ class ParallelCodexOrchestrationService:
             errors.append("worker_identity_signature_digest mismatch")
         if receipt.get("worker_identity_evidence_bound") is not worker_identity_evidence_bound:
             errors.append("worker_identity_evidence_bound mismatch")
+        remote_metadata_bound = (
+            remote_metadata_digest_bound
+            and _is_sha256(receipt.get("remote_metadata_digest"))
+            and receipt.get("remote_metadata_bound") is True
+        )
+        if not remote_metadata_digest_bound:
+            errors.append("remote_metadata_digest mismatch")
+        if receipt.get("remote_metadata_bound") is not remote_metadata_bound:
+            errors.append("remote_metadata_bound mismatch")
         if receipt.get("upstream_binding_digest") != self._upstream_binding_digest(
             source_system=str(receipt.get("source_system", "")),
             upstream_receipt_ref=str(receipt.get("upstream_receipt_ref", "")),
@@ -446,6 +520,7 @@ class ParallelCodexOrchestrationService:
             raw_patch_payload_redacted
             and raw_upstream_payload_redacted
             and raw_worker_identity_payload_redacted
+            and raw_remote_metadata_payload_redacted
             and raw_transcript_payload_redacted
             and raw_verification_payload_redacted
         ):
@@ -466,10 +541,15 @@ class ParallelCodexOrchestrationService:
             ),
             "worker_identity_signature_bound": worker_identity_signature_bound,
             "worker_identity_evidence_bound": worker_identity_evidence_bound,
+            "remote_metadata_digest_bound": remote_metadata_digest_bound,
+            "remote_metadata_bound": remote_metadata_bound,
             "receipt_digest_bound": receipt_digest_bound,
             "raw_patch_payload_redacted": raw_patch_payload_redacted,
             "raw_upstream_payload_redacted": raw_upstream_payload_redacted,
             "raw_worker_identity_payload_redacted": raw_worker_identity_payload_redacted,
+            "raw_remote_metadata_payload_redacted": (
+                raw_remote_metadata_payload_redacted
+            ),
             "raw_transcript_payload_redacted": raw_transcript_payload_redacted,
             "raw_verification_payload_redacted": raw_verification_payload_redacted,
         }
@@ -514,18 +594,78 @@ class ParallelCodexOrchestrationService:
         upstream_patch_candidate_digests = list(
             receipt.get("upstream_patch_candidate_receipt_digests", []),
         )
-        if source_system not in {"direct-worker-result", "yaoyorozu-worker-dispatch"}:
+        if source_system not in set(self._policy.accepted_source_systems):
             reasons.append("source_system must be an accepted worker result source")
-        if source_system == "direct-worker-result":
+        if source_system in {"direct-worker-result", PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM}:
             if receipt.get("upstream_receipt_ref") or upstream_receipt_digest:
-                reasons.append("direct worker results must not carry upstream receipt refs")
+                reasons.append(
+                    f"{source_system} results must not carry upstream receipt refs",
+                )
             if (
                 receipt.get("upstream_patch_candidate_receipt_refs")
                 or upstream_patch_candidate_digests
             ):
                 reasons.append(
-                    "direct worker results must not carry upstream patch candidates"
+                    f"{source_system} results must not carry upstream patch candidates"
                 )
+        if source_system == PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM:
+            if receipt.get("worker_role") != "external":
+                reasons.append("remote branch / PR results must use worker_role=external")
+            if receipt.get("remote_metadata_profile") != PARALLEL_CODEX_REMOTE_METADATA_PROFILE:
+                reasons.append("remote_metadata_profile mismatch")
+            if not receipt.get("remote_branch_ref"):
+                reasons.append("remote branch metadata requires remote_branch_ref")
+            if not receipt.get("remote_pr_ref"):
+                reasons.append("remote PR metadata requires remote_pr_ref")
+            if not receipt.get("remote_review_authority_ref"):
+                reasons.append("remote review authority ref must not be empty")
+            if not _is_sha256(receipt.get("remote_review_authority_digest")):
+                reasons.append("remote_review_authority_digest must be sha256")
+            if not receipt.get("accepted_source_policy_ref"):
+                reasons.append("accepted_source_policy_ref must not be empty")
+            if not _is_sha256(receipt.get("accepted_source_policy_digest")):
+                reasons.append("accepted_source_policy_digest must be sha256")
+        else:
+            if (
+                receipt.get("remote_metadata_profile")
+                != PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+            ):
+                reasons.append("non-remote result must mark remote metadata not-applicable")
+            remote_refs_or_digests = [
+                receipt.get("remote_branch_ref"),
+                receipt.get("remote_pr_ref"),
+                receipt.get("remote_review_authority_ref"),
+                receipt.get("remote_review_authority_digest"),
+                receipt.get("accepted_source_policy_ref"),
+                receipt.get("accepted_source_policy_digest"),
+            ]
+            if any(remote_refs_or_digests):
+                reasons.append("non-remote result must not carry remote metadata refs")
+        if not _is_sha256(receipt.get("remote_metadata_digest")):
+            reasons.append("remote_metadata_digest must be a sha256 hex digest")
+        elif receipt.get("remote_metadata_digest") != self._remote_metadata_digest(
+            source_system=str(receipt.get("source_system", "")),
+            remote_metadata_profile=str(receipt.get("remote_metadata_profile", "")),
+            remote_branch_ref=str(receipt.get("remote_branch_ref", "")),
+            remote_pr_ref=str(receipt.get("remote_pr_ref", "")),
+            remote_review_authority_ref=str(
+                receipt.get("remote_review_authority_ref", ""),
+            ),
+            remote_review_authority_digest=str(
+                receipt.get("remote_review_authority_digest", ""),
+            ),
+            accepted_source_policy_ref=str(
+                receipt.get("accepted_source_policy_ref", ""),
+            ),
+            accepted_source_policy_digest=str(
+                receipt.get("accepted_source_policy_digest", ""),
+            ),
+        ):
+            reasons.append("remote_metadata_digest mismatch")
+        if receipt.get("remote_metadata_bound") is not True:
+            reasons.append("remote_metadata_bound must be true")
+        if receipt.get("raw_remote_metadata_payload_stored") is not False:
+            reasons.append("raw_remote_metadata_payload_stored must be false")
         if source_system == "yaoyorozu-worker-dispatch":
             if not receipt.get("upstream_receipt_ref"):
                 reasons.append("yaoyorozu bridge requires upstream_receipt_ref")
@@ -656,6 +796,154 @@ class ParallelCodexOrchestrationService:
                 }
             )
         )
+
+    @staticmethod
+    def _accepted_source_policy_digest() -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "policy_ref": PARALLEL_CODEX_ACCEPTED_SOURCE_POLICY_REF,
+                    "accepted_source_systems": [
+                        "direct-worker-result",
+                        "yaoyorozu-worker-dispatch",
+                        PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM,
+                    ],
+                    "remote_metadata_profile": PARALLEL_CODEX_REMOTE_METADATA_PROFILE,
+                    "remote_review_authority_profile": (
+                        PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE
+                    ),
+                }
+            )
+        )
+
+    @staticmethod
+    def _remote_review_authority_digest(remote_review_authority_ref: str) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE,
+                    "authority_ref": remote_review_authority_ref,
+                    "required_signature_role": (
+                        PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE
+                    ),
+                    "accepted_source_policy_ref": (
+                        PARALLEL_CODEX_ACCEPTED_SOURCE_POLICY_REF
+                    ),
+                }
+            )
+        )
+
+    @staticmethod
+    def _remote_metadata_digest(
+        *,
+        source_system: str,
+        remote_metadata_profile: str,
+        remote_branch_ref: str,
+        remote_pr_ref: str,
+        remote_review_authority_ref: str,
+        remote_review_authority_digest: str,
+        accepted_source_policy_ref: str,
+        accepted_source_policy_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "source_system": source_system,
+                    "remote_metadata_profile": remote_metadata_profile,
+                    "remote_branch_ref": remote_branch_ref,
+                    "remote_pr_ref": remote_pr_ref,
+                    "remote_review_authority_ref": remote_review_authority_ref,
+                    "remote_review_authority_digest": remote_review_authority_digest,
+                    "accepted_source_policy_ref": accepted_source_policy_ref,
+                    "accepted_source_policy_digest": accepted_source_policy_digest,
+                }
+            )
+        )
+
+    def _normalize_remote_metadata(
+        self,
+        *,
+        source_system: str,
+        remote_branch_ref: str,
+        remote_pr_ref: str,
+        remote_review_authority_ref: str,
+        remote_review_authority_digest: str,
+        accepted_source_policy_ref: str,
+        accepted_source_policy_digest: str,
+        remote_metadata_digest: str,
+    ) -> Dict[str, Any]:
+        if source_system != PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM:
+            normalized_profile = PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+            normalized_metadata = {
+                "remote_metadata_profile": normalized_profile,
+                "remote_branch_ref": "",
+                "remote_pr_ref": "",
+                "remote_review_authority_profile": (
+                    PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                ),
+                "remote_review_authority_ref": "",
+                "remote_review_authority_digest": "",
+                "accepted_source_policy_ref": "",
+                "accepted_source_policy_digest": "",
+            }
+            normalized_metadata["remote_metadata_digest"] = self._remote_metadata_digest(
+                source_system=source_system,
+                remote_metadata_profile=normalized_profile,
+                remote_branch_ref="",
+                remote_pr_ref="",
+                remote_review_authority_ref="",
+                remote_review_authority_digest="",
+                accepted_source_policy_ref="",
+                accepted_source_policy_digest="",
+            )
+            normalized_metadata["remote_metadata_bound"] = True
+            return normalized_metadata
+
+        normalized_review_authority_ref = (
+            remote_review_authority_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_REMOTE_REVIEW_AUTHORITY_REF
+        )
+        normalized_review_authority_digest = remote_review_authority_digest.strip()
+        if not _is_sha256(normalized_review_authority_digest):
+            normalized_review_authority_digest = self._remote_review_authority_digest(
+                normalized_review_authority_ref,
+            )
+        normalized_policy_ref = (
+            accepted_source_policy_ref.strip()
+            or PARALLEL_CODEX_ACCEPTED_SOURCE_POLICY_REF
+        )
+        normalized_policy_digest = accepted_source_policy_digest.strip()
+        if not _is_sha256(normalized_policy_digest):
+            normalized_policy_digest = self._accepted_source_policy_digest()
+        expected_metadata_digest = self._remote_metadata_digest(
+            source_system=source_system,
+            remote_metadata_profile=PARALLEL_CODEX_REMOTE_METADATA_PROFILE,
+            remote_branch_ref=remote_branch_ref.strip(),
+            remote_pr_ref=remote_pr_ref.strip(),
+            remote_review_authority_ref=normalized_review_authority_ref,
+            remote_review_authority_digest=normalized_review_authority_digest,
+            accepted_source_policy_ref=normalized_policy_ref,
+            accepted_source_policy_digest=normalized_policy_digest,
+        )
+        normalized_metadata_digest = remote_metadata_digest.strip()
+        if not _is_sha256(normalized_metadata_digest):
+            normalized_metadata_digest = expected_metadata_digest
+        return {
+            "remote_metadata_profile": PARALLEL_CODEX_REMOTE_METADATA_PROFILE,
+            "remote_branch_ref": remote_branch_ref.strip(),
+            "remote_pr_ref": remote_pr_ref.strip(),
+            "remote_review_authority_profile": (
+                PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE
+            ),
+            "remote_review_authority_ref": normalized_review_authority_ref,
+            "remote_review_authority_digest": normalized_review_authority_digest,
+            "accepted_source_policy_ref": normalized_policy_ref,
+            "accepted_source_policy_digest": normalized_policy_digest,
+            "remote_metadata_digest": normalized_metadata_digest,
+            "remote_metadata_bound": (
+                normalized_metadata_digest == expected_metadata_digest
+            ),
+        }
 
     @staticmethod
     def _upstream_binding_digest(

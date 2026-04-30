@@ -961,6 +961,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ready_receipt_digest_bound"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
         self.assertTrue(result["validation"]["ready_raw_payload_redacted"])
+        self.assertTrue(result["validation"]["remote_ready_for_main_checkout"])
+        self.assertTrue(result["validation"]["remote_branch_pr_metadata_bound"])
+        self.assertTrue(result["validation"]["remote_review_authority_digest_bound"])
+        self.assertTrue(
+            result["validation"]["remote_accepted_source_policy_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["remote_worker_identity_evidence_bound"])
+        self.assertTrue(result["validation"]["remote_raw_metadata_payload_redacted"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(result["validation"]["blocked_base_head_mismatch"])
         self.assertTrue(result["validation"]["blocked_receipt_digest_bound"])
@@ -973,6 +981,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["ledger_bound"])
         self.assertEqual("accept-ready", result["ready_receipt"]["integration_decision"])
+        self.assertEqual("accept-ready", result["remote_receipt"]["integration_decision"])
+        self.assertEqual(
+            "remote-branch-pr-worker-result",
+            result["remote_receipt"]["source_system"],
+        )
         self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
         self.assertEqual(
             "yaoyorozu-worker-dispatch",

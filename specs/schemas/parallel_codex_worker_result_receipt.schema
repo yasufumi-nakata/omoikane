@@ -4,7 +4,8 @@ title: ParallelCodexWorkerResultReceipt
 description: >
   Digest-only receipt for accepting or blocking one parallel Codex worker result
   before it is integrated into the main checkout, including signed worker
-  identity evidence without storing raw worker identity payloads.
+  identity evidence and remote branch / PR source metadata without storing raw
+  worker identity or remote metadata payloads.
 type: object
 additionalProperties: false
 required:
@@ -16,6 +17,16 @@ required:
   - integration_policy_profile
   - reference_runbook_ref
   - source_system
+  - remote_metadata_profile
+  - remote_branch_ref
+  - remote_pr_ref
+  - remote_review_authority_profile
+  - remote_review_authority_ref
+  - remote_review_authority_digest
+  - accepted_source_policy_ref
+  - accepted_source_policy_digest
+  - remote_metadata_digest
+  - remote_metadata_bound
   - worker_identity_profile
   - worker_identity_ref
   - worker_identity_digest
@@ -49,6 +60,7 @@ required:
   - raw_patch_payload_stored
   - raw_upstream_payload_stored
   - raw_worker_identity_payload_stored
+  - raw_remote_metadata_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -76,6 +88,36 @@ properties:
     enum:
       - direct-worker-result
       - yaoyorozu-worker-dispatch
+      - remote-branch-pr-worker-result
+  remote_metadata_profile:
+    type: string
+    enum:
+      - remote-branch-pr-metadata-binding-v1
+      - not-applicable
+  remote_branch_ref:
+    type: string
+  remote_pr_ref:
+    type: string
+  remote_review_authority_profile:
+    type: string
+    enum:
+      - integrity-guardian-remote-review-authority-v1
+      - not-applicable
+  remote_review_authority_ref:
+    type: string
+  remote_review_authority_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  accepted_source_policy_ref:
+    type: string
+  accepted_source_policy_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_metadata_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  remote_metadata_bound:
+    type: boolean
   worker_identity_profile:
     const: signed-worker-identity-evidence-v1
   worker_identity_ref:
@@ -192,6 +234,8 @@ properties:
   raw_upstream_payload_stored:
     const: false
   raw_worker_identity_payload_stored:
+    const: false
+  raw_remote_metadata_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false

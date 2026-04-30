@@ -136,8 +136,9 @@ high-priority task として検出できるか。
 
 ### Parallel Codex Result Ingestion
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、
-verification manifest、worker base commit freshness を main checkout integration 前の
-schema-bound receipt として固定し、stale worker result を fail-closed にできるか。
+verification manifest、worker base commit freshness、signed worker identity、
+remote branch / PR metadata を main checkout integration 前の schema-bound receipt
+として固定し、stale worker result を fail-closed にできるか。
 
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。

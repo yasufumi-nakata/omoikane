@@ -973,6 +973,7 @@ class OmoikaneReferenceOS:
             "docs/07-reference-implementation/README.md",
             "agents/guardians/integrity-guardian.yaml",
             "meta/decision-log/2026-05-01_parallel-codex-worker-identity-evidence.md",
+            "meta/decision-log/2026-05-01_parallel-codex-remote-source-metadata.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -989,6 +990,39 @@ class OmoikaneReferenceOS:
                 "changed files, and verification receipts before main checkout "
                 "integration."
             ),
+        )
+        remote_receipt = self.parallel_orchestration.ingest_worker_result(
+            worker_id="codex-remote-pr-worker",
+            worker_role="external",
+            worker_result_status="completed",
+            main_checkout_head=main_checkout_head,
+            worker_base_commit=main_checkout_head,
+            ownership_scope=[
+                "src/omoikane/self_construction/",
+                "tests/unit/",
+                "tests/integration/",
+                "specs/interfaces/",
+                "specs/schemas/",
+                "evals/continuity/",
+                "docs/",
+                "agents/",
+                "meta/decision-log/",
+                "references/",
+            ],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+                "specs/schemas/parallel_codex_worker_result_receipt.schema",
+                "tests/unit/test_parallel_orchestration.py",
+            ],
+            verification_results=verification_results,
+            result_summary=(
+                "Remote branch / PR worker result carries branch ref, PR ref, "
+                "accepted source policy digest, and review authority digest before "
+                "main checkout integration."
+            ),
+            source_system="remote-branch-pr-worker-result",
+            remote_branch_ref="refs/remotes/origin/codex/remote-worker-metadata",
+            remote_pr_ref="pull-request://omoikane/128",
         )
         blocked_receipt = self.parallel_orchestration.ingest_worker_result(
             worker_id="codex-worker-stale-readonly",
@@ -1061,6 +1095,9 @@ class OmoikaneReferenceOS:
         blocked_validation = self.parallel_orchestration.validate_worker_result_receipt(
             blocked_receipt,
         )
+        remote_validation = self.parallel_orchestration.validate_worker_result_receipt(
+            remote_receipt,
+        )
         yaoyorozu_bridge_validation = (
             self.parallel_orchestration.validate_worker_result_receipt(
                 yaoyorozu_bridge_receipt,
@@ -1084,6 +1121,15 @@ class OmoikaneReferenceOS:
                 "ready_worker_identity_signature_digest": ready_receipt[
                     "worker_identity_signature_digest"
                 ],
+                "remote_receipt_ref": remote_receipt["receipt_ref"],
+                "remote_receipt_digest": remote_receipt["receipt_digest"],
+                "remote_metadata_digest": remote_receipt["remote_metadata_digest"],
+                "remote_review_authority_digest": remote_receipt[
+                    "remote_review_authority_digest"
+                ],
+                "remote_accepted_source_policy_digest": remote_receipt[
+                    "accepted_source_policy_digest"
+                ],
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
                 "yaoyorozu_bridge_receipt_ref": yaoyorozu_bridge_receipt[
@@ -1101,6 +1147,7 @@ class OmoikaneReferenceOS:
                 "raw_patch_payload_stored": False,
                 "raw_upstream_payload_stored": False,
                 "raw_worker_identity_payload_stored": False,
+                "raw_remote_metadata_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1118,6 +1165,14 @@ class OmoikaneReferenceOS:
                     "parallel_codex_worker_result_receipt.schema"
                 ),
                 "contract_role": "parallel-codex-ready-worker-result-ingestion",
+            },
+            {
+                "payload_path": "remote_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_worker_result_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-remote-branch-pr-result-ingestion",
             },
             {
                 "payload_path": "blocked_receipt",
@@ -1140,6 +1195,7 @@ class OmoikaneReferenceOS:
             "policy": self.parallel_orchestration.policy(),
             "schema_contracts": schema_contracts,
             "ready_receipt": ready_receipt,
+            "remote_receipt": remote_receipt,
             "blocked_receipt": blocked_receipt,
             "yaoyorozu_bridge_receipt": yaoyorozu_bridge_receipt,
             "ledger_entry_ref": f"ledger://continuity-ledger/{ledger_entry.entry_hash}",
@@ -1149,8 +1205,10 @@ class OmoikaneReferenceOS:
                 "ok": (
                     ready_validation["ok"]
                     and blocked_validation["ok"]
+                    and remote_validation["ok"]
                     and yaoyorozu_bridge_validation["ok"]
                     and ready_validation["ready_for_main_checkout"]
+                    and remote_validation["ready_for_main_checkout"]
                     and yaoyorozu_bridge_validation["ready_for_main_checkout"]
                     and not blocked_validation["ready_for_main_checkout"]
                 ),
@@ -1176,9 +1234,33 @@ class OmoikaneReferenceOS:
                 "ready_raw_payload_redacted": (
                     ready_validation["raw_patch_payload_redacted"]
                     and ready_validation["raw_worker_identity_payload_redacted"]
+                    and ready_validation["raw_remote_metadata_payload_redacted"]
                     and ready_validation["raw_transcript_payload_redacted"]
                     and ready_validation["raw_verification_payload_redacted"]
                 ),
+                "remote_receipt_ok": remote_validation["ok"],
+                "remote_ready_for_main_checkout": remote_validation[
+                    "ready_for_main_checkout"
+                ],
+                "remote_branch_pr_metadata_bound": (
+                    remote_validation["remote_metadata_bound"]
+                    and bool(remote_receipt["remote_branch_ref"])
+                    and bool(remote_receipt["remote_pr_ref"])
+                ),
+                "remote_review_authority_digest_bound": (
+                    remote_validation["remote_metadata_digest_bound"]
+                    and bool(remote_receipt["remote_review_authority_digest"])
+                ),
+                "remote_accepted_source_policy_digest_bound": (
+                    remote_validation["remote_metadata_digest_bound"]
+                    and bool(remote_receipt["accepted_source_policy_digest"])
+                ),
+                "remote_worker_identity_evidence_bound": remote_validation[
+                    "worker_identity_evidence_bound"
+                ],
+                "remote_raw_metadata_payload_redacted": remote_validation[
+                    "raw_remote_metadata_payload_redacted"
+                ],
                 "blocked_receipt_ok": blocked_validation["ok"],
                 "blocked_stale_worker_result": not blocked_validation[
                     "ready_for_main_checkout"

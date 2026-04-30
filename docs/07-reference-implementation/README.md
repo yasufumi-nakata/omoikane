@@ -901,7 +901,7 @@ self / council / guardian の 3 者通知を
 
 `parallel-orchestration-demo` は L5 parallel Codex orchestration の reference contract
 (`selfctor.parallel_orchestration.v0`) を JSON で可視化し、
-subagent / worker / `codex exec` の成果を main checkout に混ぜる前に
+subagent / worker / `codex exec` / remote branch / PR の成果を main checkout に混ぜる前に
 `parallel_codex_worker_result_receipt` へ縮約する。
 ready receipt は worker base commit と main checkout head の一致、ownership scope 内の
 changed file manifest digest、patch digest、signed worker identity evidence、
@@ -909,6 +909,9 @@ unittest / gap-report verification digest を束縛し、
 raw patch payload、raw transcript、raw verification output は保存しない。
 worker identity は `worker_identity_ref`、`worker_identity_digest`、
 integrity Guardian 署名 digest だけに縮約し、raw worker identity payload は保存しない。
+remote receipt は `remote_branch_ref`、`remote_pr_ref`、
+accepted source policy digest、review authority digest を
+`remote_metadata_digest` へ束縛し、raw remote metadata payload は保存しない。
 blocked receipt は stale worker base commit を schema-bound に残しつつ
 `integration_decision=blocked` として fail-closed にする。
 同じ demo は Yaoyorozu worker dispatch receipt から

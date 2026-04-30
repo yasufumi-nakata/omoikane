@@ -2,8 +2,9 @@ eval_id: parallel_codex_result_ingestion
 target: selfctor.parallel_orchestration
 summary: >
   parallel-orchestration-demo が worker result の patch digest、changed files、
-  verification result、base commit freshness を main checkout integration 前の
-  digest-only receipt として固定し、stale worker result を fail-closed にすること
+  verification result、base commit freshness、signed worker identity、remote
+  branch / PR metadata を main checkout integration 前の digest-only receipt として
+  固定し、stale worker result を fail-closed にすること
 checks:
   - name: parallel Codex worker result ingestion smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -16,6 +17,12 @@ expect:
   ready_required_verifications_passed: true
   ready_worker_identity_evidence_bound: true
   ready_receipt_digest_bound: true
+  remote_ready_for_main_checkout: true
+  remote_branch_pr_metadata_bound: true
+  remote_review_authority_digest_bound: true
+  remote_accepted_source_policy_digest_bound: true
+  remote_worker_identity_evidence_bound: true
+  remote_raw_metadata_payload_redacted: true
   blocked_stale_worker_result: true
   blocked_base_head_mismatch: true
   yaoyorozu_bridge_ready_for_main_checkout: true
@@ -26,6 +33,7 @@ expect:
   raw_patch_payload_stored: false
   raw_upstream_payload_stored: false
   raw_worker_identity_payload_stored: false
+  raw_remote_metadata_payload_stored: false
   raw_transcript_payload_stored: false
   raw_verification_payload_stored: false
 metric: boolean
