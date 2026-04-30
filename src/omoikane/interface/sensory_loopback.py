@@ -65,6 +65,13 @@ SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY = (
 SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY = (
     "participant-gate-digest+drift-threshold-digest-only"
 )
+SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE = (
+    "participant-hardware-timing-latency-drift-gate-v1"
+)
+SENSORY_LOOPBACK_PARTICIPANT_LATENCY_STORAGE_POLICY = (
+    "participant-timing-ref+latency-drift-digest-only"
+)
+SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS = 12.0
 SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES = {
     "self-exclusive",
     "shared-aligned",
@@ -90,6 +97,7 @@ class SensoryLoopbackService:
         self.sessions: Dict[str, Dict[str, Any]] = {}
         self.artifact_families: Dict[str, Dict[str, Any]] = {}
         self.biodata_arbitration_bindings: Dict[str, Dict[str, Any]] = {}
+        self.participant_latency_drift_gates: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -139,10 +147,22 @@ class SensoryLoopbackService:
                 "requires_shared_session": True,
                 "requires_participant_gate_coverage": True,
                 "requires_series_drift_gate_pass": True,
+                "requires_participant_latency_drift_gate": True,
+                "latency_drift_profile": (
+                    SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE
+                ),
+                "latency_storage_policy": (
+                    SENSORY_LOOPBACK_PARTICIPANT_LATENCY_STORAGE_POLICY
+                ),
+                "max_participant_latency_drift_ms": (
+                    SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS
+                ),
                 "raw_biodata_payload_stored": False,
                 "raw_calibration_payload_stored": False,
                 "raw_drift_payload_stored": False,
                 "raw_gate_payload_stored": False,
+                "raw_timing_payload_stored": False,
+                "raw_hardware_adapter_payload_stored": False,
             },
         }
 
@@ -796,20 +816,28 @@ class SensoryLoopbackService:
         session_id: str,
         *,
         participant_gate_receipts: Mapping[str, Mapping[str, Any]],
+        participant_latency_drift_gates: Mapping[str, Mapping[str, Any]],
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         if not session["arbitration_required"]:
             raise ValueError("participant BioData arbitration requires a shared loopback session")
         if not isinstance(participant_gate_receipts, Mapping):
             raise ValueError("participant_gate_receipts must be a mapping")
+        if not isinstance(participant_latency_drift_gates, Mapping):
+            raise ValueError("participant_latency_drift_gates must be a mapping")
 
         participant_ids = list(session["participant_identity_ids"])
         if set(participant_gate_receipts) != set(participant_ids):
             raise ValueError(
                 "participant_gate_receipts must cover exactly participant_identity_ids",
             )
+        if set(participant_latency_drift_gates) != set(participant_ids):
+            raise ValueError(
+                "participant_latency_drift_gates must cover exactly participant_identity_ids",
+            )
 
         participant_bindings: List[Dict[str, Any]] = []
+        participant_latency_bindings: List[Dict[str, Any]] = []
         for participant_identity_id in participant_ids:
             gate_receipt = participant_gate_receipts[participant_identity_id]
             if not isinstance(gate_receipt, Mapping):
@@ -831,6 +859,93 @@ class SensoryLoopbackService:
                 raise ValueError(
                     "participant BioData confidence gate raw_drift_payload_stored must be false",
                 )
+            threshold_policy_authority_bound = (
+                gate_receipt.get(
+                    "feature_window_series_threshold_policy_authority_bound"
+                )
+                is True
+            )
+            threshold_policy_authority_ref = self._normalize_string(
+                gate_receipt.get(
+                    "feature_window_series_threshold_policy_authority_ref",
+                    "",
+                ),
+                "feature_window_series_threshold_policy_authority_ref",
+            )
+            threshold_policy_authority_digest = self._normalize_string(
+                gate_receipt.get(
+                    "feature_window_series_threshold_policy_authority_digest",
+                    "",
+                ),
+                "feature_window_series_threshold_policy_authority_digest",
+            )
+            threshold_policy_source_digest_set = self._normalize_string(
+                gate_receipt.get(
+                    "feature_window_series_threshold_policy_source_digest_set",
+                    "",
+                ),
+                "feature_window_series_threshold_policy_source_digest_set",
+            )
+            threshold_policy_authority_status = self._normalize_string(
+                gate_receipt.get(
+                    "feature_window_series_threshold_policy_authority_status",
+                    "not-bound",
+                ),
+                "feature_window_series_threshold_policy_authority_status",
+            )
+            if threshold_policy_authority_bound:
+                if threshold_policy_authority_status != "complete":
+                    raise ValueError(
+                        "participant BioData confidence gate threshold policy authority must be complete",
+                    )
+                for field_name, field_value in (
+                    (
+                        "feature_window_series_threshold_policy_authority_ref",
+                        threshold_policy_authority_ref,
+                    ),
+                    (
+                        "feature_window_series_threshold_policy_authority_digest",
+                        threshold_policy_authority_digest,
+                    ),
+                    (
+                        "feature_window_series_threshold_policy_source_digest_set",
+                        threshold_policy_source_digest_set,
+                    ),
+                ):
+                    if not field_value:
+                        raise ValueError(
+                            f"participant BioData confidence gate {field_name} must be bound",
+                        )
+            elif threshold_policy_authority_status != "not-bound":
+                raise ValueError(
+                    "unbound participant BioData threshold policy authority must use not-bound status",
+                )
+
+            latency_gate = participant_latency_drift_gates[participant_identity_id]
+            latency_validation = self.validate_participant_latency_drift_gate(
+                latency_gate,
+            )
+            if not latency_validation["ok"]:
+                raise ValueError(
+                    "participant latency drift gate is invalid: "
+                    + "; ".join(latency_validation["errors"]),
+                )
+            if latency_gate.get("participant_identity_id") != participant_identity_id:
+                raise ValueError(
+                    "participant latency drift gate identity must match the participant",
+                )
+            if latency_gate.get("latency_drift_status") != "pass":
+                raise ValueError("participant latency drift gate must pass")
+            if threshold_policy_authority_bound:
+                if (
+                    latency_gate.get("threshold_policy_authority_digest")
+                    != threshold_policy_authority_digest
+                    or latency_gate.get("threshold_policy_authority_ref")
+                    != threshold_policy_authority_ref
+                ):
+                    raise ValueError(
+                        "participant latency drift gate must bind the same threshold policy authority as the BioData gate",
+                    )
 
             participant_bindings.append(
                 {
@@ -852,6 +967,21 @@ class SensoryLoopbackService:
                         gate_receipt.get("feature_window_series_drift_threshold_digest"),
                         "feature_window_series_drift_threshold_digest",
                     ),
+                    "feature_window_series_threshold_policy_authority_ref": (
+                        threshold_policy_authority_ref
+                    ),
+                    "feature_window_series_threshold_policy_authority_digest": (
+                        threshold_policy_authority_digest
+                    ),
+                    "feature_window_series_threshold_policy_source_digest_set": (
+                        threshold_policy_source_digest_set
+                    ),
+                    "feature_window_series_threshold_policy_authority_status": (
+                        threshold_policy_authority_status
+                    ),
+                    "feature_window_series_threshold_policy_authority_bound": (
+                        threshold_policy_authority_bound
+                    ),
                     "feature_window_series_drift_gate_status": "pass",
                     "target_gate_set_digest": self._normalize_non_empty_string(
                         gate_receipt.get("target_gate_set_digest"),
@@ -863,6 +993,80 @@ class SensoryLoopbackService:
                     "raw_gate_payload_stored": False,
                     "subjective_equivalence_claimed": False,
                     "semantic_thought_content_generated": False,
+                }
+            )
+            participant_latency_bindings.append(
+                {
+                    "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
+                    "profile_id": SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE,
+                    "participant_identity_id": participant_identity_id,
+                    "timing_gate_ref": self._normalize_non_empty_string(
+                        latency_gate.get("timing_gate_ref"),
+                        "timing_gate_ref",
+                    ),
+                    "created_at": self._normalize_non_empty_string(
+                        latency_gate.get("created_at"),
+                        "created_at",
+                    ),
+                    "timing_gate_digest": self._normalize_non_empty_string(
+                        latency_gate.get("timing_gate_digest"),
+                        "timing_gate_digest",
+                    ),
+                    "hardware_adapter_ref": self._normalize_non_empty_string(
+                        latency_gate.get("hardware_adapter_ref"),
+                        "hardware_adapter_ref",
+                    ),
+                    "timing_evidence_ref": self._normalize_non_empty_string(
+                        latency_gate.get("timing_evidence_ref"),
+                        "timing_evidence_ref",
+                    ),
+                    "baseline_latency_ms": self._normalize_non_negative_number(
+                        latency_gate.get("baseline_latency_ms"),
+                        "baseline_latency_ms",
+                    ),
+                    "observed_latency_ms": self._normalize_non_negative_number(
+                        latency_gate.get("observed_latency_ms"),
+                        "observed_latency_ms",
+                    ),
+                    "absolute_latency_drift_ms": self._normalize_non_negative_number(
+                        latency_gate.get("absolute_latency_drift_ms"),
+                        "absolute_latency_drift_ms",
+                    ),
+                    "max_latency_drift_ms": self._normalize_non_negative_number(
+                        latency_gate.get("max_latency_drift_ms"),
+                        "max_latency_drift_ms",
+                    ),
+                    "latency_threshold_digest": self._normalize_non_empty_string(
+                        latency_gate.get("latency_threshold_digest"),
+                        "latency_threshold_digest",
+                    ),
+                    "threshold_policy_authority_ref": self._normalize_string(
+                        latency_gate.get("threshold_policy_authority_ref", ""),
+                        "threshold_policy_authority_ref",
+                    ),
+                    "threshold_policy_authority_digest": self._normalize_string(
+                        latency_gate.get("threshold_policy_authority_digest", ""),
+                        "threshold_policy_authority_digest",
+                    ),
+                    "threshold_policy_source_digest_set": self._normalize_string(
+                        latency_gate.get("threshold_policy_source_digest_set", ""),
+                        "threshold_policy_source_digest_set",
+                    ),
+                    "threshold_policy_authority_status": self._normalize_string(
+                        latency_gate.get(
+                            "threshold_policy_authority_status",
+                            "not-bound",
+                        ),
+                        "threshold_policy_authority_status",
+                    ),
+                    "threshold_policy_authority_bound": bool(
+                        latency_gate.get("threshold_policy_authority_bound")
+                    ),
+                    "latency_drift_status": "pass",
+                    "raw_timing_payload_stored": False,
+                    "raw_hardware_adapter_payload_stored": False,
+                    "raw_threshold_policy_payload_stored": False,
+                    "raw_authority_payload_stored": False,
                 }
             )
 
@@ -883,14 +1087,25 @@ class SensoryLoopbackService:
             "participant_gate_digest_set": self._participant_biodata_gate_digest_set(
                 participant_bindings,
             ),
+            "participant_latency_bindings": participant_latency_bindings,
+            "participant_latency_gate_count": len(participant_latency_bindings),
+            "participant_latency_digest_set": (
+                self._participant_latency_drift_digest_set(participant_latency_bindings)
+            ),
             "all_participant_gates_bound": True,
             "all_drift_gates_passed": True,
+            "all_latency_gates_passed": True,
             "arbitration_gate_status": "pass",
+            "latency_gate_status": "pass",
             "storage_policy": SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY,
+            "timing_storage_policy": SENSORY_LOOPBACK_PARTICIPANT_LATENCY_STORAGE_POLICY,
             "raw_biodata_payload_stored": False,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
             "raw_gate_payload_stored": False,
+            "raw_timing_payload_stored": False,
+            "raw_hardware_adapter_payload_stored": False,
+            "raw_latency_threshold_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -899,6 +1114,109 @@ class SensoryLoopbackService:
         )
         self.biodata_arbitration_bindings[binding_id] = binding
         return deepcopy(binding)
+
+    def bind_participant_latency_drift_gate(
+        self,
+        *,
+        participant_identity_id: str,
+        hardware_adapter_ref: str,
+        timing_evidence_ref: str,
+        baseline_latency_ms: float,
+        observed_latency_ms: float,
+        threshold_policy_authority_ref: str = "",
+        threshold_policy_authority_digest: str = "",
+        threshold_policy_source_digest_set: str = "",
+    ) -> Dict[str, Any]:
+        participant_id = self._normalize_non_empty_string(
+            participant_identity_id,
+            "participant_identity_id",
+        )
+        adapter_ref = self._normalize_non_empty_string(
+            hardware_adapter_ref,
+            "hardware_adapter_ref",
+        )
+        evidence_ref = self._normalize_non_empty_string(
+            timing_evidence_ref,
+            "timing_evidence_ref",
+        )
+        baseline_latency = self._normalize_non_negative_number(
+            baseline_latency_ms,
+            "baseline_latency_ms",
+        )
+        observed_latency = self._normalize_non_negative_number(
+            observed_latency_ms,
+            "observed_latency_ms",
+        )
+        absolute_drift = round(abs(observed_latency - baseline_latency), 3)
+        authority_ref = self._normalize_string(
+            threshold_policy_authority_ref,
+            "threshold_policy_authority_ref",
+        )
+        authority_digest = self._normalize_string(
+            threshold_policy_authority_digest,
+            "threshold_policy_authority_digest",
+        )
+        authority_source_digest_set = self._normalize_string(
+            threshold_policy_source_digest_set,
+            "threshold_policy_source_digest_set",
+        )
+        authority_bound = bool(authority_ref or authority_digest or authority_source_digest_set)
+        if authority_bound and not (
+            authority_ref and authority_digest and authority_source_digest_set
+        ):
+            raise ValueError(
+                "threshold policy authority binding requires ref, digest, and source digest set",
+            )
+        latency_threshold_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE,
+                    "max_latency_drift_ms": (
+                        SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS
+                    ),
+                    "threshold_policy_authority_ref": authority_ref,
+                    "threshold_policy_authority_digest": authority_digest,
+                    "threshold_policy_source_digest_set": authority_source_digest_set,
+                }
+            )
+        )
+        gate = {
+            "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
+            "profile_id": SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE,
+            "timing_gate_ref": (
+                f"loopback-latency-drift-gate://{new_id('sl-latency-gate')}"
+            ),
+            "created_at": utc_now_iso(),
+            "participant_identity_id": participant_id,
+            "hardware_adapter_ref": adapter_ref,
+            "timing_evidence_ref": evidence_ref,
+            "baseline_latency_ms": baseline_latency,
+            "observed_latency_ms": observed_latency,
+            "absolute_latency_drift_ms": absolute_drift,
+            "max_latency_drift_ms": SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS,
+            "latency_threshold_digest": latency_threshold_digest,
+            "threshold_policy_authority_ref": authority_ref,
+            "threshold_policy_authority_digest": authority_digest,
+            "threshold_policy_source_digest_set": authority_source_digest_set,
+            "threshold_policy_authority_status": (
+                "complete" if authority_bound else "not-bound"
+            ),
+            "threshold_policy_authority_bound": authority_bound,
+            "latency_drift_status": (
+                "pass"
+                if absolute_drift <= SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS
+                else "blocked"
+            ),
+            "raw_timing_payload_stored": False,
+            "raw_hardware_adapter_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_authority_payload_stored": False,
+        }
+        gate["timing_gate_digest"] = sha256_text(
+            canonical_json(self._participant_latency_drift_digest_payload(gate))
+        )
+        self.participant_latency_drift_gates[gate["timing_gate_ref"]] = gate
+        return deepcopy(gate)
 
     def snapshot(self, session_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_session(session_id))
@@ -1643,6 +1961,138 @@ class SensoryLoopbackService:
             and isinstance(guardian_arbitration_count, int),
         }
 
+    def validate_participant_latency_drift_gate(
+        self,
+        gate: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(gate, Mapping):
+            raise ValueError("gate must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "timing_gate_ref",
+            "created_at",
+            "participant_identity_id",
+            "hardware_adapter_ref",
+            "timing_evidence_ref",
+            "latency_threshold_digest",
+            "timing_gate_digest",
+        ):
+            self._check_non_empty_string(gate.get(field_name), field_name, errors)
+        if gate.get("schema_version") != SENSORY_LOOPBACK_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {SENSORY_LOOPBACK_SCHEMA_VERSION}")
+        if gate.get("profile_id") != SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE:
+            errors.append(
+                "profile_id must be "
+                f"{SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE}",
+            )
+        baseline_latency = self._normalize_non_negative_number(
+            gate.get("baseline_latency_ms"),
+            "baseline_latency_ms",
+        )
+        observed_latency = self._normalize_non_negative_number(
+            gate.get("observed_latency_ms"),
+            "observed_latency_ms",
+        )
+        absolute_latency_drift = self._normalize_non_negative_number(
+            gate.get("absolute_latency_drift_ms"),
+            "absolute_latency_drift_ms",
+        )
+        expected_absolute_drift = round(abs(observed_latency - baseline_latency), 3)
+        absolute_drift_bound = absolute_latency_drift == expected_absolute_drift
+        if not absolute_drift_bound:
+            errors.append("absolute_latency_drift_ms must match observed-baseline drift")
+        if gate.get("max_latency_drift_ms") != SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS:
+            errors.append(
+                "max_latency_drift_ms must be "
+                f"{SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS}",
+            )
+        authority_ref = gate.get("threshold_policy_authority_ref")
+        authority_digest = gate.get("threshold_policy_authority_digest")
+        authority_source_digest_set = gate.get("threshold_policy_source_digest_set")
+        authority_status = gate.get("threshold_policy_authority_status")
+        authority_bound = gate.get("threshold_policy_authority_bound")
+        if not isinstance(authority_ref, str):
+            errors.append("threshold_policy_authority_ref must be a string")
+            authority_ref = ""
+        if not isinstance(authority_digest, str):
+            errors.append("threshold_policy_authority_digest must be a string")
+            authority_digest = ""
+        if not isinstance(authority_source_digest_set, str):
+            errors.append("threshold_policy_source_digest_set must be a string")
+            authority_source_digest_set = ""
+        if not isinstance(authority_bound, bool):
+            errors.append("threshold_policy_authority_bound must be a boolean")
+            authority_bound = False
+        if authority_bound:
+            if authority_status != "complete":
+                errors.append("threshold_policy_authority_status must be complete")
+            for field_name, field_value in (
+                ("threshold_policy_authority_ref", authority_ref),
+                ("threshold_policy_authority_digest", authority_digest),
+                ("threshold_policy_source_digest_set", authority_source_digest_set),
+            ):
+                if not field_value:
+                    errors.append(f"{field_name} must be bound")
+        else:
+            if authority_status != "not-bound":
+                errors.append("threshold_policy_authority_status must be not-bound")
+            if authority_ref or authority_digest or authority_source_digest_set:
+                errors.append("unbound threshold policy authority refs must be empty")
+        expected_threshold_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE,
+                    "max_latency_drift_ms": (
+                        SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS
+                    ),
+                    "threshold_policy_authority_ref": authority_ref,
+                    "threshold_policy_authority_digest": authority_digest,
+                    "threshold_policy_source_digest_set": authority_source_digest_set,
+                }
+            )
+        )
+        latency_threshold_digest_bound = (
+            gate.get("latency_threshold_digest") == expected_threshold_digest
+        )
+        if not latency_threshold_digest_bound:
+            errors.append("latency_threshold_digest mismatch")
+        expected_status = (
+            "pass"
+            if absolute_latency_drift <= SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS
+            else "blocked"
+        )
+        if gate.get("latency_drift_status") != expected_status:
+            errors.append("latency_drift_status must match latency threshold result")
+        for field_name in (
+            "raw_timing_payload_stored",
+            "raw_hardware_adapter_payload_stored",
+            "raw_threshold_policy_payload_stored",
+            "raw_authority_payload_stored",
+        ):
+            if gate.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+        expected_digest = sha256_text(
+            canonical_json(self._participant_latency_drift_digest_payload(gate))
+        )
+        timing_gate_digest_bound = gate.get("timing_gate_digest") == expected_digest
+        if not timing_gate_digest_bound:
+            errors.append("timing_gate_digest mismatch")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "latency_drift_status": gate.get("latency_drift_status"),
+            "absolute_latency_drift_bound": absolute_drift_bound,
+            "latency_threshold_digest_bound": latency_threshold_digest_bound,
+            "threshold_policy_authority_bound": bool(authority_bound),
+            "timing_gate_digest_bound": timing_gate_digest_bound,
+            "raw_timing_payload_stored": False,
+            "raw_hardware_adapter_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_authority_payload_stored": False,
+        }
+
     def validate_participant_biodata_arbitration(
         self,
         binding: Mapping[str, Any],
@@ -1670,6 +2120,11 @@ class SensoryLoopbackService:
             errors.append(
                 "storage_policy must be "
                 f"{SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY}",
+            )
+        if binding.get("timing_storage_policy") != SENSORY_LOOPBACK_PARTICIPANT_LATENCY_STORAGE_POLICY:
+            errors.append(
+                "timing_storage_policy must be "
+                f"{SENSORY_LOOPBACK_PARTICIPANT_LATENCY_STORAGE_POLICY}",
             )
         participant_identity_ids = binding.get("participant_identity_ids")
         if (
@@ -1762,6 +2217,46 @@ class SensoryLoopbackService:
                 errors.append(
                     f"participant_gate_bindings[{index}].feature_window_series_drift_gate_status must be pass",
                 )
+            authority_bound = participant_binding.get(
+                "feature_window_series_threshold_policy_authority_bound"
+            )
+            authority_status = participant_binding.get(
+                "feature_window_series_threshold_policy_authority_status"
+            )
+            if not isinstance(authority_bound, bool):
+                errors.append(
+                    f"participant_gate_bindings[{index}].feature_window_series_threshold_policy_authority_bound must be a boolean",
+                )
+                authority_bound = False
+            if authority_bound:
+                if authority_status != "complete":
+                    errors.append(
+                        f"participant_gate_bindings[{index}].feature_window_series_threshold_policy_authority_status must be complete",
+                    )
+                for field_name in (
+                    "feature_window_series_threshold_policy_authority_ref",
+                    "feature_window_series_threshold_policy_authority_digest",
+                    "feature_window_series_threshold_policy_source_digest_set",
+                ):
+                    self._check_non_empty_string(
+                        participant_binding.get(field_name),
+                        f"participant_gate_bindings[{index}].{field_name}",
+                        errors,
+                    )
+            else:
+                if authority_status != "not-bound":
+                    errors.append(
+                        f"participant_gate_bindings[{index}].feature_window_series_threshold_policy_authority_status must be not-bound",
+                    )
+                for field_name in (
+                    "feature_window_series_threshold_policy_authority_ref",
+                    "feature_window_series_threshold_policy_authority_digest",
+                    "feature_window_series_threshold_policy_source_digest_set",
+                ):
+                    if participant_binding.get(field_name) not in {"", None}:
+                        errors.append(
+                            f"participant_gate_bindings[{index}].{field_name} must be empty when unbound",
+                        )
             if participant_binding.get("sensory_loopback_gate_bound") is not True:
                 errors.append(
                     f"participant_gate_bindings[{index}].sensory_loopback_gate_bound must be true",
@@ -1787,6 +2282,67 @@ class SensoryLoopbackService:
             )
         if not participant_gate_digest_set_bound:
             errors.append("participant_gate_digest_set mismatch")
+        participant_latency_bindings = binding.get("participant_latency_bindings")
+        if not isinstance(participant_latency_bindings, list):
+            errors.append("participant_latency_bindings must be a list")
+            participant_latency_bindings = []
+        if binding.get("participant_latency_gate_count") != len(participant_latency_bindings):
+            errors.append(
+                "participant_latency_gate_count must match participant_latency_bindings length",
+            )
+        if participant_identity_ids and [
+            item.get("participant_identity_id")
+            for item in participant_latency_bindings
+            if isinstance(item, Mapping)
+        ] != participant_identity_ids:
+            errors.append("participant_latency_bindings must follow participant_identity_ids order")
+
+        latency_validations: List[Dict[str, Any]] = []
+        for index, latency_binding in enumerate(participant_latency_bindings):
+            if not isinstance(latency_binding, Mapping):
+                errors.append(f"participant_latency_bindings[{index}] must be a mapping")
+                continue
+            latency_validation = self.validate_participant_latency_drift_gate(
+                latency_binding,
+            )
+            latency_validations.append(latency_validation)
+            for error in latency_validation["errors"]:
+                errors.append(f"participant_latency_bindings[{index}].{error}")
+            if latency_binding.get("latency_drift_status") != "pass":
+                errors.append(
+                    f"participant_latency_bindings[{index}].latency_drift_status must be pass",
+                )
+            if isinstance(participant_bindings, list) and index < len(participant_bindings):
+                gate_binding = participant_bindings[index]
+                if isinstance(gate_binding, Mapping) and gate_binding.get(
+                    "feature_window_series_threshold_policy_authority_bound"
+                ):
+                    if (
+                        latency_binding.get("threshold_policy_authority_digest")
+                        != gate_binding.get(
+                            "feature_window_series_threshold_policy_authority_digest"
+                        )
+                        or latency_binding.get("threshold_policy_authority_ref")
+                        != gate_binding.get(
+                            "feature_window_series_threshold_policy_authority_ref"
+                        )
+                    ):
+                        errors.append(
+                            f"participant_latency_bindings[{index}] must share the BioData threshold policy authority",
+                        )
+
+        participant_latency_digest_set_bound = False
+        if all(isinstance(item, Mapping) for item in participant_latency_bindings):
+            expected_latency_digest_set = self._participant_latency_drift_digest_set(
+                participant_latency_bindings,
+            )
+            participant_latency_digest_set_bound = (
+                bool(participant_latency_bindings)
+                and binding.get("participant_latency_digest_set")
+                == expected_latency_digest_set
+            )
+        if not participant_latency_digest_set_bound:
+            errors.append("participant_latency_digest_set mismatch")
         expected_binding_digest = sha256_text(
             canonical_json(self._participant_biodata_arbitration_digest_payload(binding))
         )
@@ -1811,24 +2367,41 @@ class SensoryLoopbackService:
                 for item in participant_bindings
             )
         )
+        all_latency_gates_passed = (
+            bool(participant_latency_bindings)
+            and all(
+                isinstance(item, Mapping)
+                and item.get("latency_drift_status") == "pass"
+                for item in participant_latency_bindings
+            )
+        )
         if binding.get("all_participant_gates_bound") != all_participant_gates_bound:
             errors.append("all_participant_gates_bound mismatch")
         if binding.get("all_drift_gates_passed") != all_drift_gates_passed:
             errors.append("all_drift_gates_passed mismatch")
+        if binding.get("all_latency_gates_passed") != all_latency_gates_passed:
+            errors.append("all_latency_gates_passed mismatch")
         expected_status = (
             "pass"
             if all_participant_gates_bound
             and all_drift_gates_passed
             and participant_gate_digest_set_bound
+            and all_latency_gates_passed
+            and participant_latency_digest_set_bound
             else "blocked"
         )
         if binding.get("arbitration_gate_status") != expected_status:
             errors.append("arbitration_gate_status mismatch")
+        if binding.get("latency_gate_status") != expected_status:
+            errors.append("latency_gate_status mismatch")
         for field_name in (
             "raw_biodata_payload_stored",
             "raw_calibration_payload_stored",
             "raw_drift_payload_stored",
             "raw_gate_payload_stored",
+            "raw_timing_payload_stored",
+            "raw_hardware_adapter_payload_stored",
+            "raw_latency_threshold_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
         ):
@@ -1855,14 +2428,21 @@ class SensoryLoopbackService:
             "session_bound": session_bound,
             "participant_gate_count": len(participant_bindings),
             "participant_gate_digest_set_bound": participant_gate_digest_set_bound,
+            "participant_latency_gate_count": len(participant_latency_bindings),
+            "participant_latency_digest_set_bound": participant_latency_digest_set_bound,
             "binding_digest_bound": binding_digest_bound,
             "all_participant_gates_bound": all_participant_gates_bound,
             "all_drift_gates_passed": all_drift_gates_passed,
+            "all_latency_gates_passed": all_latency_gates_passed,
             "arbitration_gate_status": binding.get("arbitration_gate_status"),
+            "latency_gate_status": binding.get("latency_gate_status"),
             "raw_biodata_payload_stored": False,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
             "raw_gate_payload_stored": False,
+            "raw_timing_payload_stored": False,
+            "raw_hardware_adapter_payload_stored": False,
+            "raw_latency_threshold_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -2126,6 +2706,12 @@ class SensoryLoopbackService:
                             "feature_window_series_drift_threshold_digest": binding.get(
                                 "feature_window_series_drift_threshold_digest"
                             ),
+                            "feature_window_series_threshold_policy_authority_digest": binding.get(
+                                "feature_window_series_threshold_policy_authority_digest"
+                            ),
+                            "feature_window_series_threshold_policy_source_digest_set": binding.get(
+                                "feature_window_series_threshold_policy_source_digest_set"
+                            ),
                             "target_gate_set_digest": binding.get(
                                 "target_gate_set_digest"
                             ),
@@ -2135,6 +2721,44 @@ class SensoryLoopbackService:
                 }
             )
         )
+
+    @staticmethod
+    def _participant_latency_drift_digest_set(
+        participant_latency_bindings: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE,
+                    "participant_latency_bindings": [
+                        {
+                            "participant_identity_id": binding.get(
+                                "participant_identity_id"
+                            ),
+                            "timing_gate_digest": binding.get("timing_gate_digest"),
+                            "latency_threshold_digest": binding.get(
+                                "latency_threshold_digest"
+                            ),
+                            "threshold_policy_authority_digest": binding.get(
+                                "threshold_policy_authority_digest"
+                            ),
+                            "threshold_policy_source_digest_set": binding.get(
+                                "threshold_policy_source_digest_set"
+                            ),
+                        }
+                        for binding in participant_latency_bindings
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
+    def _participant_latency_drift_digest_payload(
+        gate: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        payload = dict(gate)
+        payload.pop("timing_gate_digest", None)
+        return payload
 
     @staticmethod
     def _participant_biodata_arbitration_digest_payload(

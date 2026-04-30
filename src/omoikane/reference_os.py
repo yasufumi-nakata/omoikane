@@ -12497,10 +12497,66 @@ json.dump(response, sys.stdout)
                 f"calibration-day://sensory-loopback/{label}/day-2",
             ],
         )
+        threshold_policy_authority = (
+            self.biodata_transmitter.bind_drift_threshold_policy_authority(
+                session,
+                policy_sources=[
+                    {
+                        "authority_role": "clinical-reviewer",
+                        "authority_ref": (
+                            f"clinical-reviewer://sensory-loopback/{label}/thresholds"
+                        ),
+                        "policy_ref": (
+                            f"policy://sensory-loopback/{label}/clinical-drift-threshold"
+                        ),
+                        "signer_key_ref": (
+                            f"signer-key://sensory-loopback/{label}/clinical"
+                        ),
+                        "signature_ref": (
+                            f"signature://sensory-loopback/{label}/clinical-threshold"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "authority_role": "jurisdiction-policy",
+                        "authority_ref": (
+                            f"jurisdiction-policy://sensory-loopback/{label}/thresholds"
+                        ),
+                        "policy_ref": (
+                            f"policy://sensory-loopback/{label}/jurisdiction-drift-threshold"
+                        ),
+                        "signer_key_ref": (
+                            f"signer-key://sensory-loopback/{label}/jurisdiction"
+                        ),
+                        "signature_ref": (
+                            f"signature://sensory-loopback/{label}/jurisdiction-threshold"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                    {
+                        "authority_role": "guardian",
+                        "authority_ref": (
+                            f"guardian://sensory-loopback/{label}/thresholds"
+                        ),
+                        "policy_ref": (
+                            f"policy://sensory-loopback/{label}/guardian-drift-threshold"
+                        ),
+                        "signer_key_ref": (
+                            f"signer-key://sensory-loopback/{label}/guardian"
+                        ),
+                        "signature_ref": (
+                            f"signature://sensory-loopback/{label}/guardian-threshold"
+                        ),
+                        "jurisdiction": "JP-13",
+                    },
+                ],
+            )
+        )
         drift_gate = self.biodata_transmitter.bind_feature_window_series_drift_gate(
             session,
             series_profile,
             calibration_profile,
+            threshold_policy_authority_receipt=threshold_policy_authority,
         )
         confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
             session,
@@ -12527,6 +12583,7 @@ json.dump(response, sys.stdout)
             "circadian_phase_verifier": circadian_phase_verifier,
             "feature_window_series_profile": series_profile,
             "calibration_profile": calibration_profile,
+            "drift_threshold_policy_authority": threshold_policy_authority,
             "feature_window_series_drift_gate": drift_gate,
             "confidence_gate": confidence_gate,
             "confidence_gate_validation": confidence_gate_validation,
@@ -12860,12 +12917,52 @@ json.dump(response, sys.stdout)
             "peer",
             heart_rate_shift=1.2,
         )
+        shared_self_latency_gate = (
+            self.sensory_loopback.bind_participant_latency_drift_gate(
+                participant_identity_id=identity.identity_id,
+                hardware_adapter_ref="hardware-adapter://atrium/shared/self-timing",
+                timing_evidence_ref="timing-evidence://atrium/shared/self-frame-clock",
+                baseline_latency_ms=45.0,
+                observed_latency_ms=51.0,
+                threshold_policy_authority_ref=shared_self_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_ref"],
+                threshold_policy_authority_digest=shared_self_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_digest"],
+                threshold_policy_source_digest_set=shared_self_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_source_digest_set"],
+            )
+        )
+        shared_peer_latency_gate = (
+            self.sensory_loopback.bind_participant_latency_drift_gate(
+                participant_identity_id=peer.identity_id,
+                hardware_adapter_ref="hardware-adapter://atrium/shared/peer-timing",
+                timing_evidence_ref="timing-evidence://atrium/shared/peer-frame-clock",
+                baseline_latency_ms=45.0,
+                observed_latency_ms=53.5,
+                threshold_policy_authority_ref=shared_peer_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_ref"],
+                threshold_policy_authority_digest=shared_peer_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_digest"],
+                threshold_policy_source_digest_set=shared_peer_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_source_digest_set"],
+            )
+        )
         shared_biodata_arbitration_binding = (
             self.sensory_loopback.bind_participant_biodata_arbitration(
                 shared_session["session_id"],
                 participant_gate_receipts={
                     identity.identity_id: shared_self_biodata_gate["confidence_gate"],
                     peer.identity_id: shared_peer_biodata_gate["confidence_gate"],
+                },
+                participant_latency_drift_gates={
+                    identity.identity_id: shared_self_latency_gate,
+                    peer.identity_id: shared_peer_latency_gate,
                 },
             )
         )
@@ -12887,11 +12984,20 @@ json.dump(response, sys.stdout)
                 "all_drift_gates_passed": shared_biodata_arbitration_binding[
                     "all_drift_gates_passed"
                 ],
+                "all_latency_gates_passed": shared_biodata_arbitration_binding[
+                    "all_latency_gates_passed"
+                ],
+                "participant_latency_digest_set": shared_biodata_arbitration_binding[
+                    "participant_latency_digest_set"
+                ],
                 "raw_biodata_payload_stored": shared_biodata_arbitration_binding[
                     "raw_biodata_payload_stored"
                 ],
                 "raw_drift_payload_stored": shared_biodata_arbitration_binding[
                     "raw_drift_payload_stored"
+                ],
+                "raw_timing_payload_stored": shared_biodata_arbitration_binding[
+                    "raw_timing_payload_stored"
                 ],
             },
             actor="SensoryLoopbackService",
@@ -13121,6 +13227,10 @@ json.dump(response, sys.stdout)
                     "self": shared_self_biodata_gate,
                     "peer": shared_peer_biodata_gate,
                 },
+                "participant_latency_drift_gates": {
+                    "self": shared_self_latency_gate,
+                    "peer": shared_peer_latency_gate,
+                },
                 "biodata_arbitration_binding": shared_biodata_arbitration_binding,
                 "receipts": {
                     "aligned": shared_aligned,
@@ -13148,9 +13258,17 @@ json.dump(response, sys.stdout)
                     "biodata_arbitration_drift_gates_passed": (
                         shared_biodata_arbitration_validation["all_drift_gates_passed"]
                     ),
+                    "biodata_arbitration_latency_gates_passed": (
+                        shared_biodata_arbitration_validation[
+                            "all_latency_gates_passed"
+                        ]
+                    ),
                     "biodata_arbitration_digest_bound": (
                         shared_biodata_arbitration_validation[
                             "binding_digest_bound"
+                        ]
+                        and shared_biodata_arbitration_validation[
+                            "participant_latency_digest_set_bound"
                         ]
                     ),
                     "biodata_arbitration_raw_payload_redacted": (
@@ -13168,6 +13286,14 @@ json.dump(response, sys.stdout)
                         is False
                         and shared_biodata_arbitration_validation[
                             "raw_gate_payload_stored"
+                        ]
+                        is False
+                        and shared_biodata_arbitration_validation[
+                            "raw_timing_payload_stored"
+                        ]
+                        is False
+                        and shared_biodata_arbitration_validation[
+                            "raw_hardware_adapter_payload_stored"
                         ]
                         is False
                     ),
@@ -13295,10 +13421,16 @@ json.dump(response, sys.stdout)
                 "shared_loopback_biodata_drift_gates_passed": (
                     shared_biodata_arbitration_validation["all_drift_gates_passed"]
                 ),
+                "shared_loopback_biodata_latency_gates_passed": (
+                    shared_biodata_arbitration_validation["all_latency_gates_passed"]
+                ),
                 "shared_loopback_biodata_binding_digest_bound": (
                     shared_biodata_arbitration_validation["binding_digest_bound"]
                     and shared_biodata_arbitration_validation[
                         "participant_gate_digest_set_bound"
+                    ]
+                    and shared_biodata_arbitration_validation[
+                        "participant_latency_digest_set_bound"
                     ]
                 ),
                 "shared_loopback_biodata_raw_payload_redacted": (
@@ -13316,6 +13448,14 @@ json.dump(response, sys.stdout)
                     is False
                     and shared_biodata_arbitration_validation[
                         "raw_gate_payload_stored"
+                    ]
+                    is False
+                    and shared_biodata_arbitration_validation[
+                        "raw_timing_payload_stored"
+                    ]
+                    is False
+                    and shared_biodata_arbitration_validation[
+                        "raw_hardware_adapter_payload_stored"
                     ]
                     is False
                 ),

@@ -1106,8 +1106,12 @@ sensory loopback 側では、この gate を
 shared sensory loopback では、participant ごとの confidence gate と
 feature-window drift gate digest を
 `participant-biodata-gate-arbitration-v1` binding にまとめ、全 participant の
-gate coverage、drift pass、binding digest、raw BioData / drift / gate payload 非保持を
-Sensory Loopback 側で検証する。
+gate coverage、drift pass、hardware timing latency drift pass、binding digest、
+raw BioData / drift / timing / hardware adapter / gate payload 非保持を
+Sensory Loopback 側で検証する。latency gate は
+`participant-hardware-timing-latency-drift-gate-v1` として baseline / observed latency の
+差を `12.0ms` cap で評価し、BioData drift threshold policy authority が bound の時は
+同じ authority ref / digest / source digest set を保持する。
 
 `imc-demo` は L6 Inter-Mind Channel の reference contract
 (`interface.imc.v0`) を JSON で可視化し、
@@ -1394,7 +1398,9 @@ owner handoff を伴う `shared-aligned` / `guardian-mediated` arbitration を
 別の digest-only artifact family として machine-checkable に残す。
 その前段で participant ごとの BioData confidence gate と feature-window drift gate を
 `sensory_loopback_biodata_arbitration_binding.schema` に従う digest-only binding へ束縛し、
-shared arbitration が calibration / drift / gate payload を保存しないことを検証する。
+participant ごとの hardware timing latency drift gate も同じ binding へ束縛し、
+shared arbitration が calibration / drift / timing / hardware adapter / gate payload を
+保存しないことを検証する。
 さらに `sensory-loopback-public-schema-contract-v1` の `schema_contracts` manifest が
 self-only と shared loopback の session / receipt / artifact family / BioData arbitration binding payload を
 `sensory_loopback_session.schema` /

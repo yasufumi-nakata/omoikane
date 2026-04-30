@@ -22,14 +22,23 @@ required:
   - participant_gate_bindings
   - participant_gate_count
   - participant_gate_digest_set
+  - participant_latency_bindings
+  - participant_latency_gate_count
+  - participant_latency_digest_set
   - all_participant_gates_bound
   - all_drift_gates_passed
+  - all_latency_gates_passed
   - arbitration_gate_status
+  - latency_gate_status
   - storage_policy
+  - timing_storage_policy
   - raw_biodata_payload_stored
   - raw_calibration_payload_stored
   - raw_drift_payload_stored
   - raw_gate_payload_stored
+  - raw_timing_payload_stored
+  - raw_hardware_adapter_payload_stored
+  - raw_latency_threshold_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
   - binding_digest
@@ -84,6 +93,11 @@ properties:
         - feature_window_series_drift_gate_ref
         - feature_window_series_drift_gate_digest
         - feature_window_series_drift_threshold_digest
+        - feature_window_series_threshold_policy_authority_ref
+        - feature_window_series_threshold_policy_authority_digest
+        - feature_window_series_threshold_policy_source_digest_set
+        - feature_window_series_threshold_policy_authority_status
+        - feature_window_series_threshold_policy_authority_bound
         - feature_window_series_drift_gate_status
         - target_gate_set_digest
         - sensory_loopback_gate_bound
@@ -119,6 +133,19 @@ properties:
         feature_window_series_drift_threshold_digest:
           type: string
           minLength: 32
+        feature_window_series_threshold_policy_authority_ref:
+          type: string
+        feature_window_series_threshold_policy_authority_digest:
+          type: string
+        feature_window_series_threshold_policy_source_digest_set:
+          type: string
+        feature_window_series_threshold_policy_authority_status:
+          type: string
+          enum:
+            - complete
+            - not-bound
+        feature_window_series_threshold_policy_authority_bound:
+          type: boolean
         feature_window_series_drift_gate_status:
           const: pass
         target_gate_set_digest:
@@ -143,14 +170,118 @@ properties:
   participant_gate_digest_set:
     type: string
     minLength: 32
+  participant_latency_bindings:
+    type: array
+    minItems: 2
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - profile_id
+        - timing_gate_ref
+        - created_at
+        - participant_identity_id
+        - hardware_adapter_ref
+        - timing_evidence_ref
+        - baseline_latency_ms
+        - observed_latency_ms
+        - absolute_latency_drift_ms
+        - max_latency_drift_ms
+        - latency_threshold_digest
+        - threshold_policy_authority_ref
+        - threshold_policy_authority_digest
+        - threshold_policy_source_digest_set
+        - threshold_policy_authority_status
+        - threshold_policy_authority_bound
+        - latency_drift_status
+        - raw_timing_payload_stored
+        - raw_hardware_adapter_payload_stored
+        - raw_threshold_policy_payload_stored
+        - raw_authority_payload_stored
+        - timing_gate_digest
+      properties:
+        schema_version:
+          const: "1.0"
+        profile_id:
+          const: participant-hardware-timing-latency-drift-gate-v1
+        timing_gate_ref:
+          type: string
+          pattern: "^loopback-latency-drift-gate://sl-latency-gate-[a-f0-9]{12}$"
+        created_at:
+          type: string
+          format: date-time
+        participant_identity_id:
+          type: string
+          minLength: 1
+        hardware_adapter_ref:
+          type: string
+          minLength: 1
+        timing_evidence_ref:
+          type: string
+          minLength: 1
+        baseline_latency_ms:
+          type: number
+          minimum: 0
+        observed_latency_ms:
+          type: number
+          minimum: 0
+        absolute_latency_drift_ms:
+          type: number
+          minimum: 0
+        max_latency_drift_ms:
+          const: 12.0
+        latency_threshold_digest:
+          type: string
+          minLength: 32
+        threshold_policy_authority_ref:
+          type: string
+        threshold_policy_authority_digest:
+          type: string
+        threshold_policy_source_digest_set:
+          type: string
+        threshold_policy_authority_status:
+          type: string
+          enum:
+            - complete
+            - not-bound
+        threshold_policy_authority_bound:
+          type: boolean
+        latency_drift_status:
+          const: pass
+        raw_timing_payload_stored:
+          const: false
+        raw_hardware_adapter_payload_stored:
+          const: false
+        raw_threshold_policy_payload_stored:
+          const: false
+        raw_authority_payload_stored:
+          const: false
+        timing_gate_digest:
+          type: string
+          minLength: 32
+  participant_latency_gate_count:
+    type: integer
+    minimum: 2
+    maximum: 4
+  participant_latency_digest_set:
+    type: string
+    minLength: 32
   all_participant_gates_bound:
     const: true
   all_drift_gates_passed:
     const: true
+  all_latency_gates_passed:
+    const: true
   arbitration_gate_status:
+    const: pass
+  latency_gate_status:
     const: pass
   storage_policy:
     const: participant-gate-digest+drift-threshold-digest-only
+  timing_storage_policy:
+    const: participant-timing-ref+latency-drift-digest-only
   raw_biodata_payload_stored:
     const: false
   raw_calibration_payload_stored:
@@ -158,6 +289,12 @@ properties:
   raw_drift_payload_stored:
     const: false
   raw_gate_payload_stored:
+    const: false
+  raw_timing_payload_stored:
+    const: false
+  raw_hardware_adapter_payload_stored:
+    const: false
+  raw_latency_threshold_payload_stored:
     const: false
   subjective_equivalence_claimed:
     const: false

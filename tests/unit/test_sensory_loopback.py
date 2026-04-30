@@ -23,6 +23,13 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             ),
             "feature_window_series_drift_gate_digest": f"{suffix[:1].upper()}" * 64,
             "feature_window_series_drift_threshold_digest": "c" * 64,
+            "feature_window_series_threshold_policy_authority_ref": (
+                "drift-threshold-authority://unit/shared-authority"
+            ),
+            "feature_window_series_threshold_policy_authority_digest": "e" * 64,
+            "feature_window_series_threshold_policy_source_digest_set": "f" * 64,
+            "feature_window_series_threshold_policy_authority_status": "complete",
+            "feature_window_series_threshold_policy_authority_bound": True,
             "feature_window_series_drift_gate_status": "pass",
             "feature_window_series_drift_gate_bound": True,
             "target_gate_set_digest": "d" * 64,
@@ -46,6 +53,27 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
+
+    @staticmethod
+    def _fake_participant_latency_drift_gate(
+        service: SensoryLoopbackService,
+        identity_id: str,
+        suffix: str,
+        *,
+        observed_latency_ms: float = 52.0,
+    ) -> dict:
+        return service.bind_participant_latency_drift_gate(
+            participant_identity_id=identity_id,
+            hardware_adapter_ref=f"hardware-adapter://unit/{suffix}",
+            timing_evidence_ref=f"timing-evidence://unit/{suffix}",
+            baseline_latency_ms=45.0,
+            observed_latency_ms=observed_latency_ms,
+            threshold_policy_authority_ref=(
+                "drift-threshold-authority://unit/shared-authority"
+            ),
+            threshold_policy_authority_digest="e" * 64,
+            threshold_policy_source_digest_set="f" * 64,
+        )
 
     def test_coherent_bundle_preserves_immersion_and_digest_only_audit(self) -> None:
         service = SensoryLoopbackService()
@@ -518,6 +546,19 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                     "b-peer",
                 ),
             },
+            participant_latency_drift_gates={
+                "identity://loopback-primary": self._fake_participant_latency_drift_gate(
+                    service,
+                    "identity://loopback-primary",
+                    "self",
+                ),
+                "identity://loopback-peer": self._fake_participant_latency_drift_gate(
+                    service,
+                    "identity://loopback-peer",
+                    "peer",
+                    observed_latency_ms=54.0,
+                ),
+            },
         )
         validation = service.validate_participant_biodata_arbitration(binding)
 
@@ -526,10 +567,13 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertEqual(2, validation["participant_gate_count"])
         self.assertTrue(validation["all_participant_gates_bound"])
         self.assertTrue(validation["all_drift_gates_passed"])
+        self.assertTrue(validation["all_latency_gates_passed"])
+        self.assertTrue(validation["participant_latency_digest_set_bound"])
         self.assertTrue(validation["participant_gate_digest_set_bound"])
         self.assertTrue(validation["binding_digest_bound"])
         self.assertFalse(binding["raw_biodata_payload_stored"])
         self.assertFalse(binding["raw_drift_payload_stored"])
+        self.assertFalse(binding["raw_timing_payload_stored"])
 
         tampered = deepcopy(binding)
         tampered["participant_gate_digest_set"] = "0" * 64
@@ -542,6 +586,43 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                     "identity://loopback-primary": self._fake_biodata_confidence_gate(
                         "identity://loopback-primary",
                         "a-self",
+                    ),
+                },
+                participant_latency_drift_gates={
+                    "identity://loopback-primary": self._fake_participant_latency_drift_gate(
+                        service,
+                        "identity://loopback-primary",
+                        "self",
+                    ),
+                },
+            )
+
+        blocked_latency_gate = self._fake_participant_latency_drift_gate(
+            service,
+            "identity://loopback-primary",
+            "self-blocked",
+            observed_latency_ms=82.0,
+        )
+        self.assertEqual("blocked", blocked_latency_gate["latency_drift_status"])
+        with self.assertRaisesRegex(ValueError, "latency drift gate must pass"):
+            service.bind_participant_biodata_arbitration(
+                session["session_id"],
+                participant_gate_receipts={
+                    "identity://loopback-primary": self._fake_biodata_confidence_gate(
+                        "identity://loopback-primary",
+                        "a-self",
+                    ),
+                    "identity://loopback-peer": self._fake_biodata_confidence_gate(
+                        "identity://loopback-peer",
+                        "b-peer",
+                    ),
+                },
+                participant_latency_drift_gates={
+                    "identity://loopback-primary": blocked_latency_gate,
+                    "identity://loopback-peer": self._fake_participant_latency_drift_gate(
+                        service,
+                        "identity://loopback-peer",
+                        "peer",
                     ),
                 },
             )

@@ -597,6 +597,14 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["shared_loopback"]["validation"]["biodata_arbitration_ok"]
         )
+        self.assertTrue(
+            result["shared_loopback"]["validation"][
+                "biodata_arbitration_latency_gates_passed"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["shared_loopback_biodata_latency_gates_passed"]
+        )
 
 
 if __name__ == "__main__":

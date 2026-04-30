@@ -136,8 +136,9 @@ integration test が各 payload を schema に直接通せることを確認す�
 
 ### Sensory Loopback BioData Arbitration
 shared loopback session で participant ごとの BioData confidence gate と
-feature-window drift gate が digest-only binding に束縛され、raw BioData / drift /
-gate payload を保存しないことを確認する。
+feature-window drift gate、hardware timing latency drift gate が digest-only binding に
+束縛され、threshold authority digest を共有しつつ raw BioData / drift / timing /
+hardware adapter / gate payload を保存しないことを確認する。
 
 ## 実装済み eval
 
