@@ -39,7 +39,8 @@ fail-closed `build_request` emit、runtime/tests/evals/docs/meta にまたがる
 parsed baseline/sandbox observation と comparison digest に加え temp workspace command evidence も持つ A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。
 `parallel-orchestration-demo` は subagent / worker / `codex exec` の成果を main checkout に取り込む前に
-patch digest、changed file manifest digest、verification manifest digest、worker base commit を
+patch digest、changed file manifest digest、verification manifest digest、worker base commit、
+signed worker identity evidence を
 `parallel_codex_worker_result_receipt` へ縮約し、stale result を blocked のまま保持する。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、

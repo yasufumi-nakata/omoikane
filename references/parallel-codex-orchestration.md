@@ -26,7 +26,9 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - worker result は patch / changed file list / verification result の形で受け取る
 - worker result は main checkout へ混ぜる前に `parallel_codex_worker_result_receipt.schema`
   で patch digest、changed file manifest digest、verification manifest digest、
-  worker base commit を束縛する
+  worker base commit、signed worker identity evidence を束縛する
+- worker identity は ref / digest / integrity Guardian signature digest に縮約し、
+  raw worker identity payload は保存しない
 - user または他 worker の未確認変更を revert しない
 
 ## Integration
@@ -36,6 +38,8 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - raw payload や長い transcript は保存せず、ref / digest / bounded receipt に縮約する
 - `parallel-orchestration-demo --json` は ready worker result と stale worker result の
   両方を receipt 化し、stale / failed / blocked result を fail-closed にする
+- Yaoyorozu dispatch 由来の worker result も upstream receipt / patch candidate digest と
+  worker identity evidence の両方を持つ ingestion receipt へ変換する
 - conflict が残る場合は merge せず、blocked state と再開条件を報告する
 
 ## Verification

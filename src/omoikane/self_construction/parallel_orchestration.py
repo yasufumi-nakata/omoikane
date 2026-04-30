@@ -15,6 +15,11 @@ PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
 PARALLEL_CODEX_INTEGRATION_POLICY_PROFILE = (
     "main-checkout-worker-result-ingestion-v1"
 )
+PARALLEL_CODEX_WORKER_IDENTITY_PROFILE = "signed-worker-identity-evidence-v1"
+PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE = (
+    "digest-bound-worker-identity-signature-v1"
+)
+PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE = "integrity-guardian"
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
     "PYTHONPATH=src python3 -m unittest discover -s tests -t .",
@@ -84,8 +89,16 @@ class ParallelCodexOrchestrationPolicy:
                 "direct-worker-result",
                 "yaoyorozu-worker-dispatch",
             ],
+            "worker_identity_profile": PARALLEL_CODEX_WORKER_IDENTITY_PROFILE,
+            "worker_identity_signature_profile": (
+                PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE
+            ),
+            "worker_identity_signature_role": (
+                PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE
+            ),
             "raw_patch_payload_stored": False,
             "raw_upstream_payload_stored": False,
+            "raw_worker_identity_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -106,6 +119,9 @@ class ParallelCodexOrchestrationService:
         worker_id: str,
         worker_role: str,
         worker_result_status: str,
+        worker_identity_ref: str = "",
+        worker_identity_digest: str = "",
+        worker_identity_signature_digest: str = "",
         main_checkout_head: str,
         worker_base_commit: str,
         ownership_scope: Sequence[str],
@@ -119,6 +135,7 @@ class ParallelCodexOrchestrationService:
         upstream_patch_candidate_receipt_refs: Sequence[str] = (),
         upstream_patch_candidate_receipt_digests: Sequence[str] = (),
     ) -> Dict[str, Any]:
+        normalized_source_system = source_system.strip() or "direct-worker-result"
         normalized_scope = _dedupe_strings(ownership_scope)
         normalized_files = _dedupe_strings(changed_files)
         normalized_upstream_refs = _dedupe_strings(upstream_patch_candidate_receipt_refs)
@@ -139,6 +156,37 @@ class ParallelCodexOrchestrationService:
                     }
                 )
             )
+        normalized_worker_identity_ref = worker_identity_ref.strip() or (
+            f"worker://{normalized_source_system}/{worker_id}"
+        )
+        normalized_worker_identity_digest = worker_identity_digest.strip()
+        if not _is_sha256(normalized_worker_identity_digest):
+            normalized_worker_identity_digest = self._worker_identity_digest(
+                source_system=normalized_source_system,
+                worker_id=worker_id,
+                worker_role=worker_role,
+                worker_identity_ref=normalized_worker_identity_ref,
+            )
+        normalized_worker_identity_signature_digest = (
+            worker_identity_signature_digest.strip()
+        )
+        expected_worker_identity_signature_digest = (
+            self._worker_identity_signature_digest(
+                worker_identity_ref=normalized_worker_identity_ref,
+                worker_identity_digest=normalized_worker_identity_digest,
+                main_checkout_head=main_checkout_head,
+                worker_base_commit=worker_base_commit,
+                patch_digest=normalized_patch_digest,
+            )
+        )
+        if not _is_sha256(normalized_worker_identity_signature_digest):
+            normalized_worker_identity_signature_digest = (
+                expected_worker_identity_signature_digest
+            )
+        worker_identity_evidence_bound = (
+            normalized_worker_identity_signature_digest
+            == expected_worker_identity_signature_digest
+        )
 
         receipt = {
             "kind": "parallel_codex_worker_result_receipt",
@@ -148,13 +196,26 @@ class ParallelCodexOrchestrationService:
             "profile_id": PARALLEL_CODEX_WORKER_RESULT_PROFILE,
             "integration_policy_profile": self._policy.profile_id,
             "reference_runbook_ref": self._policy.reference_runbook_ref,
-            "source_system": source_system,
+            "source_system": normalized_source_system,
+            "worker_identity_profile": PARALLEL_CODEX_WORKER_IDENTITY_PROFILE,
+            "worker_identity_ref": normalized_worker_identity_ref,
+            "worker_identity_digest": normalized_worker_identity_digest,
+            "worker_identity_signature_profile": (
+                PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE
+            ),
+            "worker_identity_signature_role": (
+                PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE
+            ),
+            "worker_identity_signature_digest": (
+                normalized_worker_identity_signature_digest
+            ),
+            "worker_identity_evidence_bound": worker_identity_evidence_bound,
             "upstream_receipt_ref": upstream_receipt_ref,
             "upstream_receipt_digest": upstream_receipt_digest,
             "upstream_patch_candidate_receipt_refs": normalized_upstream_refs,
             "upstream_patch_candidate_receipt_digests": normalized_upstream_digests,
             "upstream_binding_digest": self._upstream_binding_digest(
-                source_system=source_system,
+                source_system=normalized_source_system,
                 upstream_receipt_ref=upstream_receipt_ref,
                 upstream_receipt_digest=upstream_receipt_digest,
                 upstream_patch_candidate_receipt_refs=normalized_upstream_refs,
@@ -187,6 +248,7 @@ class ParallelCodexOrchestrationService:
             "result_summary": result_summary,
             "raw_patch_payload_stored": False,
             "raw_upstream_payload_stored": False,
+            "raw_worker_identity_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
             "receipt_digest": "",
@@ -297,6 +359,9 @@ class ParallelCodexOrchestrationService:
         raw_upstream_payload_redacted = (
             receipt.get("raw_upstream_payload_stored") is False
         )
+        raw_worker_identity_payload_redacted = (
+            receipt.get("raw_worker_identity_payload_stored") is False
+        )
         raw_transcript_payload_redacted = (
             receipt.get("raw_transcript_payload_stored") is False
         )
@@ -312,6 +377,40 @@ class ParallelCodexOrchestrationService:
             errors.append("integration_policy_profile mismatch")
         if receipt.get("reference_runbook_ref") != self._policy.reference_runbook_ref:
             errors.append("reference_runbook_ref mismatch")
+        if receipt.get("worker_identity_profile") != PARALLEL_CODEX_WORKER_IDENTITY_PROFILE:
+            errors.append("worker_identity_profile mismatch")
+        if (
+            receipt.get("worker_identity_signature_profile")
+            != PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE
+        ):
+            errors.append("worker_identity_signature_profile mismatch")
+        if (
+            receipt.get("worker_identity_signature_role")
+            != PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE
+        ):
+            errors.append("worker_identity_signature_role mismatch")
+        worker_identity_signature_bound = (
+            receipt.get("worker_identity_signature_digest")
+            == self._worker_identity_signature_digest(
+                worker_identity_ref=str(receipt.get("worker_identity_ref", "")),
+                worker_identity_digest=str(
+                    receipt.get("worker_identity_digest", ""),
+                ),
+                main_checkout_head=str(receipt.get("main_checkout_head", "")),
+                worker_base_commit=str(receipt.get("worker_base_commit", "")),
+                patch_digest=str(receipt.get("patch_digest", "")),
+            )
+        )
+        worker_identity_evidence_bound = (
+            bool(receipt.get("worker_identity_ref"))
+            and _is_sha256(receipt.get("worker_identity_digest"))
+            and worker_identity_signature_bound
+            and receipt.get("worker_identity_evidence_bound") is True
+        )
+        if not worker_identity_signature_bound:
+            errors.append("worker_identity_signature_digest mismatch")
+        if receipt.get("worker_identity_evidence_bound") is not worker_identity_evidence_bound:
+            errors.append("worker_identity_evidence_bound mismatch")
         if receipt.get("upstream_binding_digest") != self._upstream_binding_digest(
             source_system=str(receipt.get("source_system", "")),
             upstream_receipt_ref=str(receipt.get("upstream_receipt_ref", "")),
@@ -346,6 +445,7 @@ class ParallelCodexOrchestrationService:
         if not (
             raw_patch_payload_redacted
             and raw_upstream_payload_redacted
+            and raw_worker_identity_payload_redacted
             and raw_transcript_payload_redacted
             and raw_verification_payload_redacted
         ):
@@ -364,9 +464,12 @@ class ParallelCodexOrchestrationService:
             "required_verifications_passed": self._required_verifications_passed(
                 verification_results,
             ),
+            "worker_identity_signature_bound": worker_identity_signature_bound,
+            "worker_identity_evidence_bound": worker_identity_evidence_bound,
             "receipt_digest_bound": receipt_digest_bound,
             "raw_patch_payload_redacted": raw_patch_payload_redacted,
             "raw_upstream_payload_redacted": raw_upstream_payload_redacted,
+            "raw_worker_identity_payload_redacted": raw_worker_identity_payload_redacted,
             "raw_transcript_payload_redacted": raw_transcript_payload_redacted,
             "raw_verification_payload_redacted": raw_verification_payload_redacted,
         }
@@ -447,6 +550,39 @@ class ParallelCodexOrchestrationService:
             reasons.append("upstream_binding_digest must be a sha256 hex digest")
         if receipt.get("raw_upstream_payload_stored") is not False:
             reasons.append("raw_upstream_payload_stored must be false")
+        if receipt.get("worker_identity_profile") != PARALLEL_CODEX_WORKER_IDENTITY_PROFILE:
+            reasons.append("worker_identity_profile mismatch")
+        if not receipt.get("worker_identity_ref"):
+            reasons.append("worker_identity_ref must not be empty")
+        if not _is_sha256(receipt.get("worker_identity_digest")):
+            reasons.append("worker_identity_digest must be a sha256 hex digest")
+        if (
+            receipt.get("worker_identity_signature_profile")
+            != PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE
+        ):
+            reasons.append("worker_identity_signature_profile mismatch")
+        if (
+            receipt.get("worker_identity_signature_role")
+            != PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE
+        ):
+            reasons.append("worker_identity_signature_role mismatch")
+        if (
+            receipt.get("worker_identity_signature_digest")
+            != self._worker_identity_signature_digest(
+                worker_identity_ref=str(receipt.get("worker_identity_ref", "")),
+                worker_identity_digest=str(
+                    receipt.get("worker_identity_digest", ""),
+                ),
+                main_checkout_head=str(receipt.get("main_checkout_head", "")),
+                worker_base_commit=str(receipt.get("worker_base_commit", "")),
+                patch_digest=str(receipt.get("patch_digest", "")),
+            )
+        ):
+            reasons.append("worker_identity_signature_digest mismatch")
+        if receipt.get("worker_identity_evidence_bound") is not True:
+            reasons.append("worker_identity_evidence_bound must be true")
+        if receipt.get("raw_worker_identity_payload_stored") is not False:
+            reasons.append("raw_worker_identity_payload_stored must be false")
         if not _is_commit(receipt.get("main_checkout_head")):
             reasons.append("main_checkout_head must be a 40 character hex commit")
         if not _is_commit(receipt.get("worker_base_commit")):
@@ -477,6 +613,49 @@ class ParallelCodexOrchestrationService:
     @staticmethod
     def _changed_file_manifest_digest(changed_files: Sequence[str]) -> str:
         return sha256_text(canonical_json({"changed_files": list(changed_files)}))
+
+    @staticmethod
+    def _worker_identity_digest(
+        *,
+        source_system: str,
+        worker_id: str,
+        worker_role: str,
+        worker_identity_ref: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_WORKER_IDENTITY_PROFILE,
+                    "source_system": source_system,
+                    "worker_id": worker_id,
+                    "worker_role": worker_role,
+                    "worker_identity_ref": worker_identity_ref,
+                }
+            )
+        )
+
+    @staticmethod
+    def _worker_identity_signature_digest(
+        *,
+        worker_identity_ref: str,
+        worker_identity_digest: str,
+        main_checkout_head: str,
+        worker_base_commit: str,
+        patch_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "signature_profile": PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_PROFILE,
+                    "signature_role": PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE,
+                    "worker_identity_ref": worker_identity_ref,
+                    "worker_identity_digest": worker_identity_digest,
+                    "main_checkout_head": main_checkout_head,
+                    "worker_base_commit": worker_base_commit,
+                    "patch_digest": patch_digest,
+                }
+            )
+        )
 
     @staticmethod
     def _upstream_binding_digest(

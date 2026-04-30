@@ -159,7 +159,7 @@
 - `naming_policy.schema`
 - `naming_validation.schema`
 - `parallel_codex_worker_result_receipt.schema`
-  - parallel Codex worker / subagent / codex exec / Yaoyorozu dispatch result を main checkout 統合前に patch digest、changed file manifest digest、verification manifest digest、worker base commit freshness、upstream dispatch / patch candidate digest、raw payload 非保存 flag へ縮約する
+  - parallel Codex worker / subagent / codex exec / Yaoyorozu dispatch result を main checkout 統合前に patch digest、changed file manifest digest、verification manifest digest、worker base commit freshness、signed worker identity evidence、upstream dispatch / patch candidate digest、raw payload 非保存 flag へ縮約する
 - `patch_descriptor.schema`
 - `perception_frame.schema`
 - `perception_shift.schema`

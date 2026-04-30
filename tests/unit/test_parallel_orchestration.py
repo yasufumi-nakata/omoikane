@@ -54,8 +54,15 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["ready_for_main_checkout"])
         self.assertTrue(validation["changed_file_manifest_digest_bound"])
         self.assertTrue(validation["verification_manifest_digest_bound"])
+        self.assertTrue(validation["worker_identity_evidence_bound"])
+        self.assertTrue(receipt["worker_identity_evidence_bound"])
+        self.assertEqual(
+            "signed-worker-identity-evidence-v1",
+            receipt["worker_identity_profile"],
+        )
         self.assertTrue(validation["receipt_digest_bound"])
         self.assertFalse(receipt["raw_patch_payload_stored"])
+        self.assertFalse(receipt["raw_worker_identity_payload_stored"])
         self.assertFalse(receipt["raw_transcript_payload_stored"])
         self.assertFalse(receipt["raw_verification_payload_stored"])
 
@@ -127,6 +134,32 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertIn("changed_file_count mismatch", validation["errors"])
         self.assertIn("receipt_digest mismatch", validation["errors"])
 
+    def test_worker_identity_signature_tampering_blocks_integration(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-unit",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=["src/omoikane/self_construction/parallel_orchestration.py"],
+            verification_results=_verification_results(),
+            result_summary="Worker result with tampered identity evidence.",
+        )
+        tampered = dict(receipt)
+        tampered["worker_identity_signature_digest"] = "f" * 64
+        tampered["receipt_digest"] = self.service._receipt_digest(tampered)
+
+        validation = self.service.validate_worker_result_receipt(tampered)
+
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["ready_for_main_checkout"])
+        self.assertFalse(validation["worker_identity_evidence_bound"])
+        self.assertIn(
+            "worker_identity_signature_digest mismatch",
+            tampered["blocking_reasons"] or validation["errors"],
+        )
+
     def test_yaoyorozu_dispatch_receipt_bridges_to_parallel_ingestion(self) -> None:
         patch_receipt_digest = "c" * 64
         dispatch_receipt = {
@@ -179,9 +212,12 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             [patch_receipt_digest],
             receipt["upstream_patch_candidate_receipt_digests"],
         )
+        self.assertTrue(receipt["worker_identity_evidence_bound"])
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["worker_identity_evidence_bound"])
         self.assertFalse(receipt["raw_upstream_payload_stored"])
+        self.assertFalse(receipt["raw_worker_identity_payload_stored"])
 
 
 if __name__ == "__main__":

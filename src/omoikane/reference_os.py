@@ -951,6 +951,7 @@ class OmoikaneReferenceOS:
             "tests/integration/",
             "specs/interfaces/",
             "specs/schemas/",
+            "specs/",
             "evals/continuity/",
             "docs/",
             "agents/",
@@ -961,13 +962,17 @@ class OmoikaneReferenceOS:
             "src/omoikane/self_construction/parallel_orchestration.py",
             "tests/unit/test_parallel_orchestration.py",
             "tests/integration/test_parallel_orchestration_schema_contracts.py",
+            "tests/integration/test_reference_runtime.py",
             "specs/interfaces/selfctor.parallel_orchestration.v0.idl",
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
+            "specs/schemas/README.md",
+            "specs/catalog.yaml",
             "evals/continuity/parallel_codex_result_ingestion.yaml",
             "docs/02-subsystems/self-construction/README.md",
+            "docs/04-ai-governance/codex-as-builder.md",
             "docs/07-reference-implementation/README.md",
             "agents/guardians/integrity-guardian.yaml",
-            "meta/decision-log/2026-04-30_parallel-codex-worker-result-ingestion.md",
+            "meta/decision-log/2026-05-01_parallel-codex-worker-identity-evidence.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -980,8 +985,9 @@ class OmoikaneReferenceOS:
             changed_files=changed_files,
             verification_results=verification_results,
             result_summary=(
-                "Worker result carries patch digest, changed files, and verification "
-                "receipts before main checkout integration."
+                "Worker result carries signed identity evidence, patch digest, "
+                "changed files, and verification receipts before main checkout "
+                "integration."
             ),
         )
         blocked_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1072,6 +1078,12 @@ class OmoikaneReferenceOS:
                 "ready_verification_manifest_digest": ready_receipt[
                     "verification_manifest_digest"
                 ],
+                "ready_worker_identity_digest": ready_receipt[
+                    "worker_identity_digest"
+                ],
+                "ready_worker_identity_signature_digest": ready_receipt[
+                    "worker_identity_signature_digest"
+                ],
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
                 "yaoyorozu_bridge_receipt_ref": yaoyorozu_bridge_receipt[
@@ -1083,8 +1095,12 @@ class OmoikaneReferenceOS:
                 "yaoyorozu_bridge_upstream_binding_digest": (
                     yaoyorozu_bridge_receipt["upstream_binding_digest"]
                 ),
+                "yaoyorozu_bridge_worker_identity_digest": (
+                    yaoyorozu_bridge_receipt["worker_identity_digest"]
+                ),
                 "raw_patch_payload_stored": False,
                 "raw_upstream_payload_stored": False,
+                "raw_worker_identity_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1154,8 +1170,12 @@ class OmoikaneReferenceOS:
                 "ready_receipt_digest_bound": ready_validation[
                     "receipt_digest_bound"
                 ],
+                "ready_worker_identity_evidence_bound": ready_validation[
+                    "worker_identity_evidence_bound"
+                ],
                 "ready_raw_payload_redacted": (
                     ready_validation["raw_patch_payload_redacted"]
+                    and ready_validation["raw_worker_identity_payload_redacted"]
                     and ready_validation["raw_transcript_payload_redacted"]
                     and ready_validation["raw_verification_payload_redacted"]
                 ),
@@ -1183,8 +1203,16 @@ class OmoikaneReferenceOS:
                         "upstream_patch_candidate_receipt_digests"
                     ]
                 ),
+                "yaoyorozu_bridge_worker_identity_evidence_bound": (
+                    yaoyorozu_bridge_validation["worker_identity_evidence_bound"]
+                ),
                 "yaoyorozu_bridge_raw_upstream_payload_redacted": (
                     yaoyorozu_bridge_validation["raw_upstream_payload_redacted"]
+                ),
+                "yaoyorozu_bridge_raw_worker_identity_payload_redacted": (
+                    yaoyorozu_bridge_validation[
+                        "raw_worker_identity_payload_redacted"
+                    ]
                 ),
                 "ledger_bound": bool(ledger_entry.entry_hash)
                 and ledger_entry.payload_ref.startswith("cas://sha256/"),

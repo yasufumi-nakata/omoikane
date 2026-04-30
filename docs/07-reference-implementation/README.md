@@ -904,15 +904,20 @@ self / council / guardian の 3 者通知を
 subagent / worker / `codex exec` の成果を main checkout に混ぜる前に
 `parallel_codex_worker_result_receipt` へ縮約する。
 ready receipt は worker base commit と main checkout head の一致、ownership scope 内の
-changed file manifest digest、patch digest、unittest / gap-report verification digest を束縛し、
+changed file manifest digest、patch digest、signed worker identity evidence、
+unittest / gap-report verification digest を束縛し、
 raw patch payload、raw transcript、raw verification output は保存しない。
+worker identity は `worker_identity_ref`、`worker_identity_digest`、
+integrity Guardian 署名 digest だけに縮約し、raw worker identity payload は保存しない。
 blocked receipt は stale worker base commit を schema-bound に残しつつ
 `integration_decision=blocked` として fail-closed にする。
 同じ demo は Yaoyorozu worker dispatch receipt から
 dispatch receipt digest、dispatch plan digest、patch candidate receipt refs/digests、
 changed files を取り出し、`upstream_binding_digest` と derived `patch_digest` を持つ
 `source_system=yaoyorozu-worker-dispatch` receipt へ変換する。
-raw dispatch payload や raw patch payload は Parallel Codex 側へ保存しない。
+Yaoyorozu bridge receipt も同じ worker identity evidence に束縛される。
+raw dispatch payload、raw patch payload、raw worker identity payload は
+Parallel Codex 側へ保存しない。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

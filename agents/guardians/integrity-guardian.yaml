@@ -64,6 +64,7 @@ capabilities:
   - gap-report.continuity-ledger-binding.attest
   - gap-report.continuity-ledger-entry.attest
   - parallel-codex.worker-result-ingestion.attest
+  - parallel-codex.worker-identity-evidence.attest
   - parallel-codex.yaoyorozu-dispatch-bridge.attest
   - ethics.consent-authenticity-redaction.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest
@@ -122,6 +123,7 @@ oversight_scope_refs:
   - specs/schemas/sensory_loopback_calibration_refresh_state_guard.schema
   - docs/02-subsystems/agentic/yaoyorozu-roster.md
   - specs/schemas/gap_report.schema
+  - specs/schemas/parallel_codex_worker_result_receipt.schema
   - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
   - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
   - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
@@ -135,6 +137,7 @@ oversight_scope_refs:
   - specs/schemas/sensory_loopback_latency_weight_policy_verifier_quorum.schema
   - evals/continuity/gap_report_scan_receipt.yaml
   - evals/continuity/gap_scanner_required_reference_files.yaml
+  - evals/continuity/parallel_codex_result_ingestion.yaml
   - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
   - evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
   - evals/agentic/yaoyorozu_source_manifest_public_verification.yaml
@@ -190,7 +193,7 @@ when_to_invoke: |
   - gap-report の scan_receipt が all-zero 判定、prioritized task count、scan surface、report digest、surface digest manifest、raw report / raw surface payload 非保存に束縛されていることを検証する時
   - gap-report の scan_receipt が continuity_event_ref / continuity_event_digest を返し、raw continuity event payload を保存しないことを検証する時
   - gap-report の scan_receipt が実 ContinuityLedger entry ref / hash / payload ref と self+guardian 署名 role に束縛されていることを検証する時
-  - parallel Codex worker result が patch digest、changed file manifest digest、verification manifest digest、worker base commit freshness に束縛され、raw patch / transcript / verification payload を保持しないことを検証する時
+  - parallel Codex worker result が patch digest、changed file manifest digest、verification manifest digest、worker base commit freshness、signed worker identity evidence に束縛され、raw patch / worker identity / transcript / verification payload を保持しないことを検証する時
   - Yaoyorozu worker dispatch receipt が Parallel Codex worker result receipt へ変換される前に、dispatch receipt digest、patch candidate receipt refs/digests、changed files、upstream binding digest に束縛され、raw dispatch / patch / transcript payload を保持しないことを検証する時
   - Yaoyorozu councilor source definition が deliberation_scope_refs と deliberation_policy_ref を registry entry へ保持し、raw deliberation transcript ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時

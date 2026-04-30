@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex and Yaoyorozu worker-dispatch results to digest-only receipts before main checkout integration.
+summary: Bind parallel Codex and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity evidence before main checkout integration.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
 operations:
@@ -32,6 +32,15 @@ operations:
           worker_result_status:
             type: string
             enum: [completed, blocked, failed, stale]
+          worker_identity_ref:
+            type: string
+            minLength: 1
+          worker_identity_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          worker_identity_signature_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
           main_checkout_head:
             type: string
             pattern: "^[a-f0-9]{40}$"
@@ -64,8 +73,9 @@ operations:
     guarantees:
       - worker_base_commit must match main_checkout_head before integration_decision can become accept-ready
       - direct worker results carry source_system=direct-worker-result and no upstream dispatch refs
+      - worker_identity_ref, worker_identity_digest, and integrity-guardian worker_identity_signature_digest are bound to patch digest and base/head commit evidence
       - changed_files must remain inside both the repo-local allowed workspace prefixes and the worker ownership_scope
-      - patch payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
+      - patch payload, raw worker identity payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
       - unittest discover and gap-report required verification commands must pass before main checkout integration is accepted
       - blocked, stale, or failed worker results remain schema-bound but cannot be integrated
   ingest_yaoyorozu_dispatch_receipt:
@@ -103,6 +113,7 @@ operations:
       schema_ref: parallel_codex_worker_result_receipt
     guarantees:
       - source_system is yaoyorozu-worker-dispatch
+      - the derived worker identity evidence binds the Yaoyorozu dispatch receipt id to the same patch digest used for main-checkout ingestion
       - upstream dispatch receipt digest, patch-candidate receipt refs/digests, and changed-file list are bound by upstream_binding_digest
       - patch_digest is derived from the dispatch receipt digest, dispatch plan digest, patch-candidate receipt digests, and changed files
       - raw Yaoyorozu dispatch payloads, raw patch payloads, transcripts, stdout, and stderr are not stored in the Parallel Codex receipt

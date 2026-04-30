@@ -735,7 +735,7 @@ entries:
       - references/parallel-codex-orchestration.md
       - evals/continuity/parallel_codex_result_ingestion.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize one digest-only parallel Codex worker result before main checkout integration, including worker base commit freshness, changed file manifest digest, verification manifest digest, patch digest, Yaoyorozu upstream dispatch / patch candidate digest binding, and raw worker / upstream payload redaction.
+    rationale: Required to serialize one digest-only parallel Codex worker result before main checkout integration, including worker base commit freshness, changed file manifest digest, verification manifest digest, patch digest, signed worker identity evidence, Yaoyorozu upstream dispatch / patch candidate digest binding, and raw worker / identity / upstream payload redaction.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.parallel_orchestration.v0.idl
@@ -745,7 +745,7 @@ entries:
       - docs/02-subsystems/self-construction/README.md
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make parallel Codex worker result ingestion, Yaoyorozu dispatch-to-ingestion bridging, and fail-closed stale worker blocking machine-readable in the L5 self-construction pipeline.
+    rationale: Required to make parallel Codex worker result ingestion, signed worker identity evidence binding, Yaoyorozu dispatch-to-ingestion bridging, and fail-closed stale worker blocking machine-readable in the L5 self-construction pipeline.
   - priority: P1
     kind: eval
     file: evals/continuity/design_reader_handoff.yaml
@@ -3277,7 +3277,7 @@ entries:
       - references/parallel-codex-orchestration.md
       - specs/schemas/parallel_codex_worker_result_receipt.schema
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects parallel Codex worker result ingestion receipts from stale worker base commits, unbound Yaoyorozu upstream dispatch / patch candidate receipts, unbound patch or verification manifests, and raw worker / upstream payload storage.
+    rationale: Protects parallel Codex worker result ingestion receipts from stale worker base commits, unbound signed worker identity evidence, unbound Yaoyorozu upstream dispatch / patch candidate receipts, unbound patch or verification manifests, and raw worker / identity / upstream payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

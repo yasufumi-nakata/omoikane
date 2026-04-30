@@ -62,13 +62,22 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertEqual(3, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
+        self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
         )
         self.assertTrue(result["validation"]["yaoyorozu_bridge_patch_candidates_bound"])
         self.assertTrue(
+            result["validation"]["yaoyorozu_bridge_worker_identity_evidence_bound"]
+        )
+        self.assertTrue(
             result["validation"]["yaoyorozu_bridge_raw_upstream_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "yaoyorozu_bridge_raw_worker_identity_payload_redacted"
+            ]
         )
         self.assertTrue(result["validation"]["ledger_bound"])
 
