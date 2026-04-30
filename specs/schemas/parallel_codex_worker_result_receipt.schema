@@ -7,7 +7,8 @@ description: >
   identity evidence and remote branch / PR source metadata without storing raw
   worker identity, remote metadata, or remote revocation payloads.
   Remote source revocation evidence also carries a bounded freshness window so
-  old current-not-revoked checks cannot be reused silently.
+  old current-not-revoked checks cannot be reused silently, and the freshness
+  refs are bound to a signed provider timestamp digest before acceptance.
 type: object
 additionalProperties: false
 required:
@@ -37,6 +38,12 @@ required:
   - remote_source_revocation_expires_at_ref
   - remote_source_revocation_freshness_status
   - remote_source_revocation_freshness_digest
+  - remote_source_revocation_timestamp_profile
+  - remote_source_revocation_timestamp_ref
+  - remote_source_revocation_timestamp_status
+  - remote_source_revocation_timestamp_digest
+  - remote_source_revocation_timestamp_signature_profile
+  - remote_source_revocation_timestamp_signature_digest
   - remote_metadata_digest
   - remote_metadata_bound
   - worker_identity_profile
@@ -75,6 +82,7 @@ required:
   - raw_remote_metadata_payload_stored
   - raw_remote_revocation_payload_stored
   - raw_remote_revocation_freshness_payload_stored
+  - raw_remote_revocation_timestamp_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -164,6 +172,31 @@ properties:
       - expired
       - not-applicable
   remote_source_revocation_freshness_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_revocation_timestamp_profile:
+    type: string
+    enum:
+      - remote-source-revocation-signed-provider-timestamp-v1
+      - not-applicable
+  remote_source_revocation_timestamp_ref:
+    type: string
+  remote_source_revocation_timestamp_status:
+    type: string
+    enum:
+      - signed-current
+      - stale
+      - invalid
+      - not-applicable
+  remote_source_revocation_timestamp_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_revocation_timestamp_signature_profile:
+    type: string
+    enum:
+      - remote-source-revocation-provider-timestamp-signature-v1
+      - not-applicable
+  remote_source_revocation_timestamp_signature_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
   remote_metadata_digest:
@@ -293,6 +326,8 @@ properties:
   raw_remote_revocation_payload_stored:
     const: false
   raw_remote_revocation_freshness_payload_stored:
+    const: false
+  raw_remote_revocation_timestamp_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false

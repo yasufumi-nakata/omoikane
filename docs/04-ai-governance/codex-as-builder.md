@@ -43,7 +43,9 @@ patch digest、changed file manifest digest、verification manifest digest、wor
 signed worker identity evidence、remote branch / PR metadata digest を
 `parallel_codex_worker_result_receipt` へ縮約し、remote source revocation status が
 `current-not-revoked` でない result、revocation freshness window が expired の result、
-stale result、metadata 欠落を blocked のまま保持する。
+provider timestamp が `signed-current` でない result、stale result、metadata 欠落を
+blocked のまま保持する。remote freshness refs は signed provider timestamp digest
+と timestamp signature digest へ束縛し、raw timestamp payload は保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

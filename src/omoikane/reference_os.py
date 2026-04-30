@@ -976,6 +976,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-metadata.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-revocation-check.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-revocation-freshness.md",
+            "meta/decision-log/2026-05-01_parallel-codex-remote-source-timestamp-binding.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1156,6 +1157,18 @@ class OmoikaneReferenceOS:
                 "remote_source_revocation_freshness_digest": remote_receipt[
                     "remote_source_revocation_freshness_digest"
                 ],
+                "remote_source_revocation_timestamp_ref": remote_receipt[
+                    "remote_source_revocation_timestamp_ref"
+                ],
+                "remote_source_revocation_timestamp_status": remote_receipt[
+                    "remote_source_revocation_timestamp_status"
+                ],
+                "remote_source_revocation_timestamp_digest": remote_receipt[
+                    "remote_source_revocation_timestamp_digest"
+                ],
+                "remote_source_revocation_timestamp_signature_digest": remote_receipt[
+                    "remote_source_revocation_timestamp_signature_digest"
+                ],
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
                 "yaoyorozu_bridge_receipt_ref": yaoyorozu_bridge_receipt[
@@ -1176,6 +1189,7 @@ class OmoikaneReferenceOS:
                 "raw_remote_metadata_payload_stored": False,
                 "raw_remote_revocation_payload_stored": False,
                 "raw_remote_revocation_freshness_payload_stored": False,
+                "raw_remote_revocation_timestamp_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1286,12 +1300,33 @@ class OmoikaneReferenceOS:
                     ]
                     and bool(remote_receipt["remote_source_revocation_freshness_digest"])
                 ),
+                "remote_source_revocation_timestamp_digest_bound": (
+                    remote_validation[
+                        "remote_source_revocation_timestamp_digest_bound"
+                    ]
+                    and bool(remote_receipt["remote_source_revocation_timestamp_digest"])
+                ),
+                "remote_source_revocation_timestamp_signature_bound": (
+                    remote_validation[
+                        "remote_source_revocation_timestamp_signature_bound"
+                    ]
+                    and bool(
+                        remote_receipt[
+                            "remote_source_revocation_timestamp_signature_digest"
+                        ]
+                    )
+                ),
                 "remote_source_revocation_not_revoked": remote_validation[
                     "remote_source_revocation_not_revoked"
                 ],
                 "remote_source_revocation_fresh": remote_validation[
                     "remote_source_revocation_fresh"
                 ],
+                "remote_source_revocation_timestamp_signed_current": (
+                    remote_validation[
+                        "remote_source_revocation_timestamp_signed_current"
+                    ]
+                ),
                 "remote_review_authority_digest_bound": (
                     remote_validation["remote_metadata_digest_bound"]
                     and bool(remote_receipt["remote_review_authority_digest"])
@@ -1311,6 +1346,9 @@ class OmoikaneReferenceOS:
                 ],
                 "remote_raw_revocation_freshness_payload_redacted": remote_validation[
                     "raw_remote_revocation_freshness_payload_redacted"
+                ],
+                "remote_raw_revocation_timestamp_payload_redacted": remote_validation[
+                    "raw_remote_revocation_timestamp_payload_redacted"
                 ],
                 "blocked_receipt_ok": blocked_validation["ok"],
                 "blocked_stale_worker_result": not blocked_validation[

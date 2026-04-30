@@ -33,8 +33,10 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   policy digest、review authority digest、current-not-revoked revocation digest を
   remote metadata digest へ束縛する
 - remote source revocation check は freshness window digest も持ち、
-  `fresh` 以外または 900 秒を超える window は fail-closed にする。raw remote
-  metadata / revocation / freshness payload は保存しない
+  `fresh` 以外または 900 秒を超える window は fail-closed にする。freshness refs
+  は signed provider timestamp digest と integrity Guardian signature digest にも束縛し、
+  timestamp が `signed-current` でない場合は fail-closed にする。raw remote
+  metadata / revocation / freshness / timestamp payload は保存しない
 - user または他 worker の未確認変更を revert しない
 
 ## Integration

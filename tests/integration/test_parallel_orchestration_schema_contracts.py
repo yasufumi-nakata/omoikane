@@ -77,6 +77,15 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
                 "remote_source_revocation_freshness_digest_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["remote_source_revocation_timestamp_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["remote_source_revocation_timestamp_signature_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["remote_source_revocation_timestamp_signed_current"]
+        )
         self.assertTrue(result["validation"]["remote_source_revocation_not_revoked"])
         self.assertTrue(result["validation"]["remote_source_revocation_fresh"])
         self.assertTrue(result["validation"]["remote_review_authority_digest_bound"])
@@ -88,6 +97,9 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["remote_raw_revocation_payload_redacted"])
         self.assertTrue(
             result["validation"]["remote_raw_revocation_freshness_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"]["remote_raw_revocation_timestamp_payload_redacted"]
         )
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(

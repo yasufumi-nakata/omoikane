@@ -3,7 +3,8 @@ target: selfctor.parallel_orchestration
 summary: >
   parallel-orchestration-demo が worker result の patch digest、changed files、
   verification result、base commit freshness、signed worker identity、remote
-  branch / PR metadata、remote source revocation check と freshness window を main checkout integration 前の digest-only receipt として
+  branch / PR metadata、remote source revocation check、freshness window、
+  signed provider timestamp を main checkout integration 前の digest-only receipt として
   固定し、stale worker result を fail-closed にすること
 checks:
   - name: parallel Codex worker result ingestion smoke
@@ -21,14 +22,18 @@ expect:
   remote_branch_pr_metadata_bound: true
   remote_source_revocation_digest_bound: true
   remote_source_revocation_freshness_digest_bound: true
+  remote_source_revocation_timestamp_digest_bound: true
+  remote_source_revocation_timestamp_signature_bound: true
   remote_source_revocation_not_revoked: true
   remote_source_revocation_fresh: true
+  remote_source_revocation_timestamp_signed_current: true
   remote_review_authority_digest_bound: true
   remote_accepted_source_policy_digest_bound: true
   remote_worker_identity_evidence_bound: true
   remote_raw_metadata_payload_redacted: true
   remote_raw_revocation_payload_redacted: true
   remote_raw_revocation_freshness_payload_redacted: true
+  remote_raw_revocation_timestamp_payload_redacted: true
   blocked_stale_worker_result: true
   blocked_base_head_mismatch: true
   yaoyorozu_bridge_ready_for_main_checkout: true
@@ -42,6 +47,7 @@ expect:
   raw_remote_metadata_payload_stored: false
   raw_remote_revocation_payload_stored: false
   raw_remote_revocation_freshness_payload_stored: false
+  raw_remote_revocation_timestamp_payload_stored: false
   raw_transcript_payload_stored: false
   raw_verification_payload_stored: false
 metric: boolean
