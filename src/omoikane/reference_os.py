@@ -13214,6 +13214,36 @@ json.dump(response, sys.stdout)
                 ]["feature_window_series_threshold_policy_source_digest_set"],
             )
         )
+        weighted_latency_policy_authority_ref = (
+            "latency-weight-policy-authority://atrium/weighted/quorum"
+        )
+        weighted_latency_policy_source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "policy_source": "atrium-weighted-latency-quorum-demo",
+                    "participant_identity_ids": [
+                        identity.identity_id,
+                        peer.identity_id,
+                        observer.identity_id,
+                    ],
+                    "weights": {
+                        identity.identity_id: 0.4,
+                        peer.identity_id: 0.4,
+                        observer.identity_id: 0.2,
+                    },
+                    "threshold": 0.75,
+                }
+            )
+        )
+        weighted_latency_policy_authority_digest = sha256_text(
+            canonical_json(
+                {
+                    "authority_ref": weighted_latency_policy_authority_ref,
+                    "source_digest_set": weighted_latency_policy_source_digest_set,
+                    "profile_id": "weighted-latency-quorum-authority-v1",
+                }
+            )
+        )
         weighted_latency_quorum_binding = (
             self.sensory_loopback.bind_participant_biodata_arbitration(
                 weighted_session["session_id"],
@@ -13235,6 +13265,15 @@ json.dump(response, sys.stdout)
                     observer.identity_id: 0.2,
                 },
                 latency_quorum_threshold=0.75,
+                latency_weight_policy_authority_ref=(
+                    weighted_latency_policy_authority_ref
+                ),
+                latency_weight_policy_authority_digest=(
+                    weighted_latency_policy_authority_digest
+                ),
+                latency_weight_policy_source_digest_set=(
+                    weighted_latency_policy_source_digest_set
+                ),
             )
         )
         self.ledger.append(
@@ -13544,6 +13583,11 @@ json.dump(response, sys.stdout)
                         "observer": weighted_observer_latency_gate,
                     },
                     "biodata_arbitration_binding": weighted_latency_quorum_binding,
+                    "latency_weight_policy_authority": {
+                        "authority_ref": weighted_latency_policy_authority_ref,
+                        "authority_digest": weighted_latency_policy_authority_digest,
+                        "source_digest_set": weighted_latency_policy_source_digest_set,
+                    },
                     "validation": {
                         "ok": weighted_session_validation["ok"]
                         and weighted_latency_quorum_validation["ok"],
@@ -13584,6 +13628,21 @@ json.dump(response, sys.stdout)
                         "latency_quorum_digest_bound": (
                             weighted_latency_quorum_validation[
                                 "latency_quorum_digest_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_bound": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_digest_bound": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_digest_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_status": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_status"
                             ]
                         ),
                         "calibration_refresh_fresh": (
@@ -13901,8 +13960,21 @@ json.dump(response, sys.stdout)
                         "participant_latency_weight_digest_bound"
                     ]
                     and weighted_latency_quorum_validation[
+                        "latency_weight_policy_digest_bound"
+                    ]
+                    and weighted_latency_quorum_validation[
                         "latency_quorum_digest_bound"
                     ]
+                ),
+                "shared_loopback_weighted_latency_policy_bound": (
+                    weighted_latency_quorum_validation["latency_weight_policy_bound"]
+                    and weighted_latency_quorum_validation[
+                        "latency_weight_policy_digest_bound"
+                    ]
+                    and weighted_latency_quorum_validation[
+                        "latency_weight_policy_status"
+                    ]
+                    == "complete"
                 ),
                 "shared_loopback_weighted_latency_quorum_failed_participant_bound": (
                     weighted_latency_quorum_validation[

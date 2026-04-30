@@ -583,6 +583,9 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             validation["latency_quorum_profile"],
         )
         self.assertTrue(validation["participant_latency_weight_digest_bound"])
+        self.assertFalse(validation["latency_weight_policy_bound"])
+        self.assertTrue(validation["latency_weight_policy_digest_bound"])
+        self.assertEqual("not-bound", validation["latency_weight_policy_status"])
         self.assertTrue(validation["latency_quorum_digest_bound"])
         self.assertTrue(validation["participant_latency_digest_set_bound"])
         self.assertTrue(validation["participant_gate_digest_set_bound"])
@@ -592,6 +595,8 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertFalse(binding["raw_drift_payload_stored"])
         self.assertFalse(binding["raw_refresh_payload_stored"])
         self.assertFalse(binding["raw_timing_payload_stored"])
+        self.assertFalse(binding["raw_latency_weight_policy_payload_stored"])
+        self.assertFalse(binding["raw_latency_weight_authority_payload_stored"])
 
         tampered = deepcopy(binding)
         tampered["participant_gate_digest_set"] = "0" * 64
@@ -710,6 +715,11 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                 "identity://loopback-observer": 0.2,
             },
             latency_quorum_threshold=0.75,
+            latency_weight_policy_authority_ref=(
+                "latency-weight-policy-authority://unit/shared-weight-policy"
+            ),
+            latency_weight_policy_authority_digest="9" * 64,
+            latency_weight_policy_source_digest_set="8" * 64,
         )
         validation = service.validate_participant_biodata_arbitration(binding)
 
@@ -725,13 +735,64 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         )
         self.assertEqual("pass", validation["latency_gate_status"])
         self.assertTrue(validation["participant_latency_weight_digest_bound"])
+        self.assertTrue(validation["latency_weight_policy_bound"])
+        self.assertTrue(validation["latency_weight_policy_digest_bound"])
+        self.assertEqual("complete", validation["latency_weight_policy_status"])
         self.assertTrue(validation["latency_quorum_digest_bound"])
         self.assertTrue(validation["all_calibration_refresh_receipts_fresh"])
         self.assertTrue(validation["participant_calibration_refresh_digest_set_bound"])
+        self.assertFalse(binding["raw_latency_weight_policy_payload_stored"])
+        self.assertFalse(binding["raw_latency_weight_authority_payload_stored"])
 
         tampered = deepcopy(binding)
         tampered["participant_latency_weight_digest"] = "0" * 64
         self.assertFalse(service.validate_participant_biodata_arbitration(tampered)["ok"])
+        tampered_policy = deepcopy(binding)
+        tampered_policy["latency_weight_policy_digest"] = "0" * 64
+        self.assertFalse(
+            service.validate_participant_biodata_arbitration(tampered_policy)["ok"]
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "weighted latency quorum requires latency_weight_policy_authority_ref",
+        ):
+            service.bind_participant_biodata_arbitration(
+                session["session_id"],
+                participant_gate_receipts={
+                    "identity://loopback-primary": self._fake_biodata_confidence_gate(
+                        "identity://loopback-primary",
+                        "a-self",
+                    ),
+                    "identity://loopback-peer": self._fake_biodata_confidence_gate(
+                        "identity://loopback-peer",
+                        "b-peer",
+                    ),
+                    "identity://loopback-observer": self._fake_biodata_confidence_gate(
+                        "identity://loopback-observer",
+                        "c-observer",
+                    ),
+                },
+                participant_latency_drift_gates={
+                    "identity://loopback-primary": self._fake_participant_latency_drift_gate(
+                        service,
+                        "identity://loopback-primary",
+                        "self",
+                    ),
+                    "identity://loopback-peer": self._fake_participant_latency_drift_gate(
+                        service,
+                        "identity://loopback-peer",
+                        "peer",
+                        observed_latency_ms=54.0,
+                    ),
+                    "identity://loopback-observer": blocked_latency_gate,
+                },
+                participant_latency_weights={
+                    "identity://loopback-primary": 0.4,
+                    "identity://loopback-peer": 0.4,
+                    "identity://loopback-observer": 0.2,
+                },
+                latency_quorum_threshold=0.75,
+            )
 
 
 if __name__ == "__main__":

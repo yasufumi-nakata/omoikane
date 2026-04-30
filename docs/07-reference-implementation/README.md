@@ -1121,8 +1121,9 @@ Sensory Loopback 側で検証する。latency gate は
 同じ authority ref / digest / source digest set を保持する。3-4 participant の
 shared field では `weighted-latency-quorum-v1` により、blocked timing gate を
 failed participant id として残したまま、passing participant weight が threshold を
-満たす場合だけ acceptance できる。participant weight と quorum 判定も digest-only で
-束縛し、raw timing / hardware adapter payload は保存しない。
+満たす場合だけ acceptance できる。participant weight と quorum 判定は
+`weighted-latency-quorum-authority-v1` の authority ref / digest / source digest set と
+一緒に digest-only で束縛し、raw timing / hardware adapter / weight-policy authority payload は保存しない。
 
 `imc-demo` は L6 Inter-Mind Channel の reference contract
 (`interface.imc.v0`) を JSON で可視化し、
@@ -1416,8 +1417,8 @@ shared arbitration が calibration / drift / refresh / timing / hardware adapter
 保存しないことを検証する。
 同じ sidecar path は 3 participant の `weighted-latency-quorum-v1` も返し、
 observer の latency gate が blocked でも self + peer の pass weight が threshold を満たす時だけ
-`latency_quorum_satisfied=true` とし、participant latency weight digest と quorum digest を
-public schema に通す。
+`latency_quorum_satisfied=true` とし、participant latency weight digest、
+weight policy authority digest、quorum digest を public schema に通す。
 さらに `sensory-loopback-public-schema-contract-v1` の `schema_contracts` manifest が
 self-only と shared loopback の session / receipt / artifact family / BioData arbitration binding payload、
 weighted latency quorum binding payload を

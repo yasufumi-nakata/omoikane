@@ -643,6 +643,8 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(weighted["validation"]["latency_quorum_satisfied"])
         self.assertFalse(weighted["validation"]["all_latency_gates_passed"])
         self.assertTrue(weighted["validation"]["latency_quorum_digest_bound"])
+        self.assertTrue(weighted["validation"]["latency_weight_policy_bound"])
+        self.assertTrue(weighted["validation"]["latency_weight_policy_digest_bound"])
         self.assertTrue(weighted["validation"]["calibration_refresh_fresh"])
         self.assertTrue(
             weighted["validation"]["participant_calibration_refresh_digest_set_bound"]

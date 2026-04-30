@@ -77,6 +77,9 @@ SENSORY_LOOPBACK_PARTICIPANT_LATENCY_STORAGE_POLICY = (
 SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS = 12.0
 SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE = "all-participant-latency-pass-v1"
 SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE = "weighted-latency-quorum-v1"
+SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE = (
+    "weighted-latency-quorum-authority-v1"
+)
 SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS = 3
 SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES = {
     "self-exclusive",
@@ -168,6 +171,10 @@ class SensoryLoopbackService:
                     SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE,
                     SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE,
                 ],
+                "latency_weight_policy_profile": (
+                    SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE
+                ),
+                "requires_latency_weight_policy_authority_for_weighted_quorum": True,
                 "weighted_latency_min_participants": (
                     SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS
                 ),
@@ -181,6 +188,8 @@ class SensoryLoopbackService:
                 "raw_gate_payload_stored": False,
                 "raw_timing_payload_stored": False,
                 "raw_hardware_adapter_payload_stored": False,
+                "raw_latency_weight_policy_payload_stored": False,
+                "raw_latency_weight_authority_payload_stored": False,
             },
         }
 
@@ -837,6 +846,9 @@ class SensoryLoopbackService:
         participant_latency_drift_gates: Mapping[str, Mapping[str, Any]],
         participant_latency_weights: Optional[Mapping[str, float]] = None,
         latency_quorum_threshold: Optional[float] = None,
+        latency_weight_policy_authority_ref: str = "",
+        latency_weight_policy_authority_digest: str = "",
+        latency_weight_policy_source_digest_set: str = "",
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         if not session["arbitration_required"]:
@@ -859,6 +871,11 @@ class SensoryLoopbackService:
             participant_ids=participant_ids,
             participant_latency_weights=participant_latency_weights,
             latency_quorum_threshold=latency_quorum_threshold,
+            latency_weight_policy_authority_ref=latency_weight_policy_authority_ref,
+            latency_weight_policy_authority_digest=latency_weight_policy_authority_digest,
+            latency_weight_policy_source_digest_set=(
+                latency_weight_policy_source_digest_set
+            ),
         )
 
         participant_bindings: List[Dict[str, Any]] = []
@@ -1198,6 +1215,27 @@ class SensoryLoopbackService:
             "participant_latency_weight_digest": latency_quorum[
                 "participant_latency_weight_digest"
             ],
+            "latency_weight_policy_profile": latency_quorum_policy[
+                "weight_policy_profile"
+            ],
+            "latency_weight_policy_authority_ref": latency_quorum_policy[
+                "weight_policy_authority_ref"
+            ],
+            "latency_weight_policy_authority_digest": latency_quorum_policy[
+                "weight_policy_authority_digest"
+            ],
+            "latency_weight_policy_source_digest_set": latency_quorum_policy[
+                "weight_policy_source_digest_set"
+            ],
+            "latency_weight_policy_status": latency_quorum_policy[
+                "weight_policy_status"
+            ],
+            "latency_weight_policy_bound": latency_quorum_policy[
+                "weight_policy_bound"
+            ],
+            "latency_weight_policy_digest": latency_quorum[
+                "latency_weight_policy_digest"
+            ],
             "latency_quorum_pass_weight": latency_quorum["pass_weight"],
             "latency_quorum_failed_participant_ids": latency_quorum[
                 "failed_participant_ids"
@@ -1220,6 +1258,8 @@ class SensoryLoopbackService:
             "raw_timing_payload_stored": False,
             "raw_hardware_adapter_payload_stored": False,
             "raw_latency_threshold_payload_stored": False,
+            "raw_latency_weight_policy_payload_stored": False,
+            "raw_latency_weight_authority_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -2502,6 +2542,9 @@ class SensoryLoopbackService:
             latency_quorum_pass_weight,
             latency_quorum_failed_participant_ids,
             latency_quorum_satisfied,
+            latency_weight_policy_bound,
+            latency_weight_policy_digest_bound,
+            latency_weight_policy_status,
             latency_quorum_digest_bound,
         ) = self._validate_latency_quorum_fields(
             binding,
@@ -2593,6 +2636,7 @@ class SensoryLoopbackService:
             and latency_quorum_satisfied
             and participant_latency_digest_set_bound
             and participant_latency_weight_digest_bound
+            and latency_weight_policy_digest_bound
             and latency_quorum_digest_bound
             else "blocked"
         )
@@ -2609,6 +2653,8 @@ class SensoryLoopbackService:
             "raw_timing_payload_stored",
             "raw_hardware_adapter_payload_stored",
             "raw_latency_threshold_payload_stored",
+            "raw_latency_weight_policy_payload_stored",
+            "raw_latency_weight_authority_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
         ):
@@ -2649,6 +2695,9 @@ class SensoryLoopbackService:
             "latency_quorum_pass_weight": latency_quorum_pass_weight,
             "latency_quorum_failed_participant_ids": latency_quorum_failed_participant_ids,
             "latency_quorum_satisfied": latency_quorum_satisfied,
+            "latency_weight_policy_bound": latency_weight_policy_bound,
+            "latency_weight_policy_digest_bound": latency_weight_policy_digest_bound,
+            "latency_weight_policy_status": latency_weight_policy_status,
             "latency_quorum_digest_bound": latency_quorum_digest_bound,
             "binding_digest_bound": binding_digest_bound,
             "all_participant_gates_bound": all_participant_gates_bound,
@@ -2670,6 +2719,8 @@ class SensoryLoopbackService:
             "raw_timing_payload_stored": False,
             "raw_hardware_adapter_payload_stored": False,
             "raw_latency_threshold_payload_stored": False,
+            "raw_latency_weight_policy_payload_stored": False,
+            "raw_latency_weight_authority_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -2919,19 +2970,58 @@ class SensoryLoopbackService:
         participant_ids: Sequence[str],
         participant_latency_weights: Optional[Mapping[str, float]],
         latency_quorum_threshold: Optional[float],
+        latency_weight_policy_authority_ref: str,
+        latency_weight_policy_authority_digest: str,
+        latency_weight_policy_source_digest_set: str,
     ) -> Dict[str, Any]:
+        weight_policy_authority_ref = self._normalize_string(
+            latency_weight_policy_authority_ref,
+            "latency_weight_policy_authority_ref",
+        )
+        weight_policy_authority_digest = self._normalize_string(
+            latency_weight_policy_authority_digest,
+            "latency_weight_policy_authority_digest",
+        )
+        weight_policy_source_digest_set = self._normalize_string(
+            latency_weight_policy_source_digest_set,
+            "latency_weight_policy_source_digest_set",
+        )
         weighted_requested = (
             participant_latency_weights is not None
             or latency_quorum_threshold is not None
         )
         if not weighted_requested:
+            if (
+                weight_policy_authority_ref
+                or weight_policy_authority_digest
+                or weight_policy_source_digest_set
+            ):
+                raise ValueError(
+                    "latency weight policy authority is only valid for weighted quorum",
+                )
             return {
                 "profile_id": SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE,
                 "threshold": 1.0,
                 "weights": self._equal_participant_latency_weights(participant_ids),
+                "weight_policy_profile": "not-bound",
+                "weight_policy_authority_ref": "",
+                "weight_policy_authority_digest": "",
+                "weight_policy_source_digest_set": "",
+                "weight_policy_status": "not-bound",
+                "weight_policy_bound": False,
             }
         if participant_latency_weights is None:
             raise ValueError("participant_latency_weights are required for weighted quorum")
+        for field_name, field_value in (
+            ("latency_weight_policy_authority_ref", weight_policy_authority_ref),
+            ("latency_weight_policy_authority_digest", weight_policy_authority_digest),
+            ("latency_weight_policy_source_digest_set", weight_policy_source_digest_set),
+        ):
+            if not field_value:
+                raise ValueError(
+                    "weighted latency quorum requires "
+                    f"{field_name} binding",
+                )
         if len(participant_ids) < SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS:
             raise ValueError(
                 "weighted latency quorum requires at least "
@@ -2955,6 +3045,12 @@ class SensoryLoopbackService:
             "profile_id": SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE,
             "threshold": threshold,
             "weights": weights,
+            "weight_policy_profile": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE,
+            "weight_policy_authority_ref": weight_policy_authority_ref,
+            "weight_policy_authority_digest": weight_policy_authority_digest,
+            "weight_policy_source_digest_set": weight_policy_source_digest_set,
+            "weight_policy_status": "complete",
+            "weight_policy_bound": True,
         }
 
     @staticmethod
@@ -3025,11 +3121,28 @@ class SensoryLoopbackService:
             policy["threshold"],
             weights,
         )
+        latency_weight_policy_digest = self._latency_weight_policy_digest(
+            profile_id=policy["profile_id"],
+            threshold=policy["threshold"],
+            participant_latency_weights=weights,
+            participant_latency_weight_digest=participant_latency_weight_digest,
+            weight_policy_profile=str(policy["weight_policy_profile"]),
+            weight_policy_authority_ref=str(policy["weight_policy_authority_ref"]),
+            weight_policy_authority_digest=str(
+                policy["weight_policy_authority_digest"],
+            ),
+            weight_policy_source_digest_set=str(
+                policy["weight_policy_source_digest_set"],
+            ),
+            weight_policy_status=str(policy["weight_policy_status"]),
+            weight_policy_bound=bool(policy["weight_policy_bound"]),
+        )
         latency_quorum_digest = self._latency_quorum_digest(
             profile_id=policy["profile_id"],
             threshold=policy["threshold"],
             participant_latency_weights=weights,
             participant_latency_weight_digest=participant_latency_weight_digest,
+            latency_weight_policy_digest=latency_weight_policy_digest,
             participant_latency_digest_set=participant_latency_digest_set,
             pass_weight=pass_weight,
             failed_participant_ids=failed_participant_ids,
@@ -3042,6 +3155,7 @@ class SensoryLoopbackService:
             "satisfied": satisfied,
             "status": "pass" if satisfied else "blocked",
             "participant_latency_weight_digest": participant_latency_weight_digest,
+            "latency_weight_policy_digest": latency_weight_policy_digest,
             "digest": latency_quorum_digest,
         }
 
@@ -3052,7 +3166,7 @@ class SensoryLoopbackService:
         participant_latency_bindings: Sequence[Mapping[str, Any]],
         participant_latency_digest_set: Any,
         errors: List[str],
-    ) -> Tuple[str, float, Dict[str, float], bool, float, List[str], bool, bool]:
+    ) -> Tuple[str, float, Dict[str, float], bool, float, List[str], bool, bool, bool, str, bool]:
         profile = binding.get("latency_quorum_profile")
         if profile not in {
             SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE,
@@ -3107,6 +3221,84 @@ class SensoryLoopbackService:
         )
         if not participant_latency_weight_digest_bound:
             errors.append("participant_latency_weight_digest mismatch")
+        weight_policy_profile = binding.get("latency_weight_policy_profile")
+        weight_policy_authority_ref = self._normalize_string_for_validation(
+            binding.get("latency_weight_policy_authority_ref", ""),
+            "latency_weight_policy_authority_ref",
+            errors,
+        )
+        weight_policy_authority_digest = self._normalize_string_for_validation(
+            binding.get("latency_weight_policy_authority_digest", ""),
+            "latency_weight_policy_authority_digest",
+            errors,
+        )
+        weight_policy_source_digest_set = self._normalize_string_for_validation(
+            binding.get("latency_weight_policy_source_digest_set", ""),
+            "latency_weight_policy_source_digest_set",
+            errors,
+        )
+        weight_policy_status = binding.get("latency_weight_policy_status")
+        if weight_policy_status not in {"complete", "not-bound"}:
+            errors.append("latency_weight_policy_status must be complete or not-bound")
+            weight_policy_status = "not-bound"
+        weight_policy_bound = binding.get("latency_weight_policy_bound")
+        if not isinstance(weight_policy_bound, bool):
+            errors.append("latency_weight_policy_bound must be a boolean")
+            weight_policy_bound = False
+        if profile == SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE:
+            if weight_policy_profile != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE:
+                errors.append(
+                    "weighted latency quorum must bind latency weight policy profile",
+                )
+            if weight_policy_status != "complete":
+                errors.append(
+                    "weighted latency quorum policy authority must be complete",
+                )
+            if weight_policy_bound is not True:
+                errors.append("weighted latency quorum policy authority must be bound")
+            for field_name, field_value in (
+                ("latency_weight_policy_authority_ref", weight_policy_authority_ref),
+                (
+                    "latency_weight_policy_authority_digest",
+                    weight_policy_authority_digest,
+                ),
+                (
+                    "latency_weight_policy_source_digest_set",
+                    weight_policy_source_digest_set,
+                ),
+            ):
+                if not field_value:
+                    errors.append(f"{field_name} must be bound for weighted quorum")
+        else:
+            if weight_policy_profile != "not-bound":
+                errors.append("strict latency quorum must not bind weight policy profile")
+            if weight_policy_status != "not-bound":
+                errors.append("strict latency quorum weight policy status must be not-bound")
+            if weight_policy_bound is not False:
+                errors.append("strict latency quorum weight policy must not be bound")
+            if (
+                weight_policy_authority_ref
+                or weight_policy_authority_digest
+                or weight_policy_source_digest_set
+            ):
+                errors.append("strict latency quorum weight policy authority must be empty")
+        expected_weight_policy_digest = self._latency_weight_policy_digest(
+            profile_id=str(profile),
+            threshold=threshold,
+            participant_latency_weights=weights,
+            participant_latency_weight_digest=expected_weight_digest,
+            weight_policy_profile=str(weight_policy_profile),
+            weight_policy_authority_ref=weight_policy_authority_ref,
+            weight_policy_authority_digest=weight_policy_authority_digest,
+            weight_policy_source_digest_set=weight_policy_source_digest_set,
+            weight_policy_status=str(weight_policy_status),
+            weight_policy_bound=bool(weight_policy_bound),
+        )
+        latency_weight_policy_digest_bound = (
+            binding.get("latency_weight_policy_digest") == expected_weight_policy_digest
+        )
+        if not latency_weight_policy_digest_bound:
+            errors.append("latency_weight_policy_digest mismatch")
 
         passed_by_participant = {
             binding_item.get("participant_identity_id"): (
@@ -3147,6 +3339,7 @@ class SensoryLoopbackService:
             threshold=threshold,
             participant_latency_weights=weights,
             participant_latency_weight_digest=expected_weight_digest,
+            latency_weight_policy_digest=expected_weight_policy_digest,
             participant_latency_digest_set=str(participant_latency_digest_set),
             pass_weight=expected_pass_weight,
             failed_participant_ids=failed_participant_ids,
@@ -3165,6 +3358,9 @@ class SensoryLoopbackService:
             expected_pass_weight,
             failed_participant_ids,
             expected_satisfied,
+            bool(weight_policy_bound),
+            latency_weight_policy_digest_bound,
+            str(weight_policy_status),
             latency_quorum_digest_bound,
         )
 
@@ -3295,12 +3491,52 @@ class SensoryLoopbackService:
         )
 
     @staticmethod
+    def _latency_weight_policy_digest(
+        *,
+        profile_id: str,
+        threshold: float,
+        participant_latency_weights: Mapping[str, float],
+        participant_latency_weight_digest: str,
+        weight_policy_profile: str,
+        weight_policy_authority_ref: str,
+        weight_policy_authority_digest: str,
+        weight_policy_source_digest_set: str,
+        weight_policy_status: str,
+        weight_policy_bound: bool,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": profile_id,
+                    "latency_quorum_threshold": threshold,
+                    "participant_latency_weights": dict(participant_latency_weights),
+                    "participant_latency_weight_digest": (
+                        participant_latency_weight_digest
+                    ),
+                    "latency_weight_policy_profile": weight_policy_profile,
+                    "latency_weight_policy_authority_ref": (
+                        weight_policy_authority_ref
+                    ),
+                    "latency_weight_policy_authority_digest": (
+                        weight_policy_authority_digest
+                    ),
+                    "latency_weight_policy_source_digest_set": (
+                        weight_policy_source_digest_set
+                    ),
+                    "latency_weight_policy_status": weight_policy_status,
+                    "latency_weight_policy_bound": weight_policy_bound,
+                }
+            )
+        )
+
+    @staticmethod
     def _latency_quorum_digest(
         *,
         profile_id: str,
         threshold: float,
         participant_latency_weights: Mapping[str, float],
         participant_latency_weight_digest: str,
+        latency_weight_policy_digest: str,
         participant_latency_digest_set: str,
         pass_weight: float,
         failed_participant_ids: Sequence[str],
@@ -3313,6 +3549,7 @@ class SensoryLoopbackService:
                     "latency_quorum_threshold": threshold,
                     "participant_latency_weights": dict(participant_latency_weights),
                     "participant_latency_weight_digest": participant_latency_weight_digest,
+                    "latency_weight_policy_digest": latency_weight_policy_digest,
                     "participant_latency_digest_set": participant_latency_digest_set,
                     "latency_quorum_pass_weight": pass_weight,
                     "latency_quorum_failed_participant_ids": list(
@@ -3353,6 +3590,17 @@ class SensoryLoopbackService:
             errors.append(f"{name} must be between 0 and 1")
             return 0.0
         return round(float(value), 3)
+
+    @staticmethod
+    def _normalize_string_for_validation(
+        value: Any,
+        name: str,
+        errors: List[str],
+    ) -> str:
+        if not isinstance(value, str):
+            errors.append(f"{name} must be a string")
+            return ""
+        return value.strip()
 
     @staticmethod
     def _normalize_string(value: Any, name: str) -> str:

@@ -872,6 +872,9 @@ class CliIntegrationTests(unittest.TestCase):
                 "shared_loopback_weighted_latency_quorum_digest_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["shared_loopback_weighted_latency_policy_bound"]
+        )
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["session"]["status"])
@@ -899,6 +902,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("weighted-latency-quorum-v1", weighted_binding["latency_quorum_profile"])
         self.assertFalse(weighted_binding["all_latency_gates_passed"])
         self.assertTrue(weighted_binding["latency_quorum_satisfied"])
+        self.assertTrue(weighted_binding["latency_weight_policy_bound"])
+        self.assertFalse(weighted_binding["raw_latency_weight_authority_payload_stored"])
 
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

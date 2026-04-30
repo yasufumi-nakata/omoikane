@@ -833,6 +833,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ]
         )
         self.assertTrue(
+            result["validation"]["shared_loopback_weighted_latency_policy_bound"]
+        )
+        self.assertTrue(
             result["validation"][
                 "shared_loopback_weighted_latency_quorum_failed_participant_bound"
             ]
@@ -868,6 +871,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(weighted_binding["all_latency_gates_passed"])
         self.assertTrue(weighted_binding["latency_quorum_satisfied"])
         self.assertEqual(0.8, weighted_binding["latency_quorum_pass_weight"])
+        self.assertTrue(weighted_binding["latency_weight_policy_bound"])
+        self.assertEqual("complete", weighted_binding["latency_weight_policy_status"])
+        self.assertFalse(weighted_binding["raw_latency_weight_policy_payload_stored"])
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-sensory-loopback"])
         self.assertEqual(
             1,

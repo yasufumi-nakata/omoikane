@@ -5,8 +5,9 @@ description: >
   Digest-only binding that distributes participant-specific BioData calibration
   confidence, feature-window drift gates, fresh calibration refresh receipts,
   and hardware timing latency gates into one shared Sensory Loopback arbitration
-  session without storing raw BioData, calibration, drift, refresh, timing,
-  hardware adapter, or gate payloads.
+  session, including weighted latency quorum policy-authority binding when used,
+  without storing raw BioData, calibration, drift, refresh, timing,
+  hardware adapter, weight policy authority, or gate payloads.
 type: object
 additionalProperties: false
 required:
@@ -34,6 +35,13 @@ required:
   - latency_quorum_threshold
   - participant_latency_weights
   - participant_latency_weight_digest
+  - latency_weight_policy_profile
+  - latency_weight_policy_authority_ref
+  - latency_weight_policy_authority_digest
+  - latency_weight_policy_source_digest_set
+  - latency_weight_policy_status
+  - latency_weight_policy_bound
+  - latency_weight_policy_digest
   - latency_quorum_pass_weight
   - latency_quorum_failed_participant_ids
   - latency_quorum_satisfied
@@ -54,6 +62,8 @@ required:
   - raw_timing_payload_stored
   - raw_hardware_adapter_payload_stored
   - raw_latency_threshold_payload_stored
+  - raw_latency_weight_policy_payload_stored
+  - raw_latency_weight_authority_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
   - binding_digest
@@ -339,6 +349,27 @@ properties:
   participant_latency_weight_digest:
     type: string
     minLength: 32
+  latency_weight_policy_profile:
+    type: string
+    enum:
+      - not-bound
+      - weighted-latency-quorum-authority-v1
+  latency_weight_policy_authority_ref:
+    type: string
+  latency_weight_policy_authority_digest:
+    type: string
+  latency_weight_policy_source_digest_set:
+    type: string
+  latency_weight_policy_status:
+    type: string
+    enum:
+      - complete
+      - not-bound
+  latency_weight_policy_bound:
+    type: boolean
+  latency_weight_policy_digest:
+    type: string
+    minLength: 32
   latency_quorum_pass_weight:
     type: number
     minimum: 0
@@ -386,6 +417,10 @@ properties:
   raw_hardware_adapter_payload_stored:
     const: false
   raw_latency_threshold_payload_stored:
+    const: false
+  raw_latency_weight_policy_payload_stored:
+    const: false
+  raw_latency_weight_authority_payload_stored:
     const: false
   subjective_equivalence_claimed:
     const: false

@@ -345,6 +345,17 @@ operations:
             type: number
             exclusiveMinimum: 0
             maximum: 1
+          latency_weight_policy_authority_ref:
+            type: string
+            description: Required authority reference when participant_latency_weights select weighted-latency-quorum-v1.
+          latency_weight_policy_authority_digest:
+            type: string
+            minLength: 32
+            description: Digest of the external authority that approved the participant latency weights.
+          latency_weight_policy_source_digest_set:
+            type: string
+            minLength: 32
+            description: Digest set for the source policy evidence used to approve the participant latency weights.
     output:
       schema_ref: sensory_loopback_biodata_arbitration_binding
     guarantees:
@@ -355,9 +366,10 @@ operations:
       - each participant gate must propagate a fresh calibration refresh receipt with a bound freshness window
       - without participant_latency_weights, each participant latency gate must pass the hardware timing drift threshold
       - with weighted-latency-quorum-v1 on 3-4 participants, blocked participant timing gates are allowed only when the passing participant weight meets latency_quorum_threshold
+      - weighted-latency-quorum-v1 also requires latency_weight_policy_authority_ref, latency_weight_policy_authority_digest, and latency_weight_policy_source_digest_set
       - every participant latency gate must share the BioData threshold policy authority digest when authority is bound
-      - the output keeps only gate refs/digests, drift gate refs/digests, refresh refs/digests/source digest sets, threshold digests, timing gate digests, target gate-set digests, participant latency weights, and latency quorum digests
-      - raw BioData, calibration, drift, refresh, timing, hardware adapter, and gate payloads remain redacted
+      - the output keeps only gate refs/digests, drift gate refs/digests, refresh refs/digests/source digest sets, threshold digests, timing gate digests, target gate-set digests, participant latency weights, weight-policy authority refs/digests, and latency quorum digests
+      - raw BioData, calibration, drift, refresh, timing, hardware adapter, weight-policy authority, and gate payloads remain redacted
   deliver_bundle:
     summary: Deliver one bounded multi-sensory bundle with avatar body-map alignment evidence, optional shared-space owner arbitration, or degrade it into a guardian-controlled safe baseline.
     input:
