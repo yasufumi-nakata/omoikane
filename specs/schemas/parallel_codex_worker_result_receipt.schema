@@ -16,6 +16,8 @@ description: >
   digest so a current-looking provider timestamp cannot be reused silently.
   Remote branch / PR receipts also bind the mutable source ref to a digest-only
   content identity made from head commit, tree digest, and diff digest evidence.
+  The same content identity is chained to an ancestry receipt that proves the
+  remote head is based on the worker/main checkout base commit before integration.
 type: object
 additionalProperties: false
 required:
@@ -64,6 +66,12 @@ required:
   - remote_source_diff_digest
   - remote_source_content_digest
   - remote_source_content_bound
+  - remote_source_ancestry_profile
+  - remote_source_base_commit
+  - remote_source_merge_base_commit
+  - remote_source_ancestry_status
+  - remote_source_ancestry_digest
+  - remote_source_ancestry_bound
   - remote_metadata_digest
   - remote_metadata_bound
   - worker_identity_profile
@@ -111,6 +119,7 @@ required:
   - raw_remote_revocation_timestamp_payload_stored
   - raw_remote_revocation_timestamp_replay_guard_payload_stored
   - raw_remote_source_content_payload_stored
+  - raw_remote_source_ancestry_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -273,6 +282,28 @@ properties:
     pattern: "^$|^[a-f0-9]{64}$"
   remote_source_content_bound:
     type: boolean
+  remote_source_ancestry_profile:
+    type: string
+    enum:
+      - remote-source-main-ancestry-binding-v1
+      - not-applicable
+  remote_source_base_commit:
+    type: string
+    pattern: "^$|^[a-f0-9]{40}$"
+  remote_source_merge_base_commit:
+    type: string
+    pattern: "^$|^[a-f0-9]{40}$"
+  remote_source_ancestry_status:
+    type: string
+    enum:
+      - ancestor-bound
+      - unrelated
+      - not-applicable
+  remote_source_ancestry_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_ancestry_bound:
+    type: boolean
   remote_metadata_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -428,6 +459,8 @@ properties:
   raw_remote_revocation_timestamp_replay_guard_payload_stored:
     const: false
   raw_remote_source_content_payload_stored:
+    const: false
+  raw_remote_source_ancestry_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false

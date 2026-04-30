@@ -979,12 +979,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["remote_source_content_digest_bound"])
         self.assertTrue(result["validation"]["remote_source_content_bound"])
         self.assertTrue(result["validation"]["remote_source_content_status_bound"])
+        self.assertTrue(result["validation"]["remote_source_ancestry_digest_bound"])
+        self.assertTrue(result["validation"]["remote_source_ancestry_bound"])
+        self.assertTrue(result["validation"]["remote_source_ancestry_status_bound"])
+        self.assertTrue(
+            result["validation"]["remote_source_base_commit_matches_worker"]
+        )
         self.assertTrue(result["validation"]["remote_raw_metadata_payload_redacted"])
         self.assertTrue(result["validation"]["remote_raw_revocation_payload_redacted"])
         self.assertTrue(result["validation"]["remote_raw_source_content_payload_redacted"])
+        self.assertTrue(
+            result["validation"]["remote_raw_source_ancestry_payload_redacted"]
+        )
         self.assertTrue(result["validation"]["content_mismatch_result_blocked"])
         self.assertTrue(result["validation"]["content_mismatch_digest_bound"])
         self.assertTrue(result["validation"]["content_mismatch_status_rejected"])
+        self.assertTrue(result["validation"]["unrelated_ancestry_result_blocked"])
+        self.assertTrue(result["validation"]["unrelated_ancestry_digest_bound"])
+        self.assertTrue(result["validation"]["unrelated_ancestry_status_rejected"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(result["validation"]["blocked_base_head_mismatch"])
         self.assertTrue(result["validation"]["blocked_receipt_digest_bound"])
@@ -1007,6 +1019,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "blocked",
             result["content_mismatch_receipt"]["integration_decision"],
+        )
+        self.assertEqual(
+            "blocked",
+            result["unrelated_ancestry_receipt"]["integration_decision"],
         )
         self.assertEqual(
             "remote-branch-pr-worker-result",

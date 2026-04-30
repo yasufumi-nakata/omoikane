@@ -50,8 +50,10 @@ blocked のまま保持する。remote freshness refs は signed provider timest
 へ束縛し、`unique` でない timestamp reuse も blocked のまま保持する。raw timestamp /
 replay-guard payload は保存しない。mutable な remote branch / PR ref は
 head commit、tree digest、diff digest、content digest の identity に縮約し、
-`bound` でない content identity も blocked のまま保持する。raw remote content
-payload は保存しない。
+worker base commit と merge-base commit が main checkout head に一致する
+ancestry digest へも束縛する。`bound` でない content identity や
+`ancestor-bound` でない ancestry result も blocked のまま保持する。
+raw remote content / ancestry payload は保存しない。
 workspace-enacted marker-only payload は別 digest に縮約され、marker だけの worker
 result は blocked のまま保持される。
 `builder-live-demo` の actual command receipt は

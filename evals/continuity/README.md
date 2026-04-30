@@ -138,8 +138,9 @@ high-priority task として検出できるか。
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、
 verification manifest、worker base commit freshness、signed worker identity、
 remote branch / PR metadata、remote source revocation check、freshness window、
-signed provider timestamp、timestamp replay guard を main checkout integration 前の schema-bound receipt
-として固定し、stale worker result を fail-closed にできるか。
+signed provider timestamp、timestamp replay guard、remote source content identity、
+remote source main-head ancestry を main checkout integration 前の schema-bound receipt
+として固定し、stale worker result と unrelated ancestry result を fail-closed にできるか。
 
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。

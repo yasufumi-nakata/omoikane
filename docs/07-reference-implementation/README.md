@@ -924,12 +924,16 @@ replay guard digest、`remote_source_revocation_timestamp_replay_status=unique`
 ref は `remote_source_head_commit`、`remote_source_tree_digest`、
 `remote_source_diff_digest`、`remote_source_content_digest` の
 content identity に縮約し、同じ `remote_metadata_digest` に含める。
-content identity が `bound` でない remote result は schema-bound のまま blocked にする。
+content identity はさらに `remote_source_base_commit` と
+`remote_source_merge_base_commit` が worker base commit に一致する
+`remote_source_ancestry_digest` へ束縛し、同じ `remote_metadata_digest` に含める。
+content identity が `bound` でない remote result や ancestry が
+`ancestor-bound` でない remote result は schema-bound のまま blocked にする。
 revoked / stale / expired source、
 replayed timestamp、または
 `remote_source_revocation_timestamp_status` が `signed-current` でない source は
 schema-bound のまま blocked にし、raw remote metadata / revocation / freshness /
-timestamp / replay-guard / source content payload は保存しない。
+timestamp / replay-guard / source content / source ancestry payload は保存しない。
 blocked receipt は stale worker base commit を schema-bound に残しつつ
 `integration_decision=blocked` として fail-closed にする。
 同じ demo は Yaoyorozu worker dispatch receipt から

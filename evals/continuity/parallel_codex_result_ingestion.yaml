@@ -4,8 +4,9 @@ summary: >
   parallel-orchestration-demo が worker result の patch digest、changed files、
   verification result、base commit freshness、signed worker identity、remote
   branch / PR metadata、remote source revocation check、freshness window、
-  signed provider timestamp、timestamp replay guard、remote source content identity を main checkout integration 前の digest-only receipt として
-  固定し、stale worker result と workspace-enacted marker-only result を fail-closed にすること
+  signed provider timestamp、timestamp replay guard、remote source content identity、
+  remote source main-head ancestry を main checkout integration 前の digest-only receipt として
+  固定し、stale worker result、workspace-enacted marker-only result、unrelated ancestry result を fail-closed にすること
 checks:
   - name: parallel Codex worker result ingestion smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -34,6 +35,10 @@ expect:
   remote_source_content_digest_bound: true
   remote_source_content_bound: true
   remote_source_content_status_bound: true
+  remote_source_ancestry_digest_bound: true
+  remote_source_ancestry_bound: true
+  remote_source_ancestry_status_bound: true
+  remote_source_base_commit_matches_worker: true
   remote_review_authority_digest_bound: true
   remote_accepted_source_policy_digest_bound: true
   remote_worker_identity_evidence_bound: true
@@ -47,6 +52,10 @@ expect:
   content_mismatch_digest_bound: true
   content_mismatch_status_rejected: true
   content_mismatch_raw_source_content_payload_redacted: true
+  unrelated_ancestry_result_blocked: true
+  unrelated_ancestry_digest_bound: true
+  unrelated_ancestry_status_rejected: true
+  unrelated_ancestry_raw_source_ancestry_payload_redacted: true
   blocked_stale_worker_result: true
   blocked_base_head_mismatch: true
   marker_only_result_blocked: true
@@ -68,6 +77,7 @@ expect:
   raw_remote_revocation_timestamp_payload_stored: false
   raw_remote_revocation_timestamp_replay_guard_payload_stored: false
   raw_remote_source_content_payload_stored: false
+  raw_remote_source_ancestry_payload_stored: false
   raw_transcript_payload_stored: false
   raw_verification_payload_stored: false
 metric: boolean

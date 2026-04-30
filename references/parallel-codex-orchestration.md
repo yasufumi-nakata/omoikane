@@ -44,7 +44,9 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   revocation / freshness / timestamp / replay-guard payload は保存しない
 - remote branch / PR 由来の mutable ref は head commit、tree digest、diff digest、
   content digest に縮約し、`bound` でない content identity result は fail-closed にする。
-  raw remote source content payload は保存しない
+  さらに worker base commit と merge-base commit が一致する ancestry digest へ束縛し、
+  `ancestor-bound` でない remote result も fail-closed にする。
+  raw remote source content / ancestry payload は保存しない
 - user または他 worker の未確認変更を revert しない
 
 ## Integration
