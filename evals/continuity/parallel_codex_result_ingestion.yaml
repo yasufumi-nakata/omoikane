@@ -17,8 +17,12 @@ expect:
   ready_receipt_digest_bound: true
   blocked_stale_worker_result: true
   blocked_base_head_mismatch: true
+  yaoyorozu_bridge_ready_for_main_checkout: true
+  yaoyorozu_bridge_upstream_binding_digest_bound: true
+  yaoyorozu_bridge_patch_candidates_bound: true
   ledger_bound: true
   raw_patch_payload_stored: false
+  raw_upstream_payload_stored: false
   raw_transcript_payload_stored: false
   raw_verification_payload_stored: false
 metric: boolean

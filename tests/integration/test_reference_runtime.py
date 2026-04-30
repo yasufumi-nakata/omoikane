@@ -963,9 +963,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(result["validation"]["blocked_base_head_mismatch"])
         self.assertTrue(result["validation"]["blocked_receipt_digest_bound"])
+        self.assertTrue(
+            result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
+        )
+        self.assertTrue(result["validation"]["yaoyorozu_bridge_patch_candidates_bound"])
         self.assertTrue(result["validation"]["ledger_bound"])
         self.assertEqual("accept-ready", result["ready_receipt"]["integration_decision"])
         self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
+        self.assertEqual(
+            "yaoyorozu-worker-dispatch",
+            result["yaoyorozu_bridge_receipt"]["source_system"],
+        )
 
     def test_gap_report_reads_repo(self) -> None:
         runtime = OmoikaneReferenceOS()

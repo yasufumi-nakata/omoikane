@@ -56,9 +56,20 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
             result["blocked_receipt"],
         )
-        self.assertEqual(2, len(result["schema_contracts"]))
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_worker_result_receipt.schema",
+            result["yaoyorozu_bridge_receipt"],
+        )
+        self.assertEqual(3, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
+        self.assertTrue(
+            result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
+        )
+        self.assertTrue(result["validation"]["yaoyorozu_bridge_patch_candidates_bound"])
+        self.assertTrue(
+            result["validation"]["yaoyorozu_bridge_raw_upstream_payload_redacted"]
+        )
         self.assertTrue(result["validation"]["ledger_bound"])
 
 

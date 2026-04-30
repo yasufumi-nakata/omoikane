@@ -15,7 +15,7 @@ OS 自身が自身の設計図を読み、改修パッチを生成・検証・�
 
 - `DesignReader` ── docs/ と specs/ を解釈し、git-bound `design_delta_scan_receipt`、section-level `section_changes`、`planning_cues`、fail-closed `design_delta_manifest` / build_request handoff を生成
 - `PatchGenerator` ── `build_request` を読み、immutable boundary と workspace scope を検証したうえで planning cue / target subsystem / output path に整列した multi-file patch descriptor を生成する（Codex 系）
-- `ParallelCodexOrchestration` ── subagent / worker / `codex exec` の成果を main checkout に混ぜる前に、worker base commit、ownership scope、changed file manifest digest、patch digest、verification manifest digest を `parallel_codex_worker_result_receipt` として束縛し、stale / failed / blocked result を fail-closed にする
+- `ParallelCodexOrchestration` ── subagent / worker / `codex exec` / Yaoyorozu worker dispatch の成果を main checkout に混ぜる前に、worker base commit、ownership scope、changed file manifest digest、patch digest、verification manifest digest、upstream dispatch / patch candidate digest を `parallel_codex_worker_result_receipt` として束縛し、stale / failed / blocked result を fail-closed にする
 - `Sandboxer` ── Mirage Self の生成・隔離
 - `LiveEnactment` ── patch descriptor を temp workspace に materialize する前に artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を確認し、actual eval command を実行して cleanup / oversight gate 付き receipt を返す
 - `DifferentialEvaluator` ── `must_pass` eval を選定し、parsed baseline/sandbox evidence と comparison digest に加え、必要時は temp workspace の actual command run を `diff_eval_execution_receipt` として束縛して promote/hold/rollback 判定を返す
@@ -78,6 +78,9 @@ reference runtime では `builder-demo` がこの流れのうち
 `worker result -> patch digest + changed files + verification result -> schema-bound ingestion receipt`
 を direct contract として再現し、main checkout head と worker base commit が一致しない stale result を
 receipt 化したまま integration から除外する。
+同じ demo は Yaoyorozu worker dispatch receipt を upstream source として受け取り、
+dispatch receipt digest、patch candidate receipt refs/digests、changed files を
+`upstream_binding_digest` へ縮約してから Parallel Codex ingestion receipt に変換する。
 
 ## Mirage Self（サンドボックス自我）
 

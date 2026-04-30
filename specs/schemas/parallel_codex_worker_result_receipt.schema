@@ -14,6 +14,12 @@ required:
   - profile_id
   - integration_policy_profile
   - reference_runbook_ref
+  - source_system
+  - upstream_receipt_ref
+  - upstream_receipt_digest
+  - upstream_patch_candidate_receipt_refs
+  - upstream_patch_candidate_receipt_digests
+  - upstream_binding_digest
   - worker_id
   - worker_role
   - worker_result_status
@@ -33,6 +39,7 @@ required:
   - integration_decision
   - result_summary
   - raw_patch_payload_stored
+  - raw_upstream_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -55,6 +62,31 @@ properties:
     const: main-checkout-worker-result-ingestion-v1
   reference_runbook_ref:
     const: references/parallel-codex-orchestration.md
+  source_system:
+    type: string
+    enum:
+      - direct-worker-result
+      - yaoyorozu-worker-dispatch
+  upstream_receipt_ref:
+    type: string
+  upstream_receipt_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  upstream_patch_candidate_receipt_refs:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  upstream_patch_candidate_receipt_digests:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  upstream_binding_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
   worker_id:
     type: string
     minLength: 1
@@ -130,6 +162,8 @@ properties:
     type: string
     minLength: 1
   raw_patch_payload_stored:
+    const: false
+  raw_upstream_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false

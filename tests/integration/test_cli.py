@@ -95,6 +95,14 @@ class CliIntegrationTests(unittest.TestCase):
             result["ready_receipt"]["profile_id"],
         )
         self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
+        self.assertEqual(
+            "yaoyorozu-worker-dispatch",
+            result["yaoyorozu_bridge_receipt"]["source_system"],
+        )
+        self.assertTrue(
+            result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
+        )
+        self.assertTrue(result["validation"]["yaoyorozu_bridge_patch_candidates_bound"])
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()

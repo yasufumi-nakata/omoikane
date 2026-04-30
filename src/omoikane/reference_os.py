@@ -998,11 +998,67 @@ class OmoikaneReferenceOS:
                 "checkout integration."
             ),
         )
+        yaoyorozu_patch_receipt_digest = sha256_text(
+            canonical_json(
+                {
+                    "receipt_ref": "worker-patch://yaoyorozu-worker-patch-candidate-111111111111",
+                    "target_path": "src/omoikane/agentic/yaoyorozu.py",
+                    "candidate_digest": "c" * 64,
+                }
+            )
+        )
+        yaoyorozu_dispatch_receipt = {
+            "kind": "yaoyorozu_worker_dispatch_receipt",
+            "receipt_id": "yaoyorozu-dispatch-receipt-222222222222",
+            "dispatch_plan_ref": "dispatch://yaoyorozu-dispatch-333333333333",
+            "dispatch_plan_digest": "d" * 64,
+            "receipt_digest": "e" * 64,
+            "results": [
+                {
+                    "unit_id": "worker-dispatch-444444444444",
+                    "report": {
+                        "patch_candidate_receipt": {
+                            "kind": "yaoyorozu_worker_patch_candidate_receipt",
+                            "receipt_ref": (
+                                "worker-patch://"
+                                "yaoyorozu-worker-patch-candidate-111111111111"
+                            ),
+                            "receipt_digest": yaoyorozu_patch_receipt_digest,
+                            "status": "candidate-ready",
+                            "patch_candidates": [
+                                {
+                                    "target_path": "src/omoikane/agentic/yaoyorozu.py",
+                                    "patch_descriptor": {
+                                        "target_path": (
+                                            "src/omoikane/agentic/yaoyorozu.py"
+                                        )
+                                    },
+                                    "candidate_digest": "c" * 64,
+                                }
+                            ],
+                        }
+                    },
+                }
+            ],
+        }
+        yaoyorozu_bridge_receipt = (
+            self.parallel_orchestration.ingest_yaoyorozu_dispatch_receipt(
+                dispatch_receipt=yaoyorozu_dispatch_receipt,
+                main_checkout_head=main_checkout_head,
+                worker_base_commit=main_checkout_head,
+                verification_results=verification_results,
+            )
+        )
         ready_validation = self.parallel_orchestration.validate_worker_result_receipt(
             ready_receipt,
         )
         blocked_validation = self.parallel_orchestration.validate_worker_result_receipt(
             blocked_receipt,
+        )
+        yaoyorozu_bridge_validation = (
+            self.parallel_orchestration.validate_worker_result_receipt(
+                yaoyorozu_bridge_receipt,
+            )
         )
         ledger_entry = self.ledger.append(
             identity_id="omoikane-reference-runtime",
@@ -1018,7 +1074,17 @@ class OmoikaneReferenceOS:
                 ],
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
+                "yaoyorozu_bridge_receipt_ref": yaoyorozu_bridge_receipt[
+                    "receipt_ref"
+                ],
+                "yaoyorozu_bridge_receipt_digest": yaoyorozu_bridge_receipt[
+                    "receipt_digest"
+                ],
+                "yaoyorozu_bridge_upstream_binding_digest": (
+                    yaoyorozu_bridge_receipt["upstream_binding_digest"]
+                ),
                 "raw_patch_payload_stored": False,
+                "raw_upstream_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1045,12 +1111,21 @@ class OmoikaneReferenceOS:
                 ),
                 "contract_role": "parallel-codex-blocked-stale-worker-result",
             },
+            {
+                "payload_path": "yaoyorozu_bridge_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_worker_result_receipt.schema"
+                ),
+                "contract_role": "yaoyorozu-dispatch-to-parallel-codex-ingestion",
+            },
         ]
         return {
             "policy": self.parallel_orchestration.policy(),
             "schema_contracts": schema_contracts,
             "ready_receipt": ready_receipt,
             "blocked_receipt": blocked_receipt,
+            "yaoyorozu_bridge_receipt": yaoyorozu_bridge_receipt,
             "ledger_entry_ref": f"ledger://continuity-ledger/{ledger_entry.entry_hash}",
             "ledger_entry_hash": ledger_entry.entry_hash,
             "ledger_payload_ref": ledger_entry.payload_ref,
@@ -1058,7 +1133,9 @@ class OmoikaneReferenceOS:
                 "ok": (
                     ready_validation["ok"]
                     and blocked_validation["ok"]
+                    and yaoyorozu_bridge_validation["ok"]
                     and ready_validation["ready_for_main_checkout"]
+                    and yaoyorozu_bridge_validation["ready_for_main_checkout"]
                     and not blocked_validation["ready_for_main_checkout"]
                 ),
                 "ready_receipt_ok": ready_validation["ok"],
@@ -1092,6 +1169,23 @@ class OmoikaneReferenceOS:
                 "blocked_receipt_digest_bound": blocked_validation[
                     "receipt_digest_bound"
                 ],
+                "yaoyorozu_bridge_ready_for_main_checkout": (
+                    yaoyorozu_bridge_validation["ready_for_main_checkout"]
+                ),
+                "yaoyorozu_bridge_upstream_binding_digest_bound": (
+                    yaoyorozu_bridge_validation["ok"]
+                    and yaoyorozu_bridge_receipt["source_system"]
+                    == "yaoyorozu-worker-dispatch"
+                    and bool(yaoyorozu_bridge_receipt["upstream_binding_digest"])
+                ),
+                "yaoyorozu_bridge_patch_candidates_bound": bool(
+                    yaoyorozu_bridge_receipt[
+                        "upstream_patch_candidate_receipt_digests"
+                    ]
+                ),
+                "yaoyorozu_bridge_raw_upstream_payload_redacted": (
+                    yaoyorozu_bridge_validation["raw_upstream_payload_redacted"]
+                ),
                 "ledger_bound": bool(ledger_entry.entry_hash)
                 and ledger_entry.payload_ref.startswith("cas://sha256/"),
             },

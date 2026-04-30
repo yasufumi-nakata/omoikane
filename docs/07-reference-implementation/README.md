@@ -908,6 +908,11 @@ changed file manifest digest、patch digest、unittest / gap-report verification
 raw patch payload、raw transcript、raw verification output は保存しない。
 blocked receipt は stale worker base commit を schema-bound に残しつつ
 `integration_decision=blocked` として fail-closed にする。
+同じ demo は Yaoyorozu worker dispatch receipt から
+dispatch receipt digest、dispatch plan digest、patch candidate receipt refs/digests、
+changed files を取り出し、`upstream_binding_digest` と derived `patch_digest` を持つ
+`source_system=yaoyorozu-worker-dispatch` receipt へ変換する。
+raw dispatch payload や raw patch payload は Parallel Codex 側へ保存しない。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

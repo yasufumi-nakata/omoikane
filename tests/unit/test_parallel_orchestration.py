@@ -127,6 +127,62 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertIn("changed_file_count mismatch", validation["errors"])
         self.assertIn("receipt_digest mismatch", validation["errors"])
 
+    def test_yaoyorozu_dispatch_receipt_bridges_to_parallel_ingestion(self) -> None:
+        patch_receipt_digest = "c" * 64
+        dispatch_receipt = {
+            "kind": "yaoyorozu_worker_dispatch_receipt",
+            "receipt_id": "yaoyorozu-dispatch-receipt-aaaaaaaaaaaa",
+            "dispatch_plan_digest": "d" * 64,
+            "receipt_digest": "e" * 64,
+            "results": [
+                {
+                    "report": {
+                        "patch_candidate_receipt": {
+                            "receipt_ref": (
+                                "worker-patch://"
+                                "yaoyorozu-worker-patch-candidate-bbbbbbbbbbbb"
+                            ),
+                            "receipt_digest": patch_receipt_digest,
+                            "patch_candidates": [
+                                {
+                                    "target_path": (
+                                        "src/omoikane/agentic/yaoyorozu.py"
+                                    ),
+                                    "patch_descriptor": {
+                                        "target_path": (
+                                            "src/omoikane/agentic/yaoyorozu.py"
+                                        )
+                                    },
+                                }
+                            ],
+                        }
+                    }
+                }
+            ],
+        }
+
+        receipt = self.service.ingest_yaoyorozu_dispatch_receipt(
+            dispatch_receipt=dispatch_receipt,
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            verification_results=_verification_results(),
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("yaoyorozu-worker-dispatch", receipt["source_system"])
+        self.assertEqual("accept-ready", receipt["integration_decision"])
+        self.assertEqual(
+            ["src/omoikane/agentic/yaoyorozu.py"],
+            receipt["changed_files"],
+        )
+        self.assertEqual(
+            [patch_receipt_digest],
+            receipt["upstream_patch_candidate_receipt_digests"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["ready_for_main_checkout"])
+        self.assertFalse(receipt["raw_upstream_payload_stored"])
+
 
 if __name__ == "__main__":
     unittest.main()
