@@ -199,6 +199,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `yaoyorozu_inter_mind_negotiation_profile.yaml`
 - `yaoyorozu_local_worker_dispatch.yaml`
   - source manifest の public verification bundle ref/digest が worker dispatch plan / receipt へ carry されることも同じ eval で固定する
+  - cross-workspace dispatch manifest の ref/digest が workspace discovery・dispatch units・preseed/dependency requirements を raw payload なしで plan / receipt 双方に束縛することも同じ eval で固定する
 - `yaoyorozu_memory_edit_optional_schema_dispatch.yaml`
 - `yaoyorozu_worker_patch_candidate_receipt.yaml`
 - `yaoyorozu_worker_delta_receipt.yaml`

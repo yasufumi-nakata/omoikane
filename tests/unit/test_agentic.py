@@ -3779,6 +3779,9 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["source_manifest_public_verification_bound"])
         self.assertTrue(validation["source_manifest_public_verification_digest_bound"])
+        self.assertTrue(validation["cross_workspace_dispatch_manifest_bound"])
+        self.assertTrue(validation["cross_workspace_dispatch_manifest_digest_bound"])
+        self.assertFalse(validation["cross_workspace_manifest_workspace_discovery_bound"])
         self.assertEqual(4, validation["dispatch_unit_count"])
         self.assertEqual([], validation["missing_coverage"])
         self.assertEqual(
@@ -3864,6 +3867,10 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["source_manifest_public_verification_bound"])
+        self.assertTrue(validation["cross_workspace_dispatch_manifest_bound"])
+        self.assertTrue(validation["cross_workspace_dispatch_manifest_digest_bound"])
+        self.assertTrue(validation["cross_workspace_manifest_workspace_discovery_bound"])
+        self.assertTrue(validation["cross_workspace_manifest_workspace_execution_bound"])
         self.assertTrue(session["validation"]["workspace_execution_bound"])
         self.assertTrue(session["validation"]["workspace_execution_policy_ready"])
         self.assertTrue(plan["validation"]["workspace_execution_bound"])

@@ -607,6 +607,11 @@ optional coverage を requested dispatch として追加できること、
 digest-only public bundle 本体を carry し、worker 実行前の agent source manifest が
 ContinuityLedger entry / self+guardian signature digest / raw payload 非公開 condition に
 束縛済みであること、
+さらに `yaoyorozu-cross-workspace-dispatch-manifest-v1` が
+workspace discovery ref/digest、accepted workspace digest set、dispatch unit
+workspace selection、preseed gate、dependency materialization requirement、
+source manifest public bundle を raw workspace/source/dispatch payload 非保存の
+reviewer-facing manifest として dispatch plan / receipt の両方へ carry すること、
 さらに `workspace_discovery_binding` が存在する場合は
 `workspace_execution_binding` により required coverage area を non-source candidate workspace へ割り当て、
 requested optional coverage は candidate が無い場合に source fallback として明示し、

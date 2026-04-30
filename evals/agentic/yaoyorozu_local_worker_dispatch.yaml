@@ -13,6 +13,8 @@ expected:
   worker_dispatch_receipt_ok: true
   worker_dispatch_source_manifest_public_verification_bound: true
   worker_dispatch_receipt_source_manifest_public_verification_bound: true
+  worker_dispatch_cross_workspace_manifest_bound: true
+  worker_dispatch_receipt_cross_workspace_manifest_bound: true
   worker_dispatch_coverage_complete: true
   same_host_scope_only: true
   external_workspace_seeded: true

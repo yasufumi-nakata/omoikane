@@ -16,6 +16,7 @@ imports:
   yaoyorozu_registry_snapshot: ../schemas/yaoyorozu_registry_snapshot.schema
   yaoyorozu_source_manifest_ledger_binding: ../schemas/yaoyorozu_source_manifest_ledger_binding.schema
   yaoyorozu_source_manifest_public_verification_bundle: ../schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
+  yaoyorozu_cross_workspace_dispatch_manifest: ../schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
   council_convocation_session: ../schemas/council_convocation_session.schema
   yaoyorozu_worker_dispatch_plan: ../schemas/yaoyorozu_worker_dispatch_plan.schema
   yaoyorozu_worker_dispatch_receipt: ../schemas/yaoyorozu_worker_dispatch_receipt.schema
@@ -254,6 +255,7 @@ operations:
       - proposal_profile must fix the required and optional worker coverage policy echoed by the dispatch plan summary
       - requested optional worker coverage, when present, must remain a subset of the proposal profile's optional coverage and bind dispatch_coverage_areas deterministically
       - source_manifest_ledger_binding must already carry a ready yaoyorozu-source-manifest-public-verification-bundle-v1 ref/digest, and the dispatch plan must bind that same public bundle before worker launch
+      - every dispatch plan must emit a yaoyorozu-cross-workspace-dispatch-manifest-v1 ref/digest that binds workspace discovery, accepted workspace digests, dispatch units, preseed gates, dependency requirements, and the source-manifest public bundle without raw payload storage
       - every command preview must remain same-host, subprocess-bound, and temp-workspace-only
       - when workspace_discovery is bound, every dispatch unit must choose one profile-covered candidate workspace and bind execution_workspace_ref, selected_workspace_root, execution_workspace_root, and sandbox_seed_strategy
       - same-host external workspace units must carry one integrity Guardian preseed gate that passes before workspace seed, execution-root creation, or dependency materialization
@@ -282,6 +284,7 @@ operations:
       - external candidate dependency manifests must bind a materialized-dependency-lockfile-v1 digest and a materialized-dependency-wheel-attestation-v1 sealed wheel artifact digest before worker launch
       - external candidate workers must launch with materialized-dependency-sealed-import-v1 import isolation, placing only the materialized dependency src root in the receipt-bound path order and omitting the source checkout fallback
       - external candidate workers must bind materialized-dependency-module-origin-v1 so the emitted worker_module_origin proves omoikane.agentic.local_worker_stub was imported from the sealed materialized dependency snapshot
+      - dispatch receipts must echo and revalidate the same yaoyorozu-cross-workspace-dispatch-manifest-v1 ref/digest carried by the dispatch plan
       - worker reports must verify that every target path exists and remains inside the selected execution workspace
       - worker reports must bind one git-target-path delta receipt that stays inside the same target_paths and dispatch unit
       - worker reports must materialize one patch_descriptor-compatible patch candidate receipt from the same delta evidence before the ready gate passes

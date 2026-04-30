@@ -377,6 +377,11 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
                 "source_manifest_public_verification_bound"
             ]
         )
+        self.assertTrue(
+            result["dispatch_plan"]["validation"][
+                "cross_workspace_dispatch_manifest_bound"
+            ]
+        )
 
     def test_worker_dispatch_receipt_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
@@ -398,6 +403,54 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
                 "source_manifest_public_verification_bound"
             ]
         )
+        self.assertTrue(
+            result["dispatch_receipt"]["validation"][
+                "cross_workspace_dispatch_manifest_bound"
+            ]
+        )
+
+    def test_cross_workspace_dispatch_manifest_matches_public_schema(self) -> None:
+        result = self.runtime.run_yaoyorozu_demo()
+        manifest = result["dispatch_plan"]["cross_workspace_dispatch_manifest"]
+
+        self._assert_schema_valid(
+            "specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema",
+            manifest,
+        )
+        self.assertEqual(
+            result["dispatch_plan"]["cross_workspace_dispatch_manifest_ref"],
+            manifest["manifest_ref"],
+        )
+        self.assertEqual(
+            result["dispatch_plan"]["cross_workspace_dispatch_manifest_digest"],
+            manifest["manifest_digest"],
+        )
+        self.assertEqual(
+            result["dispatch_plan"]["cross_workspace_dispatch_manifest_ref"],
+            result["dispatch_receipt"]["cross_workspace_dispatch_manifest_ref"],
+        )
+        self.assertEqual(
+            result["dispatch_plan"]["cross_workspace_dispatch_manifest_digest"],
+            result["dispatch_receipt"]["cross_workspace_dispatch_manifest_digest"],
+        )
+        self.assertEqual(
+            result["workspace_discovery"]["discovery_digest"],
+            manifest["workspace_discovery_digest"],
+        )
+        self.assertEqual(
+            result["source_manifest_ledger_binding"]["public_verification_bundle_ref"],
+            manifest["source_manifest_public_verification_bundle_ref"],
+        )
+        self.assertEqual(
+            result["source_manifest_ledger_binding"]["public_verification_bundle_digest"],
+            manifest["source_manifest_public_verification_bundle_digest"],
+        )
+        self.assertTrue(manifest["validation"]["workspace_discovery_bound"])
+        self.assertTrue(manifest["validation"]["workspace_execution_bound"])
+        self.assertTrue(manifest["validation"]["dispatch_units_workspace_bound"])
+        self.assertFalse(manifest["raw_workspace_payload_stored"])
+        self.assertFalse(manifest["raw_source_payload_stored"])
+        self.assertFalse(manifest["raw_dispatch_payload_stored"])
 
     def test_workspace_guardian_preseed_gate_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()

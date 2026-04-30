@@ -71,6 +71,8 @@ properties:
       - required_workspace_coverage_areas
       - optional_workspace_coverage_areas
       - accepted_workspace_refs
+      - accepted_workspace_digests
+      - coverage_summary_digest
       - cross_workspace_coverage_complete
     properties:
       workspace_discovery_ref:
@@ -120,6 +122,45 @@ properties:
         items:
           type: string
           pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+      accepted_workspace_digests:
+        type: array
+        minItems: 2
+        maxItems: 3
+        items:
+          type: object
+          additionalProperties: false
+          required:
+            - workspace_ref
+            - workspace_role
+            - workspace_digest
+            - supported_coverage_areas
+          properties:
+            workspace_ref:
+              type: string
+              pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+            workspace_role:
+              type: string
+              enum:
+                - source
+                - candidate
+            workspace_digest:
+              type: string
+              pattern: "^[a-f0-9]{64}$"
+            supported_coverage_areas:
+              type: array
+              minItems: 1
+              maxItems: 4
+              uniqueItems: true
+              items:
+                type: string
+                enum:
+                  - runtime
+                  - schema
+                  - eval
+                  - docs
+      coverage_summary_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
       cross_workspace_coverage_complete:
         const: true
   workspace_execution_binding:

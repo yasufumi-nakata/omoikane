@@ -4411,6 +4411,36 @@ json.dump(response, sys.stdout)
                         "source_manifest_public_verification_digest_bound"
                     ]
                 ),
+                "cross_workspace_dispatch_manifest_bound": (
+                    dispatch_plan_validation["cross_workspace_dispatch_manifest_bound"]
+                    and dispatch_receipt_validation[
+                        "cross_workspace_dispatch_manifest_bound"
+                    ]
+                ),
+                "cross_workspace_dispatch_manifest_digest_bound": (
+                    dispatch_plan_validation[
+                        "cross_workspace_dispatch_manifest_digest_bound"
+                    ]
+                    and dispatch_receipt_validation[
+                        "cross_workspace_dispatch_manifest_digest_bound"
+                    ]
+                ),
+                "cross_workspace_dispatch_manifest_workspace_discovery_bound": (
+                    dispatch_plan_validation[
+                        "cross_workspace_manifest_workspace_discovery_bound"
+                    ]
+                    and dispatch_receipt_validation[
+                        "cross_workspace_manifest_workspace_discovery_bound"
+                    ]
+                ),
+                "cross_workspace_dispatch_manifest_workspace_execution_bound": (
+                    dispatch_plan_validation[
+                        "cross_workspace_manifest_workspace_execution_bound"
+                    ]
+                    and dispatch_receipt_validation[
+                        "cross_workspace_manifest_workspace_execution_bound"
+                    ]
+                ),
                 "research_evidence_exchange_ok": research_evidence_exchange_validation[
                     "ok"
                 ],
@@ -4622,6 +4652,24 @@ json.dump(response, sys.stdout)
                 "worker_dispatch_receipt_source_manifest_public_verification_bound": (
                     dispatch_receipt_validation[
                         "source_manifest_public_verification_bound"
+                    ]
+                ),
+                "worker_dispatch_cross_workspace_manifest_bound": (
+                    dispatch_plan_validation["cross_workspace_dispatch_manifest_bound"]
+                ),
+                "worker_dispatch_cross_workspace_manifest_digest_bound": (
+                    dispatch_plan_validation[
+                        "cross_workspace_dispatch_manifest_digest_bound"
+                    ]
+                ),
+                "worker_dispatch_receipt_cross_workspace_manifest_bound": (
+                    dispatch_receipt_validation[
+                        "cross_workspace_dispatch_manifest_bound"
+                    ]
+                ),
+                "worker_dispatch_receipt_cross_workspace_manifest_digest_bound": (
+                    dispatch_receipt_validation[
+                        "cross_workspace_dispatch_manifest_digest_bound"
                     ]
                 ),
                 "worker_dispatch_coverage_complete": dispatch_receipt_validation[

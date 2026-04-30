@@ -244,6 +244,7 @@
 - `yaoyorozu_dependency_materialization_manifest.schema`
 - `yaoyorozu_workspace_discovery.schema`
 - `yaoyorozu_workspace_guardian_preseed_gate.schema`
+- `yaoyorozu_cross_workspace_dispatch_manifest.schema`
 - `yaoyorozu_worker_dispatch_plan.schema`
 - `yaoyorozu_worker_dispatch_receipt.schema`
 - `yaoyorozu_worker_patch_candidate_receipt.schema`
@@ -255,6 +256,8 @@
 - `yaoyorozu_source_manifest_public_verification_bundle.schema`
   - Yaoyorozu source manifest ledger binding を external reviewer 向けに公開検証できる digest-only bundle として投影し、signature digest / verifier key ref を raw signature payload なしで束縛する
   - `yaoyorozu_worker_dispatch_plan.schema` / `yaoyorozu_worker_dispatch_receipt.schema` は同じ bundle ref/digest を carry し、worker launch 前後で agent source manifest の公開検証状態を失わない
+- `yaoyorozu_cross_workspace_dispatch_manifest.schema`
+  - workspace discovery の accepted workspace digest set、dispatch unit workspace selection、preseed gate、dependency materialization requirement、source manifest public bundle を raw payload 非保存の reviewer-facing manifest として plan/receipt の両方に束縛する
 
 ## 次段階
 

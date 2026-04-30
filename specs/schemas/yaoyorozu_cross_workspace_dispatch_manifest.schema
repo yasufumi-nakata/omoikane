@@ -1,0 +1,306 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema"
+title: YaoyorozuCrossWorkspaceDispatchManifest
+description: >
+  Digest-only reviewer manifest that binds a Yaoyorozu worker dispatch plan to
+  the workspace discovery set, source-manifest public verification bundle,
+  selected execution workspaces, preseed gates, and dependency materialization
+  requirements without storing raw workspace, source, or dispatch payloads.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - profile_id
+  - manifest_id
+  - manifest_ref
+  - dispatch_plan_ref
+  - registry_snapshot_ref
+  - convocation_session_ref
+  - proposal_profile
+  - workspace_discovery_ref
+  - workspace_discovery_digest
+  - workspace_execution_binding_digest
+  - coverage_summary_digest
+  - accepted_workspace_refs
+  - accepted_workspace_ref_set_digest
+  - accepted_workspace_digests
+  - accepted_workspace_digest_set_digest
+  - source_manifest_public_verification_bundle_ref
+  - source_manifest_public_verification_bundle_digest
+  - source_manifest_digest
+  - dispatch_unit_count
+  - source_bound_unit_count
+  - candidate_bound_unit_count
+  - guardian_preseed_gate_count
+  - external_preseed_gate_count
+  - dependency_materialization_required_count
+  - dispatch_unit_digest_set
+  - dispatch_unit_digest_set_digest
+  - dispatch_workspace_bindings
+  - public_verification_ready
+  - raw_workspace_payload_stored
+  - raw_source_payload_stored
+  - raw_dispatch_payload_stored
+  - validation
+  - manifest_digest
+properties:
+  kind:
+    const: yaoyorozu_cross_workspace_dispatch_manifest
+  schema_version:
+    const: "1.0.0"
+  profile_id:
+    const: yaoyorozu-cross-workspace-dispatch-manifest-v1
+  manifest_id:
+    type: string
+    pattern: "^yaoyorozu-cross-workspace-dispatch-manifest-[a-f0-9]{12}$"
+  manifest_ref:
+    type: string
+    pattern: "^verification://yaoyorozu/cross-workspace-dispatch/yaoyorozu-cross-workspace-dispatch-manifest-[a-f0-9]{12}$"
+  dispatch_plan_ref:
+    type: string
+    pattern: "^dispatch://yaoyorozu-dispatch-[a-f0-9]{12}$"
+  registry_snapshot_ref:
+    type: string
+    pattern: "^registry://yaoyorozu-registry-[a-f0-9]{12}$"
+  convocation_session_ref:
+    type: string
+    pattern: "^convocation://council-convocation-[a-f0-9]{12}$"
+  proposal_profile:
+    type: string
+    enum:
+      - self-modify-patch-v1
+      - memory-edit-v1
+      - fork-request-v1
+      - inter-mind-negotiation-v1
+  workspace_discovery_ref:
+    type: string
+    pattern: "^$|^workspace-discovery://yaoyorozu-workspace-discovery-[a-f0-9]{12}$"
+  workspace_discovery_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  workspace_execution_binding_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  coverage_summary_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  accepted_workspace_refs:
+    type: array
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+  accepted_workspace_ref_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  accepted_workspace_digests:
+    type: array
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - workspace_ref
+        - workspace_role
+        - workspace_digest
+        - supported_coverage_areas
+      properties:
+        workspace_ref:
+          type: string
+          pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+        workspace_role:
+          type: string
+          enum:
+            - source
+            - candidate
+        workspace_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        supported_coverage_areas:
+          type: array
+          minItems: 1
+          maxItems: 4
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - runtime
+              - schema
+              - eval
+              - docs
+  accepted_workspace_digest_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_manifest_public_verification_bundle_ref:
+    type: string
+    pattern: "^verification://yaoyorozu/source-manifest/yaoyorozu-source-manifest-public-verification-[a-f0-9]{12}$"
+  source_manifest_public_verification_bundle_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_unit_count:
+    type: integer
+    minimum: 1
+    maximum: 4
+  source_bound_unit_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  candidate_bound_unit_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  guardian_preseed_gate_count:
+    type: integer
+    minimum: 1
+    maximum: 4
+  external_preseed_gate_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  dependency_materialization_required_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  dispatch_unit_digest_set:
+    type: array
+    minItems: 1
+    maxItems: 4
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  dispatch_unit_digest_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  dispatch_workspace_bindings:
+    type: array
+    minItems: 1
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - dispatch_unit_ref
+        - coverage_area
+        - execution_workspace_ref
+        - selected_workspace_role
+        - workspace_scope
+        - selected_workspace_root
+        - execution_workspace_root
+        - workspace_target_digest
+        - command_digest
+        - guardian_preseed_gate_ref
+        - guardian_preseed_gate_digest
+        - dependency_materialization_required
+      properties:
+        dispatch_unit_ref:
+          type: string
+          pattern: "^worker-dispatch-[a-f0-9]{12}$"
+        coverage_area:
+          type: string
+          enum:
+            - runtime
+            - schema
+            - eval
+            - docs
+        execution_workspace_ref:
+          type: string
+          pattern: "^workspace://[a-z0-9][a-z0-9-]*-[a-f0-9]{8}$"
+        selected_workspace_role:
+          type: string
+          enum:
+            - source
+            - candidate
+        workspace_scope:
+          type: string
+          enum:
+            - repo-local
+            - same-host-external-workspace
+        selected_workspace_root:
+          type: string
+          minLength: 1
+        execution_workspace_root:
+          type: string
+          minLength: 1
+        workspace_target_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        command_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+        guardian_preseed_gate_ref:
+          type: string
+          pattern: "^$|^guardian-preseed-gate://workspace-preseed-gate-[a-f0-9]{12}$"
+        guardian_preseed_gate_digest:
+          type: string
+          pattern: "^$|^[a-f0-9]{64}$"
+        dependency_materialization_required:
+          type: boolean
+  public_verification_ready:
+    const: true
+  raw_workspace_payload_stored:
+    const: false
+  raw_source_payload_stored:
+    const: false
+  raw_dispatch_payload_stored:
+    const: false
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - workspace_discovery_bound
+      - workspace_execution_bound
+      - source_manifest_public_verification_bound
+      - source_manifest_public_verification_digest_bound
+      - accepted_workspace_refs_bound
+      - accepted_workspace_digests_bound
+      - coverage_summary_digest_bound
+      - dispatch_units_workspace_bound
+      - dispatch_unit_digest_set_bound
+      - source_and_candidate_units_bound
+      - preseed_dependency_requirements_bound
+      - public_verification_ready
+      - raw_workspace_payload_stored
+      - raw_source_payload_stored
+      - raw_dispatch_payload_stored
+      - ok
+    properties:
+      workspace_discovery_bound:
+        type: boolean
+      workspace_execution_bound:
+        type: boolean
+      source_manifest_public_verification_bound:
+        const: true
+      source_manifest_public_verification_digest_bound:
+        const: true
+      accepted_workspace_refs_bound:
+        const: true
+      accepted_workspace_digests_bound:
+        const: true
+      coverage_summary_digest_bound:
+        const: true
+      dispatch_units_workspace_bound:
+        const: true
+      dispatch_unit_digest_set_bound:
+        const: true
+      source_and_candidate_units_bound:
+        const: true
+      preseed_dependency_requirements_bound:
+        const: true
+      public_verification_ready:
+        const: true
+      raw_workspace_payload_stored:
+        const: false
+      raw_source_payload_stored:
+        const: false
+      raw_dispatch_payload_stored:
+        const: false
+      ok:
+        const: true
+  manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

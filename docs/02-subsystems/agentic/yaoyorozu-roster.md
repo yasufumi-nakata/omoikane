@@ -169,6 +169,11 @@ blocked direct builder handoff と worker claim chain を
 Council convocation は `workspace_discovery_binding` により、
 selected profile の required coverage と accepted workspace set を
 same-session artifact として固定する。
+worker dispatch plan / receipt はさらに
+`yaoyorozu-cross-workspace-dispatch-manifest-v1` を carry し、
+workspace discovery、accepted workspace digest set、dispatch unit selection、
+preseed gate、dependency materialization requirement、source manifest public
+bundle を raw payload 非保存の reviewer-facing contract として固定する。
 さらに `TaskGraph` 側では `max_parallelism=3` を守るため、
 `self-modify-patch-v1` は `runtime` / `schema` / `evidence-sync(eval+docs)`,
 `memory-edit-v1` は `runtime` / `eval` / `docs`,

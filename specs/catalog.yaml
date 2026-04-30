@@ -2795,6 +2795,7 @@ entries:
     consumers:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
+      - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
       - evals/agentic/yaoyorozu_local_worker_dispatch.yaml
       - agents/guardians/integrity-guardian.yaml
       - docs/02-subsystems/agentic/README.md
@@ -2803,10 +2804,24 @@ entries:
     rationale: Required to serialize one same-host builder handoff dispatch plan with fixed coverage areas, source manifest public verification bundle ref/digest, subprocess command previews, execution workspace refs, HumanOversightChannel-bound preseed gates, and explicit dispatch/unit report bindings.
   - priority: P1
     kind: schema
+    file: specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
+    consumers:
+      - specs/interfaces/agentic.yaoyorozu.v0.idl
+      - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
+      - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+      - evals/agentic/yaoyorozu_local_worker_dispatch.yaml
+      - agents/guardians/integrity-guardian.yaml
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+    rationale: Required to bind workspace discovery refs/digests, accepted workspace digest sets, dispatch-unit workspace selections, preseed gates, dependency materialization requirements, and the source manifest public verification bundle into one raw-payload-free reviewer manifest carried by both worker dispatch plans and receipts.
+  - priority: P1
+    kind: schema
     file: specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
     consumers:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
+      - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
       - evals/agentic/yaoyorozu_local_worker_dispatch.yaml
       - agents/guardians/integrity-guardian.yaml
       - docs/04-ai-governance/subagent-roster.md
@@ -3598,6 +3613,7 @@ entries:
     consumers:
       - specs/interfaces/agentic.yaoyorozu.v0.idl
       - specs/schemas/yaoyorozu_source_manifest_ledger_binding.schema
+      - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
       - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
       - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
       - reference-runtime

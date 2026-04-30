@@ -3131,6 +3131,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "dispatch_source_manifest_public_verification_digest_bound"
             ]
         )
+        self.assertTrue(result["validation"]["cross_workspace_dispatch_manifest_bound"])
+        self.assertTrue(
+            result["validation"]["cross_workspace_dispatch_manifest_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "cross_workspace_dispatch_manifest_workspace_discovery_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "cross_workspace_dispatch_manifest_workspace_execution_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["research_evidence_exchange_ok"])
         self.assertTrue(result["validation"]["research_evidence_request_digest_bound"])
         self.assertTrue(result["validation"]["research_evidence_report_digest_bound"])
@@ -3207,6 +3221,24 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"][
                 "worker_dispatch_receipt_source_manifest_public_verification_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["worker_dispatch_cross_workspace_manifest_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "worker_dispatch_cross_workspace_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "worker_dispatch_receipt_cross_workspace_manifest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "worker_dispatch_receipt_cross_workspace_manifest_digest_bound"
             ]
         )
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])

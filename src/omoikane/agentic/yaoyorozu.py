@@ -104,6 +104,9 @@ YAOYOROZU_AGENT_SOURCE_MANIFEST_LEDGER_SIGNATURE_ROLES = ["self", "guardian"]
 YAOYOROZU_AGENT_SOURCE_MANIFEST_PUBLIC_VERIFICATION_PROFILE = (
     "yaoyorozu-source-manifest-public-verification-bundle-v1"
 )
+YAOYOROZU_CROSS_WORKSPACE_DISPATCH_MANIFEST_PROFILE = (
+    "yaoyorozu-cross-workspace-dispatch-manifest-v1"
+)
 YAOYOROZU_RESEARCH_EVIDENCE_EXCHANGE_PROFILE = (
     "repo-local-research-evidence-exchange-v1"
 )
@@ -770,6 +773,15 @@ def _dispatch_plan_digest_payload(plan: Mapping[str, Any]) -> Dict[str, Any]:
         "source_manifest_public_verification_bundle": plan[
             "source_manifest_public_verification_bundle"
         ],
+        "cross_workspace_dispatch_manifest_ref": plan[
+            "cross_workspace_dispatch_manifest_ref"
+        ],
+        "cross_workspace_dispatch_manifest_digest": plan[
+            "cross_workspace_dispatch_manifest_digest"
+        ],
+        "cross_workspace_dispatch_manifest": plan[
+            "cross_workspace_dispatch_manifest"
+        ],
         "convocation_session_ref": plan["convocation_session_ref"],
         "policy_id": plan["policy_id"],
         "proposal_profile": plan["proposal_profile"],
@@ -795,6 +807,15 @@ def _dispatch_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, An
         ],
         "source_manifest_public_verification_bundle": receipt[
             "source_manifest_public_verification_bundle"
+        ],
+        "cross_workspace_dispatch_manifest_ref": receipt[
+            "cross_workspace_dispatch_manifest_ref"
+        ],
+        "cross_workspace_dispatch_manifest_digest": receipt[
+            "cross_workspace_dispatch_manifest_digest"
+        ],
+        "cross_workspace_dispatch_manifest": receipt[
+            "cross_workspace_dispatch_manifest"
         ],
         "dispatch_profile": receipt["dispatch_profile"],
         "execution_profile": receipt["execution_profile"],
@@ -823,6 +844,14 @@ def _consensus_dispatch_binding_digest_payload(binding: Mapping[str, Any]) -> Di
         "audit_summary": binding["audit_summary"],
         "validation": binding["validation"],
     }
+
+
+def _cross_workspace_dispatch_manifest_digest_payload(
+    manifest: Mapping[str, Any],
+) -> Dict[str, Any]:
+    payload = dict(manifest)
+    payload.pop("manifest_digest", None)
+    return payload
 
 
 def _task_graph_digest_payload(graph: Mapping[str, Any]) -> Dict[str, Any]:
@@ -2195,6 +2224,571 @@ class YaoyorozuRegistryService:
         }
         binding["binding_digest"] = sha256_text(canonical_json(binding))
         return binding
+
+    def _cross_workspace_dispatch_bindings(
+        self,
+        records: Sequence[Mapping[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        bindings: List[Dict[str, Any]] = []
+        for record in records:
+            guardian_gate = record.get("guardian_preseed_gate", {})
+            guardian_gate_mapping = (
+                guardian_gate if isinstance(guardian_gate, Mapping) else {}
+            )
+            workspace_scope = str(record.get("workspace_scope", ""))
+            dependency_required = bool(
+                record.get(
+                    "dependency_materialization_required",
+                    workspace_scope == self._policy.external_workspace_scope,
+                )
+            )
+            bindings.append(
+                {
+                    "dispatch_unit_ref": str(record.get("unit_id", "")),
+                    "coverage_area": str(record.get("coverage_area", "")),
+                    "execution_workspace_ref": str(
+                        record.get("execution_workspace_ref", "")
+                    ),
+                    "selected_workspace_role": str(
+                        record.get("selected_workspace_role", "")
+                    ),
+                    "workspace_scope": workspace_scope,
+                    "selected_workspace_root": str(
+                        record.get("selected_workspace_root", "")
+                    ),
+                    "execution_workspace_root": str(
+                        record.get("execution_workspace_root", "")
+                    ),
+                    "workspace_target_digest": str(
+                        record.get("workspace_target_digest", "")
+                    ),
+                    "command_digest": str(record.get("command_digest", "")),
+                    "guardian_preseed_gate_ref": str(
+                        guardian_gate_mapping.get("gate_ref", "")
+                    ),
+                    "guardian_preseed_gate_digest": str(
+                        guardian_gate_mapping.get("gate_digest", "")
+                    ),
+                    "dependency_materialization_required": dependency_required,
+                }
+            )
+        return bindings
+
+    def _build_cross_workspace_dispatch_manifest(
+        self,
+        *,
+        dispatch_plan_ref: str,
+        registry_snapshot_ref: str,
+        convocation_session_ref: str,
+        convocation_session: Mapping[str, Any],
+        source_public_bundle: Mapping[str, Any],
+        dispatch_units: Sequence[Mapping[str, Any]],
+        selection_summary: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        workspace_discovery_binding = convocation_session.get(
+            "workspace_discovery_binding", {}
+        )
+        if not isinstance(workspace_discovery_binding, Mapping):
+            workspace_discovery_binding = {}
+        workspace_execution_binding = convocation_session.get(
+            "workspace_execution_binding", {}
+        )
+        if not isinstance(workspace_execution_binding, Mapping):
+            workspace_execution_binding = {}
+
+        accepted_workspace_refs = list(
+            workspace_discovery_binding.get("accepted_workspace_refs", [])
+        )
+        accepted_workspace_digests = list(
+            workspace_discovery_binding.get("accepted_workspace_digests", [])
+        )
+        dispatch_workspace_bindings = self._cross_workspace_dispatch_bindings(
+            dispatch_units
+        )
+        dispatch_unit_digest_set = [
+            binding["command_digest"] for binding in dispatch_workspace_bindings
+        ]
+        source_bound_unit_count = sum(
+            1
+            for binding in dispatch_workspace_bindings
+            if binding["workspace_scope"] == self._policy.worker_workspace_scope
+        )
+        candidate_bound_unit_count = sum(
+            1
+            for binding in dispatch_workspace_bindings
+            if binding["workspace_scope"] == self._policy.external_workspace_scope
+        )
+        guardian_preseed_gate_count = len(dispatch_workspace_bindings)
+        external_preseed_gate_count = sum(
+            1
+            for binding in dispatch_workspace_bindings
+            if binding["workspace_scope"] == self._policy.external_workspace_scope
+            and bool(binding["guardian_preseed_gate_ref"])
+            and bool(binding["guardian_preseed_gate_digest"])
+        )
+        dependency_materialization_required_count = sum(
+            1
+            for binding in dispatch_workspace_bindings
+            if binding["dependency_materialization_required"]
+        )
+        accepted_workspace_ref_set_digest = sha256_text(
+            canonical_json(accepted_workspace_refs)
+        )
+        accepted_workspace_digest_set_digest = sha256_text(
+            canonical_json(accepted_workspace_digests)
+        )
+        dispatch_unit_digest_set_digest = sha256_text(
+            canonical_json(dispatch_unit_digest_set)
+        )
+        workspace_discovery_bound = bool(
+            str(workspace_discovery_binding.get("workspace_discovery_ref", "")).strip()
+            and str(workspace_discovery_binding.get("workspace_discovery_digest", "")).strip()
+        )
+        workspace_execution_bound = bool(
+            str(workspace_execution_binding.get("binding_digest", "")).strip()
+        )
+        source_bundle_validation = _validate_source_manifest_public_verification_bundle(
+            source_public_bundle
+        )
+        source_manifest_public_verification_bound = source_bundle_validation[
+            "ok"
+        ] and registry_snapshot_ref == source_bundle_validation["registry_snapshot_ref"]
+        source_manifest_public_verification_digest_bound = source_bundle_validation[
+            "digest_bound"
+        ]
+        accepted_workspace_digests_bound = (
+            not workspace_discovery_bound
+            or (
+                bool(accepted_workspace_digests)
+                and all(
+                    isinstance(item, Mapping)
+                    and str(item.get("workspace_ref", "")).strip()
+                    and len(str(item.get("workspace_digest", "")).strip()) == 64
+                    for item in accepted_workspace_digests
+                )
+            )
+        )
+        coverage_summary_digest = str(
+            workspace_discovery_binding.get("coverage_summary_digest", "")
+        )
+        coverage_summary_digest_bound = (
+            not workspace_discovery_bound or len(coverage_summary_digest) == 64
+        )
+        source_and_candidate_units_bound = (
+            source_bound_unit_count + candidate_bound_unit_count
+            == len(dispatch_workspace_bindings)
+            and selection_summary.get("source_bound_worker_count")
+            == source_bound_unit_count
+            and selection_summary.get("candidate_bound_worker_count")
+            == candidate_bound_unit_count
+        )
+        preseed_dependency_requirements_bound = (
+            selection_summary.get("guardian_preseed_gate_count")
+            == guardian_preseed_gate_count
+            and selection_summary.get("external_preseed_gate_count")
+            == external_preseed_gate_count
+            and selection_summary.get("dependency_materialization_required_count")
+            == dependency_materialization_required_count
+        )
+        validation = {
+            "workspace_discovery_bound": workspace_discovery_bound,
+            "workspace_execution_bound": workspace_execution_bound,
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
+            "accepted_workspace_refs_bound": (
+                accepted_workspace_ref_set_digest
+                == sha256_text(canonical_json(accepted_workspace_refs))
+            ),
+            "accepted_workspace_digests_bound": accepted_workspace_digests_bound,
+            "coverage_summary_digest_bound": coverage_summary_digest_bound,
+            "dispatch_units_workspace_bound": bool(dispatch_workspace_bindings)
+            and all(
+                binding["dispatch_unit_ref"]
+                and binding["coverage_area"]
+                and binding["execution_workspace_ref"]
+                and binding["selected_workspace_role"] in {"source", "candidate"}
+                and binding["workspace_scope"]
+                in {
+                    self._policy.worker_workspace_scope,
+                    self._policy.external_workspace_scope,
+                }
+                and len(binding["workspace_target_digest"]) == 64
+                and len(binding["command_digest"]) == 64
+                for binding in dispatch_workspace_bindings
+            ),
+            "dispatch_unit_digest_set_bound": dispatch_unit_digest_set_digest
+            == sha256_text(canonical_json(dispatch_unit_digest_set)),
+            "source_and_candidate_units_bound": source_and_candidate_units_bound,
+            "preseed_dependency_requirements_bound": (
+                preseed_dependency_requirements_bound
+            ),
+            "public_verification_ready": True,
+            "raw_workspace_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "raw_dispatch_payload_stored": False,
+        }
+        validation["ok"] = all(
+            value
+            for key, value in validation.items()
+            if key
+            not in {
+                "workspace_discovery_bound",
+                "workspace_execution_bound",
+                "raw_workspace_payload_stored",
+                "raw_source_payload_stored",
+                "raw_dispatch_payload_stored",
+            }
+        )
+        manifest_seed = {
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "workspace_discovery_digest": str(
+                workspace_discovery_binding.get("workspace_discovery_digest", "")
+            ),
+            "source_manifest_public_verification_bundle_digest": str(
+                source_public_bundle.get("bundle_digest", "")
+            ),
+            "dispatch_unit_digest_set_digest": dispatch_unit_digest_set_digest,
+        }
+        manifest_id = (
+            "yaoyorozu-cross-workspace-dispatch-manifest-"
+            f"{sha256_text(canonical_json(manifest_seed))[:12]}"
+        )
+        manifest = {
+            "kind": "yaoyorozu_cross_workspace_dispatch_manifest",
+            "schema_version": "1.0.0",
+            "profile_id": YAOYOROZU_CROSS_WORKSPACE_DISPATCH_MANIFEST_PROFILE,
+            "manifest_id": manifest_id,
+            "manifest_ref": f"verification://yaoyorozu/cross-workspace-dispatch/{manifest_id}",
+            "dispatch_plan_ref": dispatch_plan_ref,
+            "registry_snapshot_ref": registry_snapshot_ref,
+            "convocation_session_ref": convocation_session_ref,
+            "proposal_profile": str(convocation_session.get("proposal_profile", "")),
+            "workspace_discovery_ref": str(
+                workspace_discovery_binding.get("workspace_discovery_ref", "")
+            ),
+            "workspace_discovery_digest": str(
+                workspace_discovery_binding.get("workspace_discovery_digest", "")
+            ),
+            "workspace_execution_binding_digest": str(
+                workspace_execution_binding.get("binding_digest", "")
+            ),
+            "coverage_summary_digest": coverage_summary_digest,
+            "accepted_workspace_refs": accepted_workspace_refs,
+            "accepted_workspace_ref_set_digest": accepted_workspace_ref_set_digest,
+            "accepted_workspace_digests": accepted_workspace_digests,
+            "accepted_workspace_digest_set_digest": (
+                accepted_workspace_digest_set_digest
+            ),
+            "source_manifest_public_verification_bundle_ref": str(
+                source_public_bundle.get("bundle_ref", "")
+            ),
+            "source_manifest_public_verification_bundle_digest": str(
+                source_public_bundle.get("bundle_digest", "")
+            ),
+            "source_manifest_digest": str(
+                source_public_bundle.get("source_manifest_digest", "")
+            ),
+            "dispatch_unit_count": len(dispatch_workspace_bindings),
+            "source_bound_unit_count": source_bound_unit_count,
+            "candidate_bound_unit_count": candidate_bound_unit_count,
+            "guardian_preseed_gate_count": guardian_preseed_gate_count,
+            "external_preseed_gate_count": external_preseed_gate_count,
+            "dependency_materialization_required_count": (
+                dependency_materialization_required_count
+            ),
+            "dispatch_unit_digest_set": dispatch_unit_digest_set,
+            "dispatch_unit_digest_set_digest": dispatch_unit_digest_set_digest,
+            "dispatch_workspace_bindings": dispatch_workspace_bindings,
+            "public_verification_ready": True,
+            "raw_workspace_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "raw_dispatch_payload_stored": False,
+            "validation": validation,
+        }
+        manifest["manifest_digest"] = sha256_text(
+            canonical_json(_cross_workspace_dispatch_manifest_digest_payload(manifest))
+        )
+        return manifest
+
+    def _validate_cross_workspace_dispatch_manifest(
+        self,
+        manifest: Mapping[str, Any],
+        *,
+        dispatch_plan_ref: str,
+        registry_snapshot_ref: str = "",
+        convocation_session_ref: str = "",
+        source_public_bundle: Mapping[str, Any],
+        records: Sequence[Mapping[str, Any]],
+        selection_summary: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(manifest, Mapping):
+            return {
+                "ok": False,
+                "manifest_ref": "",
+                "manifest_digest": "",
+                "digest_bound": False,
+                "workspace_discovery_bound": False,
+                "workspace_execution_bound": False,
+                "source_manifest_public_verification_bound": False,
+                "source_manifest_public_verification_digest_bound": False,
+                "errors": ["cross-workspace dispatch manifest must be a mapping"],
+            }
+
+        if manifest.get("kind") != "yaoyorozu_cross_workspace_dispatch_manifest":
+            errors.append("cross-workspace dispatch manifest kind mismatch")
+        if manifest.get("profile_id") != YAOYOROZU_CROSS_WORKSPACE_DISPATCH_MANIFEST_PROFILE:
+            errors.append("cross-workspace dispatch manifest profile mismatch")
+        if manifest.get("dispatch_plan_ref") != dispatch_plan_ref:
+            errors.append("cross-workspace dispatch manifest dispatch_plan_ref mismatch")
+        if registry_snapshot_ref and manifest.get("registry_snapshot_ref") != registry_snapshot_ref:
+            errors.append("cross-workspace dispatch manifest registry_snapshot_ref mismatch")
+        if convocation_session_ref and manifest.get("convocation_session_ref") != convocation_session_ref:
+            errors.append("cross-workspace dispatch manifest convocation_session_ref mismatch")
+        source_bundle_validation = _validate_source_manifest_public_verification_bundle(
+            source_public_bundle
+        )
+        source_manifest_public_verification_digest_bound = (
+            source_bundle_validation["digest_bound"]
+            and manifest.get("source_manifest_public_verification_bundle_digest")
+            == source_bundle_validation["bundle_digest"]
+        )
+        source_manifest_public_verification_bound = (
+            source_bundle_validation["ok"]
+            and manifest.get("source_manifest_public_verification_bundle_ref")
+            == source_bundle_validation["bundle_ref"]
+            and (
+                not registry_snapshot_ref
+                or registry_snapshot_ref == source_bundle_validation["registry_snapshot_ref"]
+            )
+            and source_manifest_public_verification_digest_bound
+        )
+        if not source_manifest_public_verification_bound:
+            errors.append(
+                "cross-workspace dispatch manifest must bind the source manifest public bundle"
+            )
+
+        observed_digest = str(manifest.get("manifest_digest", ""))
+        expected_digest = sha256_text(
+            canonical_json(_cross_workspace_dispatch_manifest_digest_payload(manifest))
+        )
+        digest_bound = observed_digest == expected_digest
+        if not digest_bound:
+            errors.append("cross-workspace dispatch manifest digest mismatch")
+
+        accepted_workspace_refs = manifest.get("accepted_workspace_refs", [])
+        if not isinstance(accepted_workspace_refs, list):
+            errors.append("cross-workspace dispatch manifest accepted_workspace_refs must be a list")
+            accepted_workspace_refs = []
+        accepted_workspace_ref_set_digest = sha256_text(
+            canonical_json(accepted_workspace_refs)
+        )
+        accepted_workspace_refs_bound = (
+            manifest.get("accepted_workspace_ref_set_digest")
+            == accepted_workspace_ref_set_digest
+        )
+        if not accepted_workspace_refs_bound:
+            errors.append("cross-workspace dispatch manifest accepted workspace ref digest mismatch")
+
+        accepted_workspace_digests = manifest.get("accepted_workspace_digests", [])
+        if not isinstance(accepted_workspace_digests, list):
+            errors.append("cross-workspace dispatch manifest accepted_workspace_digests must be a list")
+            accepted_workspace_digests = []
+        accepted_workspace_digest_set_digest = sha256_text(
+            canonical_json(accepted_workspace_digests)
+        )
+        accepted_workspace_digests_bound = (
+            manifest.get("accepted_workspace_digest_set_digest")
+            == accepted_workspace_digest_set_digest
+            and (
+                not str(manifest.get("workspace_discovery_ref", "")).strip()
+                or bool(accepted_workspace_digests)
+            )
+        )
+        if not accepted_workspace_digests_bound:
+            errors.append("cross-workspace dispatch manifest accepted workspace digest mismatch")
+
+        workspace_discovery_bound = bool(
+            str(manifest.get("workspace_discovery_ref", "")).strip()
+            and str(manifest.get("workspace_discovery_digest", "")).strip()
+        )
+        workspace_execution_bound = bool(
+            str(manifest.get("workspace_execution_binding_digest", "")).strip()
+        )
+        coverage_summary_digest = str(manifest.get("coverage_summary_digest", ""))
+        coverage_summary_digest_bound = (
+            not workspace_discovery_bound or len(coverage_summary_digest) == 64
+        )
+        if not coverage_summary_digest_bound:
+            errors.append("cross-workspace dispatch manifest coverage summary digest missing")
+
+        expected_bindings = self._cross_workspace_dispatch_bindings(records)
+        dispatch_workspace_bindings = manifest.get("dispatch_workspace_bindings", [])
+        dispatch_units_workspace_bound = dispatch_workspace_bindings == expected_bindings
+        if not dispatch_units_workspace_bound:
+            errors.append("cross-workspace dispatch manifest dispatch workspace bindings mismatch")
+
+        dispatch_unit_digest_set = [
+            binding["command_digest"] for binding in expected_bindings
+        ]
+        dispatch_unit_digest_set_digest = sha256_text(
+            canonical_json(dispatch_unit_digest_set)
+        )
+        dispatch_unit_digest_set_bound = (
+            manifest.get("dispatch_unit_digest_set") == dispatch_unit_digest_set
+            and manifest.get("dispatch_unit_digest_set_digest")
+            == dispatch_unit_digest_set_digest
+        )
+        if not dispatch_unit_digest_set_bound:
+            errors.append("cross-workspace dispatch manifest unit digest set mismatch")
+
+        source_bound_unit_count = sum(
+            1
+            for binding in expected_bindings
+            if binding["workspace_scope"] == self._policy.worker_workspace_scope
+        )
+        candidate_bound_unit_count = sum(
+            1
+            for binding in expected_bindings
+            if binding["workspace_scope"] == self._policy.external_workspace_scope
+        )
+        guardian_preseed_gate_count = len(expected_bindings)
+        external_preseed_gate_count = sum(
+            1
+            for binding in expected_bindings
+            if binding["workspace_scope"] == self._policy.external_workspace_scope
+            and binding["guardian_preseed_gate_ref"]
+            and binding["guardian_preseed_gate_digest"]
+        )
+        dependency_materialization_required_count = sum(
+            1
+            for binding in expected_bindings
+            if binding["dependency_materialization_required"]
+        )
+        source_and_candidate_units_bound = (
+            manifest.get("dispatch_unit_count") == len(expected_bindings)
+            and manifest.get("source_bound_unit_count") == source_bound_unit_count
+            and manifest.get("candidate_bound_unit_count") == candidate_bound_unit_count
+            and source_bound_unit_count + candidate_bound_unit_count == len(expected_bindings)
+        )
+        preseed_dependency_requirements_bound = (
+            manifest.get("guardian_preseed_gate_count") == guardian_preseed_gate_count
+            and manifest.get("external_preseed_gate_count") == external_preseed_gate_count
+            and manifest.get("dependency_materialization_required_count")
+            == dependency_materialization_required_count
+        )
+        if isinstance(selection_summary, Mapping):
+            if "source_bound_worker_count" in selection_summary:
+                source_and_candidate_units_bound = (
+                    source_and_candidate_units_bound
+                    and selection_summary.get("source_bound_worker_count")
+                    == source_bound_unit_count
+                    and selection_summary.get("candidate_bound_worker_count")
+                    == candidate_bound_unit_count
+                )
+            if "guardian_preseed_gate_count" in selection_summary:
+                preseed_dependency_requirements_bound = (
+                    preseed_dependency_requirements_bound
+                    and selection_summary.get("guardian_preseed_gate_count")
+                    == guardian_preseed_gate_count
+                )
+            if "external_preseed_gate_count" in selection_summary:
+                preseed_dependency_requirements_bound = (
+                    preseed_dependency_requirements_bound
+                    and selection_summary.get("external_preseed_gate_count")
+                    == external_preseed_gate_count
+                )
+            if "dependency_materialization_required_count" in selection_summary:
+                preseed_dependency_requirements_bound = (
+                    preseed_dependency_requirements_bound
+                    and selection_summary.get("dependency_materialization_required_count")
+                    == dependency_materialization_required_count
+                )
+        if not source_and_candidate_units_bound:
+            errors.append("cross-workspace dispatch manifest source/candidate counts mismatch")
+        if not preseed_dependency_requirements_bound:
+            errors.append("cross-workspace dispatch manifest preseed/dependency counts mismatch")
+
+        raw_flags_ok = (
+            manifest.get("raw_workspace_payload_stored") is False
+            and manifest.get("raw_source_payload_stored") is False
+            and manifest.get("raw_dispatch_payload_stored") is False
+        )
+        if manifest.get("public_verification_ready") is not True:
+            errors.append("cross-workspace dispatch manifest must be public-verification ready")
+        if not raw_flags_ok:
+            errors.append("cross-workspace dispatch manifest raw payload flags must be false")
+
+        expected_validation = {
+            "workspace_discovery_bound": workspace_discovery_bound,
+            "workspace_execution_bound": workspace_execution_bound,
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
+            "accepted_workspace_refs_bound": accepted_workspace_refs_bound,
+            "accepted_workspace_digests_bound": accepted_workspace_digests_bound,
+            "coverage_summary_digest_bound": coverage_summary_digest_bound,
+            "dispatch_units_workspace_bound": dispatch_units_workspace_bound,
+            "dispatch_unit_digest_set_bound": dispatch_unit_digest_set_bound,
+            "source_and_candidate_units_bound": source_and_candidate_units_bound,
+            "preseed_dependency_requirements_bound": (
+                preseed_dependency_requirements_bound
+            ),
+            "public_verification_ready": manifest.get("public_verification_ready") is True,
+            "raw_workspace_payload_stored": manifest.get("raw_workspace_payload_stored"),
+            "raw_source_payload_stored": manifest.get("raw_source_payload_stored"),
+            "raw_dispatch_payload_stored": manifest.get("raw_dispatch_payload_stored"),
+        }
+        expected_validation["ok"] = all(
+            value
+            for key, value in expected_validation.items()
+            if key
+            not in {
+                "workspace_discovery_bound",
+                "workspace_execution_bound",
+                "raw_workspace_payload_stored",
+                "raw_source_payload_stored",
+                "raw_dispatch_payload_stored",
+            }
+        )
+        validation = manifest.get("validation", {})
+        if not isinstance(validation, Mapping):
+            errors.append("cross-workspace dispatch manifest validation must be a mapping")
+        else:
+            for key, expected_value in expected_validation.items():
+                if validation.get(key) != expected_value:
+                    errors.append(
+                        f"cross-workspace dispatch manifest validation.{key} mismatch"
+                    )
+
+        return {
+            "ok": not errors and expected_validation["ok"] and digest_bound,
+            "manifest_ref": str(manifest.get("manifest_ref", "")),
+            "manifest_digest": observed_digest,
+            "digest_bound": digest_bound,
+            "workspace_discovery_bound": workspace_discovery_bound,
+            "workspace_execution_bound": workspace_execution_bound,
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
+            "dispatch_units_workspace_bound": dispatch_units_workspace_bound,
+            "dispatch_unit_digest_set_bound": dispatch_unit_digest_set_bound,
+            "source_and_candidate_units_bound": source_and_candidate_units_bound,
+            "preseed_dependency_requirements_bound": (
+                preseed_dependency_requirements_bound
+            ),
+            "errors": errors,
+        }
 
     @staticmethod
     def _external_execution_workspace_root(
@@ -5375,6 +5969,21 @@ class YaoyorozuRegistryService:
                 raise ValueError(
                     "workspace_discovery must satisfy the profile-required cross-workspace coverage"
                 )
+            workspace_index = self._workspace_index(workspace_discovery)
+            accepted_workspace_digests = [
+                {
+                    "workspace_ref": str(workspace_index[workspace_ref]["workspace_ref"]),
+                    "workspace_role": str(workspace_index[workspace_ref]["workspace_role"]),
+                    "workspace_digest": str(
+                        workspace_index[workspace_ref]["workspace_digest"]
+                    ),
+                    "supported_coverage_areas": list(
+                        workspace_index[workspace_ref]["supported_coverage_areas"]
+                    ),
+                }
+                for workspace_ref in workspace_discovery["accepted_workspace_refs"]
+                if workspace_ref in workspace_index
+            ]
             workspace_discovery_binding = {
                 "workspace_discovery_ref": (
                     f"workspace-discovery://{workspace_discovery['discovery_id']}"
@@ -5392,6 +6001,10 @@ class YaoyorozuRegistryService:
                     profile_policy["optional_workspace_coverage_areas"]
                 ),
                 "accepted_workspace_refs": list(workspace_discovery["accepted_workspace_refs"]),
+                "accepted_workspace_digests": accepted_workspace_digests,
+                "coverage_summary_digest": sha256_text(
+                    canonical_json(workspace_discovery["coverage_summary"])
+                ),
                 "cross_workspace_coverage_complete": bool(
                     workspace_discovery_validation["cross_workspace_coverage_complete"]
                 ),
@@ -5907,6 +6520,82 @@ class YaoyorozuRegistryService:
             for validation in guardian_gate_validations
             if validation["gate_required"]
         ]
+        selection_summary_body = {
+            "required_worker_count": len(required_coverage),
+            "required_coverage_areas": list(required_coverage),
+            "optional_coverage_areas": list(optional_coverage),
+            "requested_optional_coverage_areas": list(normalized_requested_optional_coverage),
+            "dispatch_coverage_areas": list(dispatch_coverage),
+            "selected_worker_count": len(dispatch_units),
+            "unique_coverage_areas": sorted(set(selected_coverage)),
+            "missing_coverage": missing_coverage,
+            "candidate_bound_worker_count": sum(
+                1
+                for unit in dispatch_units
+                if unit["workspace_scope"] == self._policy.external_workspace_scope
+            ),
+            "source_bound_worker_count": sum(
+                1
+                for unit in dispatch_units
+                if unit["workspace_scope"] == self._policy.worker_workspace_scope
+            ),
+            "guardian_preseed_gate_count": len(guardian_gate_validations),
+            "external_preseed_gate_count": len(external_guardian_gate_validations),
+            "guardian_preseed_oversight_event_count": sum(
+                1
+                for unit in dispatch_units
+                if unit["guardian_preseed_gate"]["guardian_oversight_event_ref"]
+            ),
+            "external_preseed_oversight_satisfied_count": sum(
+                1
+                for gate_validation in external_guardian_gate_validations
+                if gate_validation["oversight_event_satisfied"]
+                and gate_validation["reviewer_network_attested"]
+            ),
+            "dependency_materialization_required_count": sum(
+                1
+                for unit in dispatch_units
+                if unit["dependency_materialization_required"]
+            ),
+            "runtime_exec_ready": bool(dispatch_units),
+        }
+        registry_snapshot_ref = (
+            f"registry://{self._last_snapshot_id}" if self._last_snapshot_id else ""
+        )
+        convocation_session_ref = (
+            f"convocation://{convocation_session['session_id']}"
+            if convocation_session.get("session_id")
+            else ""
+        )
+        cross_workspace_dispatch_manifest = self._build_cross_workspace_dispatch_manifest(
+            dispatch_plan_ref=dispatch_plan_ref,
+            registry_snapshot_ref=registry_snapshot_ref,
+            convocation_session_ref=convocation_session_ref,
+            convocation_session=convocation_session,
+            source_public_bundle=source_public_bundle,
+            dispatch_units=dispatch_units,
+            selection_summary=selection_summary_body,
+        )
+        cross_workspace_manifest_validation = (
+            self._validate_cross_workspace_dispatch_manifest(
+                cross_workspace_dispatch_manifest,
+                dispatch_plan_ref=dispatch_plan_ref,
+                registry_snapshot_ref=registry_snapshot_ref,
+                convocation_session_ref=convocation_session_ref,
+                source_public_bundle=source_public_bundle,
+                records=dispatch_units,
+                selection_summary=selection_summary_body,
+            )
+        )
+        cross_workspace_dispatch_manifest_digest_bound = (
+            cross_workspace_manifest_validation["digest_bound"]
+            and cross_workspace_dispatch_manifest["manifest_digest"]
+            == cross_workspace_manifest_validation["manifest_digest"]
+        )
+        cross_workspace_dispatch_manifest_bound = (
+            cross_workspace_manifest_validation["ok"]
+            and cross_workspace_dispatch_manifest_digest_bound
+        )
         validation = {
             "registry_bound": bool(self._last_snapshot_id),
             "convocation_bound": bool(convocation_session.get("session_id")),
@@ -5915,6 +6604,12 @@ class YaoyorozuRegistryService:
             ),
             "source_manifest_public_verification_digest_bound": (
                 source_manifest_public_verification_digest_bound
+            ),
+            "cross_workspace_dispatch_manifest_bound": (
+                cross_workspace_dispatch_manifest_bound
+            ),
+            "cross_workspace_dispatch_manifest_digest_bound": (
+                cross_workspace_dispatch_manifest_digest_bound
             ),
             "builder_coverage_ok": (
                 not missing_coverage
@@ -5987,9 +6682,7 @@ class YaoyorozuRegistryService:
         )
         dispatch_body = {
             "dispatch_profile": self._policy.worker_dispatch_profile,
-            "registry_snapshot_ref": (
-                f"registry://{self._last_snapshot_id}" if self._last_snapshot_id else ""
-            ),
+            "registry_snapshot_ref": registry_snapshot_ref,
             "source_manifest_public_verification_bundle_ref": str(
                 source_public_bundle.get("bundle_ref", "")
             ),
@@ -5997,11 +6690,14 @@ class YaoyorozuRegistryService:
                 source_public_bundle.get("bundle_digest", "")
             ),
             "source_manifest_public_verification_bundle": dict(source_public_bundle),
-            "convocation_session_ref": (
-                f"convocation://{convocation_session['session_id']}"
-                if convocation_session.get("session_id")
-                else ""
+            "cross_workspace_dispatch_manifest_ref": (
+                cross_workspace_dispatch_manifest["manifest_ref"]
             ),
+            "cross_workspace_dispatch_manifest_digest": (
+                cross_workspace_dispatch_manifest["manifest_digest"]
+            ),
+            "cross_workspace_dispatch_manifest": cross_workspace_dispatch_manifest,
+            "convocation_session_ref": convocation_session_ref,
             "policy_id": self._policy.policy_id,
             "proposal_profile": _non_empty_string(
                 convocation_session.get("proposal_profile"),
@@ -6017,45 +6713,7 @@ class YaoyorozuRegistryService:
             ),
             "workspace_root": str(repo_root),
             "dispatch_units": dispatch_units,
-            "selection_summary": {
-                "required_worker_count": len(required_coverage),
-                "required_coverage_areas": list(required_coverage),
-                "optional_coverage_areas": list(optional_coverage),
-                "requested_optional_coverage_areas": list(normalized_requested_optional_coverage),
-                "dispatch_coverage_areas": list(dispatch_coverage),
-                "selected_worker_count": len(dispatch_units),
-                "unique_coverage_areas": sorted(set(selected_coverage)),
-                "missing_coverage": missing_coverage,
-                "candidate_bound_worker_count": sum(
-                    1
-                    for unit in dispatch_units
-                    if unit["workspace_scope"] == self._policy.external_workspace_scope
-                ),
-                "source_bound_worker_count": sum(
-                    1
-                    for unit in dispatch_units
-                    if unit["workspace_scope"] == self._policy.worker_workspace_scope
-                ),
-                "guardian_preseed_gate_count": len(guardian_gate_validations),
-                "external_preseed_gate_count": len(external_guardian_gate_validations),
-                "guardian_preseed_oversight_event_count": sum(
-                    1
-                    for unit in dispatch_units
-                    if unit["guardian_preseed_gate"]["guardian_oversight_event_ref"]
-                ),
-                "external_preseed_oversight_satisfied_count": sum(
-                    1
-                    for gate_validation in external_guardian_gate_validations
-                    if gate_validation["oversight_event_satisfied"]
-                    and gate_validation["reviewer_network_attested"]
-                ),
-                "dependency_materialization_required_count": sum(
-                    1
-                    for unit in dispatch_units
-                    if unit["dependency_materialization_required"]
-                ),
-                "runtime_exec_ready": bool(dispatch_units),
-            },
+            "selection_summary": selection_summary_body,
             "validation": validation,
         }
         dispatch = {
@@ -6340,6 +6998,43 @@ class YaoyorozuRegistryService:
             errors.append(
                 "selection_summary.dependency_materialization_required_count must match external workspace units"
             )
+        unit_records = [unit for unit in units if isinstance(unit, Mapping)]
+        cross_workspace_manifest = dispatch_plan.get(
+            "cross_workspace_dispatch_manifest",
+            {},
+        )
+        cross_workspace_manifest_validation = (
+            self._validate_cross_workspace_dispatch_manifest(
+                cross_workspace_manifest
+                if isinstance(cross_workspace_manifest, Mapping)
+                else {},
+                dispatch_plan_ref=f"dispatch://{dispatch_plan.get('dispatch_id', '')}",
+                registry_snapshot_ref=str(dispatch_plan.get("registry_snapshot_ref", "")),
+                convocation_session_ref=str(
+                    dispatch_plan.get("convocation_session_ref", "")
+                ),
+                source_public_bundle=(
+                    source_public_bundle
+                    if isinstance(source_public_bundle, Mapping)
+                    else {}
+                ),
+                records=unit_records,
+                selection_summary=selection_summary,
+            )
+        )
+        cross_workspace_dispatch_manifest_digest_bound = (
+            cross_workspace_manifest_validation["digest_bound"]
+            and dispatch_plan.get("cross_workspace_dispatch_manifest_digest")
+            == cross_workspace_manifest_validation["manifest_digest"]
+        )
+        cross_workspace_dispatch_manifest_bound = (
+            cross_workspace_manifest_validation["ok"]
+            and dispatch_plan.get("cross_workspace_dispatch_manifest_ref")
+            == cross_workspace_manifest_validation["manifest_ref"]
+            and cross_workspace_dispatch_manifest_digest_bound
+        )
+        if not cross_workspace_dispatch_manifest_bound:
+            errors.append("cross-workspace dispatch manifest must bind dispatch plan")
         validation = dispatch_plan.get("validation", {})
         if isinstance(validation, Mapping):
             if (
@@ -6353,6 +7048,18 @@ class YaoyorozuRegistryService:
             ):
                 errors.append(
                     "validation.source_manifest_public_verification_digest_bound mismatch"
+                )
+            if (
+                validation.get("cross_workspace_dispatch_manifest_bound")
+                != cross_workspace_dispatch_manifest_bound
+            ):
+                errors.append("validation.cross_workspace_dispatch_manifest_bound mismatch")
+            if (
+                validation.get("cross_workspace_dispatch_manifest_digest_bound")
+                != cross_workspace_dispatch_manifest_digest_bound
+            ):
+                errors.append(
+                    "validation.cross_workspace_dispatch_manifest_digest_bound mismatch"
                 )
             if validation.get("guardian_preseed_gate_bound") != guardian_preseed_gate_bound:
                 errors.append("validation.guardian_preseed_gate_bound mismatch")
@@ -6388,6 +7095,18 @@ class YaoyorozuRegistryService:
             ),
             "source_manifest_public_verification_digest_bound": (
                 source_manifest_public_verification_digest_bound
+            ),
+            "cross_workspace_dispatch_manifest_bound": (
+                cross_workspace_dispatch_manifest_bound
+            ),
+            "cross_workspace_dispatch_manifest_digest_bound": (
+                cross_workspace_dispatch_manifest_digest_bound
+            ),
+            "cross_workspace_manifest_workspace_discovery_bound": (
+                cross_workspace_manifest_validation["workspace_discovery_bound"]
+            ),
+            "cross_workspace_manifest_workspace_execution_bound": (
+                cross_workspace_manifest_validation["workspace_execution_bound"]
             ),
             "guardian_preseed_gate_bound": guardian_preseed_gate_bound,
             "external_preseed_gate_count": external_preseed_gate_count,
@@ -6427,6 +7146,41 @@ class YaoyorozuRegistryService:
             and dispatch_plan.get("source_manifest_public_verification_bundle_ref")
             == source_bundle_validation["bundle_ref"]
             and source_manifest_public_verification_digest_bound
+        )
+        cross_workspace_manifest = dispatch_plan.get(
+            "cross_workspace_dispatch_manifest",
+            {},
+        )
+        unit_records = [unit for unit in units if isinstance(unit, Mapping)]
+        cross_workspace_manifest_validation = (
+            self._validate_cross_workspace_dispatch_manifest(
+                cross_workspace_manifest
+                if isinstance(cross_workspace_manifest, Mapping)
+                else {},
+                dispatch_plan_ref=dispatch_plan_ref,
+                registry_snapshot_ref=str(dispatch_plan.get("registry_snapshot_ref", "")),
+                convocation_session_ref=str(
+                    dispatch_plan.get("convocation_session_ref", "")
+                ),
+                source_public_bundle=(
+                    source_public_bundle
+                    if isinstance(source_public_bundle, Mapping)
+                    else {}
+                ),
+                records=unit_records,
+                selection_summary=dispatch_plan.get("selection_summary", {}),
+            )
+        )
+        cross_workspace_dispatch_manifest_digest_bound = (
+            cross_workspace_manifest_validation["digest_bound"]
+            and dispatch_plan.get("cross_workspace_dispatch_manifest_digest")
+            == cross_workspace_manifest_validation["manifest_digest"]
+        )
+        cross_workspace_dispatch_manifest_bound = (
+            cross_workspace_manifest_validation["ok"]
+            and dispatch_plan.get("cross_workspace_dispatch_manifest_ref")
+            == cross_workspace_manifest_validation["manifest_ref"]
+            and cross_workspace_dispatch_manifest_digest_bound
         )
 
         env = os.environ.copy()
@@ -7021,6 +7775,12 @@ class YaoyorozuRegistryService:
             "source_manifest_public_verification_digest_bound": (
                 source_manifest_public_verification_digest_bound
             ),
+            "cross_workspace_dispatch_manifest_bound": (
+                cross_workspace_dispatch_manifest_bound
+            ),
+            "cross_workspace_dispatch_manifest_digest_bound": (
+                cross_workspace_dispatch_manifest_digest_bound
+            ),
             "command_digests_match": all(
                 any(
                     isinstance(unit, Mapping)
@@ -7184,6 +7944,13 @@ class YaoyorozuRegistryService:
                 "source_manifest_public_verification_bundle_digest"
             ],
             "source_manifest_public_verification_bundle": dict(source_public_bundle),
+            "cross_workspace_dispatch_manifest_ref": dispatch_plan[
+                "cross_workspace_dispatch_manifest_ref"
+            ],
+            "cross_workspace_dispatch_manifest_digest": dispatch_plan[
+                "cross_workspace_dispatch_manifest_digest"
+            ],
+            "cross_workspace_dispatch_manifest": dict(cross_workspace_manifest),
             "dispatch_profile": dispatch_plan["dispatch_profile"],
             "execution_profile": self._policy.worker_execution_profile,
             "proposal_profile": dispatch_plan["proposal_profile"],
@@ -7240,6 +8007,39 @@ class YaoyorozuRegistryService:
         )
         if not source_manifest_public_verification_bound:
             errors.append("source manifest public verification bundle must bind dispatch receipt")
+        result_records = [result for result in results if isinstance(result, Mapping)]
+        cross_workspace_manifest = dispatch_receipt.get(
+            "cross_workspace_dispatch_manifest",
+            {},
+        )
+        cross_workspace_manifest_validation = (
+            self._validate_cross_workspace_dispatch_manifest(
+                cross_workspace_manifest
+                if isinstance(cross_workspace_manifest, Mapping)
+                else {},
+                dispatch_plan_ref=str(dispatch_receipt.get("dispatch_plan_ref", "")),
+                source_public_bundle=(
+                    source_public_bundle
+                    if isinstance(source_public_bundle, Mapping)
+                    else {}
+                ),
+                records=result_records,
+                selection_summary=execution_summary,
+            )
+        )
+        cross_workspace_dispatch_manifest_digest_bound = (
+            cross_workspace_manifest_validation["digest_bound"]
+            and dispatch_receipt.get("cross_workspace_dispatch_manifest_digest")
+            == cross_workspace_manifest_validation["manifest_digest"]
+        )
+        cross_workspace_dispatch_manifest_bound = (
+            cross_workspace_manifest_validation["ok"]
+            and dispatch_receipt.get("cross_workspace_dispatch_manifest_ref")
+            == cross_workspace_manifest_validation["manifest_ref"]
+            and cross_workspace_dispatch_manifest_digest_bound
+        )
+        if not cross_workspace_dispatch_manifest_bound:
+            errors.append("cross-workspace dispatch manifest must bind dispatch receipt")
         required_coverage = execution_summary.get("required_coverage_areas", [])
         optional_coverage = execution_summary.get("optional_coverage_areas", [])
         requested_optional_coverage = execution_summary.get("requested_optional_coverage_areas", [])
@@ -7972,6 +8772,12 @@ class YaoyorozuRegistryService:
             "source_manifest_public_verification_digest_bound": (
                 source_manifest_public_verification_digest_bound
             ),
+            "cross_workspace_dispatch_manifest_bound": (
+                cross_workspace_dispatch_manifest_bound
+            ),
+            "cross_workspace_dispatch_manifest_digest_bound": (
+                cross_workspace_dispatch_manifest_digest_bound
+            ),
             "command_digests_match": all(
                 isinstance(result, Mapping) and str(result.get("command_digest", "")).strip()
                 for result in results
@@ -8143,6 +8949,18 @@ class YaoyorozuRegistryService:
             ),
             "source_manifest_public_verification_digest_bound": (
                 source_manifest_public_verification_digest_bound
+            ),
+            "cross_workspace_dispatch_manifest_bound": (
+                cross_workspace_dispatch_manifest_bound
+            ),
+            "cross_workspace_dispatch_manifest_digest_bound": (
+                cross_workspace_dispatch_manifest_digest_bound
+            ),
+            "cross_workspace_manifest_workspace_discovery_bound": (
+                cross_workspace_manifest_validation["workspace_discovery_bound"]
+            ),
+            "cross_workspace_manifest_workspace_execution_bound": (
+                cross_workspace_manifest_validation["workspace_execution_bound"]
             ),
             "all_reports_bound_to_dispatch": expected_validation["all_reports_bound_to_dispatch"],
             "all_delta_receipts_bound": expected_validation["all_delta_receipts_bound"],

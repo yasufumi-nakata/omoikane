@@ -120,6 +120,7 @@ oversight_scope_refs:
   - docs/02-subsystems/agentic/yaoyorozu-roster.md
   - specs/schemas/gap_report.schema
   - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
+  - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
   - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
   - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
   - specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema

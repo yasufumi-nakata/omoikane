@@ -15,6 +15,9 @@ required:
   - source_manifest_public_verification_bundle_ref
   - source_manifest_public_verification_bundle_digest
   - source_manifest_public_verification_bundle
+  - cross_workspace_dispatch_manifest_ref
+  - cross_workspace_dispatch_manifest_digest
+  - cross_workspace_dispatch_manifest
   - dispatch_profile
   - execution_profile
   - proposal_profile
@@ -50,6 +53,14 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   source_manifest_public_verification_bundle:
     $ref: "yaoyorozu_source_manifest_public_verification_bundle.schema"
+  cross_workspace_dispatch_manifest_ref:
+    type: string
+    pattern: "^verification://yaoyorozu/cross-workspace-dispatch/yaoyorozu-cross-workspace-dispatch-manifest-[a-f0-9]{12}$"
+  cross_workspace_dispatch_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  cross_workspace_dispatch_manifest:
+    $ref: "yaoyorozu_cross_workspace_dispatch_manifest.schema"
   dispatch_profile:
     const: repo-local-subprocess-worker-dispatch-v1
   execution_profile:
@@ -731,6 +742,8 @@ properties:
       - command_digests_match
       - source_manifest_public_verification_bound
       - source_manifest_public_verification_digest_bound
+      - cross_workspace_dispatch_manifest_bound
+      - cross_workspace_dispatch_manifest_digest_bound
       - all_processes_exited_zero
       - all_reports_ready
       - same_host_scope_only
@@ -757,6 +770,10 @@ properties:
       source_manifest_public_verification_bound:
         const: true
       source_manifest_public_verification_digest_bound:
+        const: true
+      cross_workspace_dispatch_manifest_bound:
+        const: true
+      cross_workspace_dispatch_manifest_digest_bound:
         const: true
       all_processes_exited_zero:
         const: true
