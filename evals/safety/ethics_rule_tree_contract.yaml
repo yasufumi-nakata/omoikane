@@ -14,6 +14,10 @@ expected:
   sandbox_outcome: escalate
   coerced_consent_outcome: veto
   incomplete_consent_outcome: escalate
+  consent_event_redaction_profile: ethics-event-action-snapshot-digest-redaction-v1
+  consent_receipt_profile: consent-authenticity-digest-receipt-v1
+  consent_events_digest_only: true
+  raw_consent_payload_stored: false
   conflict_outcome: veto
   conflict_selected_rule: A7-ewa-blocked-token
   supported_operators:

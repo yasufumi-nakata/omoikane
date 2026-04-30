@@ -74,6 +74,12 @@ reference runtime は `consent_authenticity` に次の 3 点を要求する。
 `A10-consent-authenticity-attestation` として fail-closed escalation に回す。
 これにより、本人同意は単なる文字列 flag ではなく、self / witness / duress screen の
 machine-checkable evidence set として扱われる。
+EthicsLedger へ記録する時は raw `payload` / raw `consent_authenticity` を保存せず、
+`payload_ref`、`payload_digest`、`ethics_consent_authenticity_receipt` の
+ref / digest / body だけを保持する。
+receipt は `consent-authenticity-digest-receipt-v1` で、
+`self_attestation_ref`、`independent_witness_ref`、`duress_screen_ref`、
+missing evidence、authenticity status、`raw_consent_payload_stored=false` を固定する。
 
 ## ログ
 
@@ -81,7 +87,14 @@ machine-checkable evidence set として扱われる。
 
 ```yaml
 - ethics_event_id: <hash>
-  action: <action snapshot>
+  action_snapshot:
+    action_type: <action>
+    payload_ref: ethics-payload://<query>
+    payload_digest: <sha256>
+    raw_payload_stored: false
+    raw_consent_payload_stored: false
+    consent_authenticity_receipt_ref: consent-authenticity://<receipt>
+    consent_authenticity_receipt_digest: <sha256>
   rule: <violated rule id>
   decision: veto|escalate
   signatures: [enforcer, guardian]

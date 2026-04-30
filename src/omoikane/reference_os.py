@@ -5386,6 +5386,24 @@ json.dump(response, sys.stdout)
                 == ["A9-consent-coercion-veto"],
                 "incomplete_consent_escalated": consent_incomplete_decision.rule_ids
                 == ["A10-consent-authenticity-attestation"],
+                "consent_events_digest_only": all(
+                    event["action_snapshot"].get("raw_payload_stored") is False
+                    and event["action_snapshot"].get("raw_consent_payload_stored")
+                    is False
+                    and "payload" not in event["action_snapshot"]
+                    and event["action_snapshot"].get(
+                        "consent_authenticity_receipt_digest"
+                    )
+                    == event["action_snapshot"]
+                    .get("consent_authenticity_receipt", {})
+                    .get("receipt_digest")
+                    and event["action_snapshot"]
+                    .get("consent_authenticity_receipt", {})
+                    .get("validation", {})
+                    .get("ok")
+                    is True
+                    for event in (consent_coercion_event, consent_incomplete_event)
+                ),
             },
             "ethics_events": [
                 immutable_event,

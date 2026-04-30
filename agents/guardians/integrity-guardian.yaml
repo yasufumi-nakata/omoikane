@@ -63,6 +63,7 @@ capabilities:
   - gap-report.scan-receipt.attest
   - gap-report.continuity-ledger-binding.attest
   - gap-report.continuity-ledger-entry.attest
+  - ethics.consent-authenticity-redaction.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest
   - yaoyorozu.agent-source.research-evidence-schema.attest
   - yaoyorozu.research-evidence.verifier-readback.attest
@@ -125,6 +126,8 @@ oversight_scope_refs:
   - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
   - specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema
   - specs/schemas/yaoyorozu_research_evidence_synthesis.schema
+  - specs/schemas/ethics_consent_authenticity_receipt.schema
+  - specs/schemas/ethics_event.schema
   - specs/schemas/ewa_regulator_permit_verifier_receipt.schema
   - specs/schemas/ewa_regulator_permit_quorum_receipt.schema
   - specs/schemas/sensory_loopback_latency_weight_policy_verifier_quorum.schema
@@ -148,6 +151,7 @@ when_to_invoke: |
   - Sensory Loopback の BioData calibration confidence gate が bounded drift-threshold adjustment だけに使われ、body-map calibration / Guardian hold / stabilization を置き換えず、raw calibration / gate payload を保存していないことを検証する時
   - Sensory Loopback shared arbitration が participant ごとの BioData confidence / drift gate と hardware timing latency drift gate を同じ threshold authority digest に束縛し、weighted latency quorum の participant weight / failed participant / quorum digest と fresh live verifier quorum digest / 250ms request-timeout digest set を raw timing / hardware adapter / verifier response / verifier signature payload なしで保存していることを検証する時
   - Sensory Loopback の mid-session calibration refresh state guard が expired / revoked / stale refresh を delivery block、shared session hold、safe baseline requirement へ fail-closed に伝播し、revocation ref / guard digest と raw refresh / revocation payload 非保存に束縛していることを検証する時
+  - EthicsLedger event の consent-bound action が raw request payload / raw consent_authenticity payload を保存せず、payload digest と consent-authenticity receipt digest に束縛されていることを検証する時
   - Yaoyorozu researcher evidence verifier の live transport quorum / signed response / freshness window を検証する時
   - Yaoyorozu worker dispatch plan / receipt が source manifest public verification bundle ref/digest を worker launch 前後で維持していることを検証する時
   - EWA regulator permit verifier / quorum が legal execution digest、permit status、regulator API response digest、API certificate digest、verifier key digest、multi-jurisdiction threshold policy、verifier roster、revocation registry に束縛され、raw permit / response / policy / roster payload と decision authority を保持しないことを検証する時

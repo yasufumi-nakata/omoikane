@@ -3741,6 +3741,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["conflict_prefers_veto"])
         self.assertTrue(result["validation"]["coerced_consent_vetoed"])
         self.assertTrue(result["validation"]["incomplete_consent_escalated"])
+        self.assertTrue(result["validation"]["consent_events_digest_only"])
         self.assertEqual(
             "A7-ewa-blocked-token",
             result["decisions"]["ewa_conflict_resolution"]["resolution"]["selected_rule_id"],

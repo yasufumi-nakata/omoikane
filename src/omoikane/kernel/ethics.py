@@ -8,6 +8,26 @@ from typing import Any, Dict, List, Mapping
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
+CONSENT_AUTHENTICITY_RECEIPT_SCHEMA_VERSION = "1.0.0"
+CONSENT_AUTHENTICITY_RECEIPT_PROFILE_ID = (
+    "consent-authenticity-digest-receipt-v1"
+)
+ACTION_SNAPSHOT_REDACTION_PROFILE_ID = (
+    "ethics-event-action-snapshot-digest-redaction-v1"
+)
+CONSENT_AUTHENTICITY_BOOLEAN_FIELDS = (
+    "self_signed",
+    "independent_witness_signed",
+    "duress_screen_passed",
+    "coercion_suspected",
+)
+CONSENT_AUTHENTICITY_EVIDENCE_FIELDS = (
+    "self_attestation_ref",
+    "independent_witness_ref",
+    "duress_screen_ref",
+)
+
+
 @dataclass
 class ActionRequest:
     """Action being checked by the ethics layer."""
@@ -226,12 +246,7 @@ class EthicsEnforcer:
     def record_decision(self, query_id: str, request: ActionRequest, decision: EthicsDecision) -> Dict[str, Any]:
         """Create an EthicsLedger-style event for veto/escalation decisions."""
 
-        action_snapshot = {
-            "action_type": request.action_type,
-            "target": request.target,
-            "actor": request.actor,
-            "payload": request.payload,
-        }
+        action_snapshot = self._redacted_action_snapshot(query_id, request)
         fingerprint = sha256_text(canonical_json(action_snapshot))
         return {
             "ethics_event_id": new_id("ethevt"),
@@ -247,6 +262,165 @@ class EthicsEnforcer:
                 "guardian": "sig://integrity-guardian/reference-v0",
             },
             "recorded_at": utc_now_iso(),
+        }
+
+    def _redacted_action_snapshot(
+        self,
+        query_id: str,
+        request: ActionRequest,
+    ) -> Dict[str, Any]:
+        payload_digest = sha256_text(canonical_json(request.payload))
+        snapshot: Dict[str, Any] = {
+            "action_type": request.action_type,
+            "target": request.target,
+            "actor": request.actor,
+            "payload_ref": f"ethics-payload://{query_id}",
+            "payload_digest": payload_digest,
+            "payload_summary": self._payload_summary(request.payload),
+            "redaction_profile": ACTION_SNAPSHOT_REDACTION_PROFILE_ID,
+            "raw_payload_stored": False,
+            "raw_consent_payload_stored": False,
+        }
+        consent_receipt = self._build_consent_authenticity_receipt(
+            query_id,
+            request.payload,
+        )
+        if consent_receipt is not None:
+            snapshot["consent_authenticity_receipt_ref"] = consent_receipt[
+                "receipt_ref"
+            ]
+            snapshot["consent_authenticity_receipt_digest"] = consent_receipt[
+                "receipt_digest"
+            ]
+            snapshot["consent_authenticity_receipt"] = consent_receipt
+        return snapshot
+
+    @staticmethod
+    def _payload_summary(payload: Mapping[str, Any]) -> Dict[str, Any]:
+        summary: Dict[str, Any] = {}
+        for key in (
+            "target_component",
+            "requires_consent",
+            "rewrite",
+            "sandboxed",
+            "guardian_signed",
+            "intent_ambiguous",
+        ):
+            value = payload.get(key)
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                if key in payload:
+                    summary[key] = value
+        matched_tokens = payload.get("matched_tokens")
+        if isinstance(matched_tokens, list):
+            summary["matched_token_count"] = len(matched_tokens)
+            summary["matched_token_digest"] = sha256_text(canonical_json(matched_tokens))
+        approvals = payload.get("approvals")
+        if isinstance(approvals, Mapping):
+            summary["approval_keys"] = sorted(str(key) for key in approvals)
+            summary["approval_digest"] = sha256_text(canonical_json(approvals))
+        return summary
+
+    def _build_consent_authenticity_receipt(
+        self,
+        query_id: str,
+        payload: Mapping[str, Any],
+    ) -> Dict[str, Any] | None:
+        requires_consent = bool(payload.get("requires_consent"))
+        if not requires_consent:
+            return None
+        authenticity = payload.get("consent_authenticity", {})
+        authenticity_map: Mapping[str, Any] = (
+            authenticity if isinstance(authenticity, Mapping) else {}
+        )
+        consent_flags = {
+            field_name: bool(authenticity_map.get(field_name))
+            for field_name in CONSENT_AUTHENTICITY_BOOLEAN_FIELDS
+        }
+        evidence_refs = {
+            field_name: str(authenticity_map.get(field_name, ""))
+            for field_name in CONSENT_AUTHENTICITY_EVIDENCE_FIELDS
+        }
+        missing_evidence = [
+            field_name for field_name, value in evidence_refs.items() if not value
+        ]
+        missing_attestations = [
+            "self_signed"
+            if not consent_flags["self_signed"]
+            else "",
+            "independent_witness_signed"
+            if not consent_flags["independent_witness_signed"]
+            else "",
+            "duress_screen_passed"
+            if not consent_flags["duress_screen_passed"]
+            else "",
+        ]
+        missing_attestations = [value for value in missing_attestations if value]
+        if consent_flags["coercion_suspected"]:
+            authenticity_status = "coercion-suspected"
+        elif not consent_flags["duress_screen_passed"] and evidence_refs["duress_screen_ref"]:
+            authenticity_status = "duress-detected"
+        elif not missing_evidence and not missing_attestations:
+            authenticity_status = "attested"
+        else:
+            authenticity_status = "incomplete"
+        receipt_id_seed = {
+            "query_id": query_id,
+            "evidence_refs": evidence_refs,
+            "consent_flags": consent_flags,
+            "authenticity_status": authenticity_status,
+        }
+        receipt_id = (
+            "consent-authenticity-"
+            f"{sha256_text(canonical_json(receipt_id_seed))[:12]}"
+        )
+        evidence_ref_set_digest = sha256_text(canonical_json(evidence_refs))
+        receipt: Dict[str, Any] = {
+            "kind": "ethics_consent_authenticity_receipt",
+            "schema_version": CONSENT_AUTHENTICITY_RECEIPT_SCHEMA_VERSION,
+            "profile_id": CONSENT_AUTHENTICITY_RECEIPT_PROFILE_ID,
+            "receipt_id": receipt_id,
+            "receipt_ref": f"consent-authenticity://{receipt_id}",
+            "query_id": query_id,
+            "required_evidence": list(CONSENT_AUTHENTICITY_EVIDENCE_FIELDS),
+            "evidence_refs": evidence_refs,
+            "evidence_ref_set_digest": evidence_ref_set_digest,
+            "consent_flags": consent_flags,
+            "missing_evidence": missing_evidence,
+            "missing_attestations": missing_attestations,
+            "authenticity_status": authenticity_status,
+            "coercion_suspected": consent_flags["coercion_suspected"],
+            "duress_screen_passed": consent_flags["duress_screen_passed"],
+            "raw_consent_payload_stored": False,
+            "validation": {
+                "required_evidence_bound": set(evidence_refs)
+                == set(CONSENT_AUTHENTICITY_EVIDENCE_FIELDS),
+                "evidence_ref_digest_bound": evidence_ref_set_digest
+                == sha256_text(canonical_json(evidence_refs)),
+                "consent_flags_bound": set(consent_flags)
+                == set(CONSENT_AUTHENTICITY_BOOLEAN_FIELDS),
+                "raw_consent_payload_stored": False,
+            },
+        }
+        receipt["receipt_digest"] = sha256_text(
+            canonical_json(self._consent_receipt_digest_payload(receipt))
+        )
+        receipt["validation"]["receipt_digest_bound"] = (
+            receipt["receipt_digest"]
+            == sha256_text(canonical_json(self._consent_receipt_digest_payload(receipt)))
+        )
+        receipt["validation"]["ok"] = all(
+            value
+            for key, value in receipt["validation"].items()
+            if key != "raw_consent_payload_stored"
+        )
+        return receipt
+
+    @staticmethod
+    def _consent_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, Any]:
+        return {
+            key: value
+            for key, value in receipt.items()
+            if key not in {"receipt_digest", "validation"}
         }
 
     def _build_rules(self) -> List[EthicsRule]:

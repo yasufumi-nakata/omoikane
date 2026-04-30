@@ -6,7 +6,8 @@
 
 ### Ethics Rule Coverage
 全 Action が EthicsEnforcer を経由し、consent-bound action が self signature /
-independent witness / duress screen の authenticity guard を通っているか。
+independent witness / duress screen の authenticity guard を通り、
+EthicsLedger event が raw payload ではなく digest-only consent receipt を残しているか。
 
 ### Anti-Pattern Absence
 [anti-patterns.md](../../docs/02-subsystems/kernel/anti-patterns.md) のパターンが実装に存在しないか。

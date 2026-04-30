@@ -1,0 +1,181 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/ethics_consent_authenticity_receipt.schema"
+title: EthicsConsentAuthenticityReceipt
+description: >
+  Digest-only EthicsLedger receipt for consent authenticity evidence. It binds
+  self attestation, independent witness, and duress-screen references without
+  storing the raw consent payload.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - profile_id
+  - receipt_id
+  - receipt_ref
+  - query_id
+  - required_evidence
+  - evidence_refs
+  - evidence_ref_set_digest
+  - consent_flags
+  - missing_evidence
+  - missing_attestations
+  - authenticity_status
+  - coercion_suspected
+  - duress_screen_passed
+  - raw_consent_payload_stored
+  - validation
+  - receipt_digest
+properties:
+  kind:
+    const: ethics_consent_authenticity_receipt
+  schema_version:
+    const: "1.0.0"
+  profile_id:
+    const: consent-authenticity-digest-receipt-v1
+  receipt_id:
+    type: string
+    pattern: "^consent-authenticity-[a-f0-9]{12}$"
+  receipt_ref:
+    type: string
+    pattern: "^consent-authenticity://consent-authenticity-[a-f0-9]{12}$"
+  query_id:
+    type: string
+    minLength: 8
+  required_evidence:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - self_attestation_ref
+        - independent_witness_ref
+        - duress_screen_ref
+  evidence_refs:
+    type: object
+    additionalProperties: false
+    required:
+      - self_attestation_ref
+      - independent_witness_ref
+      - duress_screen_ref
+    properties:
+      self_attestation_ref:
+        type: string
+      independent_witness_ref:
+        type: string
+      duress_screen_ref:
+        type: string
+  evidence_ref_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  consent_flags:
+    type: object
+    additionalProperties: false
+    required:
+      - self_signed
+      - independent_witness_signed
+      - duress_screen_passed
+      - coercion_suspected
+    properties:
+      self_signed:
+        type: boolean
+      independent_witness_signed:
+        type: boolean
+      duress_screen_passed:
+        type: boolean
+      coercion_suspected:
+        type: boolean
+  missing_evidence:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - self_attestation_ref
+        - independent_witness_ref
+        - duress_screen_ref
+  missing_attestations:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - self_signed
+        - independent_witness_signed
+        - duress_screen_passed
+  authenticity_status:
+    type: string
+    enum:
+      - attested
+      - incomplete
+      - coercion-suspected
+      - duress-detected
+  coercion_suspected:
+    type: boolean
+  duress_screen_passed:
+    type: boolean
+  raw_consent_payload_stored:
+    const: false
+  validation:
+    type: object
+    additionalProperties: false
+    required:
+      - required_evidence_bound
+      - evidence_ref_digest_bound
+      - consent_flags_bound
+      - raw_consent_payload_stored
+      - receipt_digest_bound
+      - ok
+    properties:
+      required_evidence_bound:
+        type: boolean
+      evidence_ref_digest_bound:
+        type: boolean
+      consent_flags_bound:
+        type: boolean
+      raw_consent_payload_stored:
+        const: false
+      receipt_digest_bound:
+        type: boolean
+      ok:
+        type: boolean
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - kind: ethics_consent_authenticity_receipt
+    schema_version: "1.0.0"
+    profile_id: consent-authenticity-digest-receipt-v1
+    receipt_id: consent-authenticity-0123456789ab
+    receipt_ref: consent-authenticity://consent-authenticity-0123456789ab
+    query_id: ethq-consent-0001
+    required_evidence:
+      - self_attestation_ref
+      - independent_witness_ref
+      - duress_screen_ref
+    evidence_refs:
+      self_attestation_ref: consent://ethics-demo/self-attestation
+      independent_witness_ref: witness://ethics-demo/independent
+      duress_screen_ref: screen://ethics-demo/duress-negative
+    evidence_ref_set_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    consent_flags:
+      self_signed: true
+      independent_witness_signed: true
+      duress_screen_passed: true
+      coercion_suspected: false
+    missing_evidence: []
+    missing_attestations: []
+    authenticity_status: attested
+    coercion_suspected: false
+    duress_screen_passed: true
+    raw_consent_payload_stored: false
+    validation:
+      required_evidence_bound: true
+      evidence_ref_digest_bound: true
+      consent_flags_bound: true
+      raw_consent_payload_stored: false
+      receipt_digest_bound: true
+      ok: true
+    receipt_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef

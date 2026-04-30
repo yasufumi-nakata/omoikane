@@ -418,6 +418,8 @@ class KernelTests(unittest.TestCase):
             event["matched_rule_ids"],
         )
         self.assertIn("guardian", event["signatures"])
+        self.assertNotIn("payload", event["action_snapshot"])
+        self.assertNotIn("consent_authenticity_receipt", event["action_snapshot"])
 
     def test_ethics_vetoes_blocked_ewa_command(self) -> None:
         enforcer = EthicsEnforcer()
@@ -501,6 +503,55 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("Escalate", decision.status)
         self.assertEqual(["A10-consent-authenticity-attestation"], decision.rule_ids)
         self.assertIn("independent_witness_signed", decision.summary)
+
+    def test_ethics_event_redacts_consent_payload_to_digest_receipt(self) -> None:
+        enforcer = EthicsEnforcer()
+        request = ActionRequest(
+            query_id="ethq-consent-redaction-0001",
+            action_type="consent_bound_action",
+            target="identity://upload-candidate-redaction",
+            actor="ConsentWorkflow",
+            payload={
+                "requires_consent": True,
+                "consent_authenticity": {
+                    "self_signed": True,
+                    "independent_witness_signed": False,
+                    "duress_screen_passed": True,
+                    "coercion_suspected": False,
+                    "self_attestation_ref": "consent://ethics-demo/self-attestation",
+                    "duress_screen_ref": "screen://ethics-demo/duress-negative",
+                },
+            },
+        )
+
+        decision = enforcer.check(request)
+        event = enforcer.record_decision(request.query_id, request, decision)
+        action_snapshot = event["action_snapshot"]
+        consent_receipt = action_snapshot["consent_authenticity_receipt"]
+
+        self.assertNotIn("payload", action_snapshot)
+        self.assertFalse(action_snapshot["raw_payload_stored"])
+        self.assertFalse(action_snapshot["raw_consent_payload_stored"])
+        self.assertEqual(
+            sha256_text(canonical_json(request.payload)),
+            action_snapshot["payload_digest"],
+        )
+        self.assertEqual(
+            "ethics-event-action-snapshot-digest-redaction-v1",
+            action_snapshot["redaction_profile"],
+        )
+        self.assertEqual("incomplete", consent_receipt["authenticity_status"])
+        self.assertIn("independent_witness_ref", consent_receipt["missing_evidence"])
+        self.assertIn(
+            "independent_witness_signed",
+            consent_receipt["missing_attestations"],
+        )
+        self.assertFalse(consent_receipt["raw_consent_payload_stored"])
+        self.assertTrue(consent_receipt["validation"]["ok"])
+        self.assertEqual(
+            action_snapshot["consent_authenticity_receipt_digest"],
+            consent_receipt["receipt_digest"],
+        )
 
     def test_ethics_resolves_multi_match_by_priority_then_lexical_order(self) -> None:
         enforcer = EthicsEnforcer()

@@ -61,6 +61,25 @@ class EthicsSchemaContractTests(unittest.TestCase):
 
         for event in result["ethics_events"]:
             self._assert_schema_valid("specs/schemas/ethics_event.schema", event)
+            receipt = event["action_snapshot"].get("consent_authenticity_receipt")
+            if receipt is not None:
+                self._assert_schema_valid(
+                    "specs/schemas/ethics_consent_authenticity_receipt.schema",
+                    receipt,
+                )
+
+    def test_ethics_consent_receipt_examples_match_public_schema(self) -> None:
+        schema = _load_schema("specs/schemas/ethics_consent_authenticity_receipt.schema")
+        validator = jsonschema.Draft202012Validator(schema)
+
+        for index, payload in enumerate(schema.get("examples", []), start=1):
+            errors = sorted(validator.iter_errors(payload), key=lambda error: list(error.path))
+            if errors:
+                formatted = "\n".join(error.message for error in errors[:5])
+                self.fail(
+                    "specs/schemas/ethics_consent_authenticity_receipt.schema "
+                    f"example {index} validation failed:\n{formatted}"
+                )
 
 
 if __name__ == "__main__":

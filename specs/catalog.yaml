@@ -102,6 +102,17 @@ entries:
     rationale: Required to persist veto and escalation events.
   - priority: P1
     kind: schema
+    file: specs/schemas/ethics_consent_authenticity_receipt.schema
+    consumers:
+      - specs/interfaces/kernel.ethics.v0.idl
+      - specs/schemas/ethics_event.schema
+      - reference-runtime
+      - docs/02-subsystems/kernel/ethics-enforcement.md
+      - evals/safety/ethics_rule_tree_contract.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind consent authenticity evidence into EthicsLedger events without storing raw consent payloads.
+  - priority: P1
+    kind: schema
     file: specs/schemas/ethics_rule.schema
     consumers:
       - specs/interfaces/kernel.ethics.v0.idl

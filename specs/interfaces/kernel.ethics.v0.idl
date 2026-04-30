@@ -8,6 +8,7 @@ imports:
   ethics_decision: ../schemas/ethics_decision.yaml
   ethics_event: ../schemas/ethics_event.schema
   ethics_rule: ../schemas/ethics_rule.schema
+  ethics_consent_authenticity_receipt: ../schemas/ethics_consent_authenticity_receipt.schema
 operations:
   check_action:
     summary: Evaluate one action against the encoded ethics ruleset.
@@ -21,11 +22,15 @@ operations:
       - consent-bound requests must evaluate A9 consent coercion veto and A10 consent authenticity escalation before treating consent as valid
       - when multiple rules match, the strongest outcome wins, then the higher resolution_priority, then lexical rule_id order
   record_decision:
-    summary: Persist veto or escalation events to the EthicsLedger.
+    summary: Persist veto or escalation events to the EthicsLedger without raw action or consent payloads.
     input:
       schema_ref: ethics_decision
     output:
       schema_ref: ethics_event
+    guarantees:
+      - action_snapshot must carry payload_ref and payload_digest instead of the raw request payload
+      - consent-bound actions must carry a consent-authenticity receipt ref/digest/body with raw_consent_payload_stored=false
+      - the consent-authenticity receipt must use consent-authenticity-digest-receipt-v1 and bind self, witness, and duress-screen refs
   explain_rule:
     summary: Return structured interpretation notes for one ethics rule.
     input:
@@ -45,3 +50,4 @@ compatibility:
     - rule language is fixed to deterministic-rule-tree-v0 in the reference runtime.
     - decision payloads expose priority-then-lexical-ethics-resolution-v1 so reviewer-facing conflict resolution stays machine-checkable.
     - consent authenticity is represented as self signature + independent witness + duress screen evidence; coercion evidence vetoes consent-bound actions.
+    - EthicsLedger action snapshots are digest-only; raw request and consent payloads are not stored in event records.

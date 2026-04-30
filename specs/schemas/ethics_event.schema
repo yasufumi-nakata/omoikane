@@ -21,7 +21,50 @@ properties:
     minLength: 8
   action_snapshot:
     type: object
-    minProperties: 1
+    additionalProperties: false
+    required:
+      - action_type
+      - target
+      - actor
+      - payload_ref
+      - payload_digest
+      - payload_summary
+      - redaction_profile
+      - raw_payload_stored
+      - raw_consent_payload_stored
+    properties:
+      action_type:
+        type: string
+        minLength: 1
+      target:
+        type: string
+        minLength: 1
+      actor:
+        type: string
+        minLength: 1
+      payload_ref:
+        type: string
+        pattern: "^ethics-payload://"
+      payload_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      payload_summary:
+        type: object
+        additionalProperties: true
+      redaction_profile:
+        const: ethics-event-action-snapshot-digest-redaction-v1
+      raw_payload_stored:
+        const: false
+      raw_consent_payload_stored:
+        const: false
+      consent_authenticity_receipt_ref:
+        type: string
+        pattern: "^consent-authenticity://consent-authenticity-[a-f0-9]{12}$"
+      consent_authenticity_receipt_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      consent_authenticity_receipt:
+        $ref: "ethics_consent_authenticity_receipt.schema"
   rule_id:
     type: string
     minLength: 1

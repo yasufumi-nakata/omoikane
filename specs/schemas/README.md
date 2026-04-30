@@ -91,6 +91,8 @@
 - `energy_floor.schema`
 - `episodic_event.schema`
 - `episodic_stream_snapshot.schema`
+- `ethics_consent_authenticity_receipt.schema`
+  - binds self attestation, independent witness, and duress-screen refs into a digest-only EthicsLedger consent receipt without storing raw consent payload
 - `ethics_decision.yaml`
 - `ethics_event.schema`
 - `ethics_query.yaml`
