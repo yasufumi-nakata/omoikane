@@ -40,7 +40,8 @@ parsed baseline/sandbox observation と comparison digest に加え temp workspa
 bounded に再現できる。
 `parallel-orchestration-demo` は subagent / worker / `codex exec` の成果を main checkout に取り込む前に
 patch digest、changed file manifest digest、verification manifest digest、worker base commit、
-signed worker identity evidence、remote branch / PR metadata digest を
+signed worker identity evidence、workspace marker hygiene digest、
+remote branch / PR metadata digest を
 `parallel_codex_worker_result_receipt` へ縮約し、remote source revocation status が
 `current-not-revoked` でない result、revocation freshness window が expired の result、
 provider timestamp が `signed-current` でない result、stale result、metadata 欠落を
@@ -48,6 +49,8 @@ blocked のまま保持する。remote freshness refs は signed provider timest
 と timestamp signature digest、replay nonce、previous nonce digest、replay guard digest
 へ束縛し、`unique` でない timestamp reuse も blocked のまま保持する。raw timestamp /
 replay-guard payload は保存しない。
+workspace-enacted marker-only payload は別 digest に縮約され、marker だけの worker
+result は blocked のまま保持される。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

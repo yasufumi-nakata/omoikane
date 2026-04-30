@@ -96,11 +96,17 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["remote_source_revocation_not_revoked"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
+        self.assertTrue(result["validation"]["marker_only_result_blocked"])
+        self.assertTrue(result["validation"]["marker_only_hygiene_digest_bound"])
         self.assertEqual(
             "parallel-codex-worker-result-ingestion-v1",
             result["ready_receipt"]["profile_id"],
         )
         self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
+        self.assertEqual(
+            "marker-only-blocked",
+            result["marker_only_receipt"]["workspace_marker_hygiene_status"],
+        )
         self.assertEqual(
             "remote-branch-pr-worker-result",
             result["remote_receipt"]["source_system"],

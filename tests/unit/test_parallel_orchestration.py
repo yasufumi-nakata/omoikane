@@ -56,7 +56,11 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["verification_manifest_digest_bound"])
         self.assertTrue(validation["worker_identity_evidence_bound"])
         self.assertTrue(validation["remote_metadata_bound"])
+        self.assertTrue(validation["workspace_marker_hygiene_clean"])
+        self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
         self.assertTrue(receipt["worker_identity_evidence_bound"])
+        self.assertEqual("clean", receipt["workspace_marker_hygiene_status"])
+        self.assertEqual([], receipt["workspace_marker_only_changed_files"])
         self.assertEqual(
             "signed-worker-identity-evidence-v1",
             receipt["worker_identity_profile"],
@@ -98,6 +102,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["receipt_digest_bound"])
         self.assertFalse(receipt["raw_patch_payload_stored"])
         self.assertFalse(receipt["raw_worker_identity_payload_stored"])
+        self.assertFalse(receipt["raw_workspace_marker_payload_stored"])
         self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
         self.assertFalse(receipt["raw_remote_revocation_payload_stored"])
         self.assertFalse(receipt["raw_remote_revocation_freshness_payload_stored"])
@@ -107,6 +112,65 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         )
         self.assertFalse(receipt["raw_transcript_payload_stored"])
         self.assertFalse(receipt["raw_verification_payload_stored"])
+
+    def test_workspace_marker_only_worker_result_blocks_integration(self) -> None:
+        marker_path = "docs/02-subsystems/agentic/README.md"
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-marker-only-worker",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["docs/"],
+            changed_files=[marker_path],
+            workspace_marker_only_changed_files=[marker_path],
+            verification_results=_verification_results(),
+            result_summary="Worker result only appends workspace-enacted markers.",
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("blocked", receipt["integration_decision"])
+        self.assertEqual(
+            "marker-only-blocked",
+            receipt["workspace_marker_hygiene_status"],
+        )
+        self.assertIn(
+            "workspace marker-only changes cannot be the only integration payload",
+            receipt["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["workspace_marker_only_change_blocked"])
+        self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
+        self.assertFalse(receipt["raw_workspace_marker_payload_stored"])
+
+    def test_workspace_marker_hygiene_allows_substantive_payload_with_reviewed_marker(self) -> None:
+        marker_path = "docs/02-subsystems/agentic/README.md"
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-marker-reviewed-worker",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["docs/", "tests/unit/"],
+            changed_files=[marker_path, "tests/unit/test_parallel_orchestration.py"],
+            workspace_marker_only_changed_files=[marker_path],
+            verification_results=_verification_results(),
+            result_summary=(
+                "Worker result carries a reviewed marker comment plus a "
+                "substantive test change."
+            ),
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("accept-ready", receipt["integration_decision"])
+        self.assertEqual(
+            "marker-only-reviewed",
+            receipt["workspace_marker_hygiene_status"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
 
     def test_remote_branch_pr_worker_result_requires_review_metadata(self) -> None:
         receipt = self.service.ingest_worker_result(

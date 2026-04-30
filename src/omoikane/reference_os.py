@@ -1042,6 +1042,23 @@ class OmoikaneReferenceOS:
                 "checkout integration."
             ),
         )
+        marker_only_receipt = self.parallel_orchestration.ingest_worker_result(
+            worker_id="codex-worker-marker-only",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=main_checkout_head,
+            worker_base_commit=main_checkout_head,
+            ownership_scope=["docs/"],
+            changed_files=["docs/02-subsystems/agentic/README.md"],
+            workspace_marker_only_changed_files=[
+                "docs/02-subsystems/agentic/README.md",
+            ],
+            verification_results=verification_results[:2],
+            result_summary=(
+                "Worker result that only appends workspace-enacted marker comments "
+                "is digest-bound but blocked as non-substantive."
+            ),
+        )
         yaoyorozu_patch_receipt_digest = sha256_text(
             canonical_json(
                 {
@@ -1098,6 +1115,11 @@ class OmoikaneReferenceOS:
         )
         blocked_validation = self.parallel_orchestration.validate_worker_result_receipt(
             blocked_receipt,
+        )
+        marker_only_validation = (
+            self.parallel_orchestration.validate_worker_result_receipt(
+                marker_only_receipt,
+            )
         )
         remote_validation = self.parallel_orchestration.validate_worker_result_receipt(
             remote_receipt,
@@ -1188,6 +1210,14 @@ class OmoikaneReferenceOS:
                 ),
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
+                "marker_only_receipt_ref": marker_only_receipt["receipt_ref"],
+                "marker_only_receipt_digest": marker_only_receipt["receipt_digest"],
+                "marker_only_hygiene_digest": marker_only_receipt[
+                    "workspace_marker_hygiene_digest"
+                ],
+                "marker_only_hygiene_status": marker_only_receipt[
+                    "workspace_marker_hygiene_status"
+                ],
                 "yaoyorozu_bridge_receipt_ref": yaoyorozu_bridge_receipt[
                     "receipt_ref"
                 ],
@@ -1203,6 +1233,7 @@ class OmoikaneReferenceOS:
                 "raw_patch_payload_stored": False,
                 "raw_upstream_payload_stored": False,
                 "raw_worker_identity_payload_stored": False,
+                "raw_workspace_marker_payload_stored": False,
                 "raw_remote_metadata_payload_stored": False,
                 "raw_remote_revocation_payload_stored": False,
                 "raw_remote_revocation_freshness_payload_stored": False,
@@ -1243,6 +1274,16 @@ class OmoikaneReferenceOS:
                 "contract_role": "parallel-codex-blocked-stale-worker-result",
             },
             {
+                "payload_path": "marker_only_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_worker_result_receipt.schema"
+                ),
+                "contract_role": (
+                    "parallel-codex-blocked-workspace-marker-only-result"
+                ),
+            },
+            {
                 "payload_path": "yaoyorozu_bridge_receipt",
                 "schema_path": (
                     "specs/schemas/"
@@ -1257,6 +1298,7 @@ class OmoikaneReferenceOS:
             "ready_receipt": ready_receipt,
             "remote_receipt": remote_receipt,
             "blocked_receipt": blocked_receipt,
+            "marker_only_receipt": marker_only_receipt,
             "yaoyorozu_bridge_receipt": yaoyorozu_bridge_receipt,
             "ledger_entry_ref": f"ledger://continuity-ledger/{ledger_entry.entry_hash}",
             "ledger_entry_hash": ledger_entry.entry_hash,
@@ -1265,12 +1307,14 @@ class OmoikaneReferenceOS:
                 "ok": (
                     ready_validation["ok"]
                     and blocked_validation["ok"]
+                    and marker_only_validation["ok"]
                     and remote_validation["ok"]
                     and yaoyorozu_bridge_validation["ok"]
                     and ready_validation["ready_for_main_checkout"]
                     and remote_validation["ready_for_main_checkout"]
                     and yaoyorozu_bridge_validation["ready_for_main_checkout"]
                     and not blocked_validation["ready_for_main_checkout"]
+                    and not marker_only_validation["ready_for_main_checkout"]
                 ),
                 "ready_receipt_ok": ready_validation["ok"],
                 "ready_for_main_checkout": ready_validation[
@@ -1291,9 +1335,16 @@ class OmoikaneReferenceOS:
                 "ready_worker_identity_evidence_bound": ready_validation[
                     "worker_identity_evidence_bound"
                 ],
+                "ready_workspace_marker_hygiene_clean": ready_validation[
+                    "workspace_marker_hygiene_clean"
+                ],
+                "ready_workspace_marker_hygiene_digest_bound": ready_validation[
+                    "workspace_marker_hygiene_digest_bound"
+                ],
                 "ready_raw_payload_redacted": (
                     ready_validation["raw_patch_payload_redacted"]
                     and ready_validation["raw_worker_identity_payload_redacted"]
+                    and ready_validation["raw_workspace_marker_payload_redacted"]
                     and ready_validation["raw_remote_metadata_payload_redacted"]
                     and ready_validation["raw_remote_revocation_payload_redacted"]
                     and ready_validation["raw_transcript_payload_redacted"]
@@ -1396,6 +1447,18 @@ class OmoikaneReferenceOS:
                 "blocked_receipt_digest_bound": blocked_validation[
                     "receipt_digest_bound"
                 ],
+                "marker_only_result_blocked": not marker_only_validation[
+                    "ready_for_main_checkout"
+                ],
+                "marker_only_hygiene_digest_bound": marker_only_validation[
+                    "workspace_marker_hygiene_digest_bound"
+                ],
+                "marker_only_change_blocked": marker_only_validation[
+                    "workspace_marker_only_change_blocked"
+                ],
+                "marker_only_raw_workspace_marker_payload_redacted": (
+                    marker_only_validation["raw_workspace_marker_payload_redacted"]
+                ),
                 "yaoyorozu_bridge_ready_for_main_checkout": (
                     yaoyorozu_bridge_validation["ready_for_main_checkout"]
                 ),

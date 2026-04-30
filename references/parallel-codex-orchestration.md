@@ -26,7 +26,10 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - worker result は patch / changed file list / verification result の形で受け取る
 - worker result は main checkout へ混ぜる前に `parallel_codex_worker_result_receipt.schema`
   で patch digest、changed file manifest digest、verification manifest digest、
-  worker base commit、signed worker identity evidence を束縛する
+  worker base commit、signed worker identity evidence、workspace marker hygiene digest
+  を束縛する
+- workspace-enacted marker-only 変更だけの worker result は schema-bound のまま
+  blocked にし、marker payload raw text は保存しない
 - worker identity は ref / digest / integrity Guardian signature digest に縮約し、
   raw worker identity payload は保存しない
 - remote branch / PR 由来の worker result は branch ref、PR ref、accepted source

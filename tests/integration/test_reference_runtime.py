@@ -960,6 +960,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ready_required_verifications_passed"])
         self.assertTrue(result["validation"]["ready_receipt_digest_bound"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
+        self.assertTrue(result["validation"]["ready_workspace_marker_hygiene_clean"])
+        self.assertTrue(
+            result["validation"]["ready_workspace_marker_hygiene_digest_bound"]
+        )
         self.assertTrue(result["validation"]["ready_raw_payload_redacted"])
         self.assertTrue(result["validation"]["remote_ready_for_main_checkout"])
         self.assertTrue(result["validation"]["remote_branch_pr_metadata_bound"])
@@ -977,6 +981,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(result["validation"]["blocked_base_head_mismatch"])
         self.assertTrue(result["validation"]["blocked_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["marker_only_result_blocked"])
+        self.assertTrue(result["validation"]["marker_only_hygiene_digest_bound"])
+        self.assertTrue(result["validation"]["marker_only_change_blocked"])
+        self.assertTrue(
+            result["validation"]["marker_only_raw_workspace_marker_payload_redacted"]
+        )
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
         )
@@ -992,6 +1002,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
             result["remote_receipt"]["source_system"],
         )
         self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
+        self.assertEqual(
+            "marker-only-blocked",
+            result["marker_only_receipt"]["workspace_marker_hygiene_status"],
+        )
         self.assertEqual(
             "yaoyorozu-worker-dispatch",
             result["yaoyorozu_bridge_receipt"]["source_system"],

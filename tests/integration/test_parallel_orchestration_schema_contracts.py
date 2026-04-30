@@ -62,11 +62,19 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self._assert_schema_valid(
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
+            result["marker_only_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_worker_result_receipt.schema",
             result["yaoyorozu_bridge_receipt"],
         )
-        self.assertEqual(4, len(result["schema_contracts"]))
+        self.assertEqual(5, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
+        self.assertTrue(result["validation"]["ready_workspace_marker_hygiene_clean"])
+        self.assertTrue(
+            result["validation"]["ready_workspace_marker_hygiene_digest_bound"]
+        )
         self.assertTrue(result["validation"]["remote_ready_for_main_checkout"])
         self.assertTrue(result["validation"]["remote_branch_pr_metadata_bound"])
         self.assertTrue(
@@ -115,6 +123,12 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             ]
         )
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
+        self.assertTrue(result["validation"]["marker_only_result_blocked"])
+        self.assertTrue(result["validation"]["marker_only_hygiene_digest_bound"])
+        self.assertTrue(result["validation"]["marker_only_change_blocked"])
+        self.assertTrue(
+            result["validation"]["marker_only_raw_workspace_marker_payload_redacted"]
+        )
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
         )

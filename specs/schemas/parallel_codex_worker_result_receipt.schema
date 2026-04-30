@@ -6,6 +6,9 @@ description: >
   before it is integrated into the main checkout, including signed worker
   identity evidence and remote branch / PR source metadata without storing raw
   worker identity, remote metadata, or remote revocation payloads.
+  Workspace-enacted marker-only file changes are separately counted and
+  digest-bound so worker output that only appends local enactment comments cannot
+  be accepted as a substantive integration payload.
   Remote source revocation evidence also carries a bounded freshness window so
   old current-not-revoked checks cannot be reused silently, and the freshness
   refs are bound to a signed provider timestamp digest before acceptance.
@@ -75,6 +78,11 @@ required:
   - changed_files
   - changed_file_count
   - changed_file_manifest_digest
+  - workspace_marker_hygiene_profile
+  - workspace_marker_only_changed_files
+  - workspace_marker_only_change_count
+  - workspace_marker_hygiene_status
+  - workspace_marker_hygiene_digest
   - patch_digest
   - verification_results
   - verification_command_count
@@ -86,6 +94,7 @@ required:
   - raw_patch_payload_stored
   - raw_upstream_payload_stored
   - raw_worker_identity_payload_stored
+  - raw_workspace_marker_payload_stored
   - raw_remote_metadata_payload_stored
   - raw_remote_revocation_payload_stored
   - raw_remote_revocation_freshness_payload_stored
@@ -313,6 +322,26 @@ properties:
   changed_file_manifest_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  workspace_marker_hygiene_profile:
+    const: workspace-enacted-marker-hygiene-v1
+  workspace_marker_only_changed_files:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  workspace_marker_only_change_count:
+    type: integer
+    minimum: 0
+  workspace_marker_hygiene_status:
+    type: string
+    enum:
+      - clean
+      - marker-only-reviewed
+      - marker-only-blocked
+  workspace_marker_hygiene_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
   patch_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -347,6 +376,8 @@ properties:
   raw_upstream_payload_stored:
     const: false
   raw_worker_identity_payload_stored:
+    const: false
+  raw_workspace_marker_payload_stored:
     const: false
   raw_remote_metadata_payload_stored:
     const: false

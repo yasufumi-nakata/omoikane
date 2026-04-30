@@ -38,6 +38,9 @@ PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_SIGNATURE_PROFILE = (
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE = (
     "remote-source-revocation-timestamp-replay-guard-v1"
 )
+PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE = (
+    "workspace-enacted-marker-hygiene-v1"
+)
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_OK_STATUS = "current-not-revoked"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS = "not-applicable"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_FRESH_STATUS = "fresh"
@@ -47,6 +50,9 @@ PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_STALE_STATUS = "stale"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_INVALID_STATUS = "invalid"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS = "unique"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAYED_STATUS = "replayed"
+PARALLEL_CODEX_WORKSPACE_MARKER_CLEAN_STATUS = "clean"
+PARALLEL_CODEX_WORKSPACE_MARKER_REVIEWED_STATUS = "marker-only-reviewed"
+PARALLEL_CODEX_WORKSPACE_MARKER_BLOCKED_STATUS = "marker-only-blocked"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_MAX_FRESHNESS_WINDOW_SECONDS = 900
 PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE = (
     "integrity-guardian-remote-review-authority-v1"
@@ -154,6 +160,9 @@ class ParallelCodexOrchestrationPolicy:
             "worker_identity_signature_role": (
                 PARALLEL_CODEX_WORKER_IDENTITY_SIGNATURE_ROLE
             ),
+            "workspace_marker_hygiene_profile": (
+                PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE
+            ),
             "remote_metadata_profile": PARALLEL_CODEX_REMOTE_METADATA_PROFILE,
             "remote_source_revocation_profile": (
                 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_PROFILE
@@ -192,6 +201,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_patch_payload_stored": False,
             "raw_upstream_payload_stored": False,
             "raw_worker_identity_payload_stored": False,
+            "raw_workspace_marker_payload_stored": False,
             "raw_remote_metadata_payload_stored": False,
             "raw_remote_revocation_payload_stored": False,
             "raw_remote_revocation_freshness_payload_stored": False,
@@ -226,6 +236,7 @@ class ParallelCodexOrchestrationService:
         changed_files: Sequence[str],
         verification_results: Sequence[Mapping[str, Any]],
         result_summary: str,
+        workspace_marker_only_changed_files: Sequence[str] = (),
         patch_digest: str = "",
         source_system: str = "direct-worker-result",
         upstream_receipt_ref: str = "",
@@ -261,6 +272,18 @@ class ParallelCodexOrchestrationService:
         normalized_source_system = source_system.strip() or "direct-worker-result"
         normalized_scope = _dedupe_strings(ownership_scope)
         normalized_files = _dedupe_strings(changed_files)
+        normalized_workspace_marker_files = _dedupe_strings(
+            workspace_marker_only_changed_files,
+        )
+        workspace_marker_hygiene_status = self._workspace_marker_hygiene_status(
+            changed_files=normalized_files,
+            workspace_marker_only_changed_files=normalized_workspace_marker_files,
+        )
+        workspace_marker_hygiene_digest = self._workspace_marker_hygiene_digest(
+            changed_files=normalized_files,
+            workspace_marker_only_changed_files=normalized_workspace_marker_files,
+            workspace_marker_hygiene_status=workspace_marker_hygiene_status,
+        )
         normalized_upstream_refs = _dedupe_strings(upstream_patch_candidate_receipt_refs)
         normalized_upstream_digests = _dedupe_strings(
             upstream_patch_candidate_receipt_digests,
@@ -410,6 +433,15 @@ class ParallelCodexOrchestrationService:
             "changed_file_manifest_digest": self._changed_file_manifest_digest(
                 normalized_files,
             ),
+            "workspace_marker_hygiene_profile": (
+                PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE
+            ),
+            "workspace_marker_only_changed_files": normalized_workspace_marker_files,
+            "workspace_marker_only_change_count": len(
+                normalized_workspace_marker_files,
+            ),
+            "workspace_marker_hygiene_status": workspace_marker_hygiene_status,
+            "workspace_marker_hygiene_digest": workspace_marker_hygiene_digest,
             "patch_digest": normalized_patch_digest,
             "verification_results": normalized_verifications,
             "verification_command_count": len(normalized_verifications),
@@ -425,6 +457,7 @@ class ParallelCodexOrchestrationService:
             "raw_patch_payload_stored": False,
             "raw_upstream_payload_stored": False,
             "raw_worker_identity_payload_stored": False,
+            "raw_workspace_marker_payload_stored": False,
             "raw_remote_metadata_payload_stored": False,
             "raw_remote_revocation_payload_stored": False,
             "raw_remote_revocation_freshness_payload_stored": False,
@@ -520,14 +553,37 @@ class ParallelCodexOrchestrationService:
     ) -> Dict[str, Any]:
         errors: list[str] = []
         changed_files = list(receipt.get("changed_files", []))
+        workspace_marker_only_changed_files = list(
+            receipt.get("workspace_marker_only_changed_files", []),
+        )
         verification_results = list(receipt.get("verification_results", []))
         expected_blocking_reasons = self._derive_blocking_reasons(receipt)
         expected_integration_decision = (
             "blocked" if expected_blocking_reasons else "accept-ready"
         )
+        expected_workspace_marker_hygiene_status = (
+            self._workspace_marker_hygiene_status(
+                changed_files=changed_files,
+                workspace_marker_only_changed_files=(
+                    workspace_marker_only_changed_files
+                ),
+            )
+        )
         changed_digest_bound = (
             receipt.get("changed_file_manifest_digest")
             == self._changed_file_manifest_digest(changed_files)
+        )
+        workspace_marker_hygiene_digest_bound = (
+            receipt.get("workspace_marker_hygiene_digest")
+            == self._workspace_marker_hygiene_digest(
+                changed_files=changed_files,
+                workspace_marker_only_changed_files=(
+                    workspace_marker_only_changed_files
+                ),
+                workspace_marker_hygiene_status=(
+                    expected_workspace_marker_hygiene_status
+                ),
+            )
         )
         verification_digest_bound = (
             receipt.get("verification_manifest_digest")
@@ -822,6 +878,9 @@ class ParallelCodexOrchestrationService:
         raw_worker_identity_payload_redacted = (
             receipt.get("raw_worker_identity_payload_stored") is False
         )
+        raw_workspace_marker_payload_redacted = (
+            receipt.get("raw_workspace_marker_payload_stored") is False
+        )
         raw_remote_metadata_payload_redacted = (
             receipt.get("raw_remote_metadata_payload_stored") is False
         )
@@ -930,6 +989,15 @@ class ParallelCodexOrchestrationService:
             errors.append("base_head_matches mismatch")
         if receipt.get("changed_file_count") != len(changed_files):
             errors.append("changed_file_count mismatch")
+        if receipt.get("workspace_marker_only_change_count") != len(
+            workspace_marker_only_changed_files,
+        ):
+            errors.append("workspace_marker_only_change_count mismatch")
+        if (
+            receipt.get("workspace_marker_hygiene_status")
+            != expected_workspace_marker_hygiene_status
+        ):
+            errors.append("workspace_marker_hygiene_status mismatch")
         if receipt.get("verification_command_count") != len(verification_results):
             errors.append("verification_command_count mismatch")
         if receipt.get("blocking_reasons") != expected_blocking_reasons:
@@ -940,12 +1008,15 @@ class ParallelCodexOrchestrationService:
             errors.append("changed_file_manifest_digest mismatch")
         if not verification_digest_bound:
             errors.append("verification_manifest_digest mismatch")
+        if not workspace_marker_hygiene_digest_bound:
+            errors.append("workspace_marker_hygiene_digest mismatch")
         if not receipt_digest_bound:
             errors.append("receipt_digest mismatch")
         if not (
             raw_patch_payload_redacted
             and raw_upstream_payload_redacted
             and raw_worker_identity_payload_redacted
+            and raw_workspace_marker_payload_redacted
             and raw_remote_metadata_payload_redacted
             and raw_remote_revocation_payload_redacted
             and raw_remote_revocation_freshness_payload_redacted
@@ -969,6 +1040,17 @@ class ParallelCodexOrchestrationService:
             "base_head_matches": bool(receipt.get("base_head_matches")),
             "changed_file_manifest_digest_bound": changed_digest_bound,
             "verification_manifest_digest_bound": verification_digest_bound,
+            "workspace_marker_hygiene_digest_bound": (
+                workspace_marker_hygiene_digest_bound
+            ),
+            "workspace_marker_hygiene_clean": (
+                receipt.get("workspace_marker_hygiene_status")
+                == PARALLEL_CODEX_WORKSPACE_MARKER_CLEAN_STATUS
+            ),
+            "workspace_marker_only_change_blocked": (
+                receipt.get("workspace_marker_hygiene_status")
+                == PARALLEL_CODEX_WORKSPACE_MARKER_BLOCKED_STATUS
+            ),
             "required_verifications_passed": self._required_verifications_passed(
                 verification_results,
             ),
@@ -1023,6 +1105,9 @@ class ParallelCodexOrchestrationService:
             "raw_patch_payload_redacted": raw_patch_payload_redacted,
             "raw_upstream_payload_redacted": raw_upstream_payload_redacted,
             "raw_worker_identity_payload_redacted": raw_worker_identity_payload_redacted,
+            "raw_workspace_marker_payload_redacted": (
+                raw_workspace_marker_payload_redacted
+            ),
             "raw_remote_metadata_payload_redacted": (
                 raw_remote_metadata_payload_redacted
             ),
@@ -1076,6 +1161,9 @@ class ParallelCodexOrchestrationService:
         worker_result_status = receipt.get("worker_result_status")
         ownership_scope = list(receipt.get("ownership_scope", []))
         changed_files = list(receipt.get("changed_files", []))
+        workspace_marker_only_changed_files = list(
+            receipt.get("workspace_marker_only_changed_files", []),
+        )
         verification_results = list(receipt.get("verification_results", []))
 
         if worker_result_status != "completed":
@@ -1637,6 +1725,49 @@ class ParallelCodexOrchestrationService:
                 reasons.append(f"changed file outside allowed workspace prefixes: {path}")
             if ownership_scope and not _is_under_prefix(path, ownership_scope):
                 reasons.append(f"changed file outside worker ownership scope: {path}")
+        if (
+            receipt.get("workspace_marker_hygiene_profile")
+            != PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE
+        ):
+            reasons.append("workspace_marker_hygiene_profile mismatch")
+        if receipt.get("workspace_marker_only_change_count") != len(
+            workspace_marker_only_changed_files,
+        ):
+            reasons.append("workspace_marker_only_change_count mismatch")
+        marker_file_set = set(workspace_marker_only_changed_files)
+        changed_file_set = set(changed_files)
+        if not marker_file_set.issubset(changed_file_set):
+            reasons.append("workspace marker-only files must be subset of changed_files")
+        expected_workspace_marker_hygiene_status = (
+            self._workspace_marker_hygiene_status(
+                changed_files=changed_files,
+                workspace_marker_only_changed_files=(
+                    workspace_marker_only_changed_files
+                ),
+            )
+        )
+        if (
+            expected_workspace_marker_hygiene_status
+            == PARALLEL_CODEX_WORKSPACE_MARKER_BLOCKED_STATUS
+        ):
+            reasons.append(
+                "workspace marker-only changes cannot be the only integration payload"
+            )
+        if (
+            receipt.get("workspace_marker_hygiene_status")
+            != expected_workspace_marker_hygiene_status
+        ):
+            reasons.append("workspace_marker_hygiene_status mismatch")
+        if receipt.get(
+            "workspace_marker_hygiene_digest",
+        ) != self._workspace_marker_hygiene_digest(
+            changed_files=changed_files,
+            workspace_marker_only_changed_files=workspace_marker_only_changed_files,
+            workspace_marker_hygiene_status=expected_workspace_marker_hygiene_status,
+        ):
+            reasons.append("workspace_marker_hygiene_digest mismatch")
+        if receipt.get("raw_workspace_marker_payload_stored") is not False:
+            reasons.append("raw_workspace_marker_payload_stored must be false")
         if not _is_sha256(receipt.get("patch_digest")):
             reasons.append("patch_digest must be a sha256 hex digest")
         for command in self._policy.required_verifications:
@@ -1652,6 +1783,44 @@ class ParallelCodexOrchestrationService:
     @staticmethod
     def _changed_file_manifest_digest(changed_files: Sequence[str]) -> str:
         return sha256_text(canonical_json({"changed_files": list(changed_files)}))
+
+    @staticmethod
+    def _workspace_marker_hygiene_status(
+        *,
+        changed_files: Sequence[str],
+        workspace_marker_only_changed_files: Sequence[str],
+    ) -> str:
+        marker_files = set(workspace_marker_only_changed_files)
+        if not marker_files:
+            return PARALLEL_CODEX_WORKSPACE_MARKER_CLEAN_STATUS
+        evidence_bearing_files = [
+            path for path in changed_files if path not in marker_files
+        ]
+        if evidence_bearing_files:
+            return PARALLEL_CODEX_WORKSPACE_MARKER_REVIEWED_STATUS
+        return PARALLEL_CODEX_WORKSPACE_MARKER_BLOCKED_STATUS
+
+    @staticmethod
+    def _workspace_marker_hygiene_digest(
+        *,
+        changed_files: Sequence[str],
+        workspace_marker_only_changed_files: Sequence[str],
+        workspace_marker_hygiene_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE,
+                    "changed_files": list(changed_files),
+                    "workspace_marker_only_changed_files": list(
+                        workspace_marker_only_changed_files,
+                    ),
+                    "workspace_marker_hygiene_status": (
+                        workspace_marker_hygiene_status
+                    ),
+                }
+            )
+        )
 
     @staticmethod
     def _worker_identity_digest(
