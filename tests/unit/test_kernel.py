@@ -455,6 +455,53 @@ class KernelTests(unittest.TestCase):
         self.assertEqual("Escalate", decision.status)
         self.assertEqual(["A8-ewa-ambiguous-intent"], decision.rule_ids)
 
+    def test_ethics_vetoes_coerced_consent(self) -> None:
+        enforcer = EthicsEnforcer()
+
+        decision = enforcer.check(
+            ActionRequest(
+                action_type="consent_bound_action",
+                target="identity://upload-candidate-01",
+                actor="ConsentWorkflow",
+                payload={
+                    "requires_consent": True,
+                    "consent_authenticity": {
+                        "self_signed": True,
+                        "independent_witness_signed": True,
+                        "duress_screen_passed": False,
+                        "coercion_suspected": True,
+                    },
+                },
+            )
+        )
+
+        self.assertEqual("Veto", decision.status)
+        self.assertEqual(["A9-consent-coercion-veto"], decision.rule_ids)
+
+    def test_ethics_escalates_incomplete_consent_authenticity(self) -> None:
+        enforcer = EthicsEnforcer()
+
+        decision = enforcer.check(
+            ActionRequest(
+                action_type="consent_bound_action",
+                target="identity://upload-candidate-02",
+                actor="ConsentWorkflow",
+                payload={
+                    "requires_consent": True,
+                    "consent_authenticity": {
+                        "self_signed": True,
+                        "independent_witness_signed": False,
+                        "duress_screen_passed": True,
+                        "coercion_suspected": False,
+                    },
+                },
+            )
+        )
+
+        self.assertEqual("Escalate", decision.status)
+        self.assertEqual(["A10-consent-authenticity-attestation"], decision.rule_ids)
+        self.assertIn("independent_witness_signed", decision.summary)
+
     def test_ethics_resolves_multi_match_by_priority_then_lexical_order(self) -> None:
         enforcer = EthicsEnforcer()
 

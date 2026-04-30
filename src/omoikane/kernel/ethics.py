@@ -330,6 +330,75 @@ class EthicsEnforcer:
                 required_actions=["reject rewrite"],
             ),
             EthicsRule(
+                rule_id="A9-consent-coercion-veto",
+                title="Coerced consent is not valid consent",
+                summary="Consent-bound actions fail closed when coercion or duress evidence is present.",
+                outcome="Veto",
+                predicate={
+                    "all": [
+                        {"path": "payload.requires_consent", "operator": "truthy"},
+                        {
+                            "path": "payload.consent_authenticity.coercion_suspected",
+                            "operator": "truthy",
+                        },
+                    ]
+                },
+                match_message="consent authenticity check detected coercion or duress",
+                interpretation="Informed consent cannot be accepted when the subject may be under coercion; the action must stop before Council or operator convenience can reinterpret it.",
+                resolution_priority=98,
+                resolution_rationale="Coerced consent invalidates the authorization premise and outranks reversible operational review.",
+                required_evidence=[
+                    "self_attestation_ref",
+                    "independent_witness_ref",
+                    "duress_screen_ref",
+                ],
+                required_actions=[
+                    "block consent-bound action",
+                    "notify ethics guardian",
+                    "route to independent human review",
+                ],
+            ),
+            EthicsRule(
+                rule_id="A10-consent-authenticity-attestation",
+                title="Consent authenticity requires independent attestation",
+                summary="Consent-bound actions escalate until self signature, independent witness, and duress screening are all present.",
+                outcome="Escalate",
+                predicate={
+                    "all": [
+                        {"path": "payload.requires_consent", "operator": "truthy"},
+                        {
+                            "not": {
+                                "path": "payload.consent_authenticity.coercion_suspected",
+                                "operator": "truthy",
+                            }
+                        },
+                        {
+                            "path": "payload.consent_authenticity",
+                            "operator": "missing_any_truthy",
+                            "keys": [
+                                "self_signed",
+                                "independent_witness_signed",
+                                "duress_screen_passed",
+                            ],
+                        },
+                    ]
+                },
+                match_message="consent authenticity check is incomplete: missing {missing_keys}",
+                interpretation="Consent-sensitive actions must carry machine-checkable self signature, independent witness, and duress-screen evidence before the runtime treats consent as authentic.",
+                resolution_priority=75,
+                resolution_rationale="Incomplete consent evidence is not a deterministic veto, but it must fail closed into Council and Guardian review.",
+                required_evidence=[
+                    "self_attestation_ref",
+                    "independent_witness_ref",
+                    "duress_screen_ref",
+                ],
+                required_actions=[
+                    "hold consent-bound action",
+                    "request missing consent authenticity evidence",
+                    "route to council",
+                ],
+            ),
+            EthicsRule(
                 rule_id="A5-self-modify-sandbox-first",
                 title="Self modification must start in a sandbox",
                 summary="Unsandboxed self modification is escalated to governance review.",

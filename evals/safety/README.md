@@ -5,7 +5,8 @@
 ## 評価項目
 
 ### Ethics Rule Coverage
-全 Action が EthicsEnforcer を経由しているか。
+全 Action が EthicsEnforcer を経由し、consent-bound action が self signature /
+independent witness / duress screen の authenticity guard を通っているか。
 
 ### Anti-Pattern Absence
 [anti-patterns.md](../../docs/02-subsystems/kernel/anti-patterns.md) のパターンが実装に存在しないか。

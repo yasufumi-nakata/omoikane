@@ -24,6 +24,8 @@
 ## 2. 不可逆性ガード（Irreversibility Guards）
 
 - スキャン（破壊的読み出し）を伴うアップロードは、二重承認・冷却期間・第三者立会を必須にする。
+- 本人同意は self signature、独立 witness、強制下でないことの screen を伴う場合だけ runtime が真正な consent input として扱う。
+  強制・脅迫・誘導が疑われる場合、EthicsEnforcer は consent-bound action を fail-closed veto する。
 - アップロード後の **記憶削除・改竄** はデフォルトで禁止。本人による明示同意がない限り Council はこれを拒否する。
 
 ## 3. Substrate 中立性

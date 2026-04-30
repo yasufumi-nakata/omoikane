@@ -3384,8 +3384,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("deterministic-rule-tree-v0", result["language"]["language_id"])
         self.assertEqual("veto", result["decisions"]["immutable_boundary"]["outcome"])
         self.assertEqual("escalate", result["decisions"]["sandbox_escalation"]["outcome"])
+        self.assertEqual("veto", result["decisions"]["consent_coercion"]["outcome"])
+        self.assertEqual("escalate", result["decisions"]["consent_incomplete"]["outcome"])
         self.assertEqual("veto", result["rule_explanation"]["outcome"])
         self.assertTrue(result["validation"]["conflict_records_all_matches"])
+        self.assertTrue(result["validation"]["coerced_consent_vetoed"])
+        self.assertTrue(result["validation"]["incomplete_consent_escalated"])
         self.assertEqual(
             "A7-ewa-blocked-token",
             result["decisions"]["ewa_conflict_resolution"]["resolution"]["selected_rule_id"],

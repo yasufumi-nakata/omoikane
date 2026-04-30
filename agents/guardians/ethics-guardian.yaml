@@ -3,6 +3,7 @@ role: guardian
 version: 0.1.0
 capabilities:
   - ethics.veto
+  - ethics.consent-authenticity.verify
   - council.alert
   - energy-budget.floor.verify
   - energy-budget.pool-floor.verify
@@ -31,6 +32,8 @@ prompt_or_policy_ref: agents/guardians/ethics-guardian.policy.md
 when_to_invoke: |
   - Council 議決後、本体反映前
   - 任意の Action 実行前
+  - consent-bound action が self signature、独立 witness、duress screen を揃えているか確認する時
+  - coercion_suspected がある consent-bound action を fail-closed veto する時
   - EnergyBudget floor receipt が AP-1 economic pressure を拒否しているか確認する時
   - multi-identity EnergyBudget pool receipt が per-identity floor を守り cross-identity offset を拒否しているか確認する時
   - post-floor voluntary EnergyBudget subsidy receipt が donor consent、floor preservation、法域付き live HTTP signer roster verifier、signed response envelope、signed threshold-policy 付き multi-jurisdiction verifier quorum、revocation registry、audit authority binding を満たしているか確認する時

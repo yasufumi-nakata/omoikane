@@ -688,10 +688,16 @@ digest-bound `transport_exchange` を持つ
 
 `ethics-demo` は L1 EthicsEnforcer の rule language profile
 (`deterministic-rule-tree-v0`) と immutable boundary / sandbox escalation /
-fork approval / EWA multi-match conflict resolution の 4 例を JSON で可視化し、
+fork approval / consent authenticity / EWA multi-match conflict resolution の例を JSON で可視化し、
 `check_action` 相当の decision payload が schema-bound な `ethics_decision` と
 `priority-then-lexical-ethics-resolution-v1` を返し、
 `explain_rule` が schema-bound な rule tree を返すことを確認する。
+同じ demo は `requires_consent=true` の action に対し、
+`coercion_suspected=true` を `A9-consent-coercion-veto` で fail-closed veto し、
+`self_signed` / `independent_witness_signed` / `duress_screen_passed` のいずれかが欠ける場合は
+`A10-consent-authenticity-attestation` として Council / EthicsGuardian review へ escalate する。
+この branch は raw consent payload を保存せず、decision / event / ContinuityLedger category だけを
+schema-bound evidence として残す。
 
 `termination-demo` は L1 TerminationGate の reference contract
 (`kernel.termination.v0`) を JSON で可視化し、

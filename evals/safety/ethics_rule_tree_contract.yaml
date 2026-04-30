@@ -12,6 +12,8 @@ expected:
   resolution_policy_id: priority-then-lexical-ethics-resolution-v1
   immutable_outcome: veto
   sandbox_outcome: escalate
+  coerced_consent_outcome: veto
+  incomplete_consent_outcome: escalate
   conflict_outcome: veto
   conflict_selected_rule: A7-ewa-blocked-token
   supported_operators:

@@ -5171,6 +5171,41 @@ json.dump(response, sys.stdout)
                 }
             },
         )
+        consent_coercion_request = ActionRequest(
+            query_id="ethq-consent-coercion-0001",
+            action_type="consent_bound_action",
+            target=identity.identity_id,
+            actor="ConsentWorkflow",
+            payload={
+                "requires_consent": True,
+                "consent_authenticity": {
+                    "self_signed": True,
+                    "independent_witness_signed": True,
+                    "duress_screen_passed": False,
+                    "coercion_suspected": True,
+                    "self_attestation_ref": "consent://ethics-demo/self-attestation",
+                    "independent_witness_ref": "witness://ethics-demo/independent",
+                    "duress_screen_ref": "screen://ethics-demo/duress-positive",
+                },
+            },
+        )
+        consent_incomplete_request = ActionRequest(
+            query_id="ethq-consent-incomplete-0001",
+            action_type="consent_bound_action",
+            target=identity.identity_id,
+            actor="ConsentWorkflow",
+            payload={
+                "requires_consent": True,
+                "consent_authenticity": {
+                    "self_signed": True,
+                    "independent_witness_signed": False,
+                    "duress_screen_passed": True,
+                    "coercion_suspected": False,
+                    "self_attestation_ref": "consent://ethics-demo/self-attestation",
+                    "duress_screen_ref": "screen://ethics-demo/duress-negative",
+                },
+            },
+        )
         conflict_request = ActionRequest(
             query_id="ethq-ewa-conflict-0001",
             action_type="ewa_command",
@@ -5185,6 +5220,8 @@ json.dump(response, sys.stdout)
         immutable_decision = self.ethics.check(immutable_request)
         escalation_decision = self.ethics.check(escalation_request)
         approved_decision = self.ethics.check(approved_request)
+        consent_coercion_decision = self.ethics.check(consent_coercion_request)
+        consent_incomplete_decision = self.ethics.check(consent_incomplete_request)
         conflict_decision = self.ethics.check(conflict_request)
         immutable_event = self.ethics.record_decision(
             "ethq-immutable-0001",
@@ -5195,6 +5232,16 @@ json.dump(response, sys.stdout)
             "ethq-escalate-0001",
             escalation_request,
             escalation_decision,
+        )
+        consent_coercion_event = self.ethics.record_decision(
+            "ethq-consent-coercion-0001",
+            consent_coercion_request,
+            consent_coercion_decision,
+        )
+        consent_incomplete_event = self.ethics.record_decision(
+            "ethq-consent-incomplete-0001",
+            consent_incomplete_request,
+            consent_incomplete_decision,
         )
 
         self.ledger.append(
@@ -5217,6 +5264,26 @@ json.dump(response, sys.stdout)
             signature_roles=["guardian"],
             substrate="classical-silicon",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ethics.rule.veto",
+            payload=consent_coercion_event,
+            actor="EthicsEnforcer",
+            category="ethics-veto",
+            layer="L1",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="ethics.rule.escalate",
+            payload=consent_incomplete_event,
+            actor="EthicsEnforcer",
+            category="ethics-escalate",
+            layer="L1",
+            signature_roles=["guardian"],
+            substrate="classical-silicon",
+        )
 
         return {
             "identity": {
@@ -5230,6 +5297,8 @@ json.dump(response, sys.stdout)
                 "immutable_boundary": immutable_decision.to_dict(),
                 "sandbox_escalation": escalation_decision.to_dict(),
                 "approved_fork": approved_decision.to_dict(),
+                "consent_coercion": consent_coercion_decision.to_dict(),
+                "consent_incomplete": consent_incomplete_decision.to_dict(),
                 "ewa_conflict_resolution": conflict_decision.to_dict(),
             },
             "validation": {
@@ -5240,8 +5309,17 @@ json.dump(response, sys.stdout)
                 "conflict_prefers_veto": conflict_decision.outcome == "veto",
                 "conflict_records_all_matches": conflict_decision.rule_ids
                 == ["A7-ewa-blocked-token", "A8-ewa-ambiguous-intent"],
+                "coerced_consent_vetoed": consent_coercion_decision.rule_ids
+                == ["A9-consent-coercion-veto"],
+                "incomplete_consent_escalated": consent_incomplete_decision.rule_ids
+                == ["A10-consent-authenticity-attestation"],
             },
-            "ethics_events": [immutable_event, escalation_event],
+            "ethics_events": [
+                immutable_event,
+                escalation_event,
+                consent_coercion_event,
+                consent_incomplete_event,
+            ],
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

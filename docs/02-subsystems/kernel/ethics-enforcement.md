@@ -60,6 +60,21 @@ EthicsEnforcer 自身は L5 Self-Construction の対象外。
 改修は **OmoikaneOS の外** で人間社会と AI 群が合議し、リリースされる。
 これは「OS が自分の倫理を緩める」攻撃面を遮断するため。
 
+## 本人同意の真正性 guard
+
+本人同意を必要とする action は `payload.requires_consent=true` を持つ。
+reference runtime は `consent_authenticity` に次の 3 点を要求する。
+
+- `self_signed`: 本人 self signature
+- `independent_witness_signed`: 独立 witness の attest
+- `duress_screen_passed`: 強制・脅迫・誘導の screen
+
+`coercion_suspected=true` の場合は `A9-consent-coercion-veto` として即時 veto する。
+3 点のいずれかが欠け、かつ coercion が未検出の場合は
+`A10-consent-authenticity-attestation` として fail-closed escalation に回す。
+これにより、本人同意は単なる文字列 flag ではなく、self / witness / duress screen の
+machine-checkable evidence set として扱われる。
+
 ## ログ
 
 すべての Veto / Escalate は ContinuityLedger ではなく **専用の EthicsLedger** に記録する：
@@ -77,4 +92,3 @@ EthicsLedger も三重保管。
 ## なお未解決
 
 - 多文化／多 substrate 環境での規約の翻訳と妥当性
-- 「本人同意」の真正性検証（強制下での同意の検出）

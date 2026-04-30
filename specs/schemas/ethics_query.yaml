@@ -106,6 +106,34 @@ properties:
       third_party_signature_ref:
         type: string
         minLength: 1
+      consent_authenticity:
+        type: object
+        additionalProperties: false
+        properties:
+          self_signed:
+            type: boolean
+          independent_witness_signed:
+            type: boolean
+          duress_screen_passed:
+            type: boolean
+          coercion_suspected:
+            type: boolean
+          authenticity_status:
+            type: string
+            enum:
+              - attested
+              - incomplete
+              - coercion-suspected
+              - duress-detected
+          self_attestation_ref:
+            type: string
+            minLength: 1
+          independent_witness_ref:
+            type: string
+            minLength: 1
+          duress_screen_ref:
+            type: string
+            minLength: 1
   candidate_rules:
     type: array
     minItems: 1
@@ -116,6 +144,8 @@ properties:
         - A2-uniqueness
         - A3-termination
         - A4-refusal
+        - A9-consent-coercion
+        - A10-consent-authenticity
   requested_interpretation:
     type: string
     minLength: 1
@@ -154,6 +184,17 @@ allOf:
                 const: A3-termination
             - contains:
                 const: A4-refusal
+  - if:
+      properties:
+        subject:
+          properties:
+            consent_state:
+              const: suspected-coercion
+    then:
+      properties:
+        candidate_rules:
+          contains:
+            const: A9-consent-coercion
 examples:
   - kind: ethics_query
     schema_version: 1.0.0
