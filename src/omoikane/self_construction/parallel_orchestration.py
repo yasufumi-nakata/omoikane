@@ -35,6 +35,9 @@ PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_PROFILE = (
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_SIGNATURE_PROFILE = (
     "remote-source-revocation-provider-timestamp-signature-v1"
 )
+PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE = (
+    "remote-source-revocation-timestamp-replay-guard-v1"
+)
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_OK_STATUS = "current-not-revoked"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS = "not-applicable"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_FRESH_STATUS = "fresh"
@@ -42,6 +45,8 @@ PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_EXPIRED_STATUS = "expired"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_SIGNED_STATUS = "signed-current"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_STALE_STATUS = "stale"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_INVALID_STATUS = "invalid"
+PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS = "unique"
+PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAYED_STATUS = "replayed"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_MAX_FRESHNESS_WINDOW_SECONDS = 900
 PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE = (
     "integrity-guardian-remote-review-authority-v1"
@@ -60,6 +65,9 @@ PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_REVOCATION_FRESHNESS_REF = (
 )
 PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REF = (
     "timestamp://parallel-codex/remote-source-revocation/provider-clock/v1"
+)
+PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_REVOCATION_TIMESTAMP_NONCE_REF = (
+    "nonce://parallel-codex/remote-source-revocation/provider-clock/v1"
 )
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
@@ -171,6 +179,12 @@ class ParallelCodexOrchestrationPolicy:
             "remote_source_revocation_timestamp_signature_profile": (
                 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_SIGNATURE_PROFILE
             ),
+            "remote_source_revocation_timestamp_replay_guard_profile": (
+                PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+            ),
+            "remote_source_revocation_timestamp_replay_required_status": (
+                PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS
+            ),
             "remote_review_authority_profile": (
                 PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE
             ),
@@ -182,6 +196,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_remote_revocation_payload_stored": False,
             "raw_remote_revocation_freshness_payload_stored": False,
             "raw_remote_revocation_timestamp_payload_stored": False,
+            "raw_remote_revocation_timestamp_replay_guard_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -237,6 +252,10 @@ class ParallelCodexOrchestrationService:
         remote_source_revocation_timestamp_status: str = "",
         remote_source_revocation_timestamp_digest: str = "",
         remote_source_revocation_timestamp_signature_digest: str = "",
+        remote_source_revocation_timestamp_nonce_ref: str = "",
+        remote_source_revocation_timestamp_previous_nonce_digest: str = "",
+        remote_source_revocation_timestamp_replay_status: str = "",
+        remote_source_revocation_timestamp_replay_guard_digest: str = "",
         remote_metadata_digest: str = "",
     ) -> Dict[str, Any]:
         normalized_source_system = source_system.strip() or "direct-worker-result"
@@ -329,6 +348,18 @@ class ParallelCodexOrchestrationService:
             remote_source_revocation_timestamp_signature_digest=(
                 remote_source_revocation_timestamp_signature_digest
             ),
+            remote_source_revocation_timestamp_nonce_ref=(
+                remote_source_revocation_timestamp_nonce_ref
+            ),
+            remote_source_revocation_timestamp_previous_nonce_digest=(
+                remote_source_revocation_timestamp_previous_nonce_digest
+            ),
+            remote_source_revocation_timestamp_replay_status=(
+                remote_source_revocation_timestamp_replay_status
+            ),
+            remote_source_revocation_timestamp_replay_guard_digest=(
+                remote_source_revocation_timestamp_replay_guard_digest
+            ),
             remote_metadata_digest=remote_metadata_digest,
         )
 
@@ -398,6 +429,7 @@ class ParallelCodexOrchestrationService:
             "raw_remote_revocation_payload_stored": False,
             "raw_remote_revocation_freshness_payload_stored": False,
             "raw_remote_revocation_timestamp_payload_stored": False,
+            "raw_remote_revocation_timestamp_replay_guard_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
             "receipt_digest": "",
@@ -576,6 +608,33 @@ class ParallelCodexOrchestrationService:
                         "",
                     ),
                 ),
+                remote_source_revocation_timestamp_replay_guard_profile=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_replay_guard_profile",
+                        "",
+                    ),
+                ),
+                remote_source_revocation_timestamp_nonce_ref=str(
+                    receipt.get("remote_source_revocation_timestamp_nonce_ref", ""),
+                ),
+                remote_source_revocation_timestamp_previous_nonce_digest=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_previous_nonce_digest",
+                        "",
+                    ),
+                ),
+                remote_source_revocation_timestamp_replay_status=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_replay_status",
+                        "",
+                    ),
+                ),
+                remote_source_revocation_timestamp_replay_guard_digest=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_replay_guard_digest",
+                        "",
+                    ),
+                ),
             )
         )
         if receipt.get("source_system") == PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM:
@@ -607,6 +666,43 @@ class ParallelCodexOrchestrationService:
                     remote_source_revocation_timestamp_digest=str(
                         receipt.get("remote_source_revocation_timestamp_digest", ""),
                     ),
+                    remote_source_revocation_timestamp_nonce_ref=str(
+                        receipt.get("remote_source_revocation_timestamp_nonce_ref", ""),
+                    ),
+                    remote_source_revocation_timestamp_previous_nonce_digest=str(
+                        receipt.get(
+                            "remote_source_revocation_timestamp_previous_nonce_digest",
+                            "",
+                        ),
+                    ),
+                )
+            )
+            remote_source_revocation_timestamp_replay_guard_digest_bound = (
+                receipt.get("remote_source_revocation_timestamp_replay_guard_digest")
+                == self._remote_source_revocation_timestamp_replay_guard_digest(
+                    remote_branch_ref=str(receipt.get("remote_branch_ref", "")),
+                    remote_pr_ref=str(receipt.get("remote_pr_ref", "")),
+                    remote_source_revocation_timestamp_nonce_ref=str(
+                        receipt.get("remote_source_revocation_timestamp_nonce_ref", ""),
+                    ),
+                    remote_source_revocation_timestamp_previous_nonce_digest=str(
+                        receipt.get(
+                            "remote_source_revocation_timestamp_previous_nonce_digest",
+                            "",
+                        ),
+                    ),
+                    remote_source_revocation_timestamp_signature_digest=str(
+                        receipt.get(
+                            "remote_source_revocation_timestamp_signature_digest",
+                            "",
+                        ),
+                    ),
+                    remote_source_revocation_timestamp_replay_status=str(
+                        receipt.get(
+                            "remote_source_revocation_timestamp_replay_status",
+                            "",
+                        ),
+                    ),
                 )
             )
             remote_source_revocation_freshness_digest_bound = (
@@ -630,6 +726,12 @@ class ParallelCodexOrchestrationService:
                     remote_source_revocation_timestamp_signature_digest=str(
                         receipt.get(
                             "remote_source_revocation_timestamp_signature_digest",
+                            "",
+                        ),
+                    ),
+                    remote_source_revocation_timestamp_replay_guard_digest=str(
+                        receipt.get(
+                            "remote_source_revocation_timestamp_replay_guard_digest",
                             "",
                         ),
                     ),
@@ -671,8 +773,24 @@ class ParallelCodexOrchestrationService:
                     "remote_source_revocation_timestamp_signature_digest"
                 )
                 == ""
+                and receipt.get("remote_source_revocation_timestamp_replay_guard_profile")
+                == PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                and receipt.get("remote_source_revocation_timestamp_nonce_ref") == ""
+                and receipt.get(
+                    "remote_source_revocation_timestamp_previous_nonce_digest"
+                )
+                == ""
+                and receipt.get("remote_source_revocation_timestamp_replay_status")
+                == PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+                and receipt.get(
+                    "remote_source_revocation_timestamp_replay_guard_digest"
+                )
+                == ""
             )
             remote_source_revocation_timestamp_signature_bound = (
+                remote_source_revocation_timestamp_digest_bound
+            )
+            remote_source_revocation_timestamp_replay_guard_digest_bound = (
                 remote_source_revocation_timestamp_digest_bound
             )
             remote_source_revocation_freshness_digest_bound = (
@@ -771,6 +889,7 @@ class ParallelCodexOrchestrationService:
             and remote_source_revocation_freshness_digest_bound
             and remote_source_revocation_timestamp_digest_bound
             and remote_source_revocation_timestamp_signature_bound
+            and remote_source_revocation_timestamp_replay_guard_digest_bound
             and _is_sha256(receipt.get("remote_metadata_digest"))
             and receipt.get("remote_metadata_bound") is True
         )
@@ -785,6 +904,10 @@ class ParallelCodexOrchestrationService:
         if not remote_source_revocation_timestamp_signature_bound:
             errors.append(
                 "remote_source_revocation_timestamp_signature_digest mismatch"
+            )
+        if not remote_source_revocation_timestamp_replay_guard_digest_bound:
+            errors.append(
+                "remote_source_revocation_timestamp_replay_guard_digest mismatch"
             )
         if receipt.get("remote_metadata_bound") is not remote_metadata_bound:
             errors.append("remote_metadata_bound mismatch")
@@ -827,6 +950,10 @@ class ParallelCodexOrchestrationService:
             and raw_remote_revocation_payload_redacted
             and raw_remote_revocation_freshness_payload_redacted
             and raw_remote_revocation_timestamp_payload_redacted
+            and receipt.get(
+                "raw_remote_revocation_timestamp_replay_guard_payload_stored"
+            )
+            is False
             and raw_transcript_payload_redacted
             and raw_verification_payload_redacted
         ):
@@ -861,6 +988,9 @@ class ParallelCodexOrchestrationService:
             "remote_source_revocation_timestamp_signature_bound": (
                 remote_source_revocation_timestamp_signature_bound
             ),
+            "remote_source_revocation_timestamp_replay_guard_digest_bound": (
+                remote_source_revocation_timestamp_replay_guard_digest_bound
+            ),
             "remote_source_revocation_not_revoked": (
                 receipt.get("remote_source_revocation_status")
                 in {
@@ -882,6 +1012,13 @@ class ParallelCodexOrchestrationService:
                     PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS,
                 }
             ),
+            "remote_source_revocation_timestamp_unique": (
+                receipt.get("remote_source_revocation_timestamp_replay_status")
+                in {
+                    PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS,
+                    PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS,
+                }
+            ),
             "receipt_digest_bound": receipt_digest_bound,
             "raw_patch_payload_redacted": raw_patch_payload_redacted,
             "raw_upstream_payload_redacted": raw_upstream_payload_redacted,
@@ -897,6 +1034,12 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_remote_revocation_timestamp_payload_redacted": (
                 raw_remote_revocation_timestamp_payload_redacted
+            ),
+            "raw_remote_revocation_timestamp_replay_guard_payload_redacted": (
+                receipt.get(
+                    "raw_remote_revocation_timestamp_replay_guard_payload_stored"
+                )
+                is False
             ),
             "raw_transcript_payload_redacted": raw_transcript_payload_redacted,
             "raw_verification_payload_redacted": raw_verification_payload_redacted,
@@ -1071,9 +1214,77 @@ class ParallelCodexOrchestrationService:
                 remote_source_revocation_timestamp_digest=str(
                     receipt.get("remote_source_revocation_timestamp_digest", ""),
                 ),
+                remote_source_revocation_timestamp_nonce_ref=str(
+                    receipt.get("remote_source_revocation_timestamp_nonce_ref", ""),
+                ),
+                remote_source_revocation_timestamp_previous_nonce_digest=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_previous_nonce_digest",
+                        "",
+                    ),
+                ),
             ):
                 reasons.append(
                     "remote_source_revocation_timestamp_signature_digest mismatch"
+                )
+            if (
+                receipt.get("remote_source_revocation_timestamp_replay_guard_profile")
+                != PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+            ):
+                reasons.append(
+                    "remote_source_revocation_timestamp_replay_guard_profile mismatch"
+                )
+            if not receipt.get("remote_source_revocation_timestamp_nonce_ref"):
+                reasons.append(
+                    "remote source revocation timestamp nonce ref must not be empty"
+                )
+            if not _is_sha256(
+                receipt.get(
+                    "remote_source_revocation_timestamp_previous_nonce_digest"
+                )
+            ):
+                reasons.append(
+                    "remote_source_revocation_timestamp_previous_nonce_digest must be sha256"
+                )
+            if (
+                receipt.get("remote_source_revocation_timestamp_replay_status")
+                != PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS
+            ):
+                reasons.append(
+                    "remote source revocation timestamp replay status must be unique"
+                )
+            if not _is_sha256(
+                receipt.get("remote_source_revocation_timestamp_replay_guard_digest")
+            ):
+                reasons.append(
+                    "remote_source_revocation_timestamp_replay_guard_digest must be sha256"
+                )
+            elif receipt.get(
+                "remote_source_revocation_timestamp_replay_guard_digest"
+            ) != self._remote_source_revocation_timestamp_replay_guard_digest(
+                remote_branch_ref=str(receipt.get("remote_branch_ref", "")),
+                remote_pr_ref=str(receipt.get("remote_pr_ref", "")),
+                remote_source_revocation_timestamp_nonce_ref=str(
+                    receipt.get("remote_source_revocation_timestamp_nonce_ref", ""),
+                ),
+                remote_source_revocation_timestamp_previous_nonce_digest=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_previous_nonce_digest",
+                        "",
+                    ),
+                ),
+                remote_source_revocation_timestamp_signature_digest=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_signature_digest",
+                        "",
+                    ),
+                ),
+                remote_source_revocation_timestamp_replay_status=str(
+                    receipt.get("remote_source_revocation_timestamp_replay_status", ""),
+                ),
+            ):
+                reasons.append(
+                    "remote_source_revocation_timestamp_replay_guard_digest mismatch"
                 )
             if not _is_sha256(
                 receipt.get("remote_source_revocation_freshness_digest")
@@ -1099,6 +1310,12 @@ class ParallelCodexOrchestrationService:
                 remote_source_revocation_timestamp_signature_digest=str(
                     receipt.get(
                         "remote_source_revocation_timestamp_signature_digest",
+                        "",
+                    ),
+                ),
+                remote_source_revocation_timestamp_replay_guard_digest=str(
+                    receipt.get(
+                        "remote_source_revocation_timestamp_replay_guard_digest",
                         "",
                     ),
                 ),
@@ -1149,6 +1366,11 @@ class ParallelCodexOrchestrationService:
                 receipt.get("remote_source_revocation_timestamp_ref"),
                 receipt.get("remote_source_revocation_timestamp_digest"),
                 receipt.get("remote_source_revocation_timestamp_signature_digest"),
+                receipt.get("remote_source_revocation_timestamp_nonce_ref"),
+                receipt.get(
+                    "remote_source_revocation_timestamp_previous_nonce_digest"
+                ),
+                receipt.get("remote_source_revocation_timestamp_replay_guard_digest"),
             ]
             if any(remote_refs_or_digests):
                 reasons.append("non-remote result must not carry remote metadata refs")
@@ -1209,6 +1431,20 @@ class ParallelCodexOrchestrationService:
             ):
                 reasons.append(
                     "non-remote result must mark remote revocation timestamp signature not-applicable"
+                )
+            if (
+                receipt.get("remote_source_revocation_timestamp_replay_guard_profile")
+                != PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+            ):
+                reasons.append(
+                    "non-remote result must mark remote revocation timestamp replay guard not-applicable"
+                )
+            if (
+                receipt.get("remote_source_revocation_timestamp_replay_status")
+                != PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+            ):
+                reasons.append(
+                    "non-remote result must mark remote revocation timestamp replay status not-applicable"
                 )
         if not _is_sha256(receipt.get("remote_metadata_digest")):
             reasons.append("remote_metadata_digest must be a sha256 hex digest")
@@ -1280,6 +1516,30 @@ class ParallelCodexOrchestrationService:
                     "",
                 ),
             ),
+            remote_source_revocation_timestamp_replay_guard_profile=str(
+                receipt.get(
+                    "remote_source_revocation_timestamp_replay_guard_profile",
+                    "",
+                ),
+            ),
+            remote_source_revocation_timestamp_nonce_ref=str(
+                receipt.get("remote_source_revocation_timestamp_nonce_ref", ""),
+            ),
+            remote_source_revocation_timestamp_previous_nonce_digest=str(
+                receipt.get(
+                    "remote_source_revocation_timestamp_previous_nonce_digest",
+                    "",
+                ),
+            ),
+            remote_source_revocation_timestamp_replay_status=str(
+                receipt.get("remote_source_revocation_timestamp_replay_status", ""),
+            ),
+            remote_source_revocation_timestamp_replay_guard_digest=str(
+                receipt.get(
+                    "remote_source_revocation_timestamp_replay_guard_digest",
+                    "",
+                ),
+            ),
         ):
             reasons.append("remote_metadata_digest mismatch")
         if receipt.get("remote_metadata_bound") is not True:
@@ -1295,6 +1555,15 @@ class ParallelCodexOrchestrationService:
         if receipt.get("raw_remote_revocation_timestamp_payload_stored") is not False:
             reasons.append(
                 "raw_remote_revocation_timestamp_payload_stored must be false"
+            )
+        if (
+            receipt.get(
+                "raw_remote_revocation_timestamp_replay_guard_payload_stored"
+            )
+            is not False
+        ):
+            reasons.append(
+                "raw_remote_revocation_timestamp_replay_guard_payload_stored must be false"
             )
         if source_system == "yaoyorozu-worker-dispatch":
             if not receipt.get("upstream_receipt_ref"):
@@ -1466,6 +1735,12 @@ class ParallelCodexOrchestrationService:
                     "remote_source_revocation_timestamp_signature_profile": (
                         PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_SIGNATURE_PROFILE
                     ),
+                    "remote_source_revocation_timestamp_replay_guard_profile": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+                    ),
+                    "remote_source_revocation_timestamp_replay_required_status": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS
+                    ),
                 }
             )
         )
@@ -1494,6 +1769,9 @@ class ParallelCodexOrchestrationService:
                     ),
                     "remote_source_revocation_timestamp_signature_profile": (
                         PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_SIGNATURE_PROFILE
+                    ),
+                    "remote_source_revocation_timestamp_replay_guard_profile": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
                     ),
                 }
             )
@@ -1528,6 +1806,8 @@ class ParallelCodexOrchestrationService:
         remote_pr_ref: str,
         remote_source_revocation_timestamp_ref: str,
         remote_source_revocation_timestamp_digest: str,
+        remote_source_revocation_timestamp_nonce_ref: str,
+        remote_source_revocation_timestamp_previous_nonce_digest: str,
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -1542,6 +1822,69 @@ class ParallelCodexOrchestrationService:
                     "remote_pr_ref": remote_pr_ref,
                     "timestamp_ref": remote_source_revocation_timestamp_ref,
                     "timestamp_digest": remote_source_revocation_timestamp_digest,
+                    "timestamp_nonce_ref": (
+                        remote_source_revocation_timestamp_nonce_ref
+                    ),
+                    "previous_nonce_digest": (
+                        remote_source_revocation_timestamp_previous_nonce_digest
+                    ),
+                }
+            )
+        )
+
+    @staticmethod
+    def _remote_source_revocation_timestamp_previous_nonce_digest(
+        *,
+        remote_branch_ref: str,
+        remote_pr_ref: str,
+        remote_source_revocation_timestamp_nonce_ref: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+                    ),
+                    "remote_branch_ref": remote_branch_ref,
+                    "remote_pr_ref": remote_pr_ref,
+                    "timestamp_nonce_ref": (
+                        remote_source_revocation_timestamp_nonce_ref
+                    ),
+                    "chain_position": "previous",
+                }
+            )
+        )
+
+    @staticmethod
+    def _remote_source_revocation_timestamp_replay_guard_digest(
+        *,
+        remote_branch_ref: str,
+        remote_pr_ref: str,
+        remote_source_revocation_timestamp_nonce_ref: str,
+        remote_source_revocation_timestamp_previous_nonce_digest: str,
+        remote_source_revocation_timestamp_signature_digest: str,
+        remote_source_revocation_timestamp_replay_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+                    ),
+                    "remote_branch_ref": remote_branch_ref,
+                    "remote_pr_ref": remote_pr_ref,
+                    "timestamp_nonce_ref": (
+                        remote_source_revocation_timestamp_nonce_ref
+                    ),
+                    "previous_nonce_digest": (
+                        remote_source_revocation_timestamp_previous_nonce_digest
+                    ),
+                    "timestamp_signature_digest": (
+                        remote_source_revocation_timestamp_signature_digest
+                    ),
+                    "replay_status": (
+                        remote_source_revocation_timestamp_replay_status
+                    ),
                 }
             )
         )
@@ -1554,6 +1897,7 @@ class ParallelCodexOrchestrationService:
         remote_source_revocation_expires_at_ref: str,
         remote_source_revocation_freshness_status: str,
         remote_source_revocation_timestamp_signature_digest: str,
+        remote_source_revocation_timestamp_replay_guard_digest: str,
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -1569,6 +1913,9 @@ class ParallelCodexOrchestrationService:
                     "freshness_status": remote_source_revocation_freshness_status,
                     "timestamp_signature_digest": (
                         remote_source_revocation_timestamp_signature_digest
+                    ),
+                    "timestamp_replay_guard_digest": (
+                        remote_source_revocation_timestamp_replay_guard_digest
                     ),
                 }
             )
@@ -1629,6 +1976,11 @@ class ParallelCodexOrchestrationService:
         remote_source_revocation_timestamp_digest: str,
         remote_source_revocation_timestamp_signature_profile: str,
         remote_source_revocation_timestamp_signature_digest: str,
+        remote_source_revocation_timestamp_replay_guard_profile: str,
+        remote_source_revocation_timestamp_nonce_ref: str,
+        remote_source_revocation_timestamp_previous_nonce_digest: str,
+        remote_source_revocation_timestamp_replay_status: str,
+        remote_source_revocation_timestamp_replay_guard_digest: str,
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -1687,6 +2039,21 @@ class ParallelCodexOrchestrationService:
                     "remote_source_revocation_timestamp_signature_digest": (
                         remote_source_revocation_timestamp_signature_digest
                     ),
+                    "remote_source_revocation_timestamp_replay_guard_profile": (
+                        remote_source_revocation_timestamp_replay_guard_profile
+                    ),
+                    "remote_source_revocation_timestamp_nonce_ref": (
+                        remote_source_revocation_timestamp_nonce_ref
+                    ),
+                    "remote_source_revocation_timestamp_previous_nonce_digest": (
+                        remote_source_revocation_timestamp_previous_nonce_digest
+                    ),
+                    "remote_source_revocation_timestamp_replay_status": (
+                        remote_source_revocation_timestamp_replay_status
+                    ),
+                    "remote_source_revocation_timestamp_replay_guard_digest": (
+                        remote_source_revocation_timestamp_replay_guard_digest
+                    ),
                 }
             )
         )
@@ -1713,6 +2080,10 @@ class ParallelCodexOrchestrationService:
         remote_source_revocation_timestamp_status: str,
         remote_source_revocation_timestamp_digest: str,
         remote_source_revocation_timestamp_signature_digest: str,
+        remote_source_revocation_timestamp_nonce_ref: str,
+        remote_source_revocation_timestamp_previous_nonce_digest: str,
+        remote_source_revocation_timestamp_replay_status: str,
+        remote_source_revocation_timestamp_replay_guard_digest: str,
         remote_metadata_digest: str,
     ) -> Dict[str, Any]:
         if source_system != PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM:
@@ -1758,6 +2129,15 @@ class ParallelCodexOrchestrationService:
                     PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
                 ),
                 "remote_source_revocation_timestamp_signature_digest": "",
+                "remote_source_revocation_timestamp_replay_guard_profile": (
+                    PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                ),
+                "remote_source_revocation_timestamp_nonce_ref": "",
+                "remote_source_revocation_timestamp_previous_nonce_digest": "",
+                "remote_source_revocation_timestamp_replay_status": (
+                    PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+                ),
+                "remote_source_revocation_timestamp_replay_guard_digest": "",
             }
             normalized_metadata["remote_metadata_digest"] = self._remote_metadata_digest(
                 source_system=source_system,
@@ -1798,6 +2178,15 @@ class ParallelCodexOrchestrationService:
                     PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
                 ),
                 remote_source_revocation_timestamp_signature_digest="",
+                remote_source_revocation_timestamp_replay_guard_profile=(
+                    PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                ),
+                remote_source_revocation_timestamp_nonce_ref="",
+                remote_source_revocation_timestamp_previous_nonce_digest="",
+                remote_source_revocation_timestamp_replay_status=(
+                    PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+                ),
+                remote_source_revocation_timestamp_replay_guard_digest="",
             )
             normalized_metadata["remote_metadata_bound"] = True
             return normalized_metadata
@@ -1880,6 +2269,26 @@ class ParallelCodexOrchestrationService:
                     remote_source_revocation_expires_at_ref=normalized_expires_at_ref,
                 )
             )
+        normalized_timestamp_nonce_ref = (
+            remote_source_revocation_timestamp_nonce_ref.strip()
+            or (
+                f"{PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_REVOCATION_TIMESTAMP_NONCE_REF}"
+                f"/{remote_source_key}"
+            )
+        )
+        normalized_previous_nonce_digest = (
+            remote_source_revocation_timestamp_previous_nonce_digest.strip()
+        )
+        if not _is_sha256(normalized_previous_nonce_digest):
+            normalized_previous_nonce_digest = (
+                self._remote_source_revocation_timestamp_previous_nonce_digest(
+                    remote_branch_ref=remote_branch_ref.strip(),
+                    remote_pr_ref=remote_pr_ref.strip(),
+                    remote_source_revocation_timestamp_nonce_ref=(
+                        normalized_timestamp_nonce_ref
+                    ),
+                )
+            )
         normalized_timestamp_signature_digest = (
             remote_source_revocation_timestamp_signature_digest.strip()
         )
@@ -1891,6 +2300,38 @@ class ParallelCodexOrchestrationService:
                     remote_source_revocation_timestamp_ref=normalized_timestamp_ref,
                     remote_source_revocation_timestamp_digest=(
                         normalized_timestamp_digest
+                    ),
+                    remote_source_revocation_timestamp_nonce_ref=(
+                        normalized_timestamp_nonce_ref
+                    ),
+                    remote_source_revocation_timestamp_previous_nonce_digest=(
+                        normalized_previous_nonce_digest
+                    ),
+                )
+            )
+        normalized_replay_status = (
+            remote_source_revocation_timestamp_replay_status.strip()
+            or PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS
+        )
+        normalized_replay_guard_digest = (
+            remote_source_revocation_timestamp_replay_guard_digest.strip()
+        )
+        if not _is_sha256(normalized_replay_guard_digest):
+            normalized_replay_guard_digest = (
+                self._remote_source_revocation_timestamp_replay_guard_digest(
+                    remote_branch_ref=remote_branch_ref.strip(),
+                    remote_pr_ref=remote_pr_ref.strip(),
+                    remote_source_revocation_timestamp_nonce_ref=(
+                        normalized_timestamp_nonce_ref
+                    ),
+                    remote_source_revocation_timestamp_previous_nonce_digest=(
+                        normalized_previous_nonce_digest
+                    ),
+                    remote_source_revocation_timestamp_signature_digest=(
+                        normalized_timestamp_signature_digest
+                    ),
+                    remote_source_revocation_timestamp_replay_status=(
+                        normalized_replay_status
                     ),
                 )
             )
@@ -1914,6 +2355,9 @@ class ParallelCodexOrchestrationService:
                     ),
                     remote_source_revocation_timestamp_signature_digest=(
                         normalized_timestamp_signature_digest
+                    ),
+                    remote_source_revocation_timestamp_replay_guard_digest=(
+                        normalized_replay_guard_digest
                     ),
                 )
             )
@@ -1965,6 +2409,19 @@ class ParallelCodexOrchestrationService:
             remote_source_revocation_timestamp_signature_digest=(
                 normalized_timestamp_signature_digest
             ),
+            remote_source_revocation_timestamp_replay_guard_profile=(
+                PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+            ),
+            remote_source_revocation_timestamp_nonce_ref=(
+                normalized_timestamp_nonce_ref
+            ),
+            remote_source_revocation_timestamp_previous_nonce_digest=(
+                normalized_previous_nonce_digest
+            ),
+            remote_source_revocation_timestamp_replay_status=normalized_replay_status,
+            remote_source_revocation_timestamp_replay_guard_digest=(
+                normalized_replay_guard_digest
+            ),
         )
         normalized_metadata_digest = remote_metadata_digest.strip()
         if not _is_sha256(normalized_metadata_digest):
@@ -2007,6 +2464,21 @@ class ParallelCodexOrchestrationService:
             ),
             "remote_source_revocation_timestamp_signature_digest": (
                 normalized_timestamp_signature_digest
+            ),
+            "remote_source_revocation_timestamp_replay_guard_profile": (
+                PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+            ),
+            "remote_source_revocation_timestamp_nonce_ref": (
+                normalized_timestamp_nonce_ref
+            ),
+            "remote_source_revocation_timestamp_previous_nonce_digest": (
+                normalized_previous_nonce_digest
+            ),
+            "remote_source_revocation_timestamp_replay_status": (
+                normalized_replay_status
+            ),
+            "remote_source_revocation_timestamp_replay_guard_digest": (
+                normalized_replay_guard_digest
             ),
             "remote_metadata_digest": normalized_metadata_digest,
             "remote_metadata_bound": (

@@ -45,7 +45,9 @@ signed worker identity evidence、remote branch / PR metadata digest を
 `current-not-revoked` でない result、revocation freshness window が expired の result、
 provider timestamp が `signed-current` でない result、stale result、metadata 欠落を
 blocked のまま保持する。remote freshness refs は signed provider timestamp digest
-と timestamp signature digest へ束縛し、raw timestamp payload は保存しない。
+と timestamp signature digest、replay nonce、previous nonce digest、replay guard digest
+へ束縛し、`unique` でない timestamp reuse も blocked のまま保持する。raw timestamp /
+replay-guard payload は保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

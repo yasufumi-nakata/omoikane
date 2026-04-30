@@ -977,6 +977,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-revocation-check.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-revocation-freshness.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-timestamp-binding.md",
+            "meta/decision-log/2026-05-01_parallel-codex-remote-source-timestamp-replay-guard.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1169,6 +1170,22 @@ class OmoikaneReferenceOS:
                 "remote_source_revocation_timestamp_signature_digest": remote_receipt[
                     "remote_source_revocation_timestamp_signature_digest"
                 ],
+                "remote_source_revocation_timestamp_nonce_ref": remote_receipt[
+                    "remote_source_revocation_timestamp_nonce_ref"
+                ],
+                "remote_source_revocation_timestamp_previous_nonce_digest": (
+                    remote_receipt[
+                        "remote_source_revocation_timestamp_previous_nonce_digest"
+                    ]
+                ),
+                "remote_source_revocation_timestamp_replay_status": remote_receipt[
+                    "remote_source_revocation_timestamp_replay_status"
+                ],
+                "remote_source_revocation_timestamp_replay_guard_digest": (
+                    remote_receipt[
+                        "remote_source_revocation_timestamp_replay_guard_digest"
+                    ]
+                ),
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
                 "yaoyorozu_bridge_receipt_ref": yaoyorozu_bridge_receipt[
@@ -1190,6 +1207,7 @@ class OmoikaneReferenceOS:
                 "raw_remote_revocation_payload_stored": False,
                 "raw_remote_revocation_freshness_payload_stored": False,
                 "raw_remote_revocation_timestamp_payload_stored": False,
+                "raw_remote_revocation_timestamp_replay_guard_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1316,6 +1334,16 @@ class OmoikaneReferenceOS:
                         ]
                     )
                 ),
+                "remote_source_revocation_timestamp_replay_guard_digest_bound": (
+                    remote_validation[
+                        "remote_source_revocation_timestamp_replay_guard_digest_bound"
+                    ]
+                    and bool(
+                        remote_receipt[
+                            "remote_source_revocation_timestamp_replay_guard_digest"
+                        ]
+                    )
+                ),
                 "remote_source_revocation_not_revoked": remote_validation[
                     "remote_source_revocation_not_revoked"
                 ],
@@ -1327,6 +1355,9 @@ class OmoikaneReferenceOS:
                         "remote_source_revocation_timestamp_signed_current"
                     ]
                 ),
+                "remote_source_revocation_timestamp_unique": remote_validation[
+                    "remote_source_revocation_timestamp_unique"
+                ],
                 "remote_review_authority_digest_bound": (
                     remote_validation["remote_metadata_digest_bound"]
                     and bool(remote_receipt["remote_review_authority_digest"])
@@ -1350,6 +1381,11 @@ class OmoikaneReferenceOS:
                 "remote_raw_revocation_timestamp_payload_redacted": remote_validation[
                     "raw_remote_revocation_timestamp_payload_redacted"
                 ],
+                "remote_raw_revocation_timestamp_replay_guard_payload_redacted": (
+                    remote_validation[
+                        "raw_remote_revocation_timestamp_replay_guard_payload_redacted"
+                    ]
+                ),
                 "blocked_receipt_ok": blocked_validation["ok"],
                 "blocked_stale_worker_result": not blocked_validation[
                     "ready_for_main_checkout"

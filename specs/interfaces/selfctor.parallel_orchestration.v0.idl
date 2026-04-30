@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, source metadata, remote source revocation evidence, and signed provider timestamp evidence before main checkout integration.
+summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, source metadata, remote source revocation evidence, signed provider timestamp evidence, and timestamp replay guards before main checkout integration.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
 operations:
@@ -129,6 +129,18 @@ operations:
           remote_source_revocation_timestamp_signature_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
+          remote_source_revocation_timestamp_nonce_ref:
+            type: string
+            minLength: 1
+          remote_source_revocation_timestamp_previous_nonce_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          remote_source_revocation_timestamp_replay_status:
+            type: string
+            enum: [unique, replayed, not-applicable]
+          remote_source_revocation_timestamp_replay_guard_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
           remote_metadata_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
@@ -137,11 +149,11 @@ operations:
     guarantees:
       - worker_base_commit must match main_checkout_head before integration_decision can become accept-ready
       - direct worker results carry source_system=direct-worker-result and no upstream dispatch refs
-      - remote branch / PR worker results carry source_system=remote-branch-pr-worker-result plus branch ref, PR ref, review authority digest, accepted source policy digest, current-not-revoked source revocation digest, signed provider timestamp digest, and remote_metadata_digest
+      - remote branch / PR worker results carry source_system=remote-branch-pr-worker-result plus branch ref, PR ref, review authority digest, accepted source policy digest, current-not-revoked source revocation digest, signed provider timestamp digest, replay-unique timestamp nonce evidence, and remote_metadata_digest
       - worker_identity_ref, worker_identity_digest, and integrity-guardian worker_identity_signature_digest are bound to patch digest and base/head commit evidence
-      - remote metadata, remote source revocation status, revocation freshness window, and signed provider timestamp evidence are digest-bound and redacted before remote results can become accept-ready
+      - remote metadata, remote source revocation status, revocation freshness window, signed provider timestamp evidence, and timestamp replay guard are digest-bound and redacted before remote results can become accept-ready
       - changed_files must remain inside both the repo-local allowed workspace prefixes and the worker ownership_scope
-      - patch payload, raw worker identity payload, raw remote metadata payload, raw remote revocation payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
+      - patch payload, raw worker identity payload, raw remote metadata payload, raw remote revocation payload, raw remote timestamp replay payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
       - unittest discover and gap-report required verification commands must pass before main checkout integration is accepted
       - blocked, stale, or failed worker results remain schema-bound but cannot be integrated
   ingest_yaoyorozu_dispatch_receipt:

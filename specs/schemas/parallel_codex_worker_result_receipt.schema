@@ -9,6 +9,8 @@ description: >
   Remote source revocation evidence also carries a bounded freshness window so
   old current-not-revoked checks cannot be reused silently, and the freshness
   refs are bound to a signed provider timestamp digest before acceptance.
+  The signed timestamp is also chained to a replay nonce and previous nonce
+  digest so a current-looking provider timestamp cannot be reused silently.
 type: object
 additionalProperties: false
 required:
@@ -44,6 +46,11 @@ required:
   - remote_source_revocation_timestamp_digest
   - remote_source_revocation_timestamp_signature_profile
   - remote_source_revocation_timestamp_signature_digest
+  - remote_source_revocation_timestamp_replay_guard_profile
+  - remote_source_revocation_timestamp_nonce_ref
+  - remote_source_revocation_timestamp_previous_nonce_digest
+  - remote_source_revocation_timestamp_replay_status
+  - remote_source_revocation_timestamp_replay_guard_digest
   - remote_metadata_digest
   - remote_metadata_bound
   - worker_identity_profile
@@ -83,6 +90,7 @@ required:
   - raw_remote_revocation_payload_stored
   - raw_remote_revocation_freshness_payload_stored
   - raw_remote_revocation_timestamp_payload_stored
+  - raw_remote_revocation_timestamp_replay_guard_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -197,6 +205,25 @@ properties:
       - remote-source-revocation-provider-timestamp-signature-v1
       - not-applicable
   remote_source_revocation_timestamp_signature_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_revocation_timestamp_replay_guard_profile:
+    type: string
+    enum:
+      - remote-source-revocation-timestamp-replay-guard-v1
+      - not-applicable
+  remote_source_revocation_timestamp_nonce_ref:
+    type: string
+  remote_source_revocation_timestamp_previous_nonce_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_revocation_timestamp_replay_status:
+    type: string
+    enum:
+      - unique
+      - replayed
+      - not-applicable
+  remote_source_revocation_timestamp_replay_guard_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
   remote_metadata_digest:
@@ -328,6 +355,8 @@ properties:
   raw_remote_revocation_freshness_payload_stored:
     const: false
   raw_remote_revocation_timestamp_payload_stored:
+    const: false
+  raw_remote_revocation_timestamp_replay_guard_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false
