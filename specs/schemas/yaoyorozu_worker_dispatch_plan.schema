@@ -12,6 +12,9 @@ required:
   - dispatch_digest
   - dispatch_profile
   - registry_snapshot_ref
+  - source_manifest_public_verification_bundle_ref
+  - source_manifest_public_verification_bundle_digest
+  - source_manifest_public_verification_bundle
   - convocation_session_ref
   - policy_id
   - proposal_profile
@@ -40,6 +43,14 @@ properties:
   registry_snapshot_ref:
     type: string
     pattern: "^registry://"
+  source_manifest_public_verification_bundle_ref:
+    type: string
+    pattern: "^verification://yaoyorozu/source-manifest/yaoyorozu-source-manifest-public-verification-[a-f0-9]{12}$"
+  source_manifest_public_verification_bundle_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_manifest_public_verification_bundle:
+    $ref: "yaoyorozu_source_manifest_public_verification_bundle.schema"
   convocation_session_ref:
     type: string
     pattern: "^convocation://"
@@ -317,6 +328,8 @@ properties:
     required:
       - registry_bound
       - convocation_bound
+      - source_manifest_public_verification_bound
+      - source_manifest_public_verification_digest_bound
       - builder_coverage_ok
       - unique_command_digests
       - workspace_execution_bound
@@ -333,6 +346,10 @@ properties:
       registry_bound:
         const: true
       convocation_bound:
+        const: true
+      source_manifest_public_verification_bound:
+        const: true
+      source_manifest_public_verification_digest_bound:
         const: true
       builder_coverage_ok:
         const: true

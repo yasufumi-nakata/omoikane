@@ -3125,6 +3125,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["source_manifest_ledger_signature_roles_bound"])
         self.assertTrue(result["validation"]["source_manifest_public_verification_ready"])
         self.assertTrue(result["validation"]["source_manifest_public_verification_bundle_bound"])
+        self.assertTrue(result["validation"]["dispatch_source_manifest_public_verification_bound"])
+        self.assertTrue(
+            result["validation"][
+                "dispatch_source_manifest_public_verification_digest_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["research_evidence_exchange_ok"])
         self.assertTrue(result["validation"]["research_evidence_request_digest_bound"])
         self.assertTrue(result["validation"]["research_evidence_report_digest_bound"])
@@ -3193,6 +3199,16 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["workspace_profile_policy_ready"])
         self.assertTrue(result["validation"]["workspace_execution_bound"])
         self.assertTrue(result["validation"]["workspace_execution_policy_ready"])
+        self.assertTrue(
+            result["validation"][
+                "worker_dispatch_source_manifest_public_verification_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "worker_dispatch_receipt_source_manifest_public_verification_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["worker_dispatch_coverage_complete"])
         self.assertEqual(4, result["validation"]["candidate_bound_dispatch_count"])
         self.assertEqual(0, result["validation"]["source_bound_dispatch_count"])

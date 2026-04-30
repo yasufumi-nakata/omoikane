@@ -3887,6 +3887,24 @@ json.dump(response, sys.stdout)
         source_manifest_ledger_binding = self.yaoyorozu.build_source_manifest_ledger_binding(
             registry_snapshot
         )
+        source_manifest_ledger_entry = self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type=source_manifest_ledger_binding["continuity_ledger_event_type"],
+            payload=self.yaoyorozu.source_manifest_continuity_event_payload(
+                source_manifest_ledger_binding
+            ),
+            actor="IntegrityGuardian",
+            category=source_manifest_ledger_binding["continuity_ledger_category"],
+            layer="L4",
+            signature_roles=source_manifest_ledger_binding[
+                "continuity_ledger_signature_roles"
+            ],
+            substrate="classical-silicon",
+        )
+        source_manifest_ledger_binding = self.yaoyorozu.bind_source_manifest_ledger_entry(
+            source_manifest_ledger_binding,
+            source_manifest_ledger_entry,
+        )
         convocation = self.yaoyorozu.prepare_council_convocation(
             proposal_profile=proposal_profile,
             session_mode="standard",
@@ -3899,7 +3917,10 @@ json.dump(response, sys.stdout)
             requested_by_ref=f"council://session/{convocation['session_id']}",
         )
         research_evidence_exchange = research_evidence_exchanges[0]
-        dispatch_plan = self.yaoyorozu.prepare_worker_dispatch(convocation)
+        dispatch_plan = self.yaoyorozu.prepare_worker_dispatch(
+            convocation,
+            source_manifest_ledger_binding=source_manifest_ledger_binding,
+        )
         dispatch_plan_validation = self.yaoyorozu.validate_worker_dispatch_plan(dispatch_plan)
         dispatch_receipt = self.yaoyorozu.execute_worker_dispatch(dispatch_plan)
         dispatch_receipt_validation = self.yaoyorozu.validate_worker_dispatch_receipt(
@@ -4037,24 +4058,6 @@ json.dump(response, sys.stdout)
             category="yaoyorozu",
             layer="L4",
             substrate="classical-silicon",
-        )
-        source_manifest_ledger_entry = self.ledger.append(
-            identity_id=identity.identity_id,
-            event_type=source_manifest_ledger_binding["continuity_ledger_event_type"],
-            payload=self.yaoyorozu.source_manifest_continuity_event_payload(
-                source_manifest_ledger_binding
-            ),
-            actor="IntegrityGuardian",
-            category=source_manifest_ledger_binding["continuity_ledger_category"],
-            layer="L4",
-            signature_roles=source_manifest_ledger_binding[
-                "continuity_ledger_signature_roles"
-            ],
-            substrate="classical-silicon",
-        )
-        source_manifest_ledger_binding = self.yaoyorozu.bind_source_manifest_ledger_entry(
-            source_manifest_ledger_binding,
-            source_manifest_ledger_entry,
         )
         bound_research_evidence_exchanges = []
         for research_evidence_exchange in research_evidence_exchanges:
@@ -4394,6 +4397,20 @@ json.dump(response, sys.stdout)
                         "public_verification_bundle_digest_bound"
                     ]
                 ),
+                "dispatch_source_manifest_public_verification_bound": (
+                    dispatch_plan_validation["source_manifest_public_verification_bound"]
+                    and dispatch_receipt_validation[
+                        "source_manifest_public_verification_bound"
+                    ]
+                ),
+                "dispatch_source_manifest_public_verification_digest_bound": (
+                    dispatch_plan_validation[
+                        "source_manifest_public_verification_digest_bound"
+                    ]
+                    and dispatch_receipt_validation[
+                        "source_manifest_public_verification_digest_bound"
+                    ]
+                ),
                 "research_evidence_exchange_ok": research_evidence_exchange_validation[
                     "ok"
                 ],
@@ -4599,6 +4616,14 @@ json.dump(response, sys.stdout)
                 ],
                 "worker_dispatch_plan_ok": dispatch_plan_validation["ok"],
                 "worker_dispatch_receipt_ok": dispatch_receipt_validation["ok"],
+                "worker_dispatch_source_manifest_public_verification_bound": (
+                    dispatch_plan_validation["source_manifest_public_verification_bound"]
+                ),
+                "worker_dispatch_receipt_source_manifest_public_verification_bound": (
+                    dispatch_receipt_validation[
+                        "source_manifest_public_verification_bound"
+                    ]
+                ),
                 "worker_dispatch_coverage_complete": dispatch_receipt_validation[
                     "coverage_complete"
                 ],

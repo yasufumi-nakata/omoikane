@@ -254,6 +254,7 @@
   - Yaoyorozu source manifest digest set を yaoyorozu-agent-source-manifest ContinuityLedger entry、self+guardian 署名 role、payload ref に束縛し、raw source / registry / continuity event payload 非保存を検証する
 - `yaoyorozu_source_manifest_public_verification_bundle.schema`
   - Yaoyorozu source manifest ledger binding を external reviewer 向けに公開検証できる digest-only bundle として投影し、signature digest / verifier key ref を raw signature payload なしで束縛する
+  - `yaoyorozu_worker_dispatch_plan.schema` / `yaoyorozu_worker_dispatch_receipt.schema` は同じ bundle ref/digest を carry し、worker launch 前後で agent source manifest の公開検証状態を失わない
 
 ## 次段階
 

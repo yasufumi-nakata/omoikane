@@ -11,6 +11,8 @@ expected:
   dispatch_success_count: 4
   worker_dispatch_plan_ok: true
   worker_dispatch_receipt_ok: true
+  worker_dispatch_source_manifest_public_verification_bound: true
+  worker_dispatch_receipt_source_manifest_public_verification_bound: true
   worker_dispatch_coverage_complete: true
   same_host_scope_only: true
   external_workspace_seeded: true

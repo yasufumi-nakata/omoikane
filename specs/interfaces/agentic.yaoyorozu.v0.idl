@@ -241,15 +241,19 @@ operations:
         type: object
         required:
           - convocation_session
+          - source_manifest_ledger_binding
         properties:
           convocation_session:
             schema_ref: council_convocation_session
+          source_manifest_ledger_binding:
+            schema_ref: yaoyorozu_source_manifest_ledger_binding
     output:
       schema_ref: yaoyorozu_worker_dispatch_plan
     guarantees:
       - dispatch units must be derived only from selected builder_handoff entries
       - proposal_profile must fix the required and optional worker coverage policy echoed by the dispatch plan summary
       - requested optional worker coverage, when present, must remain a subset of the proposal profile's optional coverage and bind dispatch_coverage_areas deterministically
+      - source_manifest_ledger_binding must already carry a ready yaoyorozu-source-manifest-public-verification-bundle-v1 ref/digest, and the dispatch plan must bind that same public bundle before worker launch
       - every command preview must remain same-host, subprocess-bound, and temp-workspace-only
       - when workspace_discovery is bound, every dispatch unit must choose one profile-covered candidate workspace and bind execution_workspace_ref, selected_workspace_root, execution_workspace_root, and sandbox_seed_strategy
       - same-host external workspace units must carry one integrity Guardian preseed gate that passes before workspace seed, execution-root creation, or dependency materialization
@@ -283,6 +287,7 @@ operations:
       - worker reports must materialize one patch_descriptor-compatible patch candidate receipt from the same delta evidence before the ready gate passes
       - patch candidate receipts must expose deterministic priority ranks and top-priority summaries so builder apply review stays machine-checkable
       - worker execution must stay inside repo-local or same-host-external-workspace scope and inherit the dispatch profile
+      - dispatch receipts must echo and validate the same source manifest public verification bundle ref/digest carried by the dispatch plan
       - only zero-exit, ready-reported workers count toward completed dispatch coverage, including explicitly requested optional coverage
   bind_consensus_dispatch:
     summary: >

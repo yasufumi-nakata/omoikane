@@ -761,6 +761,15 @@ def _dispatch_plan_digest_payload(plan: Mapping[str, Any]) -> Dict[str, Any]:
         "schema_version": plan["schema_version"],
         "dispatch_profile": plan["dispatch_profile"],
         "registry_snapshot_ref": plan["registry_snapshot_ref"],
+        "source_manifest_public_verification_bundle_ref": plan[
+            "source_manifest_public_verification_bundle_ref"
+        ],
+        "source_manifest_public_verification_bundle_digest": plan[
+            "source_manifest_public_verification_bundle_digest"
+        ],
+        "source_manifest_public_verification_bundle": plan[
+            "source_manifest_public_verification_bundle"
+        ],
         "convocation_session_ref": plan["convocation_session_ref"],
         "policy_id": plan["policy_id"],
         "proposal_profile": plan["proposal_profile"],
@@ -778,6 +787,15 @@ def _dispatch_receipt_digest_payload(receipt: Mapping[str, Any]) -> Dict[str, An
         "schema_version": receipt["schema_version"],
         "dispatch_plan_ref": receipt["dispatch_plan_ref"],
         "dispatch_plan_digest": receipt["dispatch_plan_digest"],
+        "source_manifest_public_verification_bundle_ref": receipt[
+            "source_manifest_public_verification_bundle_ref"
+        ],
+        "source_manifest_public_verification_bundle_digest": receipt[
+            "source_manifest_public_verification_bundle_digest"
+        ],
+        "source_manifest_public_verification_bundle": receipt[
+            "source_manifest_public_verification_bundle"
+        ],
         "dispatch_profile": receipt["dispatch_profile"],
         "execution_profile": receipt["execution_profile"],
         "workspace_root": receipt["workspace_root"],
@@ -1007,6 +1025,55 @@ def _source_manifest_public_verification_bundle_core(
         "raw_registry_payload_exposed": False,
         "raw_continuity_event_payload_exposed": False,
         "raw_signature_payload_exposed": False,
+    }
+
+
+def _validate_source_manifest_public_verification_bundle(
+    bundle: Mapping[str, Any],
+) -> Dict[str, Any]:
+    errors: List[str] = []
+    if not isinstance(bundle, Mapping):
+        return {
+            "ok": False,
+            "bundle_ref": "",
+            "bundle_digest": "",
+            "registry_snapshot_ref": "",
+            "digest_bound": False,
+            "errors": ["source manifest public verification bundle must be a mapping"],
+        }
+
+    if bundle.get("kind") != "yaoyorozu_source_manifest_public_verification_bundle":
+        errors.append("source manifest public verification bundle kind mismatch")
+    if bundle.get("profile_id") != YAOYOROZU_AGENT_SOURCE_MANIFEST_PUBLIC_VERIFICATION_PROFILE:
+        errors.append("source manifest public verification bundle profile mismatch")
+    if bundle.get("public_verification_ready") is not True:
+        errors.append("source manifest public verification bundle must be ready")
+    for raw_flag in (
+        "raw_source_payload_exposed",
+        "raw_registry_payload_exposed",
+        "raw_continuity_event_payload_exposed",
+        "raw_signature_payload_exposed",
+    ):
+        if bundle.get(raw_flag) is not False:
+            errors.append(f"source manifest public verification bundle {raw_flag} must be false")
+    core = dict(bundle)
+    observed_digest = str(core.pop("bundle_digest", ""))
+    expected_digest = sha256_text(canonical_json(core))
+    digest_bound = observed_digest == expected_digest
+    if not digest_bound:
+        errors.append("source manifest public verification bundle digest mismatch")
+    if str(bundle.get("bundle_ref", "")).strip() == "":
+        errors.append("source manifest public verification bundle_ref must be non-empty")
+    if str(bundle.get("registry_snapshot_ref", "")).strip() == "":
+        errors.append("source manifest public verification registry snapshot ref must be non-empty")
+
+    return {
+        "ok": not errors,
+        "bundle_ref": str(bundle.get("bundle_ref", "")),
+        "bundle_digest": observed_digest,
+        "registry_snapshot_ref": str(bundle.get("registry_snapshot_ref", "")),
+        "digest_bound": digest_bound,
+        "errors": errors,
     }
 
 
@@ -5534,7 +5601,12 @@ class YaoyorozuRegistryService:
             **session_body,
         }
 
-    def prepare_worker_dispatch(self, convocation_session: Mapping[str, Any]) -> Dict[str, Any]:
+    def prepare_worker_dispatch(
+        self,
+        convocation_session: Mapping[str, Any],
+        *,
+        source_manifest_ledger_binding: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
         if not self._entries or self._agents_root is None:
             raise ValueError("registry must be synced before preparing worker dispatch")
         if convocation_session.get("kind") != "council_convocation_session":
@@ -5547,6 +5619,24 @@ class YaoyorozuRegistryService:
         repo_root = self._agents_root.parent
         dispatch_id = new_id("yaoyorozu-dispatch")
         dispatch_plan_ref = f"dispatch://{dispatch_id}"
+        source_public_bundle: Mapping[str, Any] = {}
+        if isinstance(source_manifest_ledger_binding, Mapping):
+            candidate_bundle = source_manifest_ledger_binding.get("public_verification_bundle", {})
+            if isinstance(candidate_bundle, Mapping):
+                source_public_bundle = dict(candidate_bundle)
+        source_bundle_validation = _validate_source_manifest_public_verification_bundle(
+            source_public_bundle
+        )
+        source_manifest_registry_ref = (
+            f"registry://{self._last_snapshot_id}" if self._last_snapshot_id else ""
+        )
+        source_manifest_public_verification_bound = (
+            source_bundle_validation["ok"]
+            and source_bundle_validation["registry_snapshot_ref"] == source_manifest_registry_ref
+        )
+        source_manifest_public_verification_digest_bound = source_bundle_validation[
+            "digest_bound"
+        ]
         workspace_execution_binding = convocation_session.get("workspace_execution_binding", {})
         execution_target_index: Dict[str, Dict[str, Any]] = {}
         if isinstance(workspace_execution_binding, Mapping):
@@ -5820,6 +5910,12 @@ class YaoyorozuRegistryService:
         validation = {
             "registry_bound": bool(self._last_snapshot_id),
             "convocation_bound": bool(convocation_session.get("session_id")),
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
             "builder_coverage_ok": (
                 not missing_coverage
                 and not unexpected_coverage
@@ -5894,6 +5990,13 @@ class YaoyorozuRegistryService:
             "registry_snapshot_ref": (
                 f"registry://{self._last_snapshot_id}" if self._last_snapshot_id else ""
             ),
+            "source_manifest_public_verification_bundle_ref": str(
+                source_public_bundle.get("bundle_ref", "")
+            ),
+            "source_manifest_public_verification_bundle_digest": str(
+                source_public_bundle.get("bundle_digest", "")
+            ),
+            "source_manifest_public_verification_bundle": dict(source_public_bundle),
             "convocation_session_ref": (
                 f"convocation://{convocation_session['session_id']}"
                 if convocation_session.get("session_id")
@@ -5985,6 +6088,28 @@ class YaoyorozuRegistryService:
         if not isinstance(selection_summary, Mapping):
             errors.append("selection_summary must be a mapping")
             selection_summary = {}
+        source_public_bundle = dispatch_plan.get(
+            "source_manifest_public_verification_bundle",
+            {},
+        )
+        source_bundle_validation = _validate_source_manifest_public_verification_bundle(
+            source_public_bundle if isinstance(source_public_bundle, Mapping) else {}
+        )
+        source_manifest_public_verification_digest_bound = (
+            source_bundle_validation["digest_bound"]
+            and dispatch_plan.get("source_manifest_public_verification_bundle_digest")
+            == source_bundle_validation["bundle_digest"]
+        )
+        source_manifest_public_verification_bound = (
+            source_bundle_validation["ok"]
+            and dispatch_plan.get("source_manifest_public_verification_bundle_ref")
+            == source_bundle_validation["bundle_ref"]
+            and dispatch_plan.get("registry_snapshot_ref")
+            == source_bundle_validation["registry_snapshot_ref"]
+            and source_manifest_public_verification_digest_bound
+        )
+        if not source_manifest_public_verification_bound:
+            errors.append("source manifest public verification bundle must bind dispatch plan")
 
         required_coverage = selection_summary.get("required_coverage_areas", [])
         optional_coverage = selection_summary.get("optional_coverage_areas", [])
@@ -6217,6 +6342,18 @@ class YaoyorozuRegistryService:
             )
         validation = dispatch_plan.get("validation", {})
         if isinstance(validation, Mapping):
+            if (
+                validation.get("source_manifest_public_verification_bound")
+                != source_manifest_public_verification_bound
+            ):
+                errors.append("validation.source_manifest_public_verification_bound mismatch")
+            if (
+                validation.get("source_manifest_public_verification_digest_bound")
+                != source_manifest_public_verification_digest_bound
+            ):
+                errors.append(
+                    "validation.source_manifest_public_verification_digest_bound mismatch"
+                )
             if validation.get("guardian_preseed_gate_bound") != guardian_preseed_gate_bound:
                 errors.append("validation.guardian_preseed_gate_bound mismatch")
             if validation.get("external_preseed_gate_required") != bool(external_preseed_gate_count):
@@ -6246,6 +6383,12 @@ class YaoyorozuRegistryService:
             "requested_optional_coverage_areas": list(normalized_requested_optional),
             "dispatch_coverage_areas": list(dispatch_coverage),
             "runtime_exec_ready": bool(units),
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
             "guardian_preseed_gate_bound": guardian_preseed_gate_bound,
             "external_preseed_gate_count": external_preseed_gate_count,
             "all_external_preseed_gates_ready": all_external_preseed_gates_ready,
@@ -6267,6 +6410,24 @@ class YaoyorozuRegistryService:
         units = dispatch_plan.get("dispatch_units", [])
         if not isinstance(units, list) or not units:
             raise ValueError("dispatch_plan.dispatch_units must be a non-empty list")
+        source_public_bundle = dispatch_plan.get(
+            "source_manifest_public_verification_bundle",
+            {},
+        )
+        source_bundle_validation = _validate_source_manifest_public_verification_bundle(
+            source_public_bundle if isinstance(source_public_bundle, Mapping) else {}
+        )
+        source_manifest_public_verification_digest_bound = (
+            source_bundle_validation["digest_bound"]
+            and dispatch_plan.get("source_manifest_public_verification_bundle_digest")
+            == source_bundle_validation["bundle_digest"]
+        )
+        source_manifest_public_verification_bound = (
+            source_bundle_validation["ok"]
+            and dispatch_plan.get("source_manifest_public_verification_bundle_ref")
+            == source_bundle_validation["bundle_ref"]
+            and source_manifest_public_verification_digest_bound
+        )
 
         env = os.environ.copy()
         src_root = repo_root / "src"
@@ -6854,6 +7015,12 @@ class YaoyorozuRegistryService:
             ),
         }
         validation = {
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
             "command_digests_match": all(
                 any(
                     isinstance(unit, Mapping)
@@ -7010,6 +7177,13 @@ class YaoyorozuRegistryService:
             "executed_at": utc_now_iso(),
             "dispatch_plan_ref": f"dispatch://{dispatch_plan['dispatch_id']}",
             "dispatch_plan_digest": dispatch_plan["dispatch_digest"],
+            "source_manifest_public_verification_bundle_ref": dispatch_plan[
+                "source_manifest_public_verification_bundle_ref"
+            ],
+            "source_manifest_public_verification_bundle_digest": dispatch_plan[
+                "source_manifest_public_verification_bundle_digest"
+            ],
+            "source_manifest_public_verification_bundle": dict(source_public_bundle),
             "dispatch_profile": dispatch_plan["dispatch_profile"],
             "execution_profile": self._policy.worker_execution_profile,
             "proposal_profile": dispatch_plan["proposal_profile"],
@@ -7046,6 +7220,26 @@ class YaoyorozuRegistryService:
         if not isinstance(execution_summary, Mapping):
             errors.append("execution_summary must be a mapping")
             execution_summary = {}
+        source_public_bundle = dispatch_receipt.get(
+            "source_manifest_public_verification_bundle",
+            {},
+        )
+        source_bundle_validation = _validate_source_manifest_public_verification_bundle(
+            source_public_bundle if isinstance(source_public_bundle, Mapping) else {}
+        )
+        source_manifest_public_verification_digest_bound = (
+            source_bundle_validation["digest_bound"]
+            and dispatch_receipt.get("source_manifest_public_verification_bundle_digest")
+            == source_bundle_validation["bundle_digest"]
+        )
+        source_manifest_public_verification_bound = (
+            source_bundle_validation["ok"]
+            and dispatch_receipt.get("source_manifest_public_verification_bundle_ref")
+            == source_bundle_validation["bundle_ref"]
+            and source_manifest_public_verification_digest_bound
+        )
+        if not source_manifest_public_verification_bound:
+            errors.append("source manifest public verification bundle must bind dispatch receipt")
         required_coverage = execution_summary.get("required_coverage_areas", [])
         optional_coverage = execution_summary.get("optional_coverage_areas", [])
         requested_optional_coverage = execution_summary.get("requested_optional_coverage_areas", [])
@@ -7772,6 +7966,12 @@ class YaoyorozuRegistryService:
             errors.append("validation must be a mapping")
             validation = {}
         expected_validation = {
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
             "command_digests_match": all(
                 isinstance(result, Mapping) and str(result.get("command_digest", "")).strip()
                 for result in results
@@ -7938,6 +8138,12 @@ class YaoyorozuRegistryService:
             "optional_coverage_areas": list(optional_coverage),
             "requested_optional_coverage_areas": list(normalized_requested_optional),
             "dispatch_coverage_areas": list(dispatch_coverage),
+            "source_manifest_public_verification_bound": (
+                source_manifest_public_verification_bound
+            ),
+            "source_manifest_public_verification_digest_bound": (
+                source_manifest_public_verification_digest_bound
+            ),
             "all_reports_bound_to_dispatch": expected_validation["all_reports_bound_to_dispatch"],
             "all_delta_receipts_bound": expected_validation["all_delta_receipts_bound"],
             "all_patch_candidate_receipts_bound": expected_validation[

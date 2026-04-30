@@ -364,6 +364,19 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             "specs/schemas/yaoyorozu_worker_dispatch_plan.schema",
             result["dispatch_plan"],
         )
+        self.assertEqual(
+            result["source_manifest_ledger_binding"]["public_verification_bundle_ref"],
+            result["dispatch_plan"]["source_manifest_public_verification_bundle_ref"],
+        )
+        self.assertEqual(
+            result["source_manifest_ledger_binding"]["public_verification_bundle_digest"],
+            result["dispatch_plan"]["source_manifest_public_verification_bundle_digest"],
+        )
+        self.assertTrue(
+            result["dispatch_plan"]["validation"][
+                "source_manifest_public_verification_bound"
+            ]
+        )
 
     def test_worker_dispatch_receipt_matches_public_schema(self) -> None:
         result = self.runtime.run_yaoyorozu_demo()
@@ -371,6 +384,19 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
             result["dispatch_receipt"],
+        )
+        self.assertEqual(
+            result["dispatch_plan"]["source_manifest_public_verification_bundle_ref"],
+            result["dispatch_receipt"]["source_manifest_public_verification_bundle_ref"],
+        )
+        self.assertEqual(
+            result["dispatch_plan"]["source_manifest_public_verification_bundle_digest"],
+            result["dispatch_receipt"]["source_manifest_public_verification_bundle_digest"],
+        )
+        self.assertTrue(
+            result["dispatch_receipt"]["validation"][
+                "source_manifest_public_verification_bound"
+            ]
         )
 
     def test_workspace_guardian_preseed_gate_matches_public_schema(self) -> None:

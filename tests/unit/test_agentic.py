@@ -35,7 +35,27 @@ from omoikane.agentic.trust import (
 )
 from omoikane.agentic.yaoyorozu import YaoyorozuRegistryService
 from omoikane.common import canonical_json, sha256_text
+from omoikane.kernel.continuity import ContinuityLedger
 from omoikane.reference_os import OmoikaneReferenceOS
+
+
+def _bind_source_manifest_for_dispatch(
+    service: YaoyorozuRegistryService,
+    registry_snapshot: dict,
+) -> dict:
+    binding = service.build_source_manifest_ledger_binding(registry_snapshot)
+    ledger = ContinuityLedger()
+    ledger_entry = ledger.append(
+        identity_id="identity://unit-test",
+        event_type=binding["continuity_ledger_event_type"],
+        payload=service.source_manifest_continuity_event_payload(binding),
+        actor="IntegrityGuardian",
+        category=binding["continuity_ledger_category"],
+        layer="L4",
+        signature_roles=binding["continuity_ledger_signature_roles"],
+        substrate="classical-silicon",
+    )
+    return service.bind_source_manifest_ledger_entry(binding, ledger_entry)
 
 
 class CouncilTests(unittest.TestCase):
@@ -3743,13 +3763,22 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 kwargs["pinned_reason"] = "guardian bootstrap"
             trust.register_agent(**kwargs)
         service = YaoyorozuRegistryService(trust_service=trust)
-        service.sync_from_agents_directory(repo_root / "agents")
+        registry_snapshot = service.sync_from_agents_directory(repo_root / "agents")
+        source_manifest_ledger_binding = _bind_source_manifest_for_dispatch(
+            service,
+            registry_snapshot,
+        )
         session = service.prepare_council_convocation(target_identity_ref="identity://unit-test")
 
-        plan = service.prepare_worker_dispatch(session)
+        plan = service.prepare_worker_dispatch(
+            session,
+            source_manifest_ledger_binding=source_manifest_ledger_binding,
+        )
         validation = service.validate_worker_dispatch_plan(plan)
 
         self.assertTrue(validation["ok"])
+        self.assertTrue(validation["source_manifest_public_verification_bound"])
+        self.assertTrue(validation["source_manifest_public_verification_digest_bound"])
         self.assertEqual(4, validation["dispatch_unit_count"])
         self.assertEqual([], validation["missing_coverage"])
         self.assertEqual(
@@ -3814,7 +3843,11 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 kwargs["pinned_reason"] = "guardian bootstrap"
             trust.register_agent(**kwargs)
         service = YaoyorozuRegistryService(trust_service=trust)
-        service.sync_from_agents_directory(repo_root / "agents")
+        registry_snapshot = service.sync_from_agents_directory(repo_root / "agents")
+        source_manifest_ledger_binding = _bind_source_manifest_for_dispatch(
+            service,
+            registry_snapshot,
+        )
 
         with OmoikaneReferenceOS()._yaoyorozu_demo_workspaces() as workspace_roots:
             discovery = service.discover_workspace_workers(workspace_roots)
@@ -3822,11 +3855,15 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 target_identity_ref="identity://unit-test",
                 workspace_discovery=discovery,
             )
-            plan = service.prepare_worker_dispatch(session)
+            plan = service.prepare_worker_dispatch(
+                session,
+                source_manifest_ledger_binding=source_manifest_ledger_binding,
+            )
 
         validation = service.validate_worker_dispatch_plan(plan)
 
         self.assertTrue(validation["ok"])
+        self.assertTrue(validation["source_manifest_public_verification_bound"])
         self.assertTrue(session["validation"]["workspace_execution_bound"])
         self.assertTrue(session["validation"]["workspace_execution_policy_ready"])
         self.assertTrue(plan["validation"]["workspace_execution_bound"])
@@ -3893,14 +3930,21 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 kwargs["pinned_reason"] = "guardian bootstrap"
             trust.register_agent(**kwargs)
         service = YaoyorozuRegistryService(trust_service=trust)
-        service.sync_from_agents_directory(repo_root / "agents")
+        registry_snapshot = service.sync_from_agents_directory(repo_root / "agents")
+        source_manifest_ledger_binding = _bind_source_manifest_for_dispatch(
+            service,
+            registry_snapshot,
+        )
         session = service.prepare_council_convocation(
             proposal_profile="memory-edit-v1",
             target_identity_ref="identity://unit-test",
             requested_optional_builder_coverage_areas=["schema"],
         )
 
-        plan = service.prepare_worker_dispatch(session)
+        plan = service.prepare_worker_dispatch(
+            session,
+            source_manifest_ledger_binding=source_manifest_ledger_binding,
+        )
         validation = service.validate_worker_dispatch_plan(plan)
 
         self.assertTrue(validation["ok"])
@@ -4061,14 +4105,23 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
                 kwargs["pinned_reason"] = "guardian bootstrap"
             trust.register_agent(**kwargs)
         service = YaoyorozuRegistryService(trust_service=trust)
-        service.sync_from_agents_directory(repo_root / "agents")
+        registry_snapshot = service.sync_from_agents_directory(repo_root / "agents")
+        source_manifest_ledger_binding = _bind_source_manifest_for_dispatch(
+            service,
+            registry_snapshot,
+        )
         session = service.prepare_council_convocation(target_identity_ref="identity://unit-test")
-        plan = service.prepare_worker_dispatch(session)
+        plan = service.prepare_worker_dispatch(
+            session,
+            source_manifest_ledger_binding=source_manifest_ledger_binding,
+        )
 
         receipt = service.execute_worker_dispatch(plan)
         validation = service.validate_worker_dispatch_receipt(receipt)
 
         self.assertTrue(validation["ok"])
+        self.assertTrue(validation["source_manifest_public_verification_bound"])
+        self.assertTrue(validation["source_manifest_public_verification_digest_bound"])
         self.assertEqual(4, validation["success_count"])
         self.assertTrue(validation["coverage_complete"])
         self.assertEqual([], validation["missing_coverage"])

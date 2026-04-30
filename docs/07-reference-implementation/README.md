@@ -602,6 +602,11 @@ optional coverage を requested dispatch として追加できること、
 さらにそれを same-host subprocess worker へ展開した
 `yaoyorozu_worker_dispatch_plan` / `yaoyorozu_worker_dispatch_receipt` が
 同一 convocation session に束縛されること、
+さらに dispatch plan / receipt が
+`yaoyorozu-source-manifest-public-verification-bundle-v1` の ref/digest と
+digest-only public bundle 本体を carry し、worker 実行前の agent source manifest が
+ContinuityLedger entry / self+guardian signature digest / raw payload 非公開 condition に
+束縛済みであること、
 さらに `workspace_discovery_binding` が存在する場合は
 `workspace_execution_binding` により required coverage area を non-source candidate workspace へ割り当て、
 requested optional coverage は candidate が無い場合に source fallback として明示し、
