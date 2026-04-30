@@ -18,7 +18,9 @@
 - `bdb_session.schema`
 - `biodata_calibration_profile.schema`
 - `biodata_calibration_confidence_gate.schema`
-  - identity confirmation / sensory loopback への digest-only confidence gate を保持し、Sensory Loopback 側の bounded drift-threshold adjustment は raw gate payload 無しで session / receipt / artifact family scene summary に反映される
+  - identity confirmation / sensory loopback への digest-only confidence gate を保持し、feature-window drift gate と calibration refresh receipt の digest を束縛したうえで、Sensory Loopback 側の bounded drift-threshold adjustment は raw gate payload 無しで session / receipt / artifact family scene summary に反映される
+- `biodata_calibration_refresh_receipt.schema`
+  - current drift gate、self consent、Guardian review、1-90 日 freshness window を calibration 再利用前に digest-only で束縛し、raw calibration / drift / threshold / refresh / gate payload を保存しない
 - `biodata_dataset_adapter_receipt.schema`
   - external EEG/ECG/PPG/EDA/respiration dataset window を manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset / signal sample / feature-window payload を保存しない
 - `biodata_circadian_phase_verifier_receipt.schema`

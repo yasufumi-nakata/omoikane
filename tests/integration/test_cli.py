@@ -186,14 +186,23 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["feature_window_series_drift_threshold_authority_bound"]
         )
+        self.assertTrue(result["validation"]["calibration_refresh_receipt_ok"])
+        self.assertTrue(result["validation"]["calibration_refresh_window_bound"])
+        self.assertTrue(result["validation"]["calibration_refresh_source_digest_set_bound"])
+        self.assertEqual("fresh", result["validation"]["calibration_refresh_status"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
         self.assertTrue(result["validation"]["multi_day_calibration_bound"])
         self.assertTrue(result["validation"]["calibration_digest_bound"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_ok"])
         self.assertTrue(result["validation"]["calibration_confidence_gate_series_drift_bound"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_refresh_bound"])
         self.assertEqual(
             "pass",
             result["validation"]["calibration_confidence_gate_series_drift_status"],
+        )
+        self.assertEqual(
+            "fresh",
+            result["validation"]["calibration_confidence_gate_refresh_status"],
         )
         self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
         self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
@@ -212,6 +221,7 @@ class CliIntegrationTests(unittest.TestCase):
                 "raw_threshold_policy_signature_payload_stored"
             ]
         )
+        self.assertFalse(result["calibration_refresh_receipt"]["raw_refresh_payload_stored"])
         self.assertFalse(result["feature_window_series_drift_gate"]["raw_drift_payload_stored"])
         self.assertEqual(2, result["calibration_profile"]["days_covered_count"])
         self.assertEqual(2, result["feature_window_series_profile"]["window_count"])

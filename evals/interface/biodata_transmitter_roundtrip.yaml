@@ -51,6 +51,14 @@ expected:
   feature_window_series_drift_threshold_authority_bound: true
   feature_window_series_drift_threshold_authority_digest_bound: true
   feature_window_series_drift_threshold_authority_source_digest_bound: true
+  calibration_refresh_receipt_ok: true
+  calibration_refresh_profile_bound: true
+  calibration_refresh_drift_gate_bound: true
+  calibration_refresh_threshold_authority_bound: true
+  calibration_refresh_window_bound: true
+  calibration_refresh_source_digest_set_bound: true
+  calibration_refresh_receipt_digest_bound: true
+  calibration_refresh_status: fresh
   calibration_profile_ok: true
   multi_day_calibration_bound: true
   source_latent_digest_set_bound: true
@@ -65,6 +73,9 @@ expected:
   calibration_confidence_gate_series_drift_bound: true
   calibration_confidence_gate_series_drift_status: pass
   calibration_confidence_gate_threshold_policy_authority_bound: true
+  calibration_confidence_gate_refresh_bound: true
+  calibration_confidence_gate_refresh_status: fresh
+  calibration_confidence_gate_refresh_window_bound: true
   identity_confirmation_confidence_gate_bound: true
   sensory_loopback_confidence_gate_bound: true
   raw_source_payload_stored: false
@@ -78,6 +89,7 @@ expected:
   raw_drift_payload_stored: false
   raw_threshold_policy_payload_stored: false
   raw_threshold_policy_signature_payload_stored: false
+  raw_refresh_payload_stored: false
   raw_calibration_payload_stored: false
   raw_gate_payload_stored: false
   semantic_thought_content_generated: false

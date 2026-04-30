@@ -35,12 +35,19 @@ required:
   - feature_window_series_threshold_policy_source_digest_set
   - feature_window_series_threshold_policy_authority_status
   - feature_window_series_threshold_policy_authority_bound
+  - calibration_refresh_ref
+  - calibration_refresh_digest
+  - calibration_refresh_source_digest_set
+  - calibration_refresh_window_bound
+  - calibration_refresh_status
+  - calibration_refresh_bound
   - identity_confirmation_gate_bound
   - sensory_loopback_gate_bound
   - raw_calibration_payload_stored
   - raw_drift_payload_stored
   - raw_threshold_policy_payload_stored
   - raw_threshold_policy_signature_payload_stored
+  - raw_refresh_payload_stored
   - raw_gate_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
@@ -124,6 +131,10 @@ properties:
         - feature_window_series_drift_gate_digest
         - feature_window_series_drift_gate_bound
         - feature_window_series_drift_gate_status
+        - calibration_refresh_ref
+        - calibration_refresh_digest
+        - calibration_refresh_bound
+        - calibration_refresh_status
         - status
       properties:
         target_gate:
@@ -165,6 +176,23 @@ properties:
           enum:
             - pass
             - blocked
+            - not-bound
+        calibration_refresh_ref:
+          anyOf:
+            - type: string
+              pattern: "^calibration-refresh://biodata/bdt-calibration-refresh-[a-f0-9]{12}$"
+            - const: ""
+        calibration_refresh_digest:
+          anyOf:
+            - type: string
+              pattern: "^[a-f0-9]{64}$"
+            - const: ""
+        calibration_refresh_bound:
+          type: boolean
+        calibration_refresh_status:
+          type: string
+          enum:
+            - fresh
             - not-bound
         status:
           type: string
@@ -224,6 +252,30 @@ properties:
       - not-bound
   feature_window_series_threshold_policy_authority_bound:
     type: boolean
+  calibration_refresh_ref:
+    anyOf:
+      - type: string
+        pattern: "^calibration-refresh://biodata/bdt-calibration-refresh-[a-f0-9]{12}$"
+      - const: ""
+  calibration_refresh_digest:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  calibration_refresh_source_digest_set:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  calibration_refresh_window_bound:
+    type: boolean
+  calibration_refresh_status:
+    type: string
+    enum:
+      - fresh
+      - not-bound
+  calibration_refresh_bound:
+    type: boolean
   identity_confirmation_gate_bound:
     type: boolean
   sensory_loopback_gate_bound:
@@ -235,6 +287,8 @@ properties:
   raw_threshold_policy_payload_stored:
     const: false
   raw_threshold_policy_signature_payload_stored:
+    const: false
+  raw_refresh_payload_stored:
     const: false
   raw_gate_payload_stored:
     const: false

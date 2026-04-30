@@ -2286,6 +2286,16 @@ entries:
     rationale: Required to serialize multi-day person-bound BioData Transmitter calibration baselines with source latent digest-set binding and raw payload redaction.
   - priority: P1
     kind: schema
+    file: specs/schemas/biodata_calibration_refresh_receipt.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind BioData calibration reuse to current drift-gate evidence, self consent, Guardian review, freshness window, and raw refresh payload redaction before confidence gates consume it.
+  - priority: P1
+    kind: schema
     file: specs/schemas/biodata_calibration_confidence_gate.schema
     consumers:
       - specs/interfaces/interface.biodata_transmitter.v0.idl
@@ -2295,7 +2305,7 @@ entries:
       - reference-runtime
       - evals/interface/biodata_transmitter_roundtrip.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to bind complete BioData calibration profiles and optional feature-window series drift gate receipts to identity-confirmation and sensory-loopback confidence gates without raw calibration, drift, or gate payload storage.
+    rationale: Required to bind complete BioData calibration profiles, feature-window series drift gate receipts, and calibration refresh receipts to identity-confirmation and sensory-loopback confidence gates without raw calibration, drift, refresh, or gate payload storage.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.biodata_transmitter.v0.idl
@@ -2310,7 +2320,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects dataset adapter digest binding, literature-backed intermediate, target signal generation, mind-upload.com conflict sink binding, and raw payload redaction.
+    rationale: Protects dataset adapter digest binding, calibration refresh freshness binding, literature-backed intermediate, target signal generation, mind-upload.com conflict sink binding, and raw payload redaction.
   - priority: P1
     kind: schema
     file: specs/schemas/bdb_session.schema

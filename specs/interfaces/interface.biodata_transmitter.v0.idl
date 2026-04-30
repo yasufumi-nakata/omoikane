@@ -12,6 +12,7 @@ imports:
   biodata_signal_bundle: ../schemas/biodata_signal_bundle.schema
   biodata_calibration_profile: ../schemas/biodata_calibration_profile.schema
   biodata_calibration_confidence_gate: ../schemas/biodata_calibration_confidence_gate.schema
+  biodata_calibration_refresh_receipt: ../schemas/biodata_calibration_refresh_receipt.schema
   biodata_dataset_adapter_receipt: ../schemas/biodata_dataset_adapter_receipt.schema
   biodata_circadian_phase_verifier_receipt: ../schemas/biodata_circadian_phase_verifier_receipt.schema
   biodata_feature_window_series_profile: ../schemas/biodata_feature_window_series_profile.schema
@@ -477,15 +478,80 @@ operations:
               minLength: 1
           feature_window_series_drift_gate_receipt:
             schema_ref: biodata_feature_window_series_drift_gate
+          calibration_refresh_receipt:
+            schema_ref: biodata_calibration_refresh_receipt
     output:
       schema_ref: biodata_calibration_confidence_gate
     guarantees:
       - calibration_digest_bound must prove the receipt is bound to the exact calibration profile
       - feature-window series drift gate digest must be directly bound when a drift gate receipt is supplied
+      - calibration refresh receipt digest must be directly bound when current freshness is supplied
       - source_modalities_covered must cover eeg, ecg, ppg, eda, and respiration before any target gate can pass
       - identity-confirmation gates require confidence_score >= 0.8
       - sensory-loopback gates require confidence_score >= 0.7
       - raw calibration and gate payload storage must remain false
+  bind_calibration_refresh_receipt:
+    summary: Bind a calibration profile to a current drift gate, self consent, Guardian review, and a bounded freshness window before confidence-gate consumption.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - calibration_profile
+          - feature_window_series_drift_gate_receipt
+          - refresh_sources
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          feature_window_series_drift_gate_receipt:
+            schema_ref: biodata_feature_window_series_drift_gate
+          refresh_sources:
+            type: array
+            minItems: 3
+            maxItems: 3
+            items:
+              type: object
+              required:
+                - source_type
+                - source_ref
+                - evidence_ref
+                - verifier_key_ref
+                - freshness_status_ref
+              properties:
+                source_type:
+                  type: string
+                  enum: [current-drift-gate, self-consent, guardian-review]
+                source_ref:
+                  type: string
+                  minLength: 1
+                evidence_ref:
+                  type: string
+                  minLength: 1
+                verifier_key_ref:
+                  type: string
+                  minLength: 1
+                freshness_status_ref:
+                  type: string
+                  minLength: 1
+          freshness_window_days:
+            type: integer
+            minimum: 1
+            maximum: 90
+          refresh_deadline_ref:
+            type: string
+            minLength: 1
+          refreshed_at_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: biodata_calibration_refresh_receipt
+    guarantees:
+      - calibration_digest and drift_gate_digest must both be bound before confidence-gate reuse
+      - refresh sources must cover current-drift-gate, self-consent, and guardian-review
+      - freshness_window_days must be bounded to 1-90 days and refresh_status must be fresh
+      - raw calibration, drift, threshold-policy, refresh, and gate payload storage must remain false
   validate_calibration_confidence_gate:
     summary: Verify calibration confidence-gate digest binding, target threshold checks, and raw-payload redaction.
     input:
@@ -511,6 +577,7 @@ operations:
           - required_modalities_bound
           - target_gate_set_digest_bound
           - gate_receipt_digest_bound
+          - calibration_refresh_bound
           - identity_confirmation_gate_bound
           - sensory_loopback_gate_bound
           - raw_gate_payload_stored
@@ -524,6 +591,13 @@ operations:
           target_gate_set_digest_bound:
             type: boolean
           gate_receipt_digest_bound:
+            type: boolean
+          calibration_refresh_bound:
+            type: boolean
+          calibration_refresh_status:
+            type: string
+            enum: [fresh, not-bound]
+          calibration_refresh_window_bound:
             type: boolean
           identity_confirmation_gate_bound:
             type: boolean
@@ -579,6 +653,53 @@ operations:
           threshold_policy_authority_bound:
             type: boolean
           raw_drift_payload_stored:
+            const: false
+  validate_calibration_refresh_receipt:
+    summary: Verify BioData calibration refresh-window binding and raw-payload redaction before confidence-gate consumption.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - calibration_profile
+          - feature_window_series_drift_gate_receipt
+          - refresh_receipt
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          feature_window_series_drift_gate_receipt:
+            schema_ref: biodata_feature_window_series_drift_gate
+          refresh_receipt:
+            schema_ref: biodata_calibration_refresh_receipt
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - calibration_profile_bound
+          - feature_window_series_drift_gate_bound
+          - refresh_window_bound
+          - refresh_source_digest_set_bound
+          - refresh_receipt_digest_bound
+          - raw_refresh_payload_stored
+        properties:
+          ok:
+            type: boolean
+          calibration_profile_bound:
+            type: boolean
+          feature_window_series_drift_gate_bound:
+            type: boolean
+          threshold_policy_authority_digest_bound:
+            type: boolean
+          refresh_window_bound:
+            type: boolean
+          refresh_source_digest_set_bound:
+            type: boolean
+          refresh_receipt_digest_bound:
+            type: boolean
+          raw_refresh_payload_stored:
             const: false
   validate_drift_threshold_policy_authority:
     summary: Verify threshold authority quorum digest binding and raw-payload redaction.
@@ -736,6 +857,9 @@ events:
   biodata_transmitter.drift_threshold_policy_authority_bound:
     payload:
       schema_ref: biodata_drift_threshold_policy_authority_receipt
+  biodata_transmitter.calibration_refresh_bound:
+    payload:
+      schema_ref: biodata_calibration_refresh_receipt
   biodata_transmitter.calibration_confidence_gate_bound:
     payload:
       schema_ref: biodata_calibration_confidence_gate
@@ -754,3 +878,4 @@ compatibility:
     - Circadian phase verifiers bind phase refs to external clock, sleep diary, and wearable evidence digests without storing raw phase evidence.
     - Feature-window series drift gates let calibration confidence gates consume current longitudinal evidence only through bounded, digest-only drift-threshold receipts.
     - Drift threshold policy authority receipts bind clinical, jurisdiction, and Guardian threshold policy refs without storing raw policy or signature payloads.
+    - Calibration refresh receipts force current drift-gate, self-consent, Guardian review, and freshness-window evidence to be digest-bound before a calibration gate is reused.

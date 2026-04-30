@@ -13,6 +13,7 @@ BDT_LATENT_PROFILE_ID = "physiology-latent-body-state-v0"
 BDT_GENERATOR_PROFILE_ID = "bounded-cross-modal-biosignal-generator-v0"
 BDT_CALIBRATION_PROFILE_ID = "multi-day-personal-biodata-calibration-v1"
 BDT_CONFIDENCE_GATE_PROFILE_ID = "biodata-calibration-confidence-gate-v1"
+BDT_CALIBRATION_REFRESH_PROFILE_ID = "biodata-calibration-refresh-window-v1"
 BDT_DATASET_ADAPTER_PROFILE_ID = "biodata-dataset-feature-window-adapter-v1"
 BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID = "biodata-circadian-phase-verifier-v1"
 BDT_FEATURE_WINDOW_SERIES_PROFILE_ID = "biodata-feature-window-series-profile-v1"
@@ -41,6 +42,11 @@ DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES = (
     "clinical-reviewer",
     "jurisdiction-policy",
     "guardian",
+)
+CALIBRATION_REFRESH_SOURCE_TYPES = (
+    "current-drift-gate",
+    "self-consent",
+    "guardian-review",
 )
 REQUIRED_LITERATURE_REFS = (
     {
@@ -109,6 +115,7 @@ class BioDataTransmitter:
             "generator_profile_id": BDT_GENERATOR_PROFILE_ID,
             "calibration_profile_id": BDT_CALIBRATION_PROFILE_ID,
             "confidence_gate_profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
+            "calibration_refresh_profile_id": BDT_CALIBRATION_REFRESH_PROFILE_ID,
             "dataset_adapter_profile_id": BDT_DATASET_ADAPTER_PROFILE_ID,
             "circadian_phase_verifier_profile_id": BDT_CIRCADIAN_PHASE_VERIFIER_PROFILE_ID,
             "feature_window_series_profile_id": BDT_FEATURE_WINDOW_SERIES_PROFILE_ID,
@@ -1757,12 +1764,286 @@ class BioDataTransmitter:
             "semantic_thought_content_generated": False,
         }
 
+    def bind_calibration_refresh_receipt(
+        self,
+        session: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        feature_window_series_drift_gate_receipt: Dict[str, Any],
+        refresh_sources: Sequence[Dict[str, Any]],
+        freshness_window_days: int = 30,
+        refresh_deadline_ref: str = "schedule://biodata/calibration/refresh-before-30d",
+        refreshed_at_ref: str = "timestamp://biodata/calibration/refresh/current-window",
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        self._validate_drift_gate_receipt_for_confidence(
+            session,
+            calibration_profile,
+            feature_window_series_drift_gate_receipt,
+        )
+        if not isinstance(freshness_window_days, int) or isinstance(freshness_window_days, bool):
+            raise ValueError("freshness_window_days must be a positive integer")
+        if freshness_window_days < 1 or freshness_window_days > 90:
+            raise ValueError("freshness_window_days must be between 1 and 90")
+        self._require_non_empty_string(refresh_deadline_ref, "refresh_deadline_ref")
+        self._require_non_empty_string(refreshed_at_ref, "refreshed_at_ref")
+
+        sources = self._normalize_calibration_refresh_sources(
+            refresh_sources,
+            calibration_profile,
+            feature_window_series_drift_gate_receipt,
+            freshness_window_days,
+        )
+        source_digests = [source["refresh_source_digest"] for source in sources]
+        refresh_source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_CALIBRATION_REFRESH_PROFILE_ID,
+                    "refresh_source_digests": source_digests,
+                }
+            )
+        )
+        receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "refresh_ref": f"calibration-refresh://biodata/{new_id('bdt-calibration-refresh')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_CALIBRATION_REFRESH_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "calibration_ref": calibration_profile["calibration_ref"],
+            "calibration_digest": calibration_profile["calibration_digest"],
+            "source_latent_digest_set_digest": calibration_profile[
+                "source_latent_digest_set_digest"
+            ],
+            "feature_window_series_drift_gate_ref": feature_window_series_drift_gate_receipt[
+                "drift_gate_ref"
+            ],
+            "feature_window_series_drift_gate_digest": feature_window_series_drift_gate_receipt[
+                "drift_gate_digest"
+            ],
+            "feature_window_series_drift_threshold_digest": feature_window_series_drift_gate_receipt[
+                "drift_threshold_digest"
+            ],
+            "feature_window_series_drift_gate_status": feature_window_series_drift_gate_receipt[
+                "drift_gate_status"
+            ],
+            "threshold_policy_authority_ref": feature_window_series_drift_gate_receipt.get(
+                "threshold_policy_authority_ref",
+                "",
+            ),
+            "threshold_policy_authority_digest": feature_window_series_drift_gate_receipt.get(
+                "threshold_policy_authority_digest",
+                "",
+            ),
+            "threshold_policy_source_digest_set": feature_window_series_drift_gate_receipt.get(
+                "threshold_policy_source_digest_set",
+                "",
+            ),
+            "threshold_policy_authority_status": feature_window_series_drift_gate_receipt.get(
+                "threshold_policy_authority_status",
+                "not-bound",
+            ),
+            "freshness_window_days": freshness_window_days,
+            "refresh_deadline_ref": str(refresh_deadline_ref).strip(),
+            "refreshed_at_ref": str(refreshed_at_ref).strip(),
+            "required_refresh_source_types": list(CALIBRATION_REFRESH_SOURCE_TYPES),
+            "refresh_source_types": [source["source_type"] for source in sources],
+            "refresh_sources": sources,
+            "refresh_source_digest_set": refresh_source_digest_set,
+            "refresh_window_bound": True,
+            "refresh_status": "fresh",
+            "calibration_refresh_bound": True,
+            "storage_policy": "calibration-digest+drift-gate-digest+refresh-source-digest-only",
+            "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
+            "raw_refresh_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        receipt["refresh_receipt_digest"] = sha256_text(
+            canonical_json(self._calibration_refresh_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_calibration_refresh_receipt(
+        self,
+        session: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        feature_window_series_drift_gate_receipt: Dict[str, Any],
+        refresh_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        if not isinstance(refresh_receipt, dict):
+            errors.append("refresh_receipt must be a mapping")
+            refresh_receipt = {}
+        self._check_non_empty_string(
+            refresh_receipt.get("refresh_ref"),
+            "refresh_receipt.refresh_ref",
+            errors,
+        )
+        if refresh_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("refresh_receipt.schema_version mismatch")
+        if refresh_receipt.get("profile_id") != BDT_CALIBRATION_REFRESH_PROFILE_ID:
+            errors.append("refresh_receipt.profile_id mismatch")
+        if refresh_receipt.get("session_id") != session.get("session_id"):
+            errors.append("refresh_receipt.session_id must match session.session_id")
+        if refresh_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("refresh_receipt.identity_id must match session.identity_id")
+        try:
+            self._validate_drift_gate_receipt_for_confidence(
+                session,
+                calibration_profile,
+                feature_window_series_drift_gate_receipt,
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        if refresh_receipt.get("calibration_ref") != calibration_profile.get("calibration_ref"):
+            errors.append("refresh_receipt.calibration_ref must match calibration_profile")
+        if refresh_receipt.get("calibration_digest") != calibration_profile.get("calibration_digest"):
+            errors.append("refresh_receipt.calibration_digest must match calibration_profile")
+        if refresh_receipt.get("source_latent_digest_set_digest") != calibration_profile.get(
+            "source_latent_digest_set_digest"
+        ):
+            errors.append("refresh_receipt.source_latent_digest_set_digest mismatch")
+        if refresh_receipt.get("feature_window_series_drift_gate_ref") != feature_window_series_drift_gate_receipt.get(
+            "drift_gate_ref"
+        ):
+            errors.append("refresh_receipt must bind drift_gate_ref")
+        if refresh_receipt.get("feature_window_series_drift_gate_digest") != feature_window_series_drift_gate_receipt.get(
+            "drift_gate_digest"
+        ):
+            errors.append("refresh_receipt must bind drift_gate_digest")
+        if refresh_receipt.get("feature_window_series_drift_threshold_digest") != feature_window_series_drift_gate_receipt.get(
+            "drift_threshold_digest"
+        ):
+            errors.append("refresh_receipt must bind drift_threshold_digest")
+        if refresh_receipt.get("feature_window_series_drift_gate_status") != "pass":
+            errors.append("refresh_receipt.feature_window_series_drift_gate_status must be pass")
+        if refresh_receipt.get("threshold_policy_authority_digest") != feature_window_series_drift_gate_receipt.get(
+            "threshold_policy_authority_digest",
+            "",
+        ):
+            errors.append("refresh_receipt.threshold_policy_authority_digest mismatch")
+        window_days = refresh_receipt.get("freshness_window_days")
+        refresh_window_bound = (
+            isinstance(window_days, int)
+            and not isinstance(window_days, bool)
+            and 1 <= window_days <= 90
+            and refresh_receipt.get("refresh_window_bound") is True
+        )
+        if not refresh_window_bound:
+            errors.append("refresh_receipt.refresh_window_bound must be true for 1-90 days")
+        for field_name in ("refresh_deadline_ref", "refreshed_at_ref"):
+            self._check_non_empty_string(
+                refresh_receipt.get(field_name),
+                f"refresh_receipt.{field_name}",
+                errors,
+            )
+        sources: List[Dict[str, Any]] = []
+        try:
+            sources = self._normalize_calibration_refresh_sources(
+                refresh_receipt.get("refresh_sources", []),
+                calibration_profile,
+                feature_window_series_drift_gate_receipt,
+                window_days if isinstance(window_days, int) else 0,
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        expected_source_digests = [source["refresh_source_digest"] for source in sources]
+        expected_source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_CALIBRATION_REFRESH_PROFILE_ID,
+                    "refresh_source_digests": expected_source_digests,
+                }
+            )
+        )
+        refresh_source_digest_set_bound = (
+            refresh_receipt.get("refresh_source_digest_set") == expected_source_digest_set
+        )
+        if not refresh_source_digest_set_bound:
+            errors.append("refresh_receipt.refresh_source_digest_set mismatch")
+        if refresh_receipt.get("refresh_sources") != sources:
+            errors.append("refresh_receipt.refresh_sources mismatch")
+        required_source_types_bound = (
+            refresh_receipt.get("required_refresh_source_types")
+            == list(CALIBRATION_REFRESH_SOURCE_TYPES)
+            and refresh_receipt.get("refresh_source_types")
+            == list(CALIBRATION_REFRESH_SOURCE_TYPES)
+        )
+        if not required_source_types_bound:
+            errors.append("refresh_receipt must bind current drift gate, self consent, and Guardian review")
+        if refresh_receipt.get("refresh_status") != "fresh":
+            errors.append("refresh_receipt.refresh_status must be fresh")
+        if refresh_receipt.get("calibration_refresh_bound") is not True:
+            errors.append("refresh_receipt.calibration_refresh_bound must be true")
+        expected_digest = sha256_text(
+            canonical_json(self._calibration_refresh_digest_payload(refresh_receipt))
+        )
+        refresh_receipt_digest_bound = (
+            refresh_receipt.get("refresh_receipt_digest") == expected_digest
+        )
+        if not refresh_receipt_digest_bound:
+            errors.append("refresh_receipt.refresh_receipt_digest mismatch")
+        for field_name in (
+            "raw_calibration_payload_stored",
+            "raw_drift_payload_stored",
+            "raw_threshold_policy_payload_stored",
+            "raw_threshold_policy_signature_payload_stored",
+            "raw_refresh_payload_stored",
+            "raw_gate_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if refresh_receipt.get(field_name) is not False:
+                errors.append(f"refresh_receipt.{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": refresh_receipt.get("profile_id"),
+            "refresh_status": refresh_receipt.get("refresh_status"),
+            "calibration_profile_bound": (
+                refresh_receipt.get("calibration_ref") == calibration_profile.get("calibration_ref")
+                and refresh_receipt.get("calibration_digest") == calibration_profile.get("calibration_digest")
+            ),
+            "feature_window_series_drift_gate_bound": (
+                refresh_receipt.get("feature_window_series_drift_gate_ref")
+                == feature_window_series_drift_gate_receipt.get("drift_gate_ref")
+                and refresh_receipt.get("feature_window_series_drift_gate_digest")
+                == feature_window_series_drift_gate_receipt.get("drift_gate_digest")
+            ),
+            "threshold_policy_authority_digest_bound": (
+                refresh_receipt.get("threshold_policy_authority_digest")
+                == feature_window_series_drift_gate_receipt.get(
+                    "threshold_policy_authority_digest",
+                    "",
+                )
+            ),
+            "refresh_window_bound": refresh_window_bound,
+            "refresh_source_digest_set_bound": refresh_source_digest_set_bound,
+            "required_refresh_source_types_bound": required_source_types_bound,
+            "refresh_receipt_digest_bound": refresh_receipt_digest_bound,
+            "raw_calibration_payload_stored": False,
+            "raw_drift_payload_stored": False,
+            "raw_threshold_policy_payload_stored": False,
+            "raw_threshold_policy_signature_payload_stored": False,
+            "raw_refresh_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def bind_calibration_confidence_gate(
         self,
         session: Dict[str, Any],
         calibration_profile: Dict[str, Any],
         target_gate_refs: Dict[str, str],
         feature_window_series_drift_gate_receipt: Dict[str, Any] | None = None,
+        calibration_refresh_receipt: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         self._check_session_mapping(session)
         normalized_target_refs = self._normalize_confidence_gate_refs(target_gate_refs)
@@ -1841,12 +2122,45 @@ class BioDataTransmitter:
                 )
                 is True
             )
+        refresh_ref = ""
+        refresh_digest = ""
+        refresh_source_digest_set = ""
+        refresh_status = "not-bound"
+        refresh_window_bound = False
+        refresh_bound = False
+        refresh_ready = True
+        if calibration_refresh_receipt is not None:
+            if feature_window_series_drift_gate_receipt is None:
+                raise ValueError("calibration_refresh_receipt requires a bound drift gate receipt")
+            refresh_validation = self.validate_calibration_refresh_receipt(
+                session,
+                calibration_profile,
+                feature_window_series_drift_gate_receipt,
+                calibration_refresh_receipt,
+            )
+            if not refresh_validation["ok"]:
+                raise ValueError(
+                    "calibration_refresh_receipt is invalid: "
+                    + "; ".join(refresh_validation["errors"])
+                )
+            refresh_ref = str(calibration_refresh_receipt["refresh_ref"])
+            refresh_digest = str(calibration_refresh_receipt["refresh_receipt_digest"])
+            refresh_source_digest_set = str(
+                calibration_refresh_receipt["refresh_source_digest_set"]
+            )
+            refresh_status = str(calibration_refresh_receipt["refresh_status"])
+            refresh_window_bound = (
+                calibration_refresh_receipt.get("refresh_window_bound") is True
+            )
+            refresh_bound = True
+            refresh_ready = refresh_status == "fresh" and refresh_window_bound
         common_gate_ready = (
             calibration_profile.get("profile_id") == BDT_CALIBRATION_PROFILE_ID
             and calibration_profile.get("calibration_complete") is True
             and calibration_digest_bound
             and required_modalities_bound
             and drift_gate_ready
+            and refresh_ready
             and calibration_profile.get("raw_source_payload_stored") is False
             and calibration_profile.get("raw_latent_payload_stored") is False
             and calibration_profile.get("raw_calibration_payload_stored") is False
@@ -1869,6 +2183,10 @@ class BioDataTransmitter:
                 "feature_window_series_drift_gate_digest": drift_gate_digest,
                 "feature_window_series_drift_gate_bound": drift_gate_bound,
                 "feature_window_series_drift_gate_status": drift_gate_status,
+                "calibration_refresh_ref": refresh_ref,
+                "calibration_refresh_digest": refresh_digest,
+                "calibration_refresh_bound": refresh_bound,
+                "calibration_refresh_status": refresh_status,
                 "status": "pass" if common_gate_ready and threshold_met else "fail",
             }
             target_gate_bindings.append(binding)
@@ -1921,6 +2239,12 @@ class BioDataTransmitter:
             "feature_window_series_threshold_policy_authority_bound": (
                 threshold_policy_authority_bound
             ),
+            "calibration_refresh_ref": refresh_ref,
+            "calibration_refresh_digest": refresh_digest,
+            "calibration_refresh_source_digest_set": refresh_source_digest_set,
+            "calibration_refresh_window_bound": refresh_window_bound,
+            "calibration_refresh_status": refresh_status,
+            "calibration_refresh_bound": refresh_bound,
             "identity_confirmation_gate_bound": any(
                 binding["target_gate"] == "identity-confirmation"
                 and binding["status"] == "pass"
@@ -1935,6 +2259,7 @@ class BioDataTransmitter:
             "raw_drift_payload_stored": False,
             "raw_threshold_policy_payload_stored": False,
             "raw_threshold_policy_signature_payload_stored": False,
+            "raw_refresh_payload_stored": False,
             "raw_gate_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
@@ -2042,6 +2367,41 @@ class BioDataTransmitter:
                 if gate_receipt.get(field_name, "") != "":
                     errors.append(f"gate_receipt.{field_name} must be empty when unbound")
 
+        refresh_bound = gate_receipt.get("calibration_refresh_bound") is True
+        refresh_status = str(gate_receipt.get("calibration_refresh_status", "not-bound"))
+        refresh_window_bound = (
+            gate_receipt.get("calibration_refresh_window_bound") is True
+        )
+        refresh_ready = True
+        if refresh_bound:
+            if refresh_status != "fresh":
+                errors.append("gate_receipt.calibration_refresh_status must be fresh")
+            if not refresh_window_bound:
+                errors.append("gate_receipt.calibration_refresh_window_bound must be true when bound")
+            for field_name in (
+                "calibration_refresh_ref",
+                "calibration_refresh_digest",
+                "calibration_refresh_source_digest_set",
+            ):
+                self._check_non_empty_string(
+                    gate_receipt.get(field_name),
+                    f"gate_receipt.{field_name}",
+                    errors,
+                )
+            refresh_ready = refresh_status == "fresh" and refresh_window_bound
+        else:
+            if refresh_status != "not-bound":
+                errors.append("unbound calibration refresh must use not-bound status")
+            if refresh_window_bound:
+                errors.append("unbound calibration refresh must not set refresh_window_bound")
+            for field_name in (
+                "calibration_refresh_ref",
+                "calibration_refresh_digest",
+                "calibration_refresh_source_digest_set",
+            ):
+                if gate_receipt.get(field_name, "") != "":
+                    errors.append(f"gate_receipt.{field_name} must be empty when refresh is unbound")
+
         bindings = gate_receipt.get("target_gate_bindings", [])
         if not isinstance(bindings, list) or not bindings:
             errors.append("gate_receipt.target_gate_bindings must be a non-empty list")
@@ -2060,6 +2420,7 @@ class BioDataTransmitter:
                 and calibration_digest_bound
                 and required_modalities_bound
                 and drift_gate_ready
+                and refresh_ready
                 else "fail"
             )
             if (
@@ -2074,6 +2435,12 @@ class BioDataTransmitter:
                 != gate_receipt.get("feature_window_series_drift_gate_digest")
                 or binding.get("feature_window_series_drift_gate_bound") != drift_gate_bound
                 or binding.get("feature_window_series_drift_gate_status") != drift_gate_status
+                or binding.get("calibration_refresh_ref")
+                != gate_receipt.get("calibration_refresh_ref")
+                or binding.get("calibration_refresh_digest")
+                != gate_receipt.get("calibration_refresh_digest")
+                or binding.get("calibration_refresh_bound") != refresh_bound
+                or binding.get("calibration_refresh_status") != refresh_status
                 or binding.get("status") != expected_status
             ):
                 valid_bindings = False
@@ -2094,6 +2461,7 @@ class BioDataTransmitter:
             and calibration_digest_bound
             and required_modalities_bound
             and drift_gate_ready
+            and refresh_ready
             and all(binding.get("status") == "pass" for binding in bindings)
             else "blocked"
         )
@@ -2125,6 +2493,7 @@ class BioDataTransmitter:
             "raw_drift_payload_stored",
             "raw_threshold_policy_payload_stored",
             "raw_threshold_policy_signature_payload_stored",
+            "raw_refresh_payload_stored",
             "raw_gate_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
@@ -2146,12 +2515,16 @@ class BioDataTransmitter:
             "feature_window_series_drift_gate_status": drift_gate_status,
             "feature_window_series_threshold_policy_authority_bound": authority_bound,
             "feature_window_series_threshold_policy_authority_status": authority_status,
+            "calibration_refresh_bound": refresh_bound,
+            "calibration_refresh_status": refresh_status,
+            "calibration_refresh_window_bound": refresh_window_bound,
             "identity_confirmation_gate_bound": identity_confirmation_gate_bound,
             "sensory_loopback_gate_bound": sensory_loopback_gate_bound,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
             "raw_threshold_policy_payload_stored": False,
             "raw_threshold_policy_signature_payload_stored": False,
+            "raw_refresh_payload_stored": False,
             "raw_gate_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
@@ -2577,6 +2950,68 @@ class BioDataTransmitter:
             for role in DRIFT_THRESHOLD_POLICY_AUTHORITY_ROLES
         ]
 
+    def _normalize_calibration_refresh_sources(
+        self,
+        refresh_sources: Sequence[Dict[str, Any]],
+        calibration_profile: Dict[str, Any],
+        drift_gate_receipt: Dict[str, Any],
+        freshness_window_days: int,
+    ) -> List[Dict[str, Any]]:
+        if not isinstance(refresh_sources, (list, tuple)):
+            raise ValueError("refresh_sources must be a sequence")
+        if not isinstance(freshness_window_days, int) or isinstance(freshness_window_days, bool):
+            raise ValueError("freshness_window_days must be a positive integer")
+        if freshness_window_days < 1 or freshness_window_days > 90:
+            raise ValueError("freshness_window_days must be between 1 and 90")
+        sources_by_type: Dict[str, Dict[str, Any]] = {}
+        for source in refresh_sources:
+            if not isinstance(source, dict):
+                raise ValueError("each calibration refresh source must be a mapping")
+            source_type = str(source.get("source_type", "")).strip().lower()
+            if source_type not in CALIBRATION_REFRESH_SOURCE_TYPES:
+                raise ValueError(f"unsupported calibration refresh source type: {source_type}")
+            if source_type in sources_by_type:
+                raise ValueError(f"duplicate calibration refresh source type: {source_type}")
+            normalized_source: Dict[str, Any] = {"source_type": source_type}
+            for field_name in (
+                "source_ref",
+                "evidence_ref",
+                "verifier_key_ref",
+                "freshness_status_ref",
+            ):
+                value = source.get(field_name)
+                self._require_non_empty_string(
+                    value,
+                    f"refresh_sources.{source_type}.{field_name}",
+                )
+                normalized_source[field_name] = str(value).strip()
+            source_digest_payload = {
+                "profile_id": BDT_CALIBRATION_REFRESH_PROFILE_ID,
+                "calibration_digest": calibration_profile.get("calibration_digest"),
+                "drift_gate_digest": drift_gate_receipt.get("drift_gate_digest"),
+                "freshness_window_days": freshness_window_days,
+                "source_type": normalized_source["source_type"],
+                "source_ref": normalized_source["source_ref"],
+                "evidence_ref": normalized_source["evidence_ref"],
+                "verifier_key_ref": normalized_source["verifier_key_ref"],
+                "freshness_status_ref": normalized_source["freshness_status_ref"],
+            }
+            normalized_source["refresh_source_digest"] = sha256_text(
+                canonical_json(source_digest_payload)
+            )
+            sources_by_type[source_type] = normalized_source
+        missing_source_types = [
+            source_type
+            for source_type in CALIBRATION_REFRESH_SOURCE_TYPES
+            if source_type not in sources_by_type
+        ]
+        if missing_source_types:
+            raise ValueError(f"missing calibration refresh source types: {missing_source_types}")
+        return [
+            sources_by_type[source_type]
+            for source_type in CALIBRATION_REFRESH_SOURCE_TYPES
+        ]
+
     @staticmethod
     def _normalize_series_drift_thresholds(
         axis_thresholds: Dict[str, float] | None,
@@ -2669,6 +3104,12 @@ class BioDataTransmitter:
     ) -> Dict[str, Any]:
         payload = dict(verifier_receipt)
         payload.pop("phase_verifier_digest", None)
+        return payload
+
+    @staticmethod
+    def _calibration_refresh_digest_payload(refresh_receipt: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(refresh_receipt)
+        payload.pop("refresh_receipt_digest", None)
         return payload
 
     @staticmethod

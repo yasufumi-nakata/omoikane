@@ -20,6 +20,7 @@ capabilities:
   - biodata-transmitter.feature-window-series.attest
   - biodata-transmitter.feature-window-series-drift-gate.attest
   - biodata-transmitter.calibration-profile.attest
+  - biodata-transmitter.calibration-refresh.attest
   - biodata-transmitter.confidence-gate.attest
   - sensory-loopback.calibration-confidence-threshold.attest
   - sensory-loopback.biodata-arbitration.attest
@@ -107,6 +108,7 @@ oversight_scope_refs:
   - specs/schemas/biodata_body_state_latent.schema
   - specs/schemas/biodata_signal_bundle.schema
   - specs/schemas/biodata_calibration_profile.schema
+  - specs/schemas/biodata_calibration_refresh_receipt.schema
   - specs/schemas/biodata_calibration_confidence_gate.schema
   - specs/schemas/sensory_loopback_session.schema
   - specs/schemas/sensory_loopback_receipt.schema
@@ -134,7 +136,7 @@ when_to_invoke: |
   - データ整合性の周期検査
   - ContinuityLedger の検証
   - ContinuityLedger public verification bundle の key roster / ledger head / signature digest binding を検証する時
-  - BioData Transmitter の dataset manifest digest、source feature digest、body-state latent digest、feature-window series digest、generated bundle digest、multi-day calibration digest、confidence gate digest、literature refs、mind-upload.com conflict sink、raw dataset / signal sample / feature-window / biosignal / latent / series / calibration / gate payload 非保存、semantic thought content 非生成を検証する時
+  - BioData Transmitter の dataset manifest digest、source feature digest、body-state latent digest、feature-window series digest、generated bundle digest、multi-day calibration digest、calibration refresh receipt digest、confidence gate digest、literature refs、mind-upload.com conflict sink、raw dataset / signal sample / feature-window / biosignal / latent / series / calibration / refresh / gate payload 非保存、semantic thought content 非生成を検証する時
   - Sensory Loopback の BioData calibration confidence gate が bounded drift-threshold adjustment だけに使われ、body-map calibration / Guardian hold / stabilization を置き換えず、raw calibration / gate payload を保存していないことを検証する時
   - Sensory Loopback shared arbitration が participant ごとの BioData confidence / drift gate と hardware timing latency drift gate を同じ threshold authority digest に束縛し、weighted latency quorum の participant weight / failed participant / quorum digest を raw timing / hardware adapter payload なしで保存していることを検証する時
   - Yaoyorozu researcher evidence verifier の live transport quorum / signed response / freshness window を検証する時

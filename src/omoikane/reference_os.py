@@ -7871,6 +7871,36 @@ json.dump(response, sys.stdout)
                 threshold_policy_authority_receipt=drift_threshold_policy_authority,
             )
         )
+        calibration_refresh_receipt = (
+            self.biodata_transmitter.bind_calibration_refresh_receipt(
+                session,
+                calibration_profile,
+                feature_window_series_drift_gate,
+                refresh_sources=[
+                    {
+                        "source_type": "current-drift-gate",
+                        "source_ref": feature_window_series_drift_gate["drift_gate_ref"],
+                        "evidence_ref": "drift-gate-evidence://biodata-transmitter-demo/current-series-pass",
+                        "verifier_key_ref": "verifier-key://biodata-transmitter-demo/drift-gate",
+                        "freshness_status_ref": "freshness://biodata-transmitter-demo/current-drift-gate/fresh",
+                    },
+                    {
+                        "source_type": "self-consent",
+                        "source_ref": "self-consent://biodata-transmitter-demo/calibration-refresh",
+                        "evidence_ref": "consent-evidence://biodata-transmitter-demo/calibration-refresh-digest",
+                        "verifier_key_ref": "verifier-key://biodata-transmitter-demo/self-consent",
+                        "freshness_status_ref": "freshness://biodata-transmitter-demo/self-consent/fresh",
+                    },
+                    {
+                        "source_type": "guardian-review",
+                        "source_ref": "guardian-review://biodata-transmitter-demo/integrity-refresh",
+                        "evidence_ref": "guardian-evidence://biodata-transmitter-demo/calibration-refresh",
+                        "verifier_key_ref": "verifier-key://biodata-transmitter-demo/integrity-guardian",
+                        "freshness_status_ref": "freshness://biodata-transmitter-demo/guardian-review/fresh",
+                    },
+                ],
+            )
+        )
         calibration_confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
             session,
             calibration_profile,
@@ -7881,6 +7911,7 @@ json.dump(response, sys.stdout)
                 "sensory-loopback": "sensory-loopback://biodata-transmitter-demo/session-gate",
             },
             feature_window_series_drift_gate_receipt=feature_window_series_drift_gate,
+            calibration_refresh_receipt=calibration_refresh_receipt,
         )
         transmission_validation = self.biodata_transmitter.validate_transmission(
             session,
@@ -7937,6 +7968,14 @@ json.dump(response, sys.stdout)
                 drift_threshold_policy_authority,
             )
         )
+        calibration_refresh_validation = (
+            self.biodata_transmitter.validate_calibration_refresh_receipt(
+                session,
+                calibration_profile,
+                feature_window_series_drift_gate,
+                calibration_refresh_receipt,
+            )
+        )
         validation = dict(transmission_validation)
         validation["ok"] = (
             transmission_validation["ok"]
@@ -7947,6 +7986,7 @@ json.dump(response, sys.stdout)
             and circadian_phase_verifier_validation["ok"]
             and feature_window_series_drift_gate_validation["ok"]
             and drift_threshold_policy_authority_validation["ok"]
+            and calibration_refresh_validation["ok"]
         )
         validation["dataset_adapter_ok"] = dataset_adapter_validation["ok"]
         validation["dataset_manifest_digest_bound"] = dataset_adapter_validation[
@@ -8064,6 +8104,30 @@ json.dump(response, sys.stdout)
                 "threshold_policy_source_digest_set_bound"
             ]
         )
+        validation["calibration_refresh_receipt_ok"] = calibration_refresh_validation[
+            "ok"
+        ]
+        validation["calibration_refresh_profile_bound"] = (
+            calibration_refresh_validation["calibration_profile_bound"]
+        )
+        validation["calibration_refresh_drift_gate_bound"] = (
+            calibration_refresh_validation["feature_window_series_drift_gate_bound"]
+        )
+        validation["calibration_refresh_threshold_authority_bound"] = (
+            calibration_refresh_validation["threshold_policy_authority_digest_bound"]
+        )
+        validation["calibration_refresh_window_bound"] = (
+            calibration_refresh_validation["refresh_window_bound"]
+        )
+        validation["calibration_refresh_source_digest_set_bound"] = (
+            calibration_refresh_validation["refresh_source_digest_set_bound"]
+        )
+        validation["calibration_refresh_receipt_digest_bound"] = (
+            calibration_refresh_validation["refresh_receipt_digest_bound"]
+        )
+        validation["calibration_refresh_status"] = calibration_refresh_validation[
+            "refresh_status"
+        ]
         validation["raw_dataset_payload_stored"] = dataset_adapter_validation[
             "raw_dataset_payload_stored"
         ]
@@ -8141,6 +8205,15 @@ json.dump(response, sys.stdout)
                 "feature_window_series_threshold_policy_authority_bound"
             ]
         )
+        validation["calibration_confidence_gate_refresh_bound"] = (
+            confidence_gate_validation["calibration_refresh_bound"]
+        )
+        validation["calibration_confidence_gate_refresh_status"] = (
+            confidence_gate_validation["calibration_refresh_status"]
+        )
+        validation["calibration_confidence_gate_refresh_window_bound"] = (
+            confidence_gate_validation["calibration_refresh_window_bound"]
+        )
         validation["identity_confirmation_confidence_gate_bound"] = (
             confidence_gate_validation["identity_confirmation_gate_bound"]
         )
@@ -8150,6 +8223,9 @@ json.dump(response, sys.stdout)
         validation["raw_gate_payload_stored"] = confidence_gate_validation[
             "raw_gate_payload_stored"
         ]
+        validation["raw_refresh_payload_stored"] = (
+            calibration_refresh_validation["raw_refresh_payload_stored"]
+        )
 
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -8358,6 +8434,38 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="biodata_transmitter.calibration_refresh_bound",
+            payload={
+                "refresh_ref": calibration_refresh_receipt["refresh_ref"],
+                "refresh_receipt_digest": calibration_refresh_receipt[
+                    "refresh_receipt_digest"
+                ],
+                "calibration_digest": calibration_refresh_receipt["calibration_digest"],
+                "feature_window_series_drift_gate_digest": calibration_refresh_receipt[
+                    "feature_window_series_drift_gate_digest"
+                ],
+                "threshold_policy_authority_digest": calibration_refresh_receipt[
+                    "threshold_policy_authority_digest"
+                ],
+                "refresh_source_digest_set": calibration_refresh_receipt[
+                    "refresh_source_digest_set"
+                ],
+                "refresh_window_bound": calibration_refresh_receipt[
+                    "refresh_window_bound"
+                ],
+                "refresh_status": calibration_refresh_receipt["refresh_status"],
+                "raw_refresh_payload_stored": calibration_refresh_receipt[
+                    "raw_refresh_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-calibration-refresh",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="biodata_transmitter.body_state_encoded",
             payload={
                 "latent_ref": latent_state["latent_ref"],
@@ -8432,6 +8540,12 @@ json.dump(response, sys.stdout)
                         "feature_window_series_threshold_policy_authority_digest"
                     ]
                 ),
+                "calibration_refresh_digest": calibration_confidence_gate[
+                    "calibration_refresh_digest"
+                ],
+                "calibration_refresh_status": calibration_confidence_gate[
+                    "calibration_refresh_status"
+                ],
                 "confidence_gate_status": calibration_confidence_gate[
                     "confidence_gate_status"
                 ],
@@ -8449,6 +8563,9 @@ json.dump(response, sys.stdout)
                 ],
                 "raw_drift_payload_stored": calibration_confidence_gate[
                     "raw_drift_payload_stored"
+                ],
+                "raw_refresh_payload_stored": calibration_confidence_gate[
+                    "raw_refresh_payload_stored"
                 ],
             },
             actor="BioDataTransmitter",
@@ -8476,6 +8593,7 @@ json.dump(response, sys.stdout)
             "feature_window_series_profile": feature_window_series_profile,
             "drift_threshold_policy_authority": drift_threshold_policy_authority,
             "feature_window_series_drift_gate": feature_window_series_drift_gate,
+            "calibration_refresh_receipt": calibration_refresh_receipt,
             "latent_state": latent_state,
             "calibration_latent_states": [latent_state, day_two_latent_state],
             "calibration_profile": calibration_profile,

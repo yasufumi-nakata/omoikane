@@ -1100,6 +1100,11 @@ payload は保存しない。
 gate receipt は full modality coverage、target 別 confidence threshold、calibration digest、
 feature-window drift gate digest、threshold policy authority digest、gate receipt digest を検証し、
 raw drift / threshold policy / gate payload は保存しない。
+さらに `biodata-calibration-refresh-window-v1` が current drift gate、self consent、
+Guardian review、1-90 日 freshness window を calibration 再利用前に digest-only で
+束縛し、confidence gate は refresh receipt ref/digest/source digest set と
+`refresh_status=fresh` を同じ target gate binding に持つ。raw calibration / drift /
+threshold policy / refresh / gate payload は保存しない。
 sensory loopback 側では、この gate を
 `biodata-calibration-gated-drift-threshold-v1` として受け取り、
 `confidence_score >= 0.7` の時だけ body-map drift threshold を最大 `0.04`

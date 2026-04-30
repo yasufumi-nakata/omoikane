@@ -1,0 +1,265 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_calibration_refresh_receipt.schema"
+title: BioDataCalibrationRefreshReceipt
+description: >
+  Digest-only receipt that refreshes a BioData calibration profile before
+  confidence-gate consumption by binding the current feature-window drift gate,
+  self consent, Guardian review, and a bounded freshness window without storing
+  raw calibration, drift, threshold-policy, refresh, or gate payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - refresh_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - calibration_ref
+  - calibration_digest
+  - source_latent_digest_set_digest
+  - feature_window_series_drift_gate_ref
+  - feature_window_series_drift_gate_digest
+  - feature_window_series_drift_threshold_digest
+  - feature_window_series_drift_gate_status
+  - threshold_policy_authority_ref
+  - threshold_policy_authority_digest
+  - threshold_policy_source_digest_set
+  - threshold_policy_authority_status
+  - freshness_window_days
+  - refresh_deadline_ref
+  - refreshed_at_ref
+  - required_refresh_source_types
+  - refresh_source_types
+  - refresh_sources
+  - refresh_source_digest_set
+  - refresh_window_bound
+  - refresh_status
+  - calibration_refresh_bound
+  - storage_policy
+  - raw_calibration_payload_stored
+  - raw_drift_payload_stored
+  - raw_threshold_policy_payload_stored
+  - raw_threshold_policy_signature_payload_stored
+  - raw_refresh_payload_stored
+  - raw_gate_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - refresh_receipt_digest
+properties:
+  schema_version:
+    const: "1.0"
+  refresh_ref:
+    type: string
+    pattern: "^calibration-refresh://biodata/bdt-calibration-refresh-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-calibration-refresh-window-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  calibration_ref:
+    type: string
+    pattern: "^calibration://biodata/bdt-calibration-[a-f0-9]{12}$"
+  calibration_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_latent_digest_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  feature_window_series_drift_gate_ref:
+    type: string
+    pattern: "^feature-window-drift-gate://biodata/bdt-window-drift-gate-[a-f0-9]{12}$"
+  feature_window_series_drift_gate_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  feature_window_series_drift_threshold_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  feature_window_series_drift_gate_status:
+    const: pass
+  threshold_policy_authority_ref:
+    anyOf:
+      - type: string
+        pattern: "^drift-threshold-authority://biodata/bdt-threshold-authority-[a-f0-9]{12}$"
+      - const: ""
+  threshold_policy_authority_digest:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  threshold_policy_source_digest_set:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  threshold_policy_authority_status:
+    type: string
+    enum:
+      - complete
+      - not-bound
+  freshness_window_days:
+    type: integer
+    minimum: 1
+    maximum: 90
+  refresh_deadline_ref:
+    type: string
+    minLength: 1
+  refreshed_at_ref:
+    type: string
+    minLength: 1
+  required_refresh_source_types:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - current-drift-gate
+        - self-consent
+        - guardian-review
+  refresh_source_types:
+    type: array
+    minItems: 3
+    maxItems: 3
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - current-drift-gate
+        - self-consent
+        - guardian-review
+  refresh_sources:
+    type: array
+    minItems: 3
+    maxItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - source_type
+        - source_ref
+        - evidence_ref
+        - verifier_key_ref
+        - freshness_status_ref
+        - refresh_source_digest
+      properties:
+        source_type:
+          type: string
+          enum:
+            - current-drift-gate
+            - self-consent
+            - guardian-review
+        source_ref:
+          type: string
+          minLength: 1
+        evidence_ref:
+          type: string
+          minLength: 1
+        verifier_key_ref:
+          type: string
+          minLength: 1
+        freshness_status_ref:
+          type: string
+          minLength: 1
+        refresh_source_digest:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+  refresh_source_digest_set:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  refresh_window_bound:
+    const: true
+  refresh_status:
+    const: fresh
+  calibration_refresh_bound:
+    const: true
+  storage_policy:
+    const: calibration-digest+drift-gate-digest+refresh-source-digest-only
+  raw_calibration_payload_stored:
+    const: false
+  raw_drift_payload_stored:
+    const: false
+  raw_threshold_policy_payload_stored:
+    const: false
+  raw_threshold_policy_signature_payload_stored:
+    const: false
+  raw_refresh_payload_stored:
+    const: false
+  raw_gate_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  refresh_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+examples:
+  - schema_version: "1.0"
+    refresh_ref: calibration-refresh://biodata/bdt-calibration-refresh-abcdef123456
+    created_at: "2026-04-30T03:30:00+00:00"
+    profile_id: biodata-calibration-refresh-window-v1
+    session_id: bdt-abcdef123456
+    identity_id: identity-demo
+    calibration_ref: calibration://biodata/bdt-calibration-abcdef123456
+    calibration_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    source_latent_digest_set_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    feature_window_series_drift_gate_ref: feature-window-drift-gate://biodata/bdt-window-drift-gate-abcdef123456
+    feature_window_series_drift_gate_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    feature_window_series_drift_threshold_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    feature_window_series_drift_gate_status: pass
+    threshold_policy_authority_ref: drift-threshold-authority://biodata/bdt-threshold-authority-abcdef123456
+    threshold_policy_authority_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    threshold_policy_source_digest_set: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    threshold_policy_authority_status: complete
+    freshness_window_days: 30
+    refresh_deadline_ref: schedule://biodata/calibration/refresh-before-30d
+    refreshed_at_ref: timestamp://biodata/calibration/refresh/current-window
+    required_refresh_source_types:
+      - current-drift-gate
+      - self-consent
+      - guardian-review
+    refresh_source_types:
+      - current-drift-gate
+      - self-consent
+      - guardian-review
+    refresh_sources:
+      - source_type: current-drift-gate
+        source_ref: feature-window-drift-gate://biodata/bdt-window-drift-gate-abcdef123456
+        evidence_ref: drift-gate-evidence://example/current-pass
+        verifier_key_ref: verifier-key://example/drift-gate
+        freshness_status_ref: freshness://example/current-drift-gate/fresh
+        refresh_source_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - source_type: self-consent
+        source_ref: self-consent://example/calibration-refresh
+        evidence_ref: consent-evidence://example/calibration-refresh
+        verifier_key_ref: verifier-key://example/self-consent
+        freshness_status_ref: freshness://example/self-consent/fresh
+        refresh_source_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      - source_type: guardian-review
+        source_ref: guardian-review://example/calibration-refresh
+        evidence_ref: guardian-evidence://example/calibration-refresh
+        verifier_key_ref: verifier-key://example/guardian
+        freshness_status_ref: freshness://example/guardian-review/fresh
+        refresh_source_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refresh_source_digest_set: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+    refresh_window_bound: true
+    refresh_status: fresh
+    calibration_refresh_bound: true
+    storage_policy: calibration-digest+drift-gate-digest+refresh-source-digest-only
+    raw_calibration_payload_stored: false
+    raw_drift_payload_stored: false
+    raw_threshold_policy_payload_stored: false
+    raw_threshold_policy_signature_payload_stored: false
+    raw_refresh_payload_stored: false
+    raw_gate_payload_stored: false
+    subjective_equivalence_claimed: false
+    semantic_thought_content_generated: false
+    refresh_receipt_digest: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"

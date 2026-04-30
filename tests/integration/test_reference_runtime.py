@@ -97,6 +97,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["feature_window_series_drift_threshold_authority_bound"]
         )
+        self.assertTrue(result["validation"]["calibration_refresh_receipt_ok"])
+        self.assertTrue(result["validation"]["calibration_refresh_profile_bound"])
+        self.assertTrue(result["validation"]["calibration_refresh_drift_gate_bound"])
+        self.assertTrue(result["validation"]["calibration_refresh_window_bound"])
+        self.assertTrue(result["validation"]["calibration_refresh_source_digest_set_bound"])
+        self.assertEqual("fresh", result["validation"]["calibration_refresh_status"])
         self.assertFalse(result["validation"]["raw_dataset_payload_stored"])
         self.assertFalse(result["validation"]["raw_signal_samples_stored"])
         self.assertFalse(result["validation"]["raw_feature_window_payload_stored"])
@@ -105,6 +111,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(
             result["validation"]["raw_threshold_policy_signature_payload_stored"]
         )
+        self.assertFalse(result["validation"]["raw_refresh_payload_stored"])
         self.assertFalse(result["validation"]["semantic_thought_content_generated"])
         self.assertFalse(result["validation"]["subjective_equivalence_claimed"])
         self.assertTrue(result["validation"]["calibration_profile_ok"])
@@ -123,6 +130,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["calibration_confidence_gate_threshold_policy_authority_bound"]
         )
+        self.assertTrue(result["validation"]["calibration_confidence_gate_refresh_bound"])
+        self.assertEqual("fresh", result["validation"]["calibration_confidence_gate_refresh_status"])
+        self.assertTrue(result["validation"]["calibration_confidence_gate_refresh_window_bound"])
         self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
         self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
         self.assertFalse(result["validation"]["raw_gate_payload_stored"])
@@ -159,6 +169,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-biodata-transmitter-calibration"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-calibration-refresh"
             ],
         )
         self.assertEqual(

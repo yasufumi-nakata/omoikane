@@ -293,6 +293,40 @@ class BioDataTransmitterTests(unittest.TestCase):
             drift_gate,
             threshold_authority,
         )
+        refresh_receipt = transmitter.bind_calibration_refresh_receipt(
+            session,
+            calibration,
+            drift_gate,
+            [
+                {
+                    "source_type": "current-drift-gate",
+                    "source_ref": drift_gate["drift_gate_ref"],
+                    "evidence_ref": "drift-gate-evidence://unit/current-pass",
+                    "verifier_key_ref": "verifier-key://unit/drift-gate",
+                    "freshness_status_ref": "freshness://unit/current-drift-gate/fresh",
+                },
+                {
+                    "source_type": "self-consent",
+                    "source_ref": "self-consent://unit/calibration-refresh",
+                    "evidence_ref": "consent-evidence://unit/calibration-refresh",
+                    "verifier_key_ref": "verifier-key://unit/self-consent",
+                    "freshness_status_ref": "freshness://unit/self-consent/fresh",
+                },
+                {
+                    "source_type": "guardian-review",
+                    "source_ref": "guardian-review://unit/calibration-refresh",
+                    "evidence_ref": "guardian-evidence://unit/calibration-refresh",
+                    "verifier_key_ref": "verifier-key://unit/guardian",
+                    "freshness_status_ref": "freshness://unit/guardian-review/fresh",
+                },
+            ],
+        )
+        refresh_validation = transmitter.validate_calibration_refresh_receipt(
+            session,
+            calibration,
+            drift_gate,
+            refresh_receipt,
+        )
         confidence_gate = transmitter.bind_calibration_confidence_gate(
             session,
             calibration,
@@ -301,6 +335,7 @@ class BioDataTransmitterTests(unittest.TestCase):
                 "sensory-loopback": "sensory-loopback://unit/series",
             },
             feature_window_series_drift_gate_receipt=drift_gate,
+            calibration_refresh_receipt=refresh_receipt,
         )
         confidence_validation = transmitter.validate_calibration_confidence_gate(
             session,
@@ -331,6 +366,14 @@ class BioDataTransmitterTests(unittest.TestCase):
         self.assertTrue(
             drift_validation["threshold_policy_source_digest_set_bound"]
         )
+        self.assertTrue(refresh_validation["ok"])
+        self.assertTrue(refresh_validation["calibration_profile_bound"])
+        self.assertTrue(refresh_validation["feature_window_series_drift_gate_bound"])
+        self.assertTrue(refresh_validation["threshold_policy_authority_digest_bound"])
+        self.assertTrue(refresh_validation["refresh_window_bound"])
+        self.assertTrue(refresh_validation["refresh_source_digest_set_bound"])
+        self.assertTrue(refresh_validation["refresh_receipt_digest_bound"])
+        self.assertFalse(refresh_receipt["raw_refresh_payload_stored"])
         self.assertFalse(drift_gate["raw_drift_payload_stored"])
         self.assertFalse(threshold_authority["raw_threshold_policy_payload_stored"])
         self.assertFalse(
@@ -347,6 +390,9 @@ class BioDataTransmitterTests(unittest.TestCase):
             "pass",
             confidence_validation["feature_window_series_drift_gate_status"],
         )
+        self.assertTrue(confidence_validation["calibration_refresh_bound"])
+        self.assertEqual("fresh", confidence_validation["calibration_refresh_status"])
+        self.assertTrue(confidence_validation["calibration_refresh_window_bound"])
 
         tampered = dict(series)
         tampered["series_digest_set_digest"] = "0" * 64
@@ -398,6 +444,27 @@ class BioDataTransmitterTests(unittest.TestCase):
                 tampered_authority,
             )["ok"]
         )
+        tampered_refresh = dict(refresh_receipt)
+        tampered_refresh["refresh_status"] = "expired"
+        self.assertFalse(
+            transmitter.validate_calibration_refresh_receipt(
+                session,
+                calibration,
+                drift_gate,
+                tampered_refresh,
+            )["ok"]
+        )
+        with self.assertRaisesRegex(ValueError, "calibration_refresh_receipt is invalid"):
+            transmitter.bind_calibration_confidence_gate(
+                session,
+                calibration,
+                {
+                    "identity-confirmation": "identity-confirmation://unit/expired-refresh",
+                    "sensory-loopback": "sensory-loopback://unit/expired-refresh",
+                },
+                feature_window_series_drift_gate_receipt=drift_gate,
+                calibration_refresh_receipt=tampered_refresh,
+            )
         blocked_gate = transmitter.bind_feature_window_series_drift_gate(
             session,
             series,

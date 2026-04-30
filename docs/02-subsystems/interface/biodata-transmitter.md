@@ -38,10 +38,11 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 8. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
 9. drift threshold policy を clinical reviewer / jurisdiction policy / Guardian authority refs へ digest-only に束縛する
 10. feature-window series の axis drift を authority-bound threshold receipt に束縛し、calibration confidence gate へ渡す
-11. ContinuityLedger に session / dataset adapter / circadian phase verifier / feature-window series / threshold policy authority / drift gate / latent / generated bundle / conflict sink / calibration binding を残す
-12. calibration profile と feature-window drift gate を identity confirmation / sensory loopback の confidence gate へ
+11. current drift gate、self consent、Guardian review、freshness window を calibration refresh receipt へ digest-only に束縛する
+12. ContinuityLedger に session / dataset adapter / circadian phase verifier / feature-window series / threshold policy authority / drift gate / calibration refresh / latent / generated bundle / conflict sink / calibration binding を残す
+13. calibration profile、feature-window drift gate、calibration refresh receipt を identity confirmation / sensory loopback の confidence gate へ
     digest-only receipt として束縛する
-13. shared sensory loopback へ渡す場合は participant ごとの confidence gate と drift gate digest を
+14. shared sensory loopback へ渡す場合は participant ごとの confidence gate と drift gate digest を
     Sensory Loopback 側の arbitration binding へ配布し、raw BioData / drift / gate payload は渡さない
 
 ## 中間表現
@@ -99,7 +100,8 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 11. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、circadian verifier digest、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
 12. **threshold policy authority** ── drift threshold は clinical reviewer / jurisdiction policy / Guardian authority refs、signer key refs、signature refs の digest set に束縛し、raw policy / raw signature payload は保存しない
 13. **series drift gate** ── calibration confidence gate が current series を参照する時は、series profile digest、calibration digest、axis drift threshold digest、threshold policy authority digest を直接束縛し、raw drift payload は保存しない
-14. **shared loopback arbitration** ── shared sensory loopback へ分配する時は participant ごとの confidence gate digest、drift gate digest、threshold digest だけを渡し、raw BioData payload を arbitration に渡さない
+14. **calibration refresh** ── calibration を再利用する時は current drift gate、self consent、Guardian review、1-90 日 freshness window を refresh receipt に束縛し、raw refresh payload は保存しない
+15. **shared loopback arbitration** ── shared sensory loopback へ分配する時は participant ごとの confidence gate digest、drift gate digest、threshold digest だけを渡し、raw BioData payload を arbitration に渡さない
 
 ## 個人内 calibration
 
@@ -118,12 +120,16 @@ raw calibration payload は保持しない。
 identity confirmation と sensory loopback の入口へ渡すための digest-only bridge である。
 gate receipt は calibration ref / digest、source latent digest set、`eeg / ecg / ppg / eda /
 respiration` の coverage、target gate refs、target 別 threshold を束縛する。
+current series を再利用する場合は `biodata-calibration-refresh-window-v1` の
+refresh receipt も同じ gate に束縛し、current drift gate、self consent、
+Guardian review、1-90 日 freshness window が揃う場合だけ `fresh` として扱う。
 
 reference runtime では identity confirmation gate は `confidence_score >= 0.8`、
 sensory loopback gate は `confidence_score >= 0.7` を要求する。これを満たしても
 本人同一性や主観経験の証明にはせず、各 target の既存 Guardian / witness / body-map
 contract の confidence input としてのみ扱う。raw calibration payload と raw gate payload は
-保存しない。
+保存しない。refresh receipt も raw calibration、drift、threshold policy、refresh、gate
+payload を保存せず、digest refs だけを渡す。
 
 ## Dataset adapter
 
@@ -176,6 +182,19 @@ signature refs、quorum status だけを保持し、raw threshold policy payload
 payload、raw reviewer payload は保存しない。drift gate は authority receipt digest と
 authority source digest set を直接保持するが、authority を BioData の decision
 authority や clinical diagnosis authority へ昇格させない。
+
+## Calibration refresh receipt
+
+`biodata-calibration-refresh-window-v1` は、complete calibration を confidence gate で
+再利用する前に freshness を独立して固定する。receipt は calibration digest、
+feature-window drift gate digest、threshold policy authority digest、current drift gate
+evidence、self consent、Guardian review、refresh deadline、refreshed-at ref、
+`freshness_window_days=1..90` を束縛する。
+
+この receipt は calibration を医療診断や本人同一性の証明へ昇格させない。役割は
+「現在の longitudinal drift gate と本人/Guardian の再確認が揃っている calibration input」
+を示すことだけである。raw calibration / drift / threshold policy / refresh / gate payload は
+保存しない。
 
 shared Sensory Loopback へ接続する場合、各 participant の
 `biodata-calibration-confidence-gate-v1` receipt は
