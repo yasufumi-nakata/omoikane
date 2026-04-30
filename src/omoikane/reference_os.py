@@ -978,6 +978,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-revocation-freshness.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-timestamp-binding.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-timestamp-replay-guard.md",
+            "meta/decision-log/2026-05-01_parallel-codex-remote-source-content-identity.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1027,6 +1028,32 @@ class OmoikaneReferenceOS:
             source_system="remote-branch-pr-worker-result",
             remote_branch_ref="refs/remotes/origin/codex/remote-worker-metadata",
             remote_pr_ref="pull-request://omoikane/128",
+        )
+        content_mismatch_receipt = self.parallel_orchestration.ingest_worker_result(
+            worker_id="codex-remote-pr-content-mismatch",
+            worker_role="external",
+            worker_result_status="completed",
+            main_checkout_head=main_checkout_head,
+            worker_base_commit=main_checkout_head,
+            ownership_scope=[
+                "src/omoikane/self_construction/",
+                "specs/schemas/",
+                "tests/unit/",
+            ],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+                "specs/schemas/parallel_codex_worker_result_receipt.schema",
+                "tests/unit/test_parallel_orchestration.py",
+            ],
+            verification_results=verification_results,
+            result_summary=(
+                "Remote branch / PR worker result with a content identity "
+                "mismatch remains schema-bound but cannot be integrated."
+            ),
+            source_system="remote-branch-pr-worker-result",
+            remote_branch_ref="refs/remotes/origin/codex/content-mismatch",
+            remote_pr_ref="pull-request://omoikane/133",
+            remote_source_content_status="mismatch",
         )
         blocked_receipt = self.parallel_orchestration.ingest_worker_result(
             worker_id="codex-worker-stale-readonly",
@@ -1124,6 +1151,11 @@ class OmoikaneReferenceOS:
         remote_validation = self.parallel_orchestration.validate_worker_result_receipt(
             remote_receipt,
         )
+        content_mismatch_validation = (
+            self.parallel_orchestration.validate_worker_result_receipt(
+                content_mismatch_receipt,
+            )
+        )
         yaoyorozu_bridge_validation = (
             self.parallel_orchestration.validate_worker_result_receipt(
                 yaoyorozu_bridge_receipt,
@@ -1208,6 +1240,27 @@ class OmoikaneReferenceOS:
                         "remote_source_revocation_timestamp_replay_guard_digest"
                     ]
                 ),
+                "remote_source_content_ref": remote_receipt[
+                    "remote_source_content_ref"
+                ],
+                "remote_source_head_commit": remote_receipt[
+                    "remote_source_head_commit"
+                ],
+                "remote_source_tree_digest": remote_receipt[
+                    "remote_source_tree_digest"
+                ],
+                "remote_source_diff_digest": remote_receipt[
+                    "remote_source_diff_digest"
+                ],
+                "remote_source_content_digest": remote_receipt[
+                    "remote_source_content_digest"
+                ],
+                "content_mismatch_receipt_ref": content_mismatch_receipt[
+                    "receipt_ref"
+                ],
+                "content_mismatch_receipt_digest": content_mismatch_receipt[
+                    "receipt_digest"
+                ],
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
                 "marker_only_receipt_ref": marker_only_receipt["receipt_ref"],
@@ -1239,6 +1292,7 @@ class OmoikaneReferenceOS:
                 "raw_remote_revocation_freshness_payload_stored": False,
                 "raw_remote_revocation_timestamp_payload_stored": False,
                 "raw_remote_revocation_timestamp_replay_guard_payload_stored": False,
+                "raw_remote_source_content_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1274,6 +1328,14 @@ class OmoikaneReferenceOS:
                 "contract_role": "parallel-codex-blocked-stale-worker-result",
             },
             {
+                "payload_path": "content_mismatch_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_worker_result_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-blocked-remote-content-mismatch",
+            },
+            {
                 "payload_path": "marker_only_receipt",
                 "schema_path": (
                     "specs/schemas/"
@@ -1297,6 +1359,7 @@ class OmoikaneReferenceOS:
             "schema_contracts": schema_contracts,
             "ready_receipt": ready_receipt,
             "remote_receipt": remote_receipt,
+            "content_mismatch_receipt": content_mismatch_receipt,
             "blocked_receipt": blocked_receipt,
             "marker_only_receipt": marker_only_receipt,
             "yaoyorozu_bridge_receipt": yaoyorozu_bridge_receipt,
@@ -1309,10 +1372,12 @@ class OmoikaneReferenceOS:
                     and blocked_validation["ok"]
                     and marker_only_validation["ok"]
                     and remote_validation["ok"]
+                    and content_mismatch_validation["ok"]
                     and yaoyorozu_bridge_validation["ok"]
                     and ready_validation["ready_for_main_checkout"]
                     and remote_validation["ready_for_main_checkout"]
                     and yaoyorozu_bridge_validation["ready_for_main_checkout"]
+                    and not content_mismatch_validation["ready_for_main_checkout"]
                     and not blocked_validation["ready_for_main_checkout"]
                     and not marker_only_validation["ready_for_main_checkout"]
                 ),
@@ -1347,6 +1412,7 @@ class OmoikaneReferenceOS:
                     and ready_validation["raw_workspace_marker_payload_redacted"]
                     and ready_validation["raw_remote_metadata_payload_redacted"]
                     and ready_validation["raw_remote_revocation_payload_redacted"]
+                    and ready_validation["raw_remote_source_content_payload_redacted"]
                     and ready_validation["raw_transcript_payload_redacted"]
                     and ready_validation["raw_verification_payload_redacted"]
                 ),
@@ -1409,6 +1475,16 @@ class OmoikaneReferenceOS:
                 "remote_source_revocation_timestamp_unique": remote_validation[
                     "remote_source_revocation_timestamp_unique"
                 ],
+                "remote_source_content_digest_bound": remote_validation[
+                    "remote_source_content_digest_bound"
+                ]
+                and bool(remote_receipt["remote_source_content_digest"]),
+                "remote_source_content_bound": remote_validation[
+                    "remote_source_content_bound"
+                ],
+                "remote_source_content_status_bound": remote_validation[
+                    "remote_source_content_status_bound"
+                ],
                 "remote_review_authority_digest_bound": (
                     remote_validation["remote_metadata_digest_bound"]
                     and bool(remote_receipt["remote_review_authority_digest"])
@@ -1435,6 +1511,24 @@ class OmoikaneReferenceOS:
                 "remote_raw_revocation_timestamp_replay_guard_payload_redacted": (
                     remote_validation[
                         "raw_remote_revocation_timestamp_replay_guard_payload_redacted"
+                    ]
+                ),
+                "remote_raw_source_content_payload_redacted": remote_validation[
+                    "raw_remote_source_content_payload_redacted"
+                ],
+                "content_mismatch_receipt_ok": content_mismatch_validation["ok"],
+                "content_mismatch_result_blocked": not content_mismatch_validation[
+                    "ready_for_main_checkout"
+                ],
+                "content_mismatch_digest_bound": content_mismatch_validation[
+                    "remote_source_content_digest_bound"
+                ],
+                "content_mismatch_status_rejected": not content_mismatch_validation[
+                    "remote_source_content_status_bound"
+                ],
+                "content_mismatch_raw_source_content_payload_redacted": (
+                    content_mismatch_validation[
+                        "raw_remote_source_content_payload_redacted"
                     ]
                 ),
                 "blocked_receipt_ok": blocked_validation["ok"],

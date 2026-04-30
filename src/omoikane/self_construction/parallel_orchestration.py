@@ -38,6 +38,9 @@ PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_SIGNATURE_PROFILE = (
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE = (
     "remote-source-revocation-timestamp-replay-guard-v1"
 )
+PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE = (
+    "remote-source-content-identity-binding-v1"
+)
 PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE = (
     "workspace-enacted-marker-hygiene-v1"
 )
@@ -50,6 +53,8 @@ PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_STALE_STATUS = "stale"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_INVALID_STATUS = "invalid"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS = "unique"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAYED_STATUS = "replayed"
+PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_BOUND_STATUS = "bound"
+PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_MISMATCH_STATUS = "mismatch"
 PARALLEL_CODEX_WORKSPACE_MARKER_CLEAN_STATUS = "clean"
 PARALLEL_CODEX_WORKSPACE_MARKER_REVIEWED_STATUS = "marker-only-reviewed"
 PARALLEL_CODEX_WORKSPACE_MARKER_BLOCKED_STATUS = "marker-only-blocked"
@@ -74,6 +79,9 @@ PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REF = (
 )
 PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_REVOCATION_TIMESTAMP_NONCE_REF = (
     "nonce://parallel-codex/remote-source-revocation/provider-clock/v1"
+)
+PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_CONTENT_REF = (
+    "content://parallel-codex/remote-branch-pr/content-identity/v1"
 )
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
@@ -194,6 +202,12 @@ class ParallelCodexOrchestrationPolicy:
             "remote_source_revocation_timestamp_replay_required_status": (
                 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS
             ),
+            "remote_source_content_profile": (
+                PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE
+            ),
+            "remote_source_content_required_status": (
+                PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_BOUND_STATUS
+            ),
             "remote_review_authority_profile": (
                 PARALLEL_CODEX_REMOTE_REVIEW_AUTHORITY_PROFILE
             ),
@@ -207,6 +221,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_remote_revocation_freshness_payload_stored": False,
             "raw_remote_revocation_timestamp_payload_stored": False,
             "raw_remote_revocation_timestamp_replay_guard_payload_stored": False,
+            "raw_remote_source_content_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -267,6 +282,12 @@ class ParallelCodexOrchestrationService:
         remote_source_revocation_timestamp_previous_nonce_digest: str = "",
         remote_source_revocation_timestamp_replay_status: str = "",
         remote_source_revocation_timestamp_replay_guard_digest: str = "",
+        remote_source_content_ref: str = "",
+        remote_source_content_status: str = "",
+        remote_source_head_commit: str = "",
+        remote_source_tree_digest: str = "",
+        remote_source_diff_digest: str = "",
+        remote_source_content_digest: str = "",
         remote_metadata_digest: str = "",
     ) -> Dict[str, Any]:
         normalized_source_system = source_system.strip() or "direct-worker-result"
@@ -335,6 +356,9 @@ class ParallelCodexOrchestrationService:
         )
         remote_metadata = self._normalize_remote_metadata(
             source_system=normalized_source_system,
+            changed_files=normalized_files,
+            patch_digest=normalized_patch_digest,
+            workspace_marker_hygiene_digest=workspace_marker_hygiene_digest,
             remote_branch_ref=remote_branch_ref,
             remote_pr_ref=remote_pr_ref,
             remote_review_authority_ref=remote_review_authority_ref,
@@ -383,6 +407,12 @@ class ParallelCodexOrchestrationService:
             remote_source_revocation_timestamp_replay_guard_digest=(
                 remote_source_revocation_timestamp_replay_guard_digest
             ),
+            remote_source_content_ref=remote_source_content_ref,
+            remote_source_content_status=remote_source_content_status,
+            remote_source_head_commit=remote_source_head_commit,
+            remote_source_tree_digest=remote_source_tree_digest,
+            remote_source_diff_digest=remote_source_diff_digest,
+            remote_source_content_digest=remote_source_content_digest,
             remote_metadata_digest=remote_metadata_digest,
         )
 
@@ -463,6 +493,7 @@ class ParallelCodexOrchestrationService:
             "raw_remote_revocation_freshness_payload_stored": False,
             "raw_remote_revocation_timestamp_payload_stored": False,
             "raw_remote_revocation_timestamp_replay_guard_payload_stored": False,
+            "raw_remote_source_content_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
             "receipt_digest": "",
@@ -691,9 +722,52 @@ class ParallelCodexOrchestrationService:
                         "",
                     ),
                 ),
+                remote_source_content_profile=str(
+                    receipt.get("remote_source_content_profile", ""),
+                ),
+                remote_source_content_ref=str(
+                    receipt.get("remote_source_content_ref", ""),
+                ),
+                remote_source_content_status=str(
+                    receipt.get("remote_source_content_status", ""),
+                ),
+                remote_source_head_commit=str(
+                    receipt.get("remote_source_head_commit", ""),
+                ),
+                remote_source_tree_digest=str(
+                    receipt.get("remote_source_tree_digest", ""),
+                ),
+                remote_source_diff_digest=str(
+                    receipt.get("remote_source_diff_digest", ""),
+                ),
+                remote_source_content_digest=str(
+                    receipt.get("remote_source_content_digest", ""),
+                ),
             )
         )
         if receipt.get("source_system") == PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM:
+            remote_source_content_digest_bound = (
+                receipt.get("remote_source_content_digest")
+                == self._remote_source_content_digest(
+                    remote_source_content_ref=str(
+                        receipt.get("remote_source_content_ref", ""),
+                    ),
+                    remote_source_content_status=str(
+                        receipt.get("remote_source_content_status", ""),
+                    ),
+                    remote_branch_ref=str(receipt.get("remote_branch_ref", "")),
+                    remote_pr_ref=str(receipt.get("remote_pr_ref", "")),
+                    remote_source_head_commit=str(
+                        receipt.get("remote_source_head_commit", ""),
+                    ),
+                    remote_source_tree_digest=str(
+                        receipt.get("remote_source_tree_digest", ""),
+                    ),
+                    remote_source_diff_digest=str(
+                        receipt.get("remote_source_diff_digest", ""),
+                    ),
+                )
+            )
             remote_source_revocation_timestamp_digest_bound = (
                 receipt.get("remote_source_revocation_timestamp_digest")
                 == self._remote_source_revocation_timestamp_digest(
@@ -816,6 +890,18 @@ class ParallelCodexOrchestrationService:
                 )
             )
         else:
+            remote_source_content_digest_bound = (
+                receipt.get("remote_source_content_profile")
+                == PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                and receipt.get("remote_source_content_ref") == ""
+                and receipt.get("remote_source_content_status")
+                == PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+                and receipt.get("remote_source_head_commit") == ""
+                and receipt.get("remote_source_tree_digest") == ""
+                and receipt.get("remote_source_diff_digest") == ""
+                and receipt.get("remote_source_content_digest") == ""
+                and receipt.get("remote_source_content_bound") is True
+            )
             remote_source_revocation_timestamp_digest_bound = (
                 receipt.get("remote_source_revocation_timestamp_profile")
                 == PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
@@ -949,6 +1035,7 @@ class ParallelCodexOrchestrationService:
             and remote_source_revocation_timestamp_digest_bound
             and remote_source_revocation_timestamp_signature_bound
             and remote_source_revocation_timestamp_replay_guard_digest_bound
+            and remote_source_content_digest_bound
             and _is_sha256(receipt.get("remote_metadata_digest"))
             and receipt.get("remote_metadata_bound") is True
         )
@@ -968,6 +1055,10 @@ class ParallelCodexOrchestrationService:
             errors.append(
                 "remote_source_revocation_timestamp_replay_guard_digest mismatch"
             )
+        if not remote_source_content_digest_bound:
+            errors.append("remote_source_content_digest mismatch")
+        if receipt.get("remote_source_content_bound") is not remote_source_content_digest_bound:
+            errors.append("remote_source_content_bound mismatch")
         if receipt.get("remote_metadata_bound") is not remote_metadata_bound:
             errors.append("remote_metadata_bound mismatch")
         if receipt.get("upstream_binding_digest") != self._upstream_binding_digest(
@@ -1025,6 +1116,7 @@ class ParallelCodexOrchestrationService:
                 "raw_remote_revocation_timestamp_replay_guard_payload_stored"
             )
             is False
+            and receipt.get("raw_remote_source_content_payload_stored") is False
             and raw_transcript_payload_redacted
             and raw_verification_payload_redacted
         ):
@@ -1072,6 +1164,17 @@ class ParallelCodexOrchestrationService:
             ),
             "remote_source_revocation_timestamp_replay_guard_digest_bound": (
                 remote_source_revocation_timestamp_replay_guard_digest_bound
+            ),
+            "remote_source_content_digest_bound": remote_source_content_digest_bound,
+            "remote_source_content_bound": (
+                receipt.get("remote_source_content_bound") is True
+            ),
+            "remote_source_content_status_bound": (
+                receipt.get("remote_source_content_status")
+                in {
+                    PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_BOUND_STATUS,
+                    PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS,
+                }
             ),
             "remote_source_revocation_not_revoked": (
                 receipt.get("remote_source_revocation_status")
@@ -1125,6 +1228,9 @@ class ParallelCodexOrchestrationService:
                     "raw_remote_revocation_timestamp_replay_guard_payload_stored"
                 )
                 is False
+            ),
+            "raw_remote_source_content_payload_redacted": (
+                receipt.get("raw_remote_source_content_payload_stored") is False
             ),
             "raw_transcript_payload_redacted": raw_transcript_payload_redacted,
             "raw_verification_payload_redacted": raw_verification_payload_redacted,
@@ -1341,6 +1447,50 @@ class ParallelCodexOrchestrationService:
                 reasons.append(
                     "remote source revocation timestamp replay status must be unique"
                 )
+            if (
+                receipt.get("remote_source_content_profile")
+                != PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE
+            ):
+                reasons.append("remote_source_content_profile mismatch")
+            if not receipt.get("remote_source_content_ref"):
+                reasons.append("remote source content ref must not be empty")
+            if (
+                receipt.get("remote_source_content_status")
+                != PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_BOUND_STATUS
+            ):
+                reasons.append("remote source content status must be bound")
+            if not _is_commit(receipt.get("remote_source_head_commit")):
+                reasons.append("remote_source_head_commit must be a 40 character hex commit")
+            if not _is_sha256(receipt.get("remote_source_tree_digest")):
+                reasons.append("remote_source_tree_digest must be sha256")
+            if not _is_sha256(receipt.get("remote_source_diff_digest")):
+                reasons.append("remote_source_diff_digest must be sha256")
+            if not _is_sha256(receipt.get("remote_source_content_digest")):
+                reasons.append("remote_source_content_digest must be sha256")
+            elif receipt.get(
+                "remote_source_content_digest"
+            ) != self._remote_source_content_digest(
+                remote_source_content_ref=str(
+                    receipt.get("remote_source_content_ref", ""),
+                ),
+                remote_source_content_status=str(
+                    receipt.get("remote_source_content_status", ""),
+                ),
+                remote_branch_ref=str(receipt.get("remote_branch_ref", "")),
+                remote_pr_ref=str(receipt.get("remote_pr_ref", "")),
+                remote_source_head_commit=str(
+                    receipt.get("remote_source_head_commit", ""),
+                ),
+                remote_source_tree_digest=str(
+                    receipt.get("remote_source_tree_digest", ""),
+                ),
+                remote_source_diff_digest=str(
+                    receipt.get("remote_source_diff_digest", ""),
+                ),
+            ):
+                reasons.append("remote_source_content_digest mismatch")
+            if receipt.get("remote_source_content_bound") is not True:
+                reasons.append("remote_source_content_bound must be true")
             if not _is_sha256(
                 receipt.get("remote_source_revocation_timestamp_replay_guard_digest")
             ):
@@ -1459,6 +1609,11 @@ class ParallelCodexOrchestrationService:
                     "remote_source_revocation_timestamp_previous_nonce_digest"
                 ),
                 receipt.get("remote_source_revocation_timestamp_replay_guard_digest"),
+                receipt.get("remote_source_content_ref"),
+                receipt.get("remote_source_head_commit"),
+                receipt.get("remote_source_tree_digest"),
+                receipt.get("remote_source_diff_digest"),
+                receipt.get("remote_source_content_digest"),
             ]
             if any(remote_refs_or_digests):
                 reasons.append("non-remote result must not carry remote metadata refs")
@@ -1533,6 +1688,20 @@ class ParallelCodexOrchestrationService:
             ):
                 reasons.append(
                     "non-remote result must mark remote revocation timestamp replay status not-applicable"
+                )
+            if (
+                receipt.get("remote_source_content_profile")
+                != PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+            ):
+                reasons.append(
+                    "non-remote result must mark remote source content not-applicable"
+                )
+            if (
+                receipt.get("remote_source_content_status")
+                != PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+            ):
+                reasons.append(
+                    "non-remote result must mark remote source content status not-applicable"
                 )
         if not _is_sha256(receipt.get("remote_metadata_digest")):
             reasons.append("remote_metadata_digest must be a sha256 hex digest")
@@ -1628,6 +1797,27 @@ class ParallelCodexOrchestrationService:
                     "",
                 ),
             ),
+            remote_source_content_profile=str(
+                receipt.get("remote_source_content_profile", ""),
+            ),
+            remote_source_content_ref=str(
+                receipt.get("remote_source_content_ref", ""),
+            ),
+            remote_source_content_status=str(
+                receipt.get("remote_source_content_status", ""),
+            ),
+            remote_source_head_commit=str(
+                receipt.get("remote_source_head_commit", ""),
+            ),
+            remote_source_tree_digest=str(
+                receipt.get("remote_source_tree_digest", ""),
+            ),
+            remote_source_diff_digest=str(
+                receipt.get("remote_source_diff_digest", ""),
+            ),
+            remote_source_content_digest=str(
+                receipt.get("remote_source_content_digest", ""),
+            ),
         ):
             reasons.append("remote_metadata_digest mismatch")
         if receipt.get("remote_metadata_bound") is not True:
@@ -1653,6 +1843,8 @@ class ParallelCodexOrchestrationService:
             reasons.append(
                 "raw_remote_revocation_timestamp_replay_guard_payload_stored must be false"
             )
+        if receipt.get("raw_remote_source_content_payload_stored") is not False:
+            reasons.append("raw_remote_source_content_payload_stored must be false")
         if source_system == "yaoyorozu-worker-dispatch":
             if not receipt.get("upstream_receipt_ref"):
                 reasons.append("yaoyorozu bridge requires upstream_receipt_ref")
@@ -1910,6 +2102,12 @@ class ParallelCodexOrchestrationService:
                     "remote_source_revocation_timestamp_replay_required_status": (
                         PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_UNIQUE_STATUS
                     ),
+                    "remote_source_content_profile": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE
+                    ),
+                    "remote_source_content_required_status": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_BOUND_STATUS
+                    ),
                 }
             )
         )
@@ -1941,6 +2139,9 @@ class ParallelCodexOrchestrationService:
                     ),
                     "remote_source_revocation_timestamp_replay_guard_profile": (
                         PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_TIMESTAMP_REPLAY_GUARD_PROFILE
+                    ),
+                    "remote_source_content_profile": (
+                        PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE
                     ),
                 }
             )
@@ -2059,6 +2260,86 @@ class ParallelCodexOrchestrationService:
         )
 
     @staticmethod
+    def _remote_source_head_commit(
+        *,
+        remote_branch_ref: str,
+        remote_pr_ref: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE,
+                    "remote_branch_ref": remote_branch_ref,
+                    "remote_pr_ref": remote_pr_ref,
+                    "content_identity": "head-commit",
+                }
+            )
+        )[:40]
+
+    @staticmethod
+    def _remote_source_tree_digest(
+        *,
+        remote_branch_ref: str,
+        remote_pr_ref: str,
+        remote_source_head_commit: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE,
+                    "remote_branch_ref": remote_branch_ref,
+                    "remote_pr_ref": remote_pr_ref,
+                    "remote_source_head_commit": remote_source_head_commit,
+                    "content_identity": "tree",
+                }
+            )
+        )
+
+    @staticmethod
+    def _remote_source_diff_digest(
+        *,
+        changed_files: Sequence[str],
+        patch_digest: str,
+        workspace_marker_hygiene_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE,
+                    "changed_files": list(changed_files),
+                    "patch_digest": patch_digest,
+                    "workspace_marker_hygiene_digest": workspace_marker_hygiene_digest,
+                }
+            )
+        )
+
+    @staticmethod
+    def _remote_source_content_digest(
+        *,
+        remote_source_content_ref: str,
+        remote_source_content_status: str,
+        remote_branch_ref: str,
+        remote_pr_ref: str,
+        remote_source_head_commit: str,
+        remote_source_tree_digest: str,
+        remote_source_diff_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE,
+                    "remote_source_content_ref": remote_source_content_ref,
+                    "remote_source_content_status": remote_source_content_status,
+                    "remote_branch_ref": remote_branch_ref,
+                    "remote_pr_ref": remote_pr_ref,
+                    "remote_source_head_commit": remote_source_head_commit,
+                    "remote_source_tree_digest": remote_source_tree_digest,
+                    "remote_source_diff_digest": remote_source_diff_digest,
+                }
+            )
+        )
+
+    @staticmethod
     def _remote_source_revocation_freshness_digest(
         *,
         remote_source_revocation_checked_at_ref: str,
@@ -2150,6 +2431,17 @@ class ParallelCodexOrchestrationService:
         remote_source_revocation_timestamp_previous_nonce_digest: str,
         remote_source_revocation_timestamp_replay_status: str,
         remote_source_revocation_timestamp_replay_guard_digest: str,
+        remote_source_content_profile: str = (
+            PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+        ),
+        remote_source_content_ref: str = "",
+        remote_source_content_status: str = (
+            PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+        ),
+        remote_source_head_commit: str = "",
+        remote_source_tree_digest: str = "",
+        remote_source_diff_digest: str = "",
+        remote_source_content_digest: str = "",
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -2223,6 +2515,13 @@ class ParallelCodexOrchestrationService:
                     "remote_source_revocation_timestamp_replay_guard_digest": (
                         remote_source_revocation_timestamp_replay_guard_digest
                     ),
+                    "remote_source_content_profile": remote_source_content_profile,
+                    "remote_source_content_ref": remote_source_content_ref,
+                    "remote_source_content_status": remote_source_content_status,
+                    "remote_source_head_commit": remote_source_head_commit,
+                    "remote_source_tree_digest": remote_source_tree_digest,
+                    "remote_source_diff_digest": remote_source_diff_digest,
+                    "remote_source_content_digest": remote_source_content_digest,
                 }
             )
         )
@@ -2231,6 +2530,9 @@ class ParallelCodexOrchestrationService:
         self,
         *,
         source_system: str,
+        changed_files: Sequence[str],
+        patch_digest: str,
+        workspace_marker_hygiene_digest: str,
         remote_branch_ref: str,
         remote_pr_ref: str,
         remote_review_authority_ref: str,
@@ -2253,6 +2555,12 @@ class ParallelCodexOrchestrationService:
         remote_source_revocation_timestamp_previous_nonce_digest: str,
         remote_source_revocation_timestamp_replay_status: str,
         remote_source_revocation_timestamp_replay_guard_digest: str,
+        remote_source_content_ref: str,
+        remote_source_content_status: str,
+        remote_source_head_commit: str,
+        remote_source_tree_digest: str,
+        remote_source_diff_digest: str,
+        remote_source_content_digest: str,
         remote_metadata_digest: str,
     ) -> Dict[str, Any]:
         if source_system != PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM:
@@ -2307,6 +2615,18 @@ class ParallelCodexOrchestrationService:
                     PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
                 ),
                 "remote_source_revocation_timestamp_replay_guard_digest": "",
+                "remote_source_content_profile": (
+                    PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                ),
+                "remote_source_content_ref": "",
+                "remote_source_content_status": (
+                    PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+                ),
+                "remote_source_head_commit": "",
+                "remote_source_tree_digest": "",
+                "remote_source_diff_digest": "",
+                "remote_source_content_digest": "",
+                "remote_source_content_bound": True,
             }
             normalized_metadata["remote_metadata_digest"] = self._remote_metadata_digest(
                 source_system=source_system,
@@ -2356,6 +2676,17 @@ class ParallelCodexOrchestrationService:
                     PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
                 ),
                 remote_source_revocation_timestamp_replay_guard_digest="",
+                remote_source_content_profile=(
+                    PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                ),
+                remote_source_content_ref="",
+                remote_source_content_status=(
+                    PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS
+                ),
+                remote_source_head_commit="",
+                remote_source_tree_digest="",
+                remote_source_diff_digest="",
+                remote_source_content_digest="",
             )
             normalized_metadata["remote_metadata_bound"] = True
             return normalized_metadata
@@ -2504,6 +2835,46 @@ class ParallelCodexOrchestrationService:
                     ),
                 )
             )
+        normalized_content_ref = (
+            remote_source_content_ref.strip()
+            or f"{PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_CONTENT_REF}/{remote_source_key}"
+        )
+        normalized_content_status = (
+            remote_source_content_status.strip()
+            or PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_BOUND_STATUS
+        )
+        normalized_head_commit = remote_source_head_commit.strip()
+        if not _is_commit(normalized_head_commit):
+            normalized_head_commit = self._remote_source_head_commit(
+                remote_branch_ref=remote_branch_ref.strip(),
+                remote_pr_ref=remote_pr_ref.strip(),
+            )
+        normalized_tree_digest = remote_source_tree_digest.strip()
+        if not _is_sha256(normalized_tree_digest):
+            normalized_tree_digest = self._remote_source_tree_digest(
+                remote_branch_ref=remote_branch_ref.strip(),
+                remote_pr_ref=remote_pr_ref.strip(),
+                remote_source_head_commit=normalized_head_commit,
+            )
+        normalized_diff_digest = remote_source_diff_digest.strip()
+        if not _is_sha256(normalized_diff_digest):
+            normalized_diff_digest = self._remote_source_diff_digest(
+                changed_files=changed_files,
+                patch_digest=patch_digest,
+                workspace_marker_hygiene_digest=workspace_marker_hygiene_digest,
+            )
+        expected_content_digest = self._remote_source_content_digest(
+            remote_source_content_ref=normalized_content_ref,
+            remote_source_content_status=normalized_content_status,
+            remote_branch_ref=remote_branch_ref.strip(),
+            remote_pr_ref=remote_pr_ref.strip(),
+            remote_source_head_commit=normalized_head_commit,
+            remote_source_tree_digest=normalized_tree_digest,
+            remote_source_diff_digest=normalized_diff_digest,
+        )
+        normalized_content_digest = remote_source_content_digest.strip()
+        if not _is_sha256(normalized_content_digest):
+            normalized_content_digest = expected_content_digest
         normalized_freshness_status = (
             remote_source_revocation_freshness_status.strip()
             or PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_FRESH_STATUS
@@ -2591,6 +2962,13 @@ class ParallelCodexOrchestrationService:
             remote_source_revocation_timestamp_replay_guard_digest=(
                 normalized_replay_guard_digest
             ),
+            remote_source_content_profile=PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE,
+            remote_source_content_ref=normalized_content_ref,
+            remote_source_content_status=normalized_content_status,
+            remote_source_head_commit=normalized_head_commit,
+            remote_source_tree_digest=normalized_tree_digest,
+            remote_source_diff_digest=normalized_diff_digest,
+            remote_source_content_digest=normalized_content_digest,
         )
         normalized_metadata_digest = remote_metadata_digest.strip()
         if not _is_sha256(normalized_metadata_digest):
@@ -2648,6 +3026,16 @@ class ParallelCodexOrchestrationService:
             ),
             "remote_source_revocation_timestamp_replay_guard_digest": (
                 normalized_replay_guard_digest
+            ),
+            "remote_source_content_profile": PARALLEL_CODEX_REMOTE_SOURCE_CONTENT_PROFILE,
+            "remote_source_content_ref": normalized_content_ref,
+            "remote_source_content_status": normalized_content_status,
+            "remote_source_head_commit": normalized_head_commit,
+            "remote_source_tree_digest": normalized_tree_digest,
+            "remote_source_diff_digest": normalized_diff_digest,
+            "remote_source_content_digest": normalized_content_digest,
+            "remote_source_content_bound": (
+                normalized_content_digest == expected_content_digest
             ),
             "remote_metadata_digest": normalized_metadata_digest,
             "remote_metadata_bound": (

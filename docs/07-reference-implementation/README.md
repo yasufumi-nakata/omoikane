@@ -920,11 +920,16 @@ accepted source policy digest、review authority digest を
 signed provider timestamp digest と timestamp signature digest を同じ
 metadata digest に含める。さらに timestamp nonce ref、previous nonce digest、
 replay guard digest、`remote_source_revocation_timestamp_replay_status=unique`
-を freshness digest と metadata digest に束縛する。revoked / stale / expired source、
+を freshness digest と metadata digest に束縛する。さらに mutable な remote branch / PR
+ref は `remote_source_head_commit`、`remote_source_tree_digest`、
+`remote_source_diff_digest`、`remote_source_content_digest` の
+content identity に縮約し、同じ `remote_metadata_digest` に含める。
+content identity が `bound` でない remote result は schema-bound のまま blocked にする。
+revoked / stale / expired source、
 replayed timestamp、または
 `remote_source_revocation_timestamp_status` が `signed-current` でない source は
 schema-bound のまま blocked にし、raw remote metadata / revocation / freshness /
-timestamp / replay-guard payload は保存しない。
+timestamp / replay-guard / source content payload は保存しない。
 blocked receipt は stale worker base commit を schema-bound に残しつつ
 `integration_decision=blocked` として fail-closed にする。
 同じ demo は Yaoyorozu worker dispatch receipt から

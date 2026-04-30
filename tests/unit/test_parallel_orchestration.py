@@ -98,6 +98,15 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             "not-applicable",
             receipt["remote_source_revocation_timestamp_replay_status"],
         )
+        self.assertEqual(
+            "not-applicable",
+            receipt["remote_source_content_profile"],
+        )
+        self.assertEqual(
+            "not-applicable",
+            receipt["remote_source_content_status"],
+        )
+        self.assertTrue(receipt["remote_source_content_bound"])
         self.assertEqual(0, receipt["remote_source_revocation_freshness_window_seconds"])
         self.assertTrue(validation["receipt_digest_bound"])
         self.assertFalse(receipt["raw_patch_payload_stored"])
@@ -110,6 +119,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(
             receipt["raw_remote_revocation_timestamp_replay_guard_payload_stored"]
         )
+        self.assertFalse(receipt["raw_remote_source_content_payload_stored"])
         self.assertFalse(receipt["raw_transcript_payload_stored"])
         self.assertFalse(receipt["raw_verification_payload_stored"])
 
@@ -258,6 +268,19 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             ]
         )
         self.assertTrue(validation["remote_source_revocation_timestamp_unique"])
+        self.assertEqual(
+            "remote-source-content-identity-binding-v1",
+            receipt["remote_source_content_profile"],
+        )
+        self.assertEqual("bound", receipt["remote_source_content_status"])
+        self.assertTrue(receipt["remote_source_content_bound"])
+        self.assertTrue(validation["remote_source_content_digest_bound"])
+        self.assertTrue(validation["remote_source_content_bound"])
+        self.assertTrue(validation["remote_source_content_status_bound"])
+        self.assertTrue(receipt["remote_source_head_commit"])
+        self.assertTrue(receipt["remote_source_tree_digest"])
+        self.assertTrue(receipt["remote_source_diff_digest"])
+        self.assertTrue(receipt["remote_source_content_digest"])
         self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
         self.assertFalse(receipt["raw_remote_revocation_payload_stored"])
         self.assertFalse(receipt["raw_remote_revocation_freshness_payload_stored"])
@@ -265,6 +288,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(
             receipt["raw_remote_revocation_timestamp_replay_guard_payload_stored"]
         )
+        self.assertFalse(receipt["raw_remote_source_content_payload_stored"])
 
     def test_remote_branch_pr_worker_result_blocks_revoked_source(self) -> None:
         receipt = self.service.ingest_worker_result(
@@ -386,6 +410,35 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             ]
         )
         self.assertFalse(validation["remote_source_revocation_timestamp_unique"])
+
+    def test_remote_branch_pr_worker_result_blocks_content_mismatch(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-remote-pr-worker",
+            worker_role="external",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=["src/omoikane/self_construction/parallel_orchestration.py"],
+            verification_results=_verification_results(),
+            result_summary="Remote worker result reports a content identity mismatch.",
+            source_system="remote-branch-pr-worker-result",
+            remote_branch_ref="refs/remotes/origin/codex/content-mismatch-worker",
+            remote_pr_ref="pull-request://omoikane/133",
+            remote_source_content_status="mismatch",
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("blocked", receipt["integration_decision"])
+        self.assertIn(
+            "remote source content status must be bound",
+            receipt["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["remote_source_content_digest_bound"])
+        self.assertTrue(validation["remote_source_content_bound"])
+        self.assertFalse(validation["remote_source_content_status_bound"])
 
     def test_remote_branch_pr_worker_result_without_pr_metadata_blocks(self) -> None:
         receipt = self.service.ingest_worker_result(

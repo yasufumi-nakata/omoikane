@@ -48,7 +48,10 @@ provider timestamp が `signed-current` でない result、stale result、metada
 blocked のまま保持する。remote freshness refs は signed provider timestamp digest
 と timestamp signature digest、replay nonce、previous nonce digest、replay guard digest
 へ束縛し、`unique` でない timestamp reuse も blocked のまま保持する。raw timestamp /
-replay-guard payload は保存しない。
+replay-guard payload は保存しない。mutable な remote branch / PR ref は
+head commit、tree digest、diff digest、content digest の identity に縮約し、
+`bound` でない content identity も blocked のまま保持する。raw remote content
+payload は保存しない。
 workspace-enacted marker-only payload は別 digest に縮約され、marker だけの worker
 result は blocked のまま保持される。
 `builder-live-demo` の actual command receipt は

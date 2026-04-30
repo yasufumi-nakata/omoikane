@@ -14,6 +14,8 @@ description: >
   refs are bound to a signed provider timestamp digest before acceptance.
   The signed timestamp is also chained to a replay nonce and previous nonce
   digest so a current-looking provider timestamp cannot be reused silently.
+  Remote branch / PR receipts also bind the mutable source ref to a digest-only
+  content identity made from head commit, tree digest, and diff digest evidence.
 type: object
 additionalProperties: false
 required:
@@ -54,6 +56,14 @@ required:
   - remote_source_revocation_timestamp_previous_nonce_digest
   - remote_source_revocation_timestamp_replay_status
   - remote_source_revocation_timestamp_replay_guard_digest
+  - remote_source_content_profile
+  - remote_source_content_ref
+  - remote_source_content_status
+  - remote_source_head_commit
+  - remote_source_tree_digest
+  - remote_source_diff_digest
+  - remote_source_content_digest
+  - remote_source_content_bound
   - remote_metadata_digest
   - remote_metadata_bound
   - worker_identity_profile
@@ -100,6 +110,7 @@ required:
   - raw_remote_revocation_freshness_payload_stored
   - raw_remote_revocation_timestamp_payload_stored
   - raw_remote_revocation_timestamp_replay_guard_payload_stored
+  - raw_remote_source_content_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -235,6 +246,33 @@ properties:
   remote_source_revocation_timestamp_replay_guard_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_content_profile:
+    type: string
+    enum:
+      - remote-source-content-identity-binding-v1
+      - not-applicable
+  remote_source_content_ref:
+    type: string
+  remote_source_content_status:
+    type: string
+    enum:
+      - bound
+      - mismatch
+      - not-applicable
+  remote_source_head_commit:
+    type: string
+    pattern: "^$|^[a-f0-9]{40}$"
+  remote_source_tree_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_diff_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_content_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_content_bound:
+    type: boolean
   remote_metadata_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -388,6 +426,8 @@ properties:
   raw_remote_revocation_timestamp_payload_stored:
     const: false
   raw_remote_revocation_timestamp_replay_guard_payload_stored:
+    const: false
+  raw_remote_source_content_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false

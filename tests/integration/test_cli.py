@@ -94,7 +94,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["remote_source_revocation_digest_bound"]
         )
+        self.assertTrue(result["validation"]["remote_source_content_digest_bound"])
+        self.assertTrue(result["validation"]["remote_source_content_status_bound"])
         self.assertTrue(result["validation"]["remote_source_revocation_not_revoked"])
+        self.assertTrue(result["validation"]["content_mismatch_result_blocked"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertTrue(result["validation"]["marker_only_result_blocked"])
         self.assertTrue(result["validation"]["marker_only_hygiene_digest_bound"])

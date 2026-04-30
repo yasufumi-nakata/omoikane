@@ -42,6 +42,9 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   nonce ref、previous nonce digest、replay guard digest にも束縛し、`unique`
   でない provider timestamp reuse は fail-closed にする。raw remote metadata /
   revocation / freshness / timestamp / replay-guard payload は保存しない
+- remote branch / PR 由来の mutable ref は head commit、tree digest、diff digest、
+  content digest に縮約し、`bound` でない content identity result は fail-closed にする。
+  raw remote source content payload は保存しない
 - user または他 worker の未確認変更を revert しない
 
 ## Integration

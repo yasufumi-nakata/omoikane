@@ -4,7 +4,7 @@ summary: >
   parallel-orchestration-demo が worker result の patch digest、changed files、
   verification result、base commit freshness、signed worker identity、remote
   branch / PR metadata、remote source revocation check、freshness window、
-  signed provider timestamp、timestamp replay guard を main checkout integration 前の digest-only receipt として
+  signed provider timestamp、timestamp replay guard、remote source content identity を main checkout integration 前の digest-only receipt として
   固定し、stale worker result と workspace-enacted marker-only result を fail-closed にすること
 checks:
   - name: parallel Codex worker result ingestion smoke
@@ -31,6 +31,9 @@ expect:
   remote_source_revocation_fresh: true
   remote_source_revocation_timestamp_signed_current: true
   remote_source_revocation_timestamp_unique: true
+  remote_source_content_digest_bound: true
+  remote_source_content_bound: true
+  remote_source_content_status_bound: true
   remote_review_authority_digest_bound: true
   remote_accepted_source_policy_digest_bound: true
   remote_worker_identity_evidence_bound: true
@@ -39,6 +42,11 @@ expect:
   remote_raw_revocation_freshness_payload_redacted: true
   remote_raw_revocation_timestamp_payload_redacted: true
   remote_raw_revocation_timestamp_replay_guard_payload_redacted: true
+  remote_raw_source_content_payload_redacted: true
+  content_mismatch_result_blocked: true
+  content_mismatch_digest_bound: true
+  content_mismatch_status_rejected: true
+  content_mismatch_raw_source_content_payload_redacted: true
   blocked_stale_worker_result: true
   blocked_base_head_mismatch: true
   marker_only_result_blocked: true
@@ -59,6 +67,7 @@ expect:
   raw_remote_revocation_freshness_payload_stored: false
   raw_remote_revocation_timestamp_payload_stored: false
   raw_remote_revocation_timestamp_replay_guard_payload_stored: false
+  raw_remote_source_content_payload_stored: false
   raw_transcript_payload_stored: false
   raw_verification_payload_stored: false
 metric: boolean
