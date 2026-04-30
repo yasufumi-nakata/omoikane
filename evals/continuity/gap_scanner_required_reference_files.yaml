@@ -4,7 +4,7 @@ level: L5
 description: >
   gap-report が automation 用 repo-local reference runbook の欠落を
   high-priority missing-reference-file task として検出し、parallel Codex
-  orchestration 手順の未配置を all-zero gate の外へ出せること
+  orchestration 手順の未配置と section-level policy の欠落を all-zero gate の外へ出せること
 inputs:
   - action: scan_repo
     required_reference_files:
@@ -15,8 +15,12 @@ inputs:
 expected:
   missing_required_reference_file_count: 0
   missing_required_reference_files: []
+  missing_required_reference_policy_section_count: 0
+  missing_required_reference_policy_sections: []
   parallel_codex_orchestration_required: true
+  parallel_codex_orchestration_policy_sections_required: true
   prioritized_task_kind: missing-reference-file
+  section_prioritized_task_kind: missing-reference-policy-section
   raw_reference_payload_stored: false
 metric: boolean
 threshold: 1.0

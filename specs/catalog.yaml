@@ -3385,7 +3385,7 @@ entries:
       - references/parallel-codex-orchestration.md
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects automation pull-first and parallel Codex runbook assumptions by requiring gap-report to surface missing repo-local reference files before all-zero gate completion.
+    rationale: Protects automation pull-first and parallel Codex runbook assumptions by requiring gap-report to surface missing repo-local reference files and missing required section-level policies before all-zero gate completion.
   - priority: P1
     kind: schema
     file: specs/schemas/gap_report.schema
@@ -3394,7 +3394,7 @@ entries:
       - reference-runtime
       - evals/continuity/gap_report_scan_receipt.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including source surface digests, continuity-ledger event binding, and actual ledger entry append evidence for automation gate review.
+    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including missing reference policy sections, source surface digests, continuity-ledger event binding, and actual ledger entry append evidence for automation gate review.
   - priority: P1
     kind: interface
     file: specs/interfaces/selfctor.gap_report.v0.idl
@@ -3403,7 +3403,7 @@ entries:
       - specs/schemas/gap_report.schema
       - evals/continuity/gap_report_scan_receipt.yaml
       - docs/07-reference-implementation/README.md
-    rationale: Required to bind the self-construction gap-report scan operation to the public schema, scan receipt contract, and continuity-ledger event plus appended entry evidence.
+    rationale: Required to bind the self-construction gap-report scan operation to the public schema, required reference policy section scan, scan receipt contract, and continuity-ledger event plus appended entry evidence.
   - priority: P1
     kind: eval
     file: evals/continuity/gap_report_scan_receipt.yaml

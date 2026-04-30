@@ -13,6 +13,7 @@ expected:
   schema_valid: true
   scan_receipt_profile: self-construction-gap-report-scan-receipt-v1
   all_zero: true
+  missing_required_reference_policy_section_count: 0
   validation_ok: true
   counts_match_report: true
   report_digest_bound: true

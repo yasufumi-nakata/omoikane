@@ -11,6 +11,7 @@ required:
   - open_question_count
   - missing_expected_file_count
   - missing_required_reference_file_count
+  - missing_required_reference_policy_section_count
   - empty_eval_surface_count
   - placeholder_hit_count
   - inventory_drift_count
@@ -22,6 +23,7 @@ required:
   - open_questions
   - missing_expected_files
   - missing_required_reference_files
+  - missing_required_reference_policy_sections
   - empty_eval_surfaces
   - catalog_pending_count
   - catalog_pending_files
@@ -45,6 +47,9 @@ properties:
     type: integer
     minimum: 0
   missing_required_reference_file_count:
+    type: integer
+    minimum: 0
+  missing_required_reference_policy_section_count:
     type: integer
     minimum: 0
   empty_eval_surface_count:
@@ -90,6 +95,13 @@ properties:
     items:
       type: string
       minLength: 1
+  missing_required_reference_policy_sections:
+    description: >
+      Required section-level policies that are absent from present repo-local automation
+      reference runbooks.
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
   empty_eval_surfaces:
     type: array
     items:
@@ -255,6 +267,7 @@ properties:
           - open_question_count
           - missing_expected_file_count
           - missing_required_reference_file_count
+          - missing_required_reference_policy_section_count
           - empty_eval_surface_count
           - placeholder_hit_count
           - inventory_drift_count
@@ -273,6 +286,9 @@ properties:
             type: integer
             minimum: 0
           missing_required_reference_file_count:
+            type: integer
+            minimum: 0
+          missing_required_reference_policy_section_count:
             type: integer
             minimum: 0
           empty_eval_surface_count:
@@ -414,11 +430,15 @@ $defs:
       symbol:
         type: string
         minLength: 1
+      required_section:
+        type: string
+        minLength: 1
 examples:
   - repo_root: /repo
     open_question_count: 0
     missing_expected_file_count: 0
     missing_required_reference_file_count: 0
+    missing_required_reference_policy_section_count: 0
     empty_eval_surface_count: 0
     placeholder_hit_count: 0
     inventory_drift_count: 0
@@ -430,6 +450,7 @@ examples:
     open_questions: []
     missing_expected_files: []
     missing_required_reference_files: []
+    missing_required_reference_policy_sections: []
     empty_eval_surfaces: []
     catalog_pending_count: 0
     catalog_pending_files: []
@@ -472,6 +493,7 @@ examples:
         open_question_count: 0
         missing_expected_file_count: 0
         missing_required_reference_file_count: 0
+        missing_required_reference_policy_section_count: 0
         empty_eval_surface_count: 0
         placeholder_hit_count: 0
         inventory_drift_count: 0

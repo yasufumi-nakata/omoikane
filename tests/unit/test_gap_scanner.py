@@ -5,7 +5,10 @@ import unittest
 from pathlib import Path
 
 from omoikane.common import canonical_json, sha256_text
-from omoikane.self_construction.gaps import GapScanner
+from omoikane.self_construction.gaps import (
+    GapScanner,
+    REQUIRED_REFERENCE_POLICY_SECTIONS,
+)
 
 
 class GapScannerTests(unittest.TestCase):
@@ -47,6 +50,43 @@ class GapScannerTests(unittest.TestCase):
                 )
             )
 
+    def test_scan_reports_missing_required_reference_policy_section(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "references" / "parallel-codex-orchestration.md").write_text(
+                "# Parallel Codex Orchestration\n\n"
+                "## Purpose\n\n"
+                "## Gate Order\n\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(
+                4,
+                report["missing_required_reference_policy_section_count"],
+            )
+            self.assertEqual(
+                [
+                    "## Worker Boundaries",
+                    "## Integration",
+                    "## Verification",
+                    "## Handoff",
+                ],
+                [
+                    hit["required_section"]
+                    for hit in report["missing_required_reference_policy_sections"]
+                ],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "missing-reference-policy-section"
+                    and "Worker Boundaries" in task["summary"]
+                    for task in report["prioritized_tasks"]
+                )
+            )
+
     def test_scan_receipt_binds_all_zero_report_digest(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -64,6 +104,10 @@ class GapScannerTests(unittest.TestCase):
             self.assertTrue(receipt["validation"]["ok"])
             self.assertFalse(receipt["raw_report_payload_stored"])
             self.assertEqual(0, receipt["counts"]["prioritized_task_count"])
+            self.assertEqual(
+                0,
+                receipt["counts"]["missing_required_reference_policy_section_count"],
+            )
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
             self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
@@ -108,6 +152,10 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(
                 1,
                 receipt["counts"]["missing_required_reference_file_count"],
+            )
+            self.assertEqual(
+                0,
+                receipt["counts"]["missing_required_reference_policy_section_count"],
             )
             self.assertEqual(1, receipt["counts"]["prioritized_task_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
@@ -636,7 +684,10 @@ class GapScannerTests(unittest.TestCase):
             "repo-coverage-checklist.md",
             "verification-checklist.md",
         ):
-            (references_root / filename).write_text("# bootstrap\n", encoding="utf-8")
+            relative_name = f"references/{filename}"
+            sections = REQUIRED_REFERENCE_POLICY_SECTIONS[relative_name]
+            text = "# bootstrap\n\n" + "\n\n".join(sections) + "\n"
+            (references_root / filename).write_text(text, encoding="utf-8")
         for readme in (
             repo_root / "specs" / "interfaces" / "README.md",
             repo_root / "specs" / "schemas" / "README.md",

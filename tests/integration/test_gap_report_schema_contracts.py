@@ -64,6 +64,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             counts["missing_required_reference_file_count"],
         )
         self.assertEqual(
+            report["missing_required_reference_policy_section_count"],
+            counts["missing_required_reference_policy_section_count"],
+        )
+        self.assertEqual(
             report["empty_eval_surface_count"],
             counts["empty_eval_surface_count"],
         )
@@ -124,6 +128,8 @@ class GapReportSchemaContractTests(unittest.TestCase):
 
         self.assertEqual(0, report["missing_required_reference_file_count"])
         self.assertEqual([], report["missing_required_reference_files"])
+        self.assertEqual(0, report["missing_required_reference_policy_section_count"])
+        self.assertEqual([], report["missing_required_reference_policy_sections"])
 
     def test_gap_report_scan_receipt_binds_continuity_event_digest(self) -> None:
         report = self.runtime.generate_gap_report(REPO_ROOT)

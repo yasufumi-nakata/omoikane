@@ -131,7 +131,8 @@ rollback-approved へ到達するか。
 
 ### Gap Scanner Required Reference Files
 gap-report が automation の pull-first / coverage / verification / parallel Codex
-orchestration runbook 欠落を high-priority task として検出できるか。
+orchestration runbook 欠落と必須 section-level policy 欠落を
+high-priority task として検出できるか。
 
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。

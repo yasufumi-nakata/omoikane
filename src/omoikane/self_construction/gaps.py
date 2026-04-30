@@ -55,6 +55,35 @@ REQUIRED_REFERENCE_FILES = (
     "references/repo-coverage-checklist.md",
     "references/verification-checklist.md",
 )
+REQUIRED_REFERENCE_POLICY_SECTIONS = {
+    "references/operating-playbook.md": (
+        "## 1. Preflight",
+        "## 2. 初期トリアージ",
+        "## 3. ギャップ選定ルール",
+        "## 4. 実装範囲",
+        "## 5. 検証",
+        "## 6. 完了条件",
+    ),
+    "references/parallel-codex-orchestration.md": (
+        "## Purpose",
+        "## Gate Order",
+        "## Worker Boundaries",
+        "## Integration",
+        "## Verification",
+        "## Handoff",
+    ),
+    "references/repo-coverage-checklist.md": (
+        "## Truth Source",
+        "## Runtime",
+        "## Verification",
+        "## Decision Hygiene",
+    ),
+    "references/verification-checklist.md": (
+        "## 必須コマンド",
+        "## 追加確認",
+        "## Git Hygiene",
+    ),
+}
 TRUTH_SOURCE_FUTURE_WORK_GLOBS = (
     "README.md",
     "docs/07-reference-implementation/README.md",
@@ -100,6 +129,9 @@ class GapScanner:
         open_questions = self._unchecked_items(repo_root / "meta" / "open-questions.md")
         missing_specs = self._missing_expected_files(repo_root / "specs")
         missing_reference_files = self._missing_required_reference_files(repo_root)
+        missing_reference_policy_sections = (
+            self._missing_required_reference_policy_sections(repo_root)
+        )
         empty_eval_surfaces = self._empty_eval_surfaces(repo_root / "evals")
         catalog_pending = self._catalog_pending_files(repo_root / "specs" / "catalog.yaml", repo_root)
         placeholder_hits = self._placeholder_hits(repo_root)
@@ -130,6 +162,14 @@ class GapScanner:
                     "priority": "high",
                     "kind": "missing-reference-file",
                     "summary": f"automation 用 reference file が未作成です: {filename}",
+                }
+            )
+        for hit in missing_reference_policy_sections:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "missing-reference-policy-section",
+                    "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
         for surface in empty_eval_surfaces:
@@ -218,6 +258,9 @@ class GapScanner:
             "open_question_count": len(open_questions),
             "missing_expected_file_count": len(missing_specs),
             "missing_required_reference_file_count": len(missing_reference_files),
+            "missing_required_reference_policy_section_count": len(
+                missing_reference_policy_sections
+            ),
             "empty_eval_surface_count": len(empty_eval_surfaces),
             "placeholder_hit_count": len(placeholder_hits),
             "inventory_drift_count": len(inventory_drift_hits),
@@ -229,6 +272,9 @@ class GapScanner:
             "open_questions": open_questions,
             "missing_expected_files": missing_specs,
             "missing_required_reference_files": missing_reference_files,
+            "missing_required_reference_policy_sections": (
+                missing_reference_policy_sections
+            ),
             "empty_eval_surfaces": empty_eval_surfaces,
             "catalog_pending_count": len(catalog_pending),
             "catalog_pending_files": catalog_pending,
@@ -250,6 +296,9 @@ class GapScanner:
             "missing_expected_file_count": int(report["missing_expected_file_count"]),
             "missing_required_reference_file_count": int(
                 report["missing_required_reference_file_count"]
+            ),
+            "missing_required_reference_policy_section_count": int(
+                report["missing_required_reference_policy_section_count"]
             ),
             "empty_eval_surface_count": int(report["empty_eval_surface_count"]),
             "placeholder_hit_count": int(report["placeholder_hit_count"]),
@@ -516,6 +565,39 @@ class GapScanner:
             for filename in REQUIRED_REFERENCE_FILES
             if not (repo_root / filename).exists()
         ]
+
+    @staticmethod
+    def _missing_required_reference_policy_sections(
+        repo_root: Path,
+    ) -> List[Dict[str, str]]:
+        hits: List[Dict[str, str]] = []
+        for filename, required_sections in REQUIRED_REFERENCE_POLICY_SECTIONS.items():
+            path = repo_root / filename
+            if not path.exists():
+                continue
+            try:
+                present_sections = {
+                    line.strip()
+                    for line in path.read_text(encoding="utf-8").splitlines()
+                    if line.strip().startswith("## ")
+                }
+            except UnicodeDecodeError:
+                present_sections = set()
+            for section in required_sections:
+                if section in present_sections:
+                    continue
+                hits.append(
+                    {
+                        "path": filename,
+                        "line": (
+                            f"`{section}` required policy section is missing "
+                            "from the automation reference runbook"
+                        ),
+                        "kind": "missing-reference-policy-section",
+                        "required_section": section,
+                    }
+                )
+        return hits
 
     @staticmethod
     def _extract_expected_paths(readme_path: Path) -> List[Path]:
