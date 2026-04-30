@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity and source metadata evidence before main checkout integration.
+summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, source metadata, and remote source revocation evidence before main checkout integration.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
 operations:
@@ -92,6 +92,15 @@ operations:
           accepted_source_policy_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
+          remote_source_revocation_ref:
+            type: string
+            minLength: 1
+          remote_source_revocation_status:
+            type: string
+            enum: [current-not-revoked, revoked, stale, not-applicable]
+          remote_source_revocation_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
           remote_metadata_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
@@ -100,11 +109,11 @@ operations:
     guarantees:
       - worker_base_commit must match main_checkout_head before integration_decision can become accept-ready
       - direct worker results carry source_system=direct-worker-result and no upstream dispatch refs
-      - remote branch / PR worker results carry source_system=remote-branch-pr-worker-result plus branch ref, PR ref, review authority digest, accepted source policy digest, and remote_metadata_digest
+      - remote branch / PR worker results carry source_system=remote-branch-pr-worker-result plus branch ref, PR ref, review authority digest, accepted source policy digest, current-not-revoked source revocation digest, and remote_metadata_digest
       - worker_identity_ref, worker_identity_digest, and integrity-guardian worker_identity_signature_digest are bound to patch digest and base/head commit evidence
-      - remote metadata is digest-bound and redacted before remote results can become accept-ready
+      - remote metadata and remote source revocation status are digest-bound and redacted before remote results can become accept-ready
       - changed_files must remain inside both the repo-local allowed workspace prefixes and the worker ownership_scope
-      - patch payload, raw worker identity payload, raw remote metadata payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
+      - patch payload, raw worker identity payload, raw remote metadata payload, raw remote revocation payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
       - unittest discover and gap-report required verification commands must pass before main checkout integration is accepted
       - blocked, stale, or failed worker results remain schema-bound but cannot be integrated
   ingest_yaoyorozu_dispatch_receipt:
@@ -145,7 +154,7 @@ operations:
       - the derived worker identity evidence binds the Yaoyorozu dispatch receipt id to the same patch digest used for main-checkout ingestion
       - upstream dispatch receipt digest, patch-candidate receipt refs/digests, and changed-file list are bound by upstream_binding_digest
       - patch_digest is derived from the dispatch receipt digest, dispatch plan digest, patch-candidate receipt digests, and changed files
-      - raw Yaoyorozu dispatch payloads, raw patch payloads, remote metadata payloads, transcripts, stdout, and stderr are not stored in the Parallel Codex receipt
+      - raw Yaoyorozu dispatch payloads, raw patch payloads, remote metadata payloads, remote revocation payloads, transcripts, stdout, and stderr are not stored in the Parallel Codex receipt
       - main checkout integration remains blocked unless the worker base commit is fresh and the required verification commands pass
   validate_worker_result_receipt:
     summary: Recompute the changed-file manifest digest, verification manifest digest, receipt digest, and blocking reasons for a worker result receipt.

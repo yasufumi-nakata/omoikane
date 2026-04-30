@@ -5,7 +5,7 @@ description: >
   Digest-only receipt for accepting or blocking one parallel Codex worker result
   before it is integrated into the main checkout, including signed worker
   identity evidence and remote branch / PR source metadata without storing raw
-  worker identity or remote metadata payloads.
+  worker identity, remote metadata, or remote revocation payloads.
 type: object
 additionalProperties: false
 required:
@@ -25,6 +25,10 @@ required:
   - remote_review_authority_digest
   - accepted_source_policy_ref
   - accepted_source_policy_digest
+  - remote_source_revocation_profile
+  - remote_source_revocation_ref
+  - remote_source_revocation_status
+  - remote_source_revocation_digest
   - remote_metadata_digest
   - remote_metadata_bound
   - worker_identity_profile
@@ -61,6 +65,7 @@ required:
   - raw_upstream_payload_stored
   - raw_worker_identity_payload_stored
   - raw_remote_metadata_payload_stored
+  - raw_remote_revocation_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -111,6 +116,23 @@ properties:
   accepted_source_policy_ref:
     type: string
   accepted_source_policy_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_revocation_profile:
+    type: string
+    enum:
+      - remote-source-system-revocation-check-v1
+      - not-applicable
+  remote_source_revocation_ref:
+    type: string
+  remote_source_revocation_status:
+    type: string
+    enum:
+      - current-not-revoked
+      - revoked
+      - stale
+      - not-applicable
+  remote_source_revocation_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
   remote_metadata_digest:
@@ -236,6 +258,8 @@ properties:
   raw_worker_identity_payload_stored:
     const: false
   raw_remote_metadata_payload_stored:
+    const: false
+  raw_remote_revocation_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false

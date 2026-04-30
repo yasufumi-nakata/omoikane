@@ -153,6 +153,7 @@ status: decided | superseded
 - [2026-04-30_parallel-codex-yaoyorozu-dispatch-bridge.md](2026-04-30_parallel-codex-yaoyorozu-dispatch-bridge.md)
 - [2026-05-01_parallel-codex-worker-identity-evidence.md](2026-05-01_parallel-codex-worker-identity-evidence.md)
 - [2026-05-01_parallel-codex-remote-source-metadata.md](2026-05-01_parallel-codex-remote-source-metadata.md)
+- [2026-05-01_parallel-codex-remote-source-revocation-check.md](2026-05-01_parallel-codex-remote-source-revocation-check.md)
 - [2026-04-28_yaoyorozu-builder-surface-scope.md](2026-04-28_yaoyorozu-builder-surface-scope.md)
 - [2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md](2026-04-29_yaoyorozu-source-digest-builder-coverage-binding.md)
 - [2026-04-29_yaoyorozu-source-manifest-ledger-binding.md](2026-04-29_yaoyorozu-source-manifest-ledger-binding.md)

@@ -91,6 +91,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["remote_ready_for_main_checkout"])
         self.assertTrue(result["validation"]["remote_branch_pr_metadata_bound"])
+        self.assertTrue(
+            result["validation"]["remote_source_revocation_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["remote_source_revocation_not_revoked"])
         self.assertTrue(result["validation"]["blocked_stale_worker_result"])
         self.assertEqual(
             "parallel-codex-worker-result-ingestion-v1",

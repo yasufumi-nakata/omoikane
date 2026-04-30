@@ -137,7 +137,7 @@ high-priority task として検出できるか。
 ### Parallel Codex Result Ingestion
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、
 verification manifest、worker base commit freshness、signed worker identity、
-remote branch / PR metadata を main checkout integration 前の schema-bound receipt
+remote branch / PR metadata、remote source revocation check を main checkout integration 前の schema-bound receipt
 として固定し、stale worker result を fail-closed にできるか。
 
 ### Subjective Continuity Self-Report

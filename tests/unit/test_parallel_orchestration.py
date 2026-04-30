@@ -62,10 +62,19 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             receipt["worker_identity_profile"],
         )
         self.assertEqual("not-applicable", receipt["remote_metadata_profile"])
+        self.assertEqual(
+            "not-applicable",
+            receipt["remote_source_revocation_profile"],
+        )
+        self.assertEqual(
+            "not-applicable",
+            receipt["remote_source_revocation_status"],
+        )
         self.assertTrue(validation["receipt_digest_bound"])
         self.assertFalse(receipt["raw_patch_payload_stored"])
         self.assertFalse(receipt["raw_worker_identity_payload_stored"])
         self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
+        self.assertFalse(receipt["raw_remote_revocation_payload_stored"])
         self.assertFalse(receipt["raw_transcript_payload_stored"])
         self.assertFalse(receipt["raw_verification_payload_stored"])
 
@@ -103,8 +112,47 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(receipt["remote_metadata_bound"])
         self.assertTrue(validation["remote_metadata_bound"])
         self.assertTrue(validation["remote_metadata_digest_bound"])
+        self.assertEqual(
+            "remote-source-system-revocation-check-v1",
+            receipt["remote_source_revocation_profile"],
+        )
+        self.assertEqual(
+            "current-not-revoked",
+            receipt["remote_source_revocation_status"],
+        )
+        self.assertTrue(validation["remote_source_revocation_digest_bound"])
+        self.assertTrue(validation["remote_source_revocation_not_revoked"])
         self.assertTrue(validation["worker_identity_evidence_bound"])
         self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
+        self.assertFalse(receipt["raw_remote_revocation_payload_stored"])
+
+    def test_remote_branch_pr_worker_result_blocks_revoked_source(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-remote-pr-worker",
+            worker_role="external",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=["src/omoikane/self_construction/parallel_orchestration.py"],
+            verification_results=_verification_results(),
+            result_summary="Remote worker result carries a revoked source check.",
+            source_system="remote-branch-pr-worker-result",
+            remote_branch_ref="refs/remotes/origin/codex/revoked-worker",
+            remote_pr_ref="pull-request://omoikane/129",
+            remote_source_revocation_status="revoked",
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("blocked", receipt["integration_decision"])
+        self.assertIn(
+            "remote source revocation status must be current-not-revoked",
+            receipt["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["remote_source_revocation_digest_bound"])
+        self.assertFalse(validation["remote_source_revocation_not_revoked"])
 
     def test_remote_branch_pr_worker_result_without_pr_metadata_blocks(self) -> None:
         receipt = self.service.ingest_worker_result(

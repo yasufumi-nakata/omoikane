@@ -974,6 +974,7 @@ class OmoikaneReferenceOS:
             "agents/guardians/integrity-guardian.yaml",
             "meta/decision-log/2026-05-01_parallel-codex-worker-identity-evidence.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-metadata.md",
+            "meta/decision-log/2026-05-01_parallel-codex-remote-source-revocation-check.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1017,8 +1018,8 @@ class OmoikaneReferenceOS:
             verification_results=verification_results,
             result_summary=(
                 "Remote branch / PR worker result carries branch ref, PR ref, "
-                "accepted source policy digest, and review authority digest before "
-                "main checkout integration."
+                "accepted source policy digest, review authority digest, and "
+                "current-not-revoked source evidence before main checkout integration."
             ),
             source_system="remote-branch-pr-worker-result",
             remote_branch_ref="refs/remotes/origin/codex/remote-worker-metadata",
@@ -1130,6 +1131,15 @@ class OmoikaneReferenceOS:
                 "remote_accepted_source_policy_digest": remote_receipt[
                     "accepted_source_policy_digest"
                 ],
+                "remote_source_revocation_ref": remote_receipt[
+                    "remote_source_revocation_ref"
+                ],
+                "remote_source_revocation_status": remote_receipt[
+                    "remote_source_revocation_status"
+                ],
+                "remote_source_revocation_digest": remote_receipt[
+                    "remote_source_revocation_digest"
+                ],
                 "blocked_receipt_ref": blocked_receipt["receipt_ref"],
                 "blocked_receipt_digest": blocked_receipt["receipt_digest"],
                 "yaoyorozu_bridge_receipt_ref": yaoyorozu_bridge_receipt[
@@ -1148,6 +1158,7 @@ class OmoikaneReferenceOS:
                 "raw_upstream_payload_stored": False,
                 "raw_worker_identity_payload_stored": False,
                 "raw_remote_metadata_payload_stored": False,
+                "raw_remote_revocation_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1235,6 +1246,7 @@ class OmoikaneReferenceOS:
                     ready_validation["raw_patch_payload_redacted"]
                     and ready_validation["raw_worker_identity_payload_redacted"]
                     and ready_validation["raw_remote_metadata_payload_redacted"]
+                    and ready_validation["raw_remote_revocation_payload_redacted"]
                     and ready_validation["raw_transcript_payload_redacted"]
                     and ready_validation["raw_verification_payload_redacted"]
                 ),
@@ -1247,6 +1259,13 @@ class OmoikaneReferenceOS:
                     and bool(remote_receipt["remote_branch_ref"])
                     and bool(remote_receipt["remote_pr_ref"])
                 ),
+                "remote_source_revocation_digest_bound": (
+                    remote_validation["remote_source_revocation_digest_bound"]
+                    and bool(remote_receipt["remote_source_revocation_digest"])
+                ),
+                "remote_source_revocation_not_revoked": remote_validation[
+                    "remote_source_revocation_not_revoked"
+                ],
                 "remote_review_authority_digest_bound": (
                     remote_validation["remote_metadata_digest_bound"]
                     and bool(remote_receipt["remote_review_authority_digest"])
@@ -1260,6 +1279,9 @@ class OmoikaneReferenceOS:
                 ],
                 "remote_raw_metadata_payload_redacted": remote_validation[
                     "raw_remote_metadata_payload_redacted"
+                ],
+                "remote_raw_revocation_payload_redacted": remote_validation[
+                    "raw_remote_revocation_payload_redacted"
                 ],
                 "blocked_receipt_ok": blocked_validation["ok"],
                 "blocked_stale_worker_result": not blocked_validation[

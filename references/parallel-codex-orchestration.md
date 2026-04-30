@@ -30,8 +30,8 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - worker identity は ref / digest / integrity Guardian signature digest に縮約し、
   raw worker identity payload は保存しない
 - remote branch / PR 由来の worker result は branch ref、PR ref、accepted source
-  policy digest、review authority digest を remote metadata digest へ束縛し、
-  raw remote metadata payload は保存しない
+  policy digest、review authority digest、current-not-revoked revocation digest を
+  remote metadata digest へ束縛し、raw remote metadata / revocation payload は保存しない
 - user または他 worker の未確認変更を revert しない
 
 ## Integration
