@@ -189,7 +189,7 @@
 - `semantic_procedural_handoff.schema`
 - `sensory_loopback_artifact_family.schema`
 - `sensory_loopback_biodata_arbitration_binding.schema`
-  - shared loopback の participant BioData confidence / feature-window drift gate と hardware timing latency drift gate を同じ participant set / threshold authority digest に束縛し、raw BioData / timing payload を保存しない
+  - shared loopback の participant BioData confidence / feature-window drift gate と hardware timing latency drift gate を同じ participant set / threshold authority digest に束縛し、3-4 participant の weighted latency quorum では participant weight / failed participant / quorum digest だけを保持して raw BioData / timing payload を保存しない
 - `sensory_loopback_receipt.schema`
 - `sensory_loopback_session.schema`
 - `staged_rollout_session.schema`

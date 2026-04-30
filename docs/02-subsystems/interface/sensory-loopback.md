@@ -26,6 +26,8 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
   入口で全 participant の gate coverage と drift pass を確認する
 - 同じ shared arbitration で participant ごとの hardware timing latency drift gate を
   BioData threshold authority digest と束ね、timing overshoot を raw payload なしで reject する
+- 3-4 participant の shared field では `weighted-latency-quorum-v1` を明示した場合だけ、
+  blocked timing gate を failed participant として残し、passing participant weight が threshold を満たすかを digest-only に確認する
 
 ## Reference Runtime の固定 profile
 
@@ -51,6 +53,7 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | arbitration_policy | `guardian-mediated-multi-self-loopback-v1` |
 | biodata_arbitration_policy | `participant-biodata-gate-arbitration-v1` |
 | participant_latency_drift_profile | `participant-hardware-timing-latency-drift-gate-v1` |
+| latency_quorum_profiles | `all-participant-latency-pass-v1 / weighted-latency-quorum-v1` |
 | max_participant_latency_drift_ms | `12.0` |
 
 reference runtime では raw retinal/audio/haptic payload は扱わず、
@@ -80,6 +83,8 @@ sensory_loopback.bind_participant_biodata_arbitration:
       <identity ref>: <biodata-calibration-confidence-gate-v1 receipt>
     participant_latency_drift_gates:
       <identity ref>: <participant-hardware-timing-latency-drift-gate-v1 receipt>
+    participant_latency_weights: <optional identity ref -> weight, 3-4 participants only>
+    latency_quorum_threshold: <optional float>
   output: sensory_loopback_biodata_arbitration_binding
 
 sensory_loopback.deliver_bundle:
@@ -145,9 +150,15 @@ shared session で BioData arbitration を使う場合、`participant_gate_recei
 `pass` として束縛していなければならない。`participant_latency_drift_gates` も
 同じ participant set を過不足なく覆い、baseline latency と observed latency の差が
 `12.0ms` 以下で、BioData gate に threshold policy authority がある場合は同じ
-authority ref / digest を保持していなければならない。shared arbitration binding は
+authority ref / digest を保持していなければならない。3-4 participant の shared field で
+`participant_latency_weights` と `latency_quorum_threshold` を渡す場合は
+`weighted-latency-quorum-v1` として扱い、passing participant weight が threshold 以上なら
+blocked latency gate を `latency_quorum_failed_participant_ids` へ残したまま acceptance できる。
+未指定時は `all-participant-latency-pass-v1` として全 participant latency gate pass を要求する。
+shared arbitration binding は
 gate ref / gate digest、drift gate ref / digest、threshold digest、target gate-set digest、
-timing gate digest、latency threshold digest だけを保持し、raw BioData / calibration /
+timing gate digest、latency threshold digest、participant latency weight digest、
+latency quorum digest だけを保持し、raw BioData / calibration /
 drift / timing / hardware adapter / gate payload は保存しない。
 
 ## 不変条件
@@ -179,6 +190,8 @@ drift / timing / hardware adapter / gate payload は保存しない。
   `participant-biodata-gate-arbitration-v1` binding へまとめ、
   全 participant gate coverage、drift pass、hardware timing latency pass、
   binding digest、raw payload redaction を検証する
+- 同じ demo は 3 participant の weighted latency quorum も返し、observer の timing drift が
+  blocked でも self + peer の passing weight が threshold を満たす場合だけ acceptance する
 - 同じ demo は `schema_contracts` manifest で self-only / shared の
   session、receipt、artifact family、BioData arbitration binding を public schema path へ束縛し、
   integration test が各 payload を schema に直接通す
@@ -193,15 +206,15 @@ drift / timing / hardware adapter / gate payload は保存しない。
   guardian-mediated arbitration tracking を固定
 - `evals/interface/sensory_loopback_biodata_arbitration.yaml` で
   participant BioData confidence gate coverage、series drift gate pass、
-  participant hardware timing latency pass、binding digest、raw BioData / drift /
-  timing / gate payload redaction を固定
+  participant hardware timing latency pass、weighted latency quorum、binding digest、
+  raw BioData / drift / timing / gate payload redaction を固定
 - `evals/interface/sensory_loopback_public_schema_contract.yaml` で
   CLI demo の schema manifest と public schema validation を固定
 
 ## 未解決
 
 - raw retinal/audio/haptic payload を actual capture pipeline へ接続する repo 外 adapter
-- 4 participant を超える shared sensory field で weighted latency quorum へ拡張する scale-out
+- 4 participant を超える shared sensory field で federated latency quorum へ拡張する scale-out
 
 ## 関連
 

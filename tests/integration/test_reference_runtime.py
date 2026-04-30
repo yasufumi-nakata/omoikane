@@ -799,6 +799,25 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["shared_loopback_biodata_raw_payload_redacted"]
         )
+        self.assertTrue(result["validation"]["shared_loopback_weighted_latency_quorum_ok"])
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_weighted_latency_quorum_satisfied"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["shared_loopback_weighted_latency_quorum_profile"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_weighted_latency_quorum_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_weighted_latency_quorum_failed_participant_bound"
+            ]
+        )
         self.assertEqual("active", result["session"]["status"])
         self.assertTrue(result["session"]["avatar_body_map_ref"].startswith("avatar-body-map://"))
         self.assertEqual("bound", result["session"]["calibration_confidence_gate_status"])
@@ -823,6 +842,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "participant_gate_count"
             ],
         )
+        weighted_binding = result["shared_loopback"]["weighted_latency_quorum"][
+            "biodata_arbitration_binding"
+        ]
+        self.assertEqual("weighted-latency-quorum-v1", weighted_binding["latency_quorum_profile"])
+        self.assertFalse(weighted_binding["all_latency_gates_passed"])
+        self.assertTrue(weighted_binding["latency_quorum_satisfied"])
+        self.assertEqual(0.8, weighted_binding["latency_quorum_pass_weight"])
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-sensory-loopback"])
         self.assertEqual(
             1,

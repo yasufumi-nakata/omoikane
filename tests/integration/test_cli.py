@@ -848,6 +848,17 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["shared_loopback_biodata_raw_payload_redacted"]
         )
+        self.assertTrue(result["validation"]["shared_loopback_weighted_latency_quorum_ok"])
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_weighted_latency_quorum_satisfied"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_weighted_latency_quorum_digest_bound"
+            ]
+        )
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["session"]["status"])
@@ -869,6 +880,12 @@ class CliIntegrationTests(unittest.TestCase):
                 "participant_gate_count"
             ],
         )
+        weighted_binding = result["shared_loopback"]["weighted_latency_quorum"][
+            "biodata_arbitration_binding"
+        ]
+        self.assertEqual("weighted-latency-quorum-v1", weighted_binding["latency_quorum_profile"])
+        self.assertFalse(weighted_binding["all_latency_gates_passed"])
+        self.assertTrue(weighted_binding["latency_quorum_satisfied"])
 
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

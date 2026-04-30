@@ -25,6 +25,15 @@ required:
   - participant_latency_bindings
   - participant_latency_gate_count
   - participant_latency_digest_set
+  - latency_quorum_profile
+  - latency_quorum_threshold
+  - participant_latency_weights
+  - participant_latency_weight_digest
+  - latency_quorum_pass_weight
+  - latency_quorum_failed_participant_ids
+  - latency_quorum_satisfied
+  - latency_quorum_status
+  - latency_quorum_digest
   - all_participant_gates_bound
   - all_drift_gates_passed
   - all_latency_gates_passed
@@ -249,7 +258,10 @@ properties:
         threshold_policy_authority_bound:
           type: boolean
         latency_drift_status:
-          const: pass
+          type: string
+          enum:
+            - pass
+            - blocked
         raw_timing_payload_stored:
           const: false
         raw_hardware_adapter_payload_stored:
@@ -268,12 +280,50 @@ properties:
   participant_latency_digest_set:
     type: string
     minLength: 32
+  latency_quorum_profile:
+    type: string
+    enum:
+      - all-participant-latency-pass-v1
+      - weighted-latency-quorum-v1
+  latency_quorum_threshold:
+    type: number
+    exclusiveMinimum: 0
+    maximum: 1
+  participant_latency_weights:
+    type: object
+    minProperties: 2
+    maxProperties: 4
+    additionalProperties:
+      type: number
+      exclusiveMinimum: 0
+      maximum: 1
+  participant_latency_weight_digest:
+    type: string
+    minLength: 32
+  latency_quorum_pass_weight:
+    type: number
+    minimum: 0
+    maximum: 1
+  latency_quorum_failed_participant_ids:
+    type: array
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  latency_quorum_satisfied:
+    const: true
+  latency_quorum_status:
+    const: pass
+  latency_quorum_digest:
+    type: string
+    minLength: 32
   all_participant_gates_bound:
     const: true
   all_drift_gates_passed:
     const: true
   all_latency_gates_passed:
-    const: true
+    type: boolean
   arbitration_gate_status:
     const: pass
   latency_gate_status:

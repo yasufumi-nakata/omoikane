@@ -1243,7 +1243,7 @@ entries:
       - evals/interface/sensory_loopback_public_schema_contract.yaml
       - tests/integration/test_interface_schema_contracts.py
       - reference-runtime
-    rationale: Required to serialize participant-specific BioData confidence, feature-window drift gate, and hardware timing latency drift gate distribution into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, timing, hardware adapter, or gate payload retention.
+    rationale: Required to serialize participant-specific BioData confidence, feature-window drift gate, hardware timing latency drift gate distribution, and optional 3-4 participant weighted latency quorum into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, timing, hardware adapter, or gate payload retention.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.sensory_loopback.v0.idl
@@ -1280,7 +1280,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, hardware timing latency drift pass, binding digest evidence, and raw BioData/drift/timing/hardware/gate payload redaction before shared loopback arbitration accepts participant gates.
+    rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, hardware timing latency strict pass, weighted latency quorum, binding digest evidence, and raw BioData/drift/timing/hardware/gate payload redaction before shared loopback arbitration accepts participant gates.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_public_schema_contract.yaml
@@ -1289,7 +1289,7 @@ entries:
       - tests/integration/test_interface_schema_contracts.py
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects the sensory-loopback public schema contract manifest that maps self-only and shared session, receipt, artifact-family, and BioData arbitration binding payloads from the CLI demo to reviewer-facing public schemas.
+    rationale: Protects the sensory-loopback public schema contract manifest that maps self-only and shared session, receipt, artifact-family, BioData arbitration binding, and weighted latency quorum binding payloads from the CLI demo to reviewer-facing public schemas.
   - priority: P1
     kind: schema
     file: specs/schemas/collective_merge_session.schema

@@ -12844,6 +12844,10 @@ json.dump(response, sys.stdout)
             human_consent_proof="consent://sensory-loopback-peer-demo/v1",
             metadata={"display_name": "Shared Loopback Peer"},
         )
+        observer = self.identity.create(
+            human_consent_proof="consent://sensory-loopback-observer-demo/v1",
+            metadata={"display_name": "Weighted Loopback Observer"},
+        )
         collective_identity = self.identity.create_collective(
             [identity.identity_id, peer.identity_id],
             consent_proof="consent://sensory-loopback-collective-demo/v1",
@@ -12964,6 +12968,99 @@ json.dump(response, sys.stdout)
                     identity.identity_id: shared_self_latency_gate,
                     peer.identity_id: shared_peer_latency_gate,
                 },
+            )
+        )
+        weighted_collective_identity = self.identity.create_collective(
+            [identity.identity_id, peer.identity_id, observer.identity_id],
+            consent_proof="consent://sensory-loopback-weighted-collective-demo/v1",
+            metadata={
+                "display_name": "Atrium Weighted Latency Field",
+                "purpose": "weighted participant latency quorum rehearsal",
+            },
+        )
+        weighted_collective = self.collective.register_collective(
+            collective_identity_id=weighted_collective_identity.identity_id,
+            member_ids=[identity.identity_id, peer.identity_id, observer.identity_id],
+            purpose="weighted participant latency quorum inside a shared sensory field",
+            proposed_name="Atrium Weighted Latency Field",
+            council_witnessed=True,
+            federation_attested=True,
+            guardian_observed=True,
+        )
+        weighted_world_session = self.wms.create_session(
+            [
+                weighted_collective_identity.identity_id,
+                identity.identity_id,
+                peer.identity_id,
+                observer.identity_id,
+            ],
+            objects=[
+                "weighted-shared-mirror",
+                "latency-quorum-anchor",
+                "observer-latency-clock",
+            ],
+        )
+        weighted_world_state = self.wms.snapshot(weighted_world_session["session_id"])
+        weighted_session = self.sensory_loopback.open_session(
+            identity_id=identity.identity_id,
+            world_state_ref=f"wms://state/{weighted_world_state['state_id']}",
+            body_anchor_ref="avatar://atrium/weighted-body/core",
+            avatar_body_map_ref="avatar-body-map://atrium/weighted-body/v1",
+            proprioceptive_calibration_ref="calibration://atrium/weighted-body/v1",
+            participant_identity_ids=[
+                identity.identity_id,
+                peer.identity_id,
+                observer.identity_id,
+            ],
+            shared_imc_session_id=shared_imc_session["session_id"],
+            shared_collective_id=weighted_collective["collective_id"],
+        )
+        weighted_observer_biodata_gate = self._build_sensory_loopback_biodata_gate(
+            observer.identity_id,
+            "observer",
+            heart_rate_shift=2.4,
+        )
+        weighted_observer_latency_gate = (
+            self.sensory_loopback.bind_participant_latency_drift_gate(
+                participant_identity_id=observer.identity_id,
+                hardware_adapter_ref="hardware-adapter://atrium/weighted/observer-timing",
+                timing_evidence_ref=(
+                    "timing-evidence://atrium/weighted/observer-frame-clock"
+                ),
+                baseline_latency_ms=45.0,
+                observed_latency_ms=72.0,
+                threshold_policy_authority_ref=weighted_observer_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_ref"],
+                threshold_policy_authority_digest=weighted_observer_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_digest"],
+                threshold_policy_source_digest_set=weighted_observer_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_source_digest_set"],
+            )
+        )
+        weighted_latency_quorum_binding = (
+            self.sensory_loopback.bind_participant_biodata_arbitration(
+                weighted_session["session_id"],
+                participant_gate_receipts={
+                    identity.identity_id: shared_self_biodata_gate["confidence_gate"],
+                    peer.identity_id: shared_peer_biodata_gate["confidence_gate"],
+                    observer.identity_id: weighted_observer_biodata_gate[
+                        "confidence_gate"
+                    ],
+                },
+                participant_latency_drift_gates={
+                    identity.identity_id: shared_self_latency_gate,
+                    peer.identity_id: shared_peer_latency_gate,
+                    observer.identity_id: weighted_observer_latency_gate,
+                },
+                participant_latency_weights={
+                    identity.identity_id: 0.4,
+                    peer.identity_id: 0.4,
+                    observer.identity_id: 0.2,
+                },
+                latency_quorum_threshold=0.75,
             )
         )
         self.ledger.append(
@@ -13137,6 +13234,17 @@ json.dump(response, sys.stdout)
                 shared_biodata_arbitration_binding,
             )
         )
+        weighted_final_session = self.sensory_loopback.snapshot(
+            weighted_session["session_id"]
+        )
+        weighted_session_validation = self.sensory_loopback.validate_session(
+            weighted_final_session
+        )
+        weighted_latency_quorum_validation = (
+            self.sensory_loopback.validate_participant_biodata_arbitration(
+                weighted_latency_quorum_binding,
+            )
+        )
         schema_contracts = [
             {
                 "payload_path": "session",
@@ -13191,6 +13299,17 @@ json.dump(response, sys.stdout)
                 ),
                 "contract_role": "shared-loopback-biodata-arbitration-binding",
             },
+            {
+                "payload_path": (
+                    "shared_loopback.weighted_latency_quorum."
+                    "biodata_arbitration_binding"
+                ),
+                "schema_path": (
+                    "specs/schemas/"
+                    "sensory_loopback_biodata_arbitration_binding.schema"
+                ),
+                "contract_role": "shared-loopback-weighted-latency-quorum-binding",
+            },
         ]
 
         return {
@@ -13232,6 +13351,69 @@ json.dump(response, sys.stdout)
                     "peer": shared_peer_latency_gate,
                 },
                 "biodata_arbitration_binding": shared_biodata_arbitration_binding,
+                "weighted_latency_quorum": {
+                    "observer": {
+                        "identity_id": observer.identity_id,
+                        "lineage_id": observer.lineage_id,
+                    },
+                    "collective": weighted_collective,
+                    "world_state": weighted_world_state,
+                    "session": weighted_final_session,
+                    "biodata_gate_artifacts": {
+                        "self": shared_self_biodata_gate,
+                        "peer": shared_peer_biodata_gate,
+                        "observer": weighted_observer_biodata_gate,
+                    },
+                    "participant_latency_drift_gates": {
+                        "self": shared_self_latency_gate,
+                        "peer": shared_peer_latency_gate,
+                        "observer": weighted_observer_latency_gate,
+                    },
+                    "biodata_arbitration_binding": weighted_latency_quorum_binding,
+                    "validation": {
+                        "ok": weighted_session_validation["ok"]
+                        and weighted_latency_quorum_validation["ok"],
+                        "session_ok": weighted_session_validation["ok"],
+                        "biodata_arbitration_ok": (
+                            weighted_latency_quorum_validation["ok"]
+                        ),
+                        "latency_quorum_profile": (
+                            weighted_latency_quorum_validation[
+                                "latency_quorum_profile"
+                            ]
+                        ),
+                        "latency_quorum_satisfied": (
+                            weighted_latency_quorum_validation[
+                                "latency_quorum_satisfied"
+                            ]
+                        ),
+                        "all_latency_gates_passed": (
+                            weighted_latency_quorum_validation[
+                                "all_latency_gates_passed"
+                            ]
+                        ),
+                        "latency_quorum_pass_weight": (
+                            weighted_latency_quorum_validation[
+                                "latency_quorum_pass_weight"
+                            ]
+                        ),
+                        "latency_quorum_failed_participant_ids": (
+                            weighted_latency_quorum_validation[
+                                "latency_quorum_failed_participant_ids"
+                            ]
+                        ),
+                        "participant_latency_weight_digest_bound": (
+                            weighted_latency_quorum_validation[
+                                "participant_latency_weight_digest_bound"
+                            ]
+                        ),
+                        "latency_quorum_digest_bound": (
+                            weighted_latency_quorum_validation[
+                                "latency_quorum_digest_bound"
+                            ]
+                        ),
+                    },
+                },
                 "receipts": {
                     "aligned": shared_aligned,
                     "mediated": shared_mediated,
@@ -13242,7 +13424,9 @@ json.dump(response, sys.stdout)
                     and shared_aligned_validation["ok"]
                     and shared_mediated_validation["ok"]
                     and shared_artifact_family_validation["ok"]
-                    and shared_biodata_arbitration_validation["ok"],
+                    and shared_biodata_arbitration_validation["ok"]
+                    and weighted_session_validation["ok"]
+                    and weighted_latency_quorum_validation["ok"],
                     "session_ok": shared_session_validation["ok"],
                     "aligned_ok": shared_aligned_validation["ok"],
                     "mediated_ok": shared_mediated_validation["ok"],
@@ -13297,6 +13481,28 @@ json.dump(response, sys.stdout)
                         ]
                         is False
                     ),
+                    "weighted_latency_quorum_ok": (
+                        weighted_latency_quorum_validation["ok"]
+                    ),
+                    "weighted_latency_quorum_satisfied": (
+                        weighted_latency_quorum_validation[
+                            "latency_quorum_satisfied"
+                        ]
+                    ),
+                    "weighted_latency_quorum_digest_bound": (
+                        weighted_latency_quorum_validation[
+                            "participant_latency_weight_digest_bound"
+                        ]
+                        and weighted_latency_quorum_validation[
+                            "latency_quorum_digest_bound"
+                        ]
+                    ),
+                    "weighted_latency_quorum_failed_participant_bound": (
+                        weighted_latency_quorum_validation[
+                            "latency_quorum_failed_participant_ids"
+                        ]
+                        == [observer.identity_id]
+                    ),
                     "shared_space_mode_collective": shared_final_session["shared_space_mode"]
                     == "collective-shared",
                     "participant_bindings_complete": shared_mediated_validation[
@@ -13330,6 +13536,8 @@ json.dump(response, sys.stdout)
                 and shared_mediated_validation["ok"]
                 and shared_artifact_family_validation["ok"]
                 and shared_biodata_arbitration_validation["ok"]
+                and weighted_session_validation["ok"]
+                and weighted_latency_quorum_validation["ok"]
                 and calibration_gate_validation["ok"],
                 "coherent_ok": coherent_validation["ok"],
                 "degraded_ok": degraded_validation["ok"],
@@ -13389,7 +13597,9 @@ json.dump(response, sys.stdout)
                 and shared_aligned_validation["ok"]
                 and shared_mediated_validation["ok"]
                 and shared_artifact_family_validation["ok"]
-                and shared_biodata_arbitration_validation["ok"],
+                and shared_biodata_arbitration_validation["ok"]
+                and weighted_session_validation["ok"]
+                and weighted_latency_quorum_validation["ok"],
                 "shared_loopback_collective_bound": shared_session_validation[
                     "shared_collective_bound"
                 ]
@@ -13459,10 +13669,34 @@ json.dump(response, sys.stdout)
                     ]
                     is False
                 ),
+                "shared_loopback_weighted_latency_quorum_ok": (
+                    weighted_latency_quorum_validation["ok"]
+                ),
+                "shared_loopback_weighted_latency_quorum_satisfied": (
+                    weighted_latency_quorum_validation["latency_quorum_satisfied"]
+                ),
+                "shared_loopback_weighted_latency_quorum_profile": (
+                    weighted_latency_quorum_validation["latency_quorum_profile"]
+                    == "weighted-latency-quorum-v1"
+                ),
+                "shared_loopback_weighted_latency_quorum_digest_bound": (
+                    weighted_latency_quorum_validation[
+                        "participant_latency_weight_digest_bound"
+                    ]
+                    and weighted_latency_quorum_validation[
+                        "latency_quorum_digest_bound"
+                    ]
+                ),
+                "shared_loopback_weighted_latency_quorum_failed_participant_bound": (
+                    weighted_latency_quorum_validation[
+                        "latency_quorum_failed_participant_ids"
+                    ]
+                    == [observer.identity_id]
+                ),
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
                 "public_schema_contract_profile": SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
-                "public_schema_contract_bound": len(schema_contracts) == 10
+                "public_schema_contract_bound": len(schema_contracts) == 11
                 and {contract["schema_path"] for contract in schema_contracts}
                 == {
                     "specs/schemas/sensory_loopback_session.schema",

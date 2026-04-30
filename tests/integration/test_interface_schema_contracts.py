@@ -586,7 +586,7 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["public_schema_contract_bound"])
         schema_contracts = result["schema_contracts"]
-        self.assertEqual(10, len(schema_contracts))
+        self.assertEqual(11, len(schema_contracts))
         for contract in schema_contracts:
             self._assert_schema_valid(
                 contract["schema_path"],
@@ -605,6 +605,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["shared_loopback_biodata_latency_gates_passed"]
         )
+        weighted = result["shared_loopback"]["weighted_latency_quorum"]
+        self.assertTrue(weighted["validation"]["latency_quorum_satisfied"])
+        self.assertFalse(weighted["validation"]["all_latency_gates_passed"])
+        self.assertTrue(weighted["validation"]["latency_quorum_digest_bound"])
 
 
 if __name__ == "__main__":

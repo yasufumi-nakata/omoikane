@@ -274,7 +274,6 @@ operations:
                 absolute_latency_drift_ms:
                   type: number
                   minimum: 0
-                  maximum: 12.0
                 max_latency_drift_ms:
                   const: 12.0
                 latency_threshold_digest:
@@ -294,7 +293,10 @@ operations:
                 threshold_policy_authority_bound:
                   type: boolean
                 latency_drift_status:
-                  const: pass
+                  type: string
+                  enum:
+                    - pass
+                    - blocked
                 raw_timing_payload_stored:
                   const: false
                 raw_hardware_adapter_payload_stored:
@@ -306,6 +308,19 @@ operations:
                 timing_gate_digest:
                   type: string
                   minLength: 32
+          participant_latency_weights:
+            type: object
+            minProperties: 3
+            maxProperties: 4
+            description: Optional weighted-latency-quorum-v1 participant weights. When omitted, all participant latency gates must pass.
+            additionalProperties:
+              type: number
+              exclusiveMinimum: 0
+              maximum: 1
+          latency_quorum_threshold:
+            type: number
+            exclusiveMinimum: 0
+            maximum: 1
     output:
       schema_ref: sensory_loopback_biodata_arbitration_binding
     guarantees:
@@ -313,8 +328,10 @@ operations:
       - participant_latency_drift_gates must cover exactly the same participant_identity_ids before shared arbitration accepts BioData gates
       - each participant gate must belong to the same participant identity and pass the sensory-loopback target gate
       - each participant gate must bind a passing feature-window series drift gate before shared loopback arbitration consumes it
-      - each participant latency gate must pass the hardware timing drift threshold and share the BioData threshold policy authority digest when authority is bound
-      - the output keeps only gate refs/digests, drift gate refs/digests, threshold digests, timing gate digests, and target gate-set digests
+      - without participant_latency_weights, each participant latency gate must pass the hardware timing drift threshold
+      - with weighted-latency-quorum-v1 on 3-4 participants, blocked participant timing gates are allowed only when the passing participant weight meets latency_quorum_threshold
+      - every participant latency gate must share the BioData threshold policy authority digest when authority is bound
+      - the output keeps only gate refs/digests, drift gate refs/digests, threshold digests, timing gate digests, target gate-set digests, participant latency weights, and latency quorum digests
       - raw BioData, calibration, drift, timing, hardware adapter, and gate payloads remain redacted
   deliver_bundle:
     summary: Deliver one bounded multi-sensory bundle with avatar body-map alignment evidence, optional shared-space owner arbitration, or degrade it into a guardian-controlled safe baseline.
