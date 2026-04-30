@@ -619,12 +619,34 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             ]
         )
         self.assertTrue(
+            result["shared_loopback"]["validation"][
+                "biodata_arbitration_calibration_refresh_fresh"
+            ]
+        )
+        self.assertTrue(
+            result["shared_loopback"]["validation"][
+                "biodata_arbitration_digest_bound"
+            ]
+        )
+        self.assertFalse(
+            result["shared_loopback"]["biodata_arbitration_binding"][
+                "raw_refresh_payload_stored"
+            ]
+        )
+        self.assertTrue(
             result["validation"]["shared_loopback_biodata_latency_gates_passed"]
+        )
+        self.assertTrue(
+            result["validation"]["shared_loopback_biodata_calibration_refresh_fresh"]
         )
         weighted = result["shared_loopback"]["weighted_latency_quorum"]
         self.assertTrue(weighted["validation"]["latency_quorum_satisfied"])
         self.assertFalse(weighted["validation"]["all_latency_gates_passed"])
         self.assertTrue(weighted["validation"]["latency_quorum_digest_bound"])
+        self.assertTrue(weighted["validation"]["calibration_refresh_fresh"])
+        self.assertTrue(
+            weighted["validation"]["participant_calibration_refresh_digest_set_bound"]
+        )
 
 
 if __name__ == "__main__":

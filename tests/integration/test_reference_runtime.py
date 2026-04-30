@@ -810,6 +810,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["shared_loopback_biodata_drift_gates_passed"])
         self.assertTrue(
+            result["validation"]["shared_loopback_biodata_calibration_refresh_fresh"]
+        )
+        self.assertTrue(
             result["validation"]["shared_loopback_biodata_binding_digest_bound"]
         )
         self.assertTrue(

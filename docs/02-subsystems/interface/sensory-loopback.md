@@ -22,8 +22,9 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
   `participant_identity_ids` / `shared_imc_session_id` / `shared_collective_id` を束縛し、
   competing `attention_target` を guardian-mediated arbitration で machine-checkable にする
 - shared session では participant ごとの BioData calibration confidence gate と
-  feature-window drift gate を digest-only に束ね、shared loopback arbitration の
-  入口で全 participant の gate coverage と drift pass を確認する
+  feature-window drift gate、fresh calibration refresh receipt を digest-only に束ね、
+  shared loopback arbitration の入口で全 participant の gate coverage、drift pass、
+  refresh window を確認する
 - 同じ shared arbitration で participant ごとの hardware timing latency drift gate を
   BioData threshold authority digest と束ね、timing overshoot を raw payload なしで reject する
 - 3-4 participant の shared field では `weighted-latency-quorum-v1` を明示した場合だけ、
@@ -52,6 +53,7 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | shared_space_modes | `self-only / imc-shared / collective-shared` |
 | arbitration_policy | `guardian-mediated-multi-self-loopback-v1` |
 | biodata_arbitration_policy | `participant-biodata-gate-arbitration-v1` |
+| calibration_refresh_propagation_profile | `participant-calibration-refresh-propagation-v1` |
 | participant_latency_drift_profile | `participant-hardware-timing-latency-drift-gate-v1` |
 | latency_quorum_profiles | `all-participant-latency-pass-v1 / weighted-latency-quorum-v1` |
 | max_participant_latency_drift_ms | `12.0` |
@@ -147,7 +149,9 @@ artifact family scene summary に残し、raw calibration payload と raw gate p
 shared session で BioData arbitration を使う場合、`participant_gate_receipts` は
 `participant_identity_ids` を過不足なく覆う必要がある。各 receipt は
 `sensory-loopback` target を pass し、`feature-window series drift gate` を
-`pass` として束縛していなければならない。`participant_latency_drift_gates` も
+`pass` として束縛し、`calibration_refresh_status=fresh` と
+`calibration_refresh_window_bound=true` を持つ refresh receipt も伝播していなければならない。
+`participant_latency_drift_gates` も
 同じ participant set を過不足なく覆い、baseline latency と observed latency の差が
 `12.0ms` 以下で、BioData gate に threshold policy authority がある場合は同じ
 authority ref / digest を保持していなければならない。3-4 participant の shared field で
@@ -156,10 +160,10 @@ authority ref / digest を保持していなければならない。3-4 particip
 blocked latency gate を `latency_quorum_failed_participant_ids` へ残したまま acceptance できる。
 未指定時は `all-participant-latency-pass-v1` として全 participant latency gate pass を要求する。
 shared arbitration binding は
-gate ref / gate digest、drift gate ref / digest、threshold digest、target gate-set digest、
-timing gate digest、latency threshold digest、participant latency weight digest、
-latency quorum digest だけを保持し、raw BioData / calibration /
-drift / timing / hardware adapter / gate payload は保存しない。
+gate ref / gate digest、drift gate ref / digest、refresh ref / digest / source digest set、
+threshold digest、target gate-set digest、timing gate digest、latency threshold digest、
+participant latency weight digest、latency quorum digest だけを保持し、raw BioData /
+calibration / drift / refresh / timing / hardware adapter / gate payload は保存しない。
 
 ## 不変条件
 
@@ -171,7 +175,7 @@ drift / timing / hardware adapter / gate payload は保存しない。
 6. **artifact family は同一 session 内限定** ── multi-scene family は 2-4 receipt を同一 session に束縛する
 7. **body map calibration 必須** ── session と receipt は `avatar_body_map_ref` / `proprioceptive_calibration_ref` / `body_map_alignment_ref` を必ず持つ
 8. **shared arbitration は guardian mediation 必須** ── multi-self loopback では participant map を省略せず、競合 focus は Guardian observe 下でのみ反映する
-9. **participant BioData gate は digest-only** ── shared BioData arbitration は各 participant の confidence gate、drift gate digest、latency timing gate digest だけを束縛し、raw BioData / timing payload を保持しない
+9. **participant BioData gate は digest-only** ── shared BioData arbitration は各 participant の confidence gate、drift gate digest、fresh calibration refresh digest、latency timing gate digest だけを束縛し、raw BioData / refresh / timing payload を保持しない
 
 ## reference runtime の扱い
 
@@ -188,7 +192,8 @@ drift / timing / hardware adapter / gate payload は保存しない。
   digest-only artifact family として可視化
 - 同じ shared path は participant ごとの BioData confidence / drift gate receipt を
   `participant-biodata-gate-arbitration-v1` binding へまとめ、
-  全 participant gate coverage、drift pass、hardware timing latency pass、
+  全 participant gate coverage、drift pass、fresh calibration refresh propagation、
+  hardware timing latency pass、
   binding digest、raw payload redaction を検証する
 - 同じ demo は 3 participant の weighted latency quorum も返し、observer の timing drift が
   blocked でも self + peer の passing weight が threshold を満たす場合だけ acceptance する
@@ -206,8 +211,9 @@ drift / timing / hardware adapter / gate payload は保存しない。
   guardian-mediated arbitration tracking を固定
 - `evals/interface/sensory_loopback_biodata_arbitration.yaml` で
   participant BioData confidence gate coverage、series drift gate pass、
-  participant hardware timing latency pass、weighted latency quorum、binding digest、
-  raw BioData / drift / timing / gate payload redaction を固定
+  fresh calibration refresh propagation、participant hardware timing latency pass、
+  weighted latency quorum、binding digest、
+  raw BioData / drift / refresh / timing / gate payload redaction を固定
 - `evals/interface/sensory_loopback_public_schema_contract.yaml` で
   CLI demo の schema manifest と public schema validation を固定
 

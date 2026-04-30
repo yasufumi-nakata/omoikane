@@ -1111,10 +1111,10 @@ sensory loopback 側では、この gate を
 まで補正する。これは body-map calibration、Guardian hold、stabilization を
 置き換えるものではなく、raw calibration / gate payload は保存しない。
 shared sensory loopback では、participant ごとの confidence gate と
-feature-window drift gate digest を
+feature-window drift gate digest、fresh calibration refresh digest を
 `participant-biodata-gate-arbitration-v1` binding にまとめ、全 participant の
-gate coverage、drift pass、hardware timing latency drift pass、binding digest、
-raw BioData / drift / timing / hardware adapter / gate payload 非保持を
+gate coverage、drift pass、refresh window、hardware timing latency drift pass、binding digest、
+raw BioData / drift / refresh / timing / hardware adapter / gate payload 非保持を
 Sensory Loopback 側で検証する。latency gate は
 `participant-hardware-timing-latency-drift-gate-v1` として baseline / observed latency の
 差を `12.0ms` cap で評価し、BioData drift threshold policy authority が bound の時は
@@ -1409,8 +1409,10 @@ owner handoff を伴う `shared-aligned` / `guardian-mediated` arbitration を
 別の digest-only artifact family として machine-checkable に残す。
 その前段で participant ごとの BioData confidence gate と feature-window drift gate を
 `sensory_loopback_biodata_arbitration_binding.schema` に従う digest-only binding へ束縛し、
+fresh calibration refresh receipt の ref / digest / source digest set / freshness window も
+participant ごとに同じ binding へ伝播し、
 participant ごとの hardware timing latency drift gate も同じ binding へ束縛し、
-shared arbitration が calibration / drift / timing / hardware adapter / gate payload を
+shared arbitration が calibration / drift / refresh / timing / hardware adapter / gate payload を
 保存しないことを検証する。
 同じ sidecar path は 3 participant の `weighted-latency-quorum-v1` も返し、
 observer の latency gate が blocked でも self + peer の pass weight が threshold を満たす時だけ

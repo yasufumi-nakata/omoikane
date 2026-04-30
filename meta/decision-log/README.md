@@ -143,6 +143,7 @@ status: decided | superseded
 - [2026-04-29_biodata-transmitter-calibration-profile.md](2026-04-29_biodata-transmitter-calibration-profile.md)
 - [2026-04-30_biodata-feature-window-series-drift-gate.md](2026-04-30_biodata-feature-window-series-drift-gate.md)
 - [2026-04-30_biodata-circadian-phase-verifier.md](2026-04-30_biodata-circadian-phase-verifier.md)
+- [2026-04-30_sensory-loopback-calibration-refresh-propagation.md](2026-04-30_sensory-loopback-calibration-refresh-propagation.md)
 - [2026-04-29_ewa-regulator-permit-verifier.md](2026-04-29_ewa-regulator-permit-verifier.md)
 - [2026-04-30_ewa-permit-quorum-stop-audit-binding.md](2026-04-30_ewa-permit-quorum-stop-audit-binding.md)
 - [2026-04-30_ewa-regulator-permit-revocation-forced-stop.md](2026-04-30_ewa-regulator-permit-revocation-forced-stop.md)

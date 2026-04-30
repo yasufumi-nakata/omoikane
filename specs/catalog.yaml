@@ -1243,7 +1243,7 @@ entries:
       - evals/interface/sensory_loopback_public_schema_contract.yaml
       - tests/integration/test_interface_schema_contracts.py
       - reference-runtime
-    rationale: Required to serialize participant-specific BioData confidence, feature-window drift gate, hardware timing latency drift gate distribution, and optional 3-4 participant weighted latency quorum into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, timing, hardware adapter, or gate payload retention.
+    rationale: Required to serialize participant-specific BioData confidence, feature-window drift gate, fresh calibration refresh propagation, hardware timing latency drift gate distribution, and optional 3-4 participant weighted latency quorum into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, refresh, timing, hardware adapter, or gate payload retention.
   - priority: P1
     kind: idl
     file: specs/interfaces/interface.sensory_loopback.v0.idl
@@ -1251,7 +1251,7 @@ entries:
       - reference-runtime
       - docs/02-subsystems/interface/sensory-loopback.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make L6 sensory loopback delivery, Guardian hold, stabilization, avatar body-map calibration, BioData confidence-gated drift-threshold adjustment, shared collective/IMC arbitration, participant BioData and latency drift gate arbitration, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
+    rationale: Required to make L6 sensory loopback delivery, Guardian hold, stabilization, avatar body-map calibration, BioData confidence-gated drift-threshold adjustment, shared collective/IMC arbitration, participant BioData refresh propagation and latency drift gate arbitration, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_guard.yaml
@@ -1280,7 +1280,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, hardware timing latency strict pass, weighted latency quorum, binding digest evidence, and raw BioData/drift/timing/hardware/gate payload redaction before shared loopback arbitration accepts participant gates.
+    rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, fresh calibration refresh propagation, hardware timing latency strict pass, weighted latency quorum, binding digest evidence, and raw BioData/drift/refresh/timing/hardware/gate payload redaction before shared loopback arbitration accepts participant gates.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_public_schema_contract.yaml

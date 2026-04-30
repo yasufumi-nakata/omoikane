@@ -32,6 +32,12 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             "feature_window_series_threshold_policy_authority_bound": True,
             "feature_window_series_drift_gate_status": "pass",
             "feature_window_series_drift_gate_bound": True,
+            "calibration_refresh_ref": f"calibration-refresh://unit/{suffix}",
+            "calibration_refresh_digest": f"{suffix[-1:]}" * 64,
+            "calibration_refresh_source_digest_set": f"{suffix[-1:].upper()}" * 64,
+            "calibration_refresh_window_bound": True,
+            "calibration_refresh_status": "fresh",
+            "calibration_refresh_bound": True,
             "target_gate_set_digest": "d" * 64,
             "target_gate_bindings": [
                 {
@@ -49,6 +55,7 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             ],
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
+            "raw_refresh_payload_stored": False,
             "raw_gate_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
@@ -567,6 +574,8 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertEqual(2, validation["participant_gate_count"])
         self.assertTrue(validation["all_participant_gates_bound"])
         self.assertTrue(validation["all_drift_gates_passed"])
+        self.assertTrue(validation["all_calibration_refresh_receipts_fresh"])
+        self.assertTrue(validation["all_calibration_refresh_windows_bound"])
         self.assertTrue(validation["all_latency_gates_passed"])
         self.assertTrue(validation["latency_quorum_satisfied"])
         self.assertEqual(
@@ -577,14 +586,21 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertTrue(validation["latency_quorum_digest_bound"])
         self.assertTrue(validation["participant_latency_digest_set_bound"])
         self.assertTrue(validation["participant_gate_digest_set_bound"])
+        self.assertTrue(validation["participant_calibration_refresh_digest_set_bound"])
         self.assertTrue(validation["binding_digest_bound"])
         self.assertFalse(binding["raw_biodata_payload_stored"])
         self.assertFalse(binding["raw_drift_payload_stored"])
+        self.assertFalse(binding["raw_refresh_payload_stored"])
         self.assertFalse(binding["raw_timing_payload_stored"])
 
         tampered = deepcopy(binding)
         tampered["participant_gate_digest_set"] = "0" * 64
         self.assertFalse(service.validate_participant_biodata_arbitration(tampered)["ok"])
+        tampered_refresh = deepcopy(binding)
+        tampered_refresh["participant_calibration_refresh_digest_set"] = "0" * 64
+        self.assertFalse(
+            service.validate_participant_biodata_arbitration(tampered_refresh)["ok"]
+        )
 
         with self.assertRaisesRegex(ValueError, "cover exactly"):
             service.bind_participant_biodata_arbitration(
@@ -710,6 +726,8 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertEqual("pass", validation["latency_gate_status"])
         self.assertTrue(validation["participant_latency_weight_digest_bound"])
         self.assertTrue(validation["latency_quorum_digest_bound"])
+        self.assertTrue(validation["all_calibration_refresh_receipts_fresh"])
+        self.assertTrue(validation["participant_calibration_refresh_digest_set_bound"])
 
         tampered = deepcopy(binding)
         tampered["participant_latency_weight_digest"] = "0" * 64

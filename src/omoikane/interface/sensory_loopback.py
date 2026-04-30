@@ -63,7 +63,10 @@ SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY = (
     "participant-biodata-gate-arbitration-v1"
 )
 SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY = (
-    "participant-gate-digest+drift-threshold-digest-only"
+    "participant-gate+drift+refresh-digest-only"
+)
+SENSORY_LOOPBACK_PARTICIPANT_REFRESH_PROPAGATION_PROFILE = (
+    "participant-calibration-refresh-propagation-v1"
 )
 SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE = (
     "participant-hardware-timing-latency-drift-gate-v1"
@@ -150,6 +153,10 @@ class SensoryLoopbackService:
                 "requires_shared_session": True,
                 "requires_participant_gate_coverage": True,
                 "requires_series_drift_gate_pass": True,
+                "requires_participant_calibration_refresh": True,
+                "calibration_refresh_propagation_profile": (
+                    SENSORY_LOOPBACK_PARTICIPANT_REFRESH_PROPAGATION_PROFILE
+                ),
                 "requires_participant_latency_drift_gate": True,
                 "latency_drift_profile": (
                     SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE
@@ -170,6 +177,7 @@ class SensoryLoopbackService:
                 "raw_biodata_payload_stored": False,
                 "raw_calibration_payload_stored": False,
                 "raw_drift_payload_stored": False,
+                "raw_refresh_payload_stored": False,
                 "raw_gate_payload_stored": False,
                 "raw_timing_payload_stored": False,
                 "raw_hardware_adapter_payload_stored": False,
@@ -938,6 +946,49 @@ class SensoryLoopbackService:
                 raise ValueError(
                     "unbound participant BioData threshold policy authority must use not-bound status",
                 )
+            refresh_bound = gate_receipt.get("calibration_refresh_bound") is True
+            refresh_ref = self._normalize_string(
+                gate_receipt.get("calibration_refresh_ref", ""),
+                "calibration_refresh_ref",
+            )
+            refresh_digest = self._normalize_string(
+                gate_receipt.get("calibration_refresh_digest", ""),
+                "calibration_refresh_digest",
+            )
+            refresh_source_digest_set = self._normalize_string(
+                gate_receipt.get("calibration_refresh_source_digest_set", ""),
+                "calibration_refresh_source_digest_set",
+            )
+            refresh_status = self._normalize_string(
+                gate_receipt.get("calibration_refresh_status", "not-bound"),
+                "calibration_refresh_status",
+            )
+            refresh_window_bound = gate_receipt.get("calibration_refresh_window_bound") is True
+            if not refresh_bound:
+                raise ValueError(
+                    "participant BioData confidence gate must bind a calibration refresh receipt",
+                )
+            if refresh_status != "fresh":
+                raise ValueError(
+                    "participant BioData calibration refresh receipt must be fresh",
+                )
+            if not refresh_window_bound:
+                raise ValueError(
+                    "participant BioData calibration refresh window must be bound",
+                )
+            for field_name, field_value in (
+                ("calibration_refresh_ref", refresh_ref),
+                ("calibration_refresh_digest", refresh_digest),
+                ("calibration_refresh_source_digest_set", refresh_source_digest_set),
+            ):
+                if not field_value:
+                    raise ValueError(
+                        f"participant BioData confidence gate {field_name} must be bound",
+                    )
+            if gate_receipt.get("raw_refresh_payload_stored") is not False:
+                raise ValueError(
+                    "participant BioData confidence gate raw_refresh_payload_stored must be false",
+                )
 
             latency_gate = participant_latency_drift_gates[participant_identity_id]
             latency_validation = self.validate_participant_latency_drift_gate(
@@ -1007,6 +1058,12 @@ class SensoryLoopbackService:
                         threshold_policy_authority_bound
                     ),
                     "feature_window_series_drift_gate_status": "pass",
+                    "calibration_refresh_ref": refresh_ref,
+                    "calibration_refresh_digest": refresh_digest,
+                    "calibration_refresh_source_digest_set": refresh_source_digest_set,
+                    "calibration_refresh_window_bound": refresh_window_bound,
+                    "calibration_refresh_status": refresh_status,
+                    "calibration_refresh_bound": refresh_bound,
                     "target_gate_set_digest": self._normalize_non_empty_string(
                         gate_receipt.get("target_gate_set_digest"),
                         "target_gate_set_digest",
@@ -1014,6 +1071,7 @@ class SensoryLoopbackService:
                     "sensory_loopback_gate_bound": True,
                     "raw_calibration_payload_stored": False,
                     "raw_drift_payload_stored": False,
+                    "raw_refresh_payload_stored": False,
                     "raw_gate_payload_stored": False,
                     "subjective_equivalence_claimed": False,
                     "semantic_thought_content_generated": False,
@@ -1100,6 +1158,9 @@ class SensoryLoopbackService:
         participant_latency_digest_set = self._participant_latency_drift_digest_set(
             participant_latency_bindings
         )
+        participant_refresh_digest_set = self._participant_calibration_refresh_digest_set(
+            participant_bindings
+        )
         latency_quorum = self._evaluate_latency_quorum(
             policy=latency_quorum_policy,
             participant_latency_passed=participant_latency_passed,
@@ -1124,6 +1185,10 @@ class SensoryLoopbackService:
             "participant_gate_digest_set": self._participant_biodata_gate_digest_set(
                 participant_bindings,
             ),
+            "participant_calibration_refresh_digest_set": participant_refresh_digest_set,
+            "all_calibration_refresh_receipts_fresh": True,
+            "all_calibration_refresh_windows_bound": True,
+            "calibration_refresh_status": "fresh",
             "participant_latency_bindings": participant_latency_bindings,
             "participant_latency_gate_count": len(participant_latency_bindings),
             "participant_latency_digest_set": participant_latency_digest_set,
@@ -1150,6 +1215,7 @@ class SensoryLoopbackService:
             "raw_biodata_payload_stored": False,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
+            "raw_refresh_payload_stored": False,
             "raw_gate_payload_stored": False,
             "raw_timing_payload_stored": False,
             "raw_hardware_adapter_payload_stored": False,
@@ -2157,6 +2223,11 @@ class SensoryLoopbackService:
             "participant_gate_digest_set",
             errors,
         )
+        self._check_non_empty_string(
+            binding.get("participant_calibration_refresh_digest_set"),
+            "participant_calibration_refresh_digest_set",
+            errors,
+        )
         self._check_non_empty_string(binding.get("binding_digest"), "binding_digest", errors)
         if binding.get("schema_version") != SENSORY_LOOPBACK_SCHEMA_VERSION:
             errors.append(f"schema_version must be {SENSORY_LOOPBACK_SCHEMA_VERSION}")
@@ -2265,6 +2336,28 @@ class SensoryLoopbackService:
                 errors.append(
                     f"participant_gate_bindings[{index}].feature_window_series_drift_gate_status must be pass",
                 )
+            if participant_binding.get("calibration_refresh_bound") is not True:
+                errors.append(
+                    f"participant_gate_bindings[{index}].calibration_refresh_bound must be true",
+                )
+            if participant_binding.get("calibration_refresh_status") != "fresh":
+                errors.append(
+                    f"participant_gate_bindings[{index}].calibration_refresh_status must be fresh",
+                )
+            if participant_binding.get("calibration_refresh_window_bound") is not True:
+                errors.append(
+                    f"participant_gate_bindings[{index}].calibration_refresh_window_bound must be true",
+                )
+            for field_name in (
+                "calibration_refresh_ref",
+                "calibration_refresh_digest",
+                "calibration_refresh_source_digest_set",
+            ):
+                self._check_non_empty_string(
+                    participant_binding.get(field_name),
+                    f"participant_gate_bindings[{index}].{field_name}",
+                    errors,
+                )
             authority_bound = participant_binding.get(
                 "feature_window_series_threshold_policy_authority_bound"
             )
@@ -2312,6 +2405,7 @@ class SensoryLoopbackService:
             for field_name in (
                 "raw_calibration_payload_stored",
                 "raw_drift_payload_stored",
+                "raw_refresh_payload_stored",
                 "raw_gate_payload_stored",
                 "subjective_equivalence_claimed",
                 "semantic_thought_content_generated",
@@ -2330,6 +2424,18 @@ class SensoryLoopbackService:
             )
         if not participant_gate_digest_set_bound:
             errors.append("participant_gate_digest_set mismatch")
+        participant_refresh_digest_set_bound = False
+        if all(isinstance(item, Mapping) for item in participant_bindings):
+            expected_refresh_digest_set = self._participant_calibration_refresh_digest_set(
+                participant_bindings,
+            )
+            participant_refresh_digest_set_bound = (
+                bool(participant_bindings)
+                and binding.get("participant_calibration_refresh_digest_set")
+                == expected_refresh_digest_set
+            )
+        if not participant_refresh_digest_set_bound:
+            errors.append("participant_calibration_refresh_digest_set mismatch")
         participant_latency_bindings = binding.get("participant_latency_bindings")
         if not isinstance(participant_latency_bindings, list):
             errors.append("participant_latency_bindings must be a list")
@@ -2428,6 +2534,23 @@ class SensoryLoopbackService:
                 for item in participant_bindings
             )
         )
+        all_calibration_refresh_receipts_fresh = (
+            bool(participant_bindings)
+            and all(
+                isinstance(item, Mapping)
+                and item.get("calibration_refresh_bound") is True
+                and item.get("calibration_refresh_status") == "fresh"
+                for item in participant_bindings
+            )
+        )
+        all_calibration_refresh_windows_bound = (
+            bool(participant_bindings)
+            and all(
+                isinstance(item, Mapping)
+                and item.get("calibration_refresh_window_bound") is True
+                for item in participant_bindings
+            )
+        )
         all_latency_gates_passed = (
             bool(participant_latency_bindings)
             and all(
@@ -2445,13 +2568,28 @@ class SensoryLoopbackService:
             errors.append("all_participant_gates_bound mismatch")
         if binding.get("all_drift_gates_passed") != all_drift_gates_passed:
             errors.append("all_drift_gates_passed mismatch")
+        if (
+            binding.get("all_calibration_refresh_receipts_fresh")
+            != all_calibration_refresh_receipts_fresh
+        ):
+            errors.append("all_calibration_refresh_receipts_fresh mismatch")
+        if (
+            binding.get("all_calibration_refresh_windows_bound")
+            != all_calibration_refresh_windows_bound
+        ):
+            errors.append("all_calibration_refresh_windows_bound mismatch")
+        if binding.get("calibration_refresh_status") != "fresh":
+            errors.append("calibration_refresh_status must be fresh")
         if binding.get("all_latency_gates_passed") != all_latency_gates_passed:
             errors.append("all_latency_gates_passed mismatch")
         expected_status = (
             "pass"
             if all_participant_gates_bound
             and all_drift_gates_passed
+            and all_calibration_refresh_receipts_fresh
+            and all_calibration_refresh_windows_bound
             and participant_gate_digest_set_bound
+            and participant_refresh_digest_set_bound
             and latency_quorum_satisfied
             and participant_latency_digest_set_bound
             and participant_latency_weight_digest_bound
@@ -2466,6 +2604,7 @@ class SensoryLoopbackService:
             "raw_biodata_payload_stored",
             "raw_calibration_payload_stored",
             "raw_drift_payload_stored",
+            "raw_refresh_payload_stored",
             "raw_gate_payload_stored",
             "raw_timing_payload_stored",
             "raw_hardware_adapter_payload_stored",
@@ -2496,6 +2635,9 @@ class SensoryLoopbackService:
             "session_bound": session_bound,
             "participant_gate_count": len(participant_bindings),
             "participant_gate_digest_set_bound": participant_gate_digest_set_bound,
+            "participant_calibration_refresh_digest_set_bound": (
+                participant_refresh_digest_set_bound
+            ),
             "participant_latency_gate_count": len(participant_latency_bindings),
             "participant_latency_digest_set_bound": participant_latency_digest_set_bound,
             "latency_quorum_profile": latency_quorum_profile,
@@ -2511,12 +2653,19 @@ class SensoryLoopbackService:
             "binding_digest_bound": binding_digest_bound,
             "all_participant_gates_bound": all_participant_gates_bound,
             "all_drift_gates_passed": all_drift_gates_passed,
+            "all_calibration_refresh_receipts_fresh": (
+                all_calibration_refresh_receipts_fresh
+            ),
+            "all_calibration_refresh_windows_bound": (
+                all_calibration_refresh_windows_bound
+            ),
             "all_latency_gates_passed": all_latency_gates_passed,
             "arbitration_gate_status": binding.get("arbitration_gate_status"),
             "latency_gate_status": binding.get("latency_gate_status"),
             "raw_biodata_payload_stored": False,
             "raw_calibration_payload_stored": False,
             "raw_drift_payload_stored": False,
+            "raw_refresh_payload_stored": False,
             "raw_gate_payload_stored": False,
             "raw_timing_payload_stored": False,
             "raw_hardware_adapter_payload_stored": False,
@@ -3045,8 +3194,52 @@ class SensoryLoopbackService:
                             "feature_window_series_threshold_policy_source_digest_set": binding.get(
                                 "feature_window_series_threshold_policy_source_digest_set"
                             ),
+                            "calibration_refresh_digest": binding.get(
+                                "calibration_refresh_digest"
+                            ),
+                            "calibration_refresh_source_digest_set": binding.get(
+                                "calibration_refresh_source_digest_set"
+                            ),
+                            "calibration_refresh_status": binding.get(
+                                "calibration_refresh_status"
+                            ),
+                            "calibration_refresh_window_bound": binding.get(
+                                "calibration_refresh_window_bound"
+                            ),
                             "target_gate_set_digest": binding.get(
                                 "target_gate_set_digest"
+                            ),
+                        }
+                        for binding in participant_bindings
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
+    def _participant_calibration_refresh_digest_set(
+        participant_bindings: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": SENSORY_LOOPBACK_PARTICIPANT_REFRESH_PROPAGATION_PROFILE,
+                    "participant_calibration_refresh_bindings": [
+                        {
+                            "participant_identity_id": binding.get(
+                                "participant_identity_id"
+                            ),
+                            "calibration_refresh_digest": binding.get(
+                                "calibration_refresh_digest"
+                            ),
+                            "calibration_refresh_source_digest_set": binding.get(
+                                "calibration_refresh_source_digest_set"
+                            ),
+                            "calibration_refresh_status": binding.get(
+                                "calibration_refresh_status"
+                            ),
+                            "calibration_refresh_window_bound": binding.get(
+                                "calibration_refresh_window_bound"
                             ),
                         }
                         for binding in participant_bindings

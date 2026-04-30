@@ -3,9 +3,10 @@ $id: "https://omoikane.dev/specs/schemas/sensory_loopback_biodata_arbitration_bi
 title: SensoryLoopbackBioDataArbitrationBinding
 description: >
   Digest-only binding that distributes participant-specific BioData calibration
-  confidence and feature-window drift gates into one shared Sensory Loopback
-  arbitration session without storing raw BioData, calibration, drift, or gate
-  payloads.
+  confidence, feature-window drift gates, fresh calibration refresh receipts,
+  and hardware timing latency gates into one shared Sensory Loopback arbitration
+  session without storing raw BioData, calibration, drift, refresh, timing,
+  hardware adapter, or gate payloads.
 type: object
 additionalProperties: false
 required:
@@ -22,6 +23,10 @@ required:
   - participant_gate_bindings
   - participant_gate_count
   - participant_gate_digest_set
+  - participant_calibration_refresh_digest_set
+  - all_calibration_refresh_receipts_fresh
+  - all_calibration_refresh_windows_bound
+  - calibration_refresh_status
   - participant_latency_bindings
   - participant_latency_gate_count
   - participant_latency_digest_set
@@ -44,6 +49,7 @@ required:
   - raw_biodata_payload_stored
   - raw_calibration_payload_stored
   - raw_drift_payload_stored
+  - raw_refresh_payload_stored
   - raw_gate_payload_stored
   - raw_timing_payload_stored
   - raw_hardware_adapter_payload_stored
@@ -108,10 +114,17 @@ properties:
         - feature_window_series_threshold_policy_authority_status
         - feature_window_series_threshold_policy_authority_bound
         - feature_window_series_drift_gate_status
+        - calibration_refresh_ref
+        - calibration_refresh_digest
+        - calibration_refresh_source_digest_set
+        - calibration_refresh_window_bound
+        - calibration_refresh_status
+        - calibration_refresh_bound
         - target_gate_set_digest
         - sensory_loopback_gate_bound
         - raw_calibration_payload_stored
         - raw_drift_payload_stored
+        - raw_refresh_payload_stored
         - raw_gate_payload_stored
         - subjective_equivalence_claimed
         - semantic_thought_content_generated
@@ -157,6 +170,21 @@ properties:
           type: boolean
         feature_window_series_drift_gate_status:
           const: pass
+        calibration_refresh_ref:
+          type: string
+          minLength: 1
+        calibration_refresh_digest:
+          type: string
+          minLength: 32
+        calibration_refresh_source_digest_set:
+          type: string
+          minLength: 32
+        calibration_refresh_window_bound:
+          const: true
+        calibration_refresh_status:
+          const: fresh
+        calibration_refresh_bound:
+          const: true
         target_gate_set_digest:
           type: string
           minLength: 32
@@ -165,6 +193,8 @@ properties:
         raw_calibration_payload_stored:
           const: false
         raw_drift_payload_stored:
+          const: false
+        raw_refresh_payload_stored:
           const: false
         raw_gate_payload_stored:
           const: false
@@ -179,6 +209,15 @@ properties:
   participant_gate_digest_set:
     type: string
     minLength: 32
+  participant_calibration_refresh_digest_set:
+    type: string
+    minLength: 32
+  all_calibration_refresh_receipts_fresh:
+    const: true
+  all_calibration_refresh_windows_bound:
+    const: true
+  calibration_refresh_status:
+    const: fresh
   participant_latency_bindings:
     type: array
     minItems: 2
@@ -329,7 +368,7 @@ properties:
   latency_gate_status:
     const: pass
   storage_policy:
-    const: participant-gate-digest+drift-threshold-digest-only
+    const: participant-gate+drift+refresh-digest-only
   timing_storage_policy:
     const: participant-timing-ref+latency-drift-digest-only
   raw_biodata_payload_stored:
@@ -337,6 +376,8 @@ properties:
   raw_calibration_payload_stored:
     const: false
   raw_drift_payload_stored:
+    const: false
+  raw_refresh_payload_stored:
     const: false
   raw_gate_payload_stored:
     const: false

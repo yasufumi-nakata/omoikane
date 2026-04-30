@@ -12676,6 +12676,60 @@ json.dump(response, sys.stdout)
             calibration_profile,
             threshold_policy_authority_receipt=threshold_policy_authority,
         )
+        calibration_refresh_receipt = self.biodata_transmitter.bind_calibration_refresh_receipt(
+            session,
+            calibration_profile,
+            drift_gate,
+            refresh_sources=[
+                {
+                    "source_type": "current-drift-gate",
+                    "source_ref": drift_gate["drift_gate_ref"],
+                    "evidence_ref": (
+                        f"drift-gate-evidence://sensory-loopback/{label}/current-window"
+                    ),
+                    "verifier_key_ref": (
+                        f"verifier-key://sensory-loopback/{label}/drift-gate"
+                    ),
+                    "freshness_status_ref": (
+                        f"freshness://sensory-loopback/{label}/drift-gate/fresh"
+                    ),
+                },
+                {
+                    "source_type": "self-consent",
+                    "source_ref": f"consent://sensory-loopback/{label}/refresh",
+                    "evidence_ref": (
+                        f"consent-evidence://sensory-loopback/{label}/refresh-digest"
+                    ),
+                    "verifier_key_ref": (
+                        f"verifier-key://sensory-loopback/{label}/self-consent"
+                    ),
+                    "freshness_status_ref": (
+                        f"freshness://sensory-loopback/{label}/self-consent/current"
+                    ),
+                },
+                {
+                    "source_type": "guardian-review",
+                    "source_ref": (
+                        f"guardian-review://sensory-loopback/{label}/calibration-refresh"
+                    ),
+                    "evidence_ref": (
+                        f"guardian-evidence://sensory-loopback/{label}/refresh-window"
+                    ),
+                    "verifier_key_ref": (
+                        f"verifier-key://sensory-loopback/{label}/guardian"
+                    ),
+                    "freshness_status_ref": (
+                        f"freshness://sensory-loopback/{label}/guardian/current"
+                    ),
+                },
+            ],
+            refresh_deadline_ref=(
+                f"schedule://sensory-loopback/{label}/calibration-refresh-before-30d"
+            ),
+            refreshed_at_ref=(
+                f"timestamp://sensory-loopback/{label}/calibration-refresh/current"
+            ),
+        )
         confidence_gate = self.biodata_transmitter.bind_calibration_confidence_gate(
             session,
             calibration_profile,
@@ -12686,6 +12740,7 @@ json.dump(response, sys.stdout)
                 "sensory-loopback": f"sensory-loopback://atrium/shared/{label}",
             },
             feature_window_series_drift_gate_receipt=drift_gate,
+            calibration_refresh_receipt=calibration_refresh_receipt,
         )
         confidence_gate_validation = (
             self.biodata_transmitter.validate_calibration_confidence_gate(
@@ -12703,6 +12758,7 @@ json.dump(response, sys.stdout)
             "calibration_profile": calibration_profile,
             "drift_threshold_policy_authority": threshold_policy_authority,
             "feature_window_series_drift_gate": drift_gate,
+            "calibration_refresh_receipt": calibration_refresh_receipt,
             "confidence_gate": confidence_gate,
             "confidence_gate_validation": confidence_gate_validation,
         }
@@ -13530,6 +13586,19 @@ json.dump(response, sys.stdout)
                                 "latency_quorum_digest_bound"
                             ]
                         ),
+                        "calibration_refresh_fresh": (
+                            weighted_latency_quorum_validation[
+                                "all_calibration_refresh_receipts_fresh"
+                            ]
+                            and weighted_latency_quorum_validation[
+                                "all_calibration_refresh_windows_bound"
+                            ]
+                        ),
+                        "participant_calibration_refresh_digest_set_bound": (
+                            weighted_latency_quorum_validation[
+                                "participant_calibration_refresh_digest_set_bound"
+                            ]
+                        ),
                     },
                 },
                 "receipts": {
@@ -13560,6 +13629,14 @@ json.dump(response, sys.stdout)
                     "biodata_arbitration_drift_gates_passed": (
                         shared_biodata_arbitration_validation["all_drift_gates_passed"]
                     ),
+                    "biodata_arbitration_calibration_refresh_fresh": (
+                        shared_biodata_arbitration_validation[
+                            "all_calibration_refresh_receipts_fresh"
+                        ]
+                        and shared_biodata_arbitration_validation[
+                            "all_calibration_refresh_windows_bound"
+                        ]
+                    ),
                     "biodata_arbitration_latency_gates_passed": (
                         shared_biodata_arbitration_validation[
                             "all_latency_gates_passed"
@@ -13568,6 +13645,9 @@ json.dump(response, sys.stdout)
                     "biodata_arbitration_digest_bound": (
                         shared_biodata_arbitration_validation[
                             "binding_digest_bound"
+                        ]
+                        and shared_biodata_arbitration_validation[
+                            "participant_calibration_refresh_digest_set_bound"
                         ]
                         and shared_biodata_arbitration_validation[
                             "participant_latency_digest_set_bound"
@@ -13584,6 +13664,10 @@ json.dump(response, sys.stdout)
                         is False
                         and shared_biodata_arbitration_validation[
                             "raw_drift_payload_stored"
+                        ]
+                        is False
+                        and shared_biodata_arbitration_validation[
+                            "raw_refresh_payload_stored"
                         ]
                         is False
                         and shared_biodata_arbitration_validation[
@@ -13749,6 +13833,14 @@ json.dump(response, sys.stdout)
                 "shared_loopback_biodata_drift_gates_passed": (
                     shared_biodata_arbitration_validation["all_drift_gates_passed"]
                 ),
+                "shared_loopback_biodata_calibration_refresh_fresh": (
+                    shared_biodata_arbitration_validation[
+                        "all_calibration_refresh_receipts_fresh"
+                    ]
+                    and shared_biodata_arbitration_validation[
+                        "all_calibration_refresh_windows_bound"
+                    ]
+                ),
                 "shared_loopback_biodata_latency_gates_passed": (
                     shared_biodata_arbitration_validation["all_latency_gates_passed"]
                 ),
@@ -13756,6 +13848,9 @@ json.dump(response, sys.stdout)
                     shared_biodata_arbitration_validation["binding_digest_bound"]
                     and shared_biodata_arbitration_validation[
                         "participant_gate_digest_set_bound"
+                    ]
+                    and shared_biodata_arbitration_validation[
+                        "participant_calibration_refresh_digest_set_bound"
                     ]
                     and shared_biodata_arbitration_validation[
                         "participant_latency_digest_set_bound"
@@ -13772,6 +13867,10 @@ json.dump(response, sys.stdout)
                     is False
                     and shared_biodata_arbitration_validation[
                         "raw_drift_payload_stored"
+                    ]
+                    is False
+                    and shared_biodata_arbitration_validation[
+                        "raw_refresh_payload_stored"
                     ]
                     is False
                     and shared_biodata_arbitration_validation[

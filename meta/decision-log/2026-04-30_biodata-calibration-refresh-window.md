@@ -50,4 +50,4 @@ raw refresh payload、raw gate payload は保存しない。
 
 - freshness window を live scheduler / external verifier cadence と接続する時
 - multi-jurisdiction Guardian review quorum を calibration refresh source に拡張する時
-- participant-specific shared loopback calibration refresh を group arbitration に伝播する時
+- participant-specific shared loopback calibration refresh を live scheduler / external verifier cadence まで伝播する時
