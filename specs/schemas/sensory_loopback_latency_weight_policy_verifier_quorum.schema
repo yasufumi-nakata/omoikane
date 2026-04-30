@@ -3,7 +3,8 @@ $id: "https://omoikane.dev/specs/schemas/sensory_loopback_latency_weight_policy_
 title: SensoryLoopbackLatencyWeightPolicyVerifierQuorum
 description: >
   Digest-only live verifier quorum receipt proving that a weighted Sensory
-  Loopback latency-weight policy authority remains fresh before a weighted
+  Loopback latency-weight policy authority remains fresh, and that each verifier
+  response stayed within a bounded request-timeout budget, before a weighted
   latency quorum can accept a blocked participant timing gate.
 type: object
 additionalProperties: false
@@ -19,10 +20,13 @@ required:
   - verifier_receipts
   - verifier_response_digest_set
   - verifier_signature_digest_set
+  - verifier_request_timeout_digest_set
   - quorum_threshold
   - quorum_status
   - freshness_window_hours
   - freshness_status
+  - verifier_request_timeout_budget_ms
+  - verifier_request_timeout_budget_bound
   - authority_freshness_bound
   - source_digest_set_bound
   - raw_verifier_payload_stored
@@ -76,6 +80,10 @@ properties:
         - freshness_window_hours
         - freshness_status
         - verifier_status
+        - request_timeout_ms
+        - request_timeout_budget_ms
+        - request_timeout_budget_bound
+        - observed_latency_ms
         - response_digest
         - signing_key_ref
         - response_signature_digest
@@ -106,6 +114,18 @@ properties:
           const: fresh
         verifier_status:
           const: accepted
+        request_timeout_ms:
+          type: integer
+          minimum: 1
+          maximum: 250
+        request_timeout_budget_ms:
+          const: 250
+        request_timeout_budget_bound:
+          const: true
+        observed_latency_ms:
+          type: number
+          minimum: 0
+          maximum: 250
         response_digest:
           type: string
           minLength: 32
@@ -125,6 +145,9 @@ properties:
   verifier_signature_digest_set:
     type: string
     minLength: 32
+  verifier_request_timeout_digest_set:
+    type: string
+    minLength: 32
   quorum_threshold:
     const: 2
   quorum_status:
@@ -133,6 +156,10 @@ properties:
     const: 24
   freshness_status:
     const: fresh
+  verifier_request_timeout_budget_ms:
+    const: 250
+  verifier_request_timeout_budget_bound:
+    const: true
   authority_freshness_bound:
     const: true
   source_digest_set_bound:

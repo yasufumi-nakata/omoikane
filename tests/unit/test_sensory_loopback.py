@@ -89,12 +89,39 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         authority_ref: str = "latency-weight-policy-authority://unit/shared-weight-policy",
         authority_digest: str = "9" * 64,
         source_digest_set: str = "8" * 64,
+        timeout_ms: int = 250,
     ) -> dict:
         return service.bind_latency_weight_policy_verifier_quorum(
             authority_ref=authority_ref,
             authority_digest=authority_digest,
             source_digest_set=source_digest_set,
+            timeout_ms=timeout_ms,
         )
+
+    def test_latency_weight_policy_verifier_quorum_binds_timeout_budget(self) -> None:
+        service = SensoryLoopbackService()
+        quorum = self._fake_latency_weight_policy_verifier_quorum(service)
+        validation = service.validate_latency_weight_policy_verifier_quorum(quorum)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["request_timeout_budget_bound"])
+        self.assertTrue(validation["request_timeout_digest_set_bound"])
+        self.assertEqual(250, quorum["verifier_request_timeout_budget_ms"])
+        self.assertTrue(quorum["verifier_request_timeout_budget_bound"])
+        for receipt in quorum["verifier_receipts"]:
+            self.assertEqual(250, receipt["request_timeout_ms"])
+            self.assertEqual(250, receipt["request_timeout_budget_ms"])
+            self.assertTrue(receipt["request_timeout_budget_bound"])
+            self.assertLessEqual(
+                receipt["observed_latency_ms"],
+                receipt["request_timeout_ms"],
+            )
+
+        tampered = deepcopy(quorum)
+        tampered["verifier_receipts"][0]["request_timeout_ms"] = 251
+        self.assertFalse(service.validate_latency_weight_policy_verifier_quorum(tampered)["ok"])
+        with self.assertRaisesRegex(ValueError, "timeout_ms"):
+            self._fake_latency_weight_policy_verifier_quorum(service, timeout_ms=251)
 
     def test_coherent_bundle_preserves_immersion_and_digest_only_audit(self) -> None:
         service = SensoryLoopbackService()
@@ -762,6 +789,7 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             "fresh",
             validation["latency_weight_policy_verifier_freshness_status"],
         )
+        self.assertTrue(validation["latency_weight_policy_verifier_timeout_bound"])
         self.assertTrue(validation["latency_quorum_digest_bound"])
         self.assertTrue(validation["all_calibration_refresh_receipts_fresh"])
         self.assertTrue(validation["participant_calibration_refresh_digest_set_bound"])
@@ -784,6 +812,15 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         tampered_verifier["latency_weight_policy_verifier_quorum_digest"] = "0" * 64
         self.assertFalse(
             service.validate_participant_biodata_arbitration(tampered_verifier)["ok"]
+        )
+        tampered_verifier_timeout = deepcopy(binding)
+        tampered_verifier_timeout[
+            "latency_weight_policy_verifier_timeout_bound"
+        ] = False
+        self.assertFalse(
+            service.validate_participant_biodata_arbitration(tampered_verifier_timeout)[
+                "ok"
+            ]
         )
         with self.assertRaisesRegex(
             ValueError,

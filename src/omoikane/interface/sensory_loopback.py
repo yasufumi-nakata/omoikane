@@ -85,6 +85,7 @@ SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE = (
 )
 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD = 2
 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS = 24
+SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS = 250
 SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS = 3
 SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES = {
     "self-exclusive",
@@ -191,6 +192,10 @@ class SensoryLoopbackService:
                 "latency_weight_policy_freshness_hours": (
                     SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
                 ),
+                "latency_weight_policy_verifier_request_timeout_ms": (
+                    SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS
+                ),
+                "requires_latency_weight_policy_verifier_timeout_budget": True,
                 "weighted_latency_min_participants": (
                     SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS
                 ),
@@ -1283,6 +1288,9 @@ class SensoryLoopbackService:
             "latency_weight_policy_verifier_fresh": latency_quorum_policy[
                 "weight_policy_verifier_fresh"
             ],
+            "latency_weight_policy_verifier_timeout_bound": latency_quorum_policy[
+                "weight_policy_verifier_timeout_bound"
+            ],
             "latency_quorum_pass_weight": latency_quorum["pass_weight"],
             "latency_quorum_failed_participant_ids": latency_quorum[
                 "failed_participant_ids"
@@ -1430,6 +1438,7 @@ class SensoryLoopbackService:
         source_digest_set: str,
         verifier_refs: Optional[Sequence[str]] = None,
         verifier_jurisdictions: Optional[Sequence[str]] = None,
+        timeout_ms: int = SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS,
     ) -> Dict[str, Any]:
         normalized_authority_ref = self._normalize_non_empty_string(
             authority_ref,
@@ -1472,65 +1481,61 @@ class SensoryLoopbackService:
             raise ValueError(
                 "latency weight policy verifier quorum refs and jurisdictions must be unique"
             )
+        normalized_timeout_ms = (
+            self._normalize_latency_weight_policy_verifier_timeout(timeout_ms)
+        )
 
         observed_at = utc_now_iso()
         receipts: List[Dict[str, Any]] = []
-        for normalized_verifier_ref, normalized_jurisdiction in zip(
+        for index, (normalized_verifier_ref, normalized_jurisdiction) in enumerate(zip(
             refs,
             jurisdictions,
-        ):
-            response_digest = sha256_text(
-                canonical_json(
-                    {
-                        "profile_id": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE,
-                        "verifier_ref": normalized_verifier_ref,
-                        "jurisdiction": normalized_jurisdiction,
-                        "authority_ref": normalized_authority_ref,
-                        "authority_digest": normalized_authority_digest,
-                        "source_digest_set": normalized_source_digest_set,
-                        "observed_at": observed_at,
-                        "freshness_window_hours": (
-                            SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
-                        ),
-                        "freshness_status": "fresh",
-                        "verifier_status": "accepted",
-                    }
-                )
-            )
+        )):
             signing_key_ref = (
                 f"verifier-key://{normalized_jurisdiction.lower()}/"
                 "latency-weight-policy"
+            )
+            receipt = {
+                "verifier_ref": normalized_verifier_ref,
+                "jurisdiction": normalized_jurisdiction,
+                "observed_at": observed_at,
+                "authority_ref": normalized_authority_ref,
+                "authority_digest": normalized_authority_digest,
+                "source_digest_set": normalized_source_digest_set,
+                "freshness_window_hours": (
+                    SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
+                ),
+                "freshness_status": "fresh",
+                "verifier_status": "accepted",
+                "request_timeout_ms": normalized_timeout_ms,
+                "request_timeout_budget_ms": (
+                    SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS
+                ),
+                "request_timeout_budget_bound": True,
+                "observed_latency_ms": round(18.0 + (index * 1.5), 3),
+                "signing_key_ref": signing_key_ref,
+                "raw_response_payload_stored": False,
+                "raw_signature_payload_stored": False,
+            }
+            receipt["response_digest"] = sha256_text(
+                canonical_json(
+                    self._latency_weight_policy_verifier_response_digest_payload(
+                        receipt,
+                    )
+                )
             )
             response_signature_digest = sha256_text(
                 canonical_json(
                     {
                         "verifier_ref": normalized_verifier_ref,
                         "jurisdiction": normalized_jurisdiction,
-                        "response_digest": response_digest,
+                        "response_digest": receipt["response_digest"],
                         "signing_key_ref": signing_key_ref,
                     }
                 )
             )
-            receipts.append(
-                {
-                    "verifier_ref": normalized_verifier_ref,
-                    "jurisdiction": normalized_jurisdiction,
-                    "observed_at": observed_at,
-                    "authority_ref": normalized_authority_ref,
-                    "authority_digest": normalized_authority_digest,
-                    "source_digest_set": normalized_source_digest_set,
-                    "freshness_window_hours": (
-                        SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
-                    ),
-                    "freshness_status": "fresh",
-                    "verifier_status": "accepted",
-                    "response_digest": response_digest,
-                    "signing_key_ref": signing_key_ref,
-                    "response_signature_digest": response_signature_digest,
-                    "raw_response_payload_stored": False,
-                    "raw_signature_payload_stored": False,
-                }
-            )
+            receipt["response_signature_digest"] = response_signature_digest
+            receipts.append(receipt)
 
         quorum_id = new_id("sl-latency-policy-quorum")
         quorum = {
@@ -1551,6 +1556,9 @@ class SensoryLoopbackService:
             "verifier_signature_digest_set": (
                 self._latency_weight_policy_verifier_signature_digest_set(receipts)
             ),
+            "verifier_request_timeout_digest_set": (
+                self._latency_weight_policy_verifier_timeout_digest_set(receipts)
+            ),
             "quorum_threshold": (
                 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD
             ),
@@ -1559,6 +1567,10 @@ class SensoryLoopbackService:
                 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
             ),
             "freshness_status": "fresh",
+            "verifier_request_timeout_budget_ms": (
+                SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS
+            ),
+            "verifier_request_timeout_budget_bound": True,
             "authority_freshness_bound": True,
             "source_digest_set_bound": True,
             "raw_verifier_payload_stored": False,
@@ -2465,6 +2477,7 @@ class SensoryLoopbackService:
             "source_digest_set",
             "verifier_response_digest_set",
             "verifier_signature_digest_set",
+            "verifier_request_timeout_digest_set",
             "verifier_quorum_digest",
         ):
             self._check_non_empty_string(quorum.get(field_name), field_name, errors)
@@ -2513,6 +2526,16 @@ class SensoryLoopbackService:
             )
         if quorum.get("freshness_status") != "fresh":
             errors.append("freshness_status must be fresh")
+        if (
+            quorum.get("verifier_request_timeout_budget_ms")
+            != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS
+        ):
+            errors.append(
+                "verifier_request_timeout_budget_ms must be "
+                f"{SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS}",
+            )
+        if quorum.get("verifier_request_timeout_budget_bound") is not True:
+            errors.append("verifier_request_timeout_budget_bound must be true")
         if quorum.get("authority_freshness_bound") is not True:
             errors.append("authority_freshness_bound must be true")
         if quorum.get("source_digest_set_bound") is not True:
@@ -2563,6 +2586,39 @@ class SensoryLoopbackService:
                 errors.append(f"verifier_receipts[{index}].freshness_status must be fresh")
             if receipt.get("verifier_status") != "accepted":
                 errors.append(f"verifier_receipts[{index}].verifier_status must be accepted")
+            request_timeout_ms = receipt.get("request_timeout_ms")
+            if (
+                not isinstance(request_timeout_ms, int)
+                or isinstance(request_timeout_ms, bool)
+                or request_timeout_ms <= 0
+                or request_timeout_ms
+                > SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS
+            ):
+                errors.append(
+                    f"verifier_receipts[{index}].request_timeout_ms must be within budget",
+                )
+                request_timeout_ms = 0
+            if (
+                receipt.get("request_timeout_budget_ms")
+                != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS
+            ):
+                errors.append(
+                    f"verifier_receipts[{index}].request_timeout_budget_ms mismatch",
+                )
+            if receipt.get("request_timeout_budget_bound") is not True:
+                errors.append(
+                    f"verifier_receipts[{index}].request_timeout_budget_bound must be true",
+                )
+            observed_latency_ms = receipt.get("observed_latency_ms")
+            if (
+                not isinstance(observed_latency_ms, (int, float))
+                or isinstance(observed_latency_ms, bool)
+                or float(observed_latency_ms) < 0
+                or (request_timeout_ms and float(observed_latency_ms) > request_timeout_ms)
+            ):
+                errors.append(
+                    f"verifier_receipts[{index}].observed_latency_ms must fit request timeout",
+                )
             for field_name in (
                 "raw_response_payload_stored",
                 "raw_signature_payload_stored",
@@ -2604,6 +2660,13 @@ class SensoryLoopbackService:
         )
         if not signature_digest_set_bound:
             errors.append("verifier_signature_digest_set mismatch")
+        timeout_digest_set_bound = (
+            bool(receipts)
+            and quorum.get("verifier_request_timeout_digest_set")
+            == self._latency_weight_policy_verifier_timeout_digest_set(receipts)
+        )
+        if not timeout_digest_set_bound:
+            errors.append("verifier_request_timeout_digest_set mismatch")
         expected_quorum_digest = sha256_text(
             canonical_json(
                 self._latency_weight_policy_verifier_quorum_digest_payload(quorum)
@@ -2628,6 +2691,10 @@ class SensoryLoopbackService:
             "accepted_verifier_count": len(receipts),
             "response_digest_set_bound": response_digest_set_bound,
             "signature_digest_set_bound": signature_digest_set_bound,
+            "request_timeout_digest_set_bound": timeout_digest_set_bound,
+            "request_timeout_budget_bound": (
+                quorum.get("verifier_request_timeout_budget_bound") is True
+            ),
             "quorum_digest_bound": quorum_digest_bound,
             "authority_freshness_bound": quorum.get("authority_freshness_bound") is True,
             "source_digest_set_bound": quorum.get("source_digest_set_bound") is True,
@@ -2938,6 +3005,7 @@ class SensoryLoopbackService:
             latency_weight_policy_verifier_fresh,
             latency_weight_policy_verifier_status,
             latency_weight_policy_verifier_freshness_status,
+            latency_weight_policy_verifier_timeout_bound,
             latency_quorum_digest_bound,
         ) = self._validate_latency_quorum_fields(
             binding,
@@ -3036,6 +3104,7 @@ class SensoryLoopbackService:
                 or (
                     latency_weight_policy_verifier_bound
                     and latency_weight_policy_verifier_fresh
+                    and latency_weight_policy_verifier_timeout_bound
                 )
             )
             and latency_quorum_digest_bound
@@ -3113,6 +3182,9 @@ class SensoryLoopbackService:
             ),
             "latency_weight_policy_verifier_freshness_status": (
                 latency_weight_policy_verifier_freshness_status
+            ),
+            "latency_weight_policy_verifier_timeout_bound": (
+                latency_weight_policy_verifier_timeout_bound
             ),
             "latency_quorum_digest_bound": latency_quorum_digest_bound,
             "binding_digest_bound": binding_digest_bound,
@@ -3437,11 +3509,12 @@ class SensoryLoopbackService:
                 "weight_policy_verifier_quorum_ref": "",
                 "weight_policy_verifier_quorum_digest": "",
                 "weight_policy_verifier_source_digest_set": "",
-                "weight_policy_verifier_status": "not-bound",
-                "weight_policy_verifier_freshness_status": "not-bound",
-                "weight_policy_verifier_bound": False,
-                "weight_policy_verifier_fresh": False,
-            }
+            "weight_policy_verifier_status": "not-bound",
+            "weight_policy_verifier_freshness_status": "not-bound",
+            "weight_policy_verifier_bound": False,
+            "weight_policy_verifier_fresh": False,
+            "weight_policy_verifier_timeout_bound": False,
+        }
         if participant_latency_weights is None:
             raise ValueError("participant_latency_weights are required for weighted quorum")
         for field_name, field_value in (
@@ -3470,6 +3543,13 @@ class SensoryLoopbackService:
             raise ValueError(
                 "latency weight policy verifier quorum is invalid: "
                 + "; ".join(verifier_validation["errors"]),
+            )
+        if (
+            not verifier_validation["request_timeout_budget_bound"]
+            or not verifier_validation["request_timeout_digest_set_bound"]
+        ):
+            raise ValueError(
+                "latency weight policy verifier quorum must bind request timeout budget",
             )
         if (
             latency_weight_policy_verifier_quorum.get("authority_ref")
@@ -3526,6 +3606,7 @@ class SensoryLoopbackService:
             ),
             "weight_policy_verifier_bound": True,
             "weight_policy_verifier_fresh": True,
+            "weight_policy_verifier_timeout_bound": True,
         }
 
     @staticmethod
@@ -3629,6 +3710,9 @@ class SensoryLoopbackService:
             weight_policy_verifier_freshness_status=str(
                 policy["weight_policy_verifier_freshness_status"]
             ),
+            weight_policy_verifier_timeout_bound=bool(
+                policy["weight_policy_verifier_timeout_bound"]
+            ),
             weight_policy_verifier_bound=bool(
                 policy["weight_policy_verifier_bound"]
             ),
@@ -3680,6 +3764,7 @@ class SensoryLoopbackService:
         bool,
         str,
         str,
+        bool,
         bool,
     ]:
         profile = binding.get("latency_quorum_profile")
@@ -3784,6 +3869,14 @@ class SensoryLoopbackService:
         weight_policy_verifier_freshness_status = binding.get(
             "latency_weight_policy_verifier_freshness_status",
         )
+        weight_policy_verifier_timeout_bound = binding.get(
+            "latency_weight_policy_verifier_timeout_bound",
+        )
+        if not isinstance(weight_policy_verifier_timeout_bound, bool):
+            errors.append(
+                "latency_weight_policy_verifier_timeout_bound must be a boolean",
+            )
+            weight_policy_verifier_timeout_bound = False
         weight_policy_verifier_bound = binding.get(
             "latency_weight_policy_verifier_bound",
         )
@@ -3839,6 +3932,10 @@ class SensoryLoopbackService:
                 errors.append("weighted latency quorum verifier quorum must be bound")
             if weight_policy_verifier_fresh is not True:
                 errors.append("weighted latency quorum verifier quorum must be fresh")
+            if weight_policy_verifier_timeout_bound is not True:
+                errors.append(
+                    "weighted latency quorum verifier timeout budget must be bound",
+                )
             for field_name, field_value in (
                 (
                     "latency_weight_policy_verifier_quorum_ref",
@@ -3884,6 +3981,10 @@ class SensoryLoopbackService:
                 errors.append("strict latency quorum verifier must not be bound")
             if weight_policy_verifier_fresh is not False:
                 errors.append("strict latency quorum verifier must not be fresh")
+            if weight_policy_verifier_timeout_bound is not False:
+                errors.append(
+                    "strict latency quorum verifier timeout budget must not be bound",
+                )
             if (
                 weight_policy_verifier_quorum_ref
                 or weight_policy_verifier_quorum_digest
@@ -3912,6 +4013,9 @@ class SensoryLoopbackService:
             weight_policy_verifier_status=str(weight_policy_verifier_status),
             weight_policy_verifier_freshness_status=str(
                 weight_policy_verifier_freshness_status
+            ),
+            weight_policy_verifier_timeout_bound=bool(
+                weight_policy_verifier_timeout_bound
             ),
             weight_policy_verifier_bound=bool(weight_policy_verifier_bound),
             weight_policy_verifier_fresh=bool(weight_policy_verifier_fresh),
@@ -3987,6 +4091,7 @@ class SensoryLoopbackService:
             bool(weight_policy_verifier_fresh),
             str(weight_policy_verifier_status),
             str(weight_policy_verifier_freshness_status),
+            bool(weight_policy_verifier_timeout_bound),
             latency_quorum_digest_bound,
         )
 
@@ -4145,6 +4250,33 @@ class SensoryLoopbackService:
         )
 
     @staticmethod
+    def _latency_weight_policy_verifier_timeout_digest_set(
+        verifier_receipts: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE,
+                    "verifier_request_timeouts": [
+                        {
+                            "verifier_ref": receipt.get("verifier_ref"),
+                            "jurisdiction": receipt.get("jurisdiction"),
+                            "request_timeout_ms": receipt.get("request_timeout_ms"),
+                            "request_timeout_budget_ms": receipt.get(
+                                "request_timeout_budget_ms"
+                            ),
+                            "request_timeout_budget_bound": receipt.get(
+                                "request_timeout_budget_bound"
+                            ),
+                            "observed_latency_ms": receipt.get("observed_latency_ms"),
+                        }
+                        for receipt in verifier_receipts
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
     def _latency_weight_policy_verifier_response_digest_payload(
         receipt: Mapping[str, Any],
     ) -> Dict[str, Any]:
@@ -4159,6 +4291,12 @@ class SensoryLoopbackService:
             "freshness_window_hours": receipt.get("freshness_window_hours"),
             "freshness_status": receipt.get("freshness_status"),
             "verifier_status": receipt.get("verifier_status"),
+            "request_timeout_ms": receipt.get("request_timeout_ms"),
+            "request_timeout_budget_ms": receipt.get("request_timeout_budget_ms"),
+            "request_timeout_budget_bound": receipt.get(
+                "request_timeout_budget_bound"
+            ),
+            "observed_latency_ms": receipt.get("observed_latency_ms"),
         }
 
     @staticmethod
@@ -4215,6 +4353,7 @@ class SensoryLoopbackService:
         weight_policy_verifier_source_digest_set: str,
         weight_policy_verifier_status: str,
         weight_policy_verifier_freshness_status: str,
+        weight_policy_verifier_timeout_bound: bool,
         weight_policy_verifier_bound: bool,
         weight_policy_verifier_fresh: bool,
     ) -> str:
@@ -4256,6 +4395,9 @@ class SensoryLoopbackService:
                     ),
                     "latency_weight_policy_verifier_freshness_status": (
                         weight_policy_verifier_freshness_status
+                    ),
+                    "latency_weight_policy_verifier_timeout_bound": (
+                        weight_policy_verifier_timeout_bound
                     ),
                     "latency_weight_policy_verifier_bound": (
                         weight_policy_verifier_bound
@@ -4345,6 +4487,17 @@ class SensoryLoopbackService:
         if not isinstance(value, str):
             raise ValueError(f"{name} must be a string")
         return value.strip()
+
+    @staticmethod
+    def _normalize_latency_weight_policy_verifier_timeout(value: Any) -> int:
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError("timeout_ms must be an integer")
+        if not 0 < value <= SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS:
+            raise ValueError(
+                "timeout_ms must be between 1 and "
+                f"{SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS}",
+            )
+        return value
 
     @staticmethod
     def _normalize_non_empty_string(value: Any, name: str) -> str:

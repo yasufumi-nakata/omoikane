@@ -1123,7 +1123,8 @@ shared field では `weighted-latency-quorum-v1` により、blocked timing gate
 failed participant id として残したまま、passing participant weight が threshold を
 満たす場合だけ acceptance できる。participant weight と quorum 判定は
 `weighted-latency-quorum-authority-v1` の authority ref / digest / source digest set と、
-`weighted-latency-policy-live-verifier-quorum-v1` の fresh verifier quorum ref / digest と
+`weighted-latency-policy-live-verifier-quorum-v1` の fresh verifier quorum ref / digest /
+250ms request-timeout digest set と
 一緒に digest-only で束縛し、raw timing / hardware adapter / weight-policy authority /
 verifier response / verifier signature payload は保存しない。
 
@@ -1420,10 +1421,10 @@ shared arbitration が calibration / drift / refresh / timing / hardware adapter
 同じ sidecar path は 3 participant の `weighted-latency-quorum-v1` も返し、
 observer の latency gate が blocked でも self + peer の pass weight が threshold を満たす時だけ
 `latency_quorum_satisfied=true` とし、participant latency weight digest、
-weight policy authority digest、fresh verifier quorum digest、quorum digest を public schema に通す。
+weight policy authority digest、fresh verifier quorum digest、timeout-bound flag、quorum digest を public schema に通す。
 さらに `sensory-loopback-public-schema-contract-v1` の `schema_contracts` manifest が
 self-only と shared loopback の session / receipt / artifact family / BioData arbitration binding payload、
-weighted latency quorum binding payload、weight policy verifier quorum payload を
+weighted latency quorum binding payload、timeout-bound weight policy verifier quorum payload を
 `sensory_loopback_session.schema` /
 `sensory_loopback_receipt.schema` /
 `sensory_loopback_artifact_family.schema` /

@@ -13473,6 +13473,11 @@ json.dump(response, sys.stdout)
                 weighted_latency_quorum_binding,
             )
         )
+        weighted_latency_policy_verifier_quorum_validation = (
+            self.sensory_loopback.validate_latency_weight_policy_verifier_quorum(
+                weighted_latency_policy_verifier_quorum,
+            )
+        )
         schema_contracts = [
             {
                 "payload_path": "session",
@@ -13619,7 +13624,8 @@ json.dump(response, sys.stdout)
                     },
                     "validation": {
                         "ok": weighted_session_validation["ok"]
-                        and weighted_latency_quorum_validation["ok"],
+                        and weighted_latency_quorum_validation["ok"]
+                        and weighted_latency_policy_verifier_quorum_validation["ok"],
                         "session_ok": weighted_session_validation["ok"],
                         "biodata_arbitration_ok": (
                             weighted_latency_quorum_validation["ok"]
@@ -13694,6 +13700,17 @@ json.dump(response, sys.stdout)
                                 "latency_weight_policy_verifier_freshness_status"
                             ]
                         ),
+                        "latency_weight_policy_verifier_timeout_bound": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_verifier_timeout_bound"
+                            ]
+                            and weighted_latency_policy_verifier_quorum_validation[
+                                "request_timeout_budget_bound"
+                            ]
+                            and weighted_latency_policy_verifier_quorum_validation[
+                                "request_timeout_digest_set_bound"
+                            ]
+                        ),
                         "calibration_refresh_fresh": (
                             weighted_latency_quorum_validation[
                                 "all_calibration_refresh_receipts_fresh"
@@ -13721,7 +13738,8 @@ json.dump(response, sys.stdout)
                     and shared_artifact_family_validation["ok"]
                     and shared_biodata_arbitration_validation["ok"]
                     and weighted_session_validation["ok"]
-                    and weighted_latency_quorum_validation["ok"],
+                    and weighted_latency_quorum_validation["ok"]
+                    and weighted_latency_policy_verifier_quorum_validation["ok"],
                     "session_ok": shared_session_validation["ok"],
                     "aligned_ok": shared_aligned_validation["ok"],
                     "mediated_ok": shared_mediated_validation["ok"],
@@ -13793,6 +13811,7 @@ json.dump(response, sys.stdout)
                     ),
                     "weighted_latency_quorum_ok": (
                         weighted_latency_quorum_validation["ok"]
+                        and weighted_latency_policy_verifier_quorum_validation["ok"]
                     ),
                     "weighted_latency_quorum_satisfied": (
                         weighted_latency_quorum_validation[
@@ -13813,6 +13832,15 @@ json.dump(response, sys.stdout)
                         ]
                         and weighted_latency_quorum_validation[
                             "latency_weight_policy_verifier_fresh"
+                        ]
+                        and weighted_latency_quorum_validation[
+                            "latency_weight_policy_verifier_timeout_bound"
+                        ]
+                        and weighted_latency_policy_verifier_quorum_validation[
+                            "request_timeout_budget_bound"
+                        ]
+                        and weighted_latency_policy_verifier_quorum_validation[
+                            "request_timeout_digest_set_bound"
                         ]
                     ),
                     "weighted_latency_quorum_failed_participant_bound": (
@@ -13856,6 +13884,7 @@ json.dump(response, sys.stdout)
                 and shared_biodata_arbitration_validation["ok"]
                 and weighted_session_validation["ok"]
                 and weighted_latency_quorum_validation["ok"]
+                and weighted_latency_policy_verifier_quorum_validation["ok"]
                 and calibration_gate_validation["ok"],
                 "coherent_ok": coherent_validation["ok"],
                 "degraded_ok": degraded_validation["ok"],
@@ -13917,7 +13946,8 @@ json.dump(response, sys.stdout)
                 and shared_artifact_family_validation["ok"]
                 and shared_biodata_arbitration_validation["ok"]
                 and weighted_session_validation["ok"]
-                and weighted_latency_quorum_validation["ok"],
+                and weighted_latency_quorum_validation["ok"]
+                and weighted_latency_policy_verifier_quorum_validation["ok"],
                 "shared_loopback_collective_bound": shared_session_validation[
                     "shared_collective_bound"
                 ]
@@ -14004,6 +14034,7 @@ json.dump(response, sys.stdout)
                 ),
                 "shared_loopback_weighted_latency_quorum_ok": (
                     weighted_latency_quorum_validation["ok"]
+                    and weighted_latency_policy_verifier_quorum_validation["ok"]
                 ),
                 "shared_loopback_weighted_latency_quorum_satisfied": (
                     weighted_latency_quorum_validation["latency_quorum_satisfied"]
@@ -14035,6 +14066,9 @@ json.dump(response, sys.stdout)
                         "latency_weight_policy_verifier_fresh"
                     ]
                     and weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_timeout_bound"
+                    ]
+                    and weighted_latency_quorum_validation[
                         "latency_weight_policy_status"
                     ]
                     == "complete"
@@ -14054,6 +14088,26 @@ json.dump(response, sys.stdout)
                         "latency_weight_policy_verifier_freshness_status"
                     ]
                     == "fresh"
+                    and weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_timeout_bound"
+                    ]
+                    and weighted_latency_policy_verifier_quorum_validation[
+                        "request_timeout_budget_bound"
+                    ]
+                    and weighted_latency_policy_verifier_quorum_validation[
+                        "request_timeout_digest_set_bound"
+                    ]
+                ),
+                "shared_loopback_weighted_latency_policy_verifier_timeout_bound": (
+                    weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_timeout_bound"
+                    ]
+                    and weighted_latency_policy_verifier_quorum_validation[
+                        "request_timeout_budget_bound"
+                    ]
+                    and weighted_latency_policy_verifier_quorum_validation[
+                        "request_timeout_digest_set_bound"
+                    ]
                 ),
                 "shared_loopback_weighted_latency_quorum_failed_participant_bound": (
                     weighted_latency_quorum_validation[

@@ -148,12 +148,17 @@ operations:
             items:
               type: string
               minLength: 1
+          timeout_ms:
+            type: integer
+            minimum: 1
+            maximum: 250
     output:
       schema_ref: sensory_loopback_latency_weight_policy_verifier_quorum
     guarantees:
       - weighted-latency-policy-live-verifier-quorum-v1 must bind at least two distinct verifier refs and jurisdictions
       - verifier receipts must bind the same authority ref, authority digest, and source digest set used by the weighted latency policy
       - freshness_status must be fresh inside a 24 hour freshness window before weighted latency quorum is accepted
+      - request_timeout_ms must be at most 250 and bound into each verifier response digest plus the quorum timeout digest set
       - verifier response and signature evidence are digest-only and raw verifier / response / signature payloads remain redacted
   bind_participant_biodata_arbitration:
     summary: Bind participant-specific BioData calibration confidence, feature-window drift gate, and calibration refresh receipts into one shared loopback arbitration session.
@@ -411,7 +416,7 @@ operations:
       - without participant_latency_weights, each participant latency gate must pass the hardware timing drift threshold
       - with weighted-latency-quorum-v1 on 3-4 participants, blocked participant timing gates are allowed only when the passing participant weight meets latency_quorum_threshold
       - weighted-latency-quorum-v1 also requires latency_weight_policy_authority_ref, latency_weight_policy_authority_digest, and latency_weight_policy_source_digest_set
-      - weighted-latency-quorum-v1 also requires a fresh weighted-latency-policy-live-verifier-quorum-v1 receipt bound to the same authority and source digest set
+      - weighted-latency-quorum-v1 also requires a fresh weighted-latency-policy-live-verifier-quorum-v1 receipt bound to the same authority, source digest set, and 250ms request-timeout budget
       - every participant latency gate must share the BioData threshold policy authority digest when authority is bound
       - the output keeps only gate refs/digests, drift gate refs/digests, refresh refs/digests/source digest sets, threshold digests, timing gate digests, target gate-set digests, participant latency weights, weight-policy authority refs/digests, verifier quorum refs/digests, and latency quorum digests
       - raw BioData, calibration, drift, refresh, timing, hardware adapter, weight-policy authority, verifier, response, signature, and gate payloads remain redacted

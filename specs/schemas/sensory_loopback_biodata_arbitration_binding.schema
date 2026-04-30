@@ -6,7 +6,7 @@ description: >
   confidence, feature-window drift gates, fresh calibration refresh receipts,
   and hardware timing latency gates into one shared Sensory Loopback arbitration
   session, including weighted latency quorum policy-authority and live verifier
-  quorum binding when used,
+  quorum binding with bounded verifier request timeout when used,
   without storing raw BioData, calibration, drift, refresh, timing,
   hardware adapter, weight policy authority, verifier, response, signature, or
   gate payloads.
@@ -52,6 +52,7 @@ required:
   - latency_weight_policy_verifier_freshness_status
   - latency_weight_policy_verifier_bound
   - latency_weight_policy_verifier_fresh
+  - latency_weight_policy_verifier_timeout_bound
   - latency_quorum_pass_weight
   - latency_quorum_failed_participant_ids
   - latency_quorum_satisfied
@@ -407,6 +408,8 @@ properties:
   latency_weight_policy_verifier_bound:
     type: boolean
   latency_weight_policy_verifier_fresh:
+    type: boolean
+  latency_weight_policy_verifier_timeout_bound:
     type: boolean
   latency_quorum_pass_weight:
     type: number

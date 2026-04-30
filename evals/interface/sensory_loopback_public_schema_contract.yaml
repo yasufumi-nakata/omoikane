@@ -4,7 +4,7 @@ level: L6
 description: >
   Sensory Loopback demo が self-only と collective-shared loopback の session、
   coherent / guardian-hold / stabilized / guardian-mediated receipt、artifact family、
-  weighted latency quorum binding、weight policy verifier quorum を
+  weighted latency quorum binding、request-timeout-bound weight policy verifier quorum を
   reviewer-facing public schema contract manifest に列挙し、各 payload を対応する
   public schema に直接 validation できること
 inputs:

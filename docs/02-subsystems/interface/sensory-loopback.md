@@ -30,7 +30,7 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 - 3-4 participant の shared field では `weighted-latency-quorum-v1` を明示した場合だけ、
   blocked timing gate を failed participant として残し、passing participant weight が threshold を満たすかを
   `weighted-latency-quorum-authority-v1` の policy authority digest と
-  `weighted-latency-policy-live-verifier-quorum-v1` の freshness quorum と一緒に digest-only に確認する
+  `weighted-latency-policy-live-verifier-quorum-v1` の freshness / 250ms timeout-bound quorum と一緒に digest-only に確認する
 
 ## Reference Runtime の固定 profile
 
@@ -62,6 +62,7 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | latency_weight_policy_verifier_profile | `weighted-latency-policy-live-verifier-quorum-v1` |
 | latency_weight_policy_verifier_quorum_threshold | `2` |
 | latency_weight_policy_freshness_window | `24h` |
+| latency_weight_policy_verifier_request_timeout_ms | `250` |
 | max_participant_latency_drift_ms | `12.0` |
 
 reference runtime では raw retinal/audio/haptic payload は扱わず、
@@ -106,6 +107,7 @@ sensory_loopback.bind_latency_weight_policy_verifier_quorum:
     source_digest_set: <source policy digest set>
     verifier_refs: [<live verifier ref>, ...]
     verifier_jurisdictions: [<jurisdiction>, ...]
+    timeout_ms: <optional, max 250>
   output: sensory_loopback_latency_weight_policy_verifier_quorum
 
 sensory_loopback.deliver_bundle:
@@ -182,7 +184,8 @@ blocked latency gate を `latency_quorum_failed_participant_ids` へ残したま
 `latency_weight_policy_source_digest_set` が必須で、
 同じ authority ref / digest / source digest set を
 `weighted-latency-policy-live-verifier-quorum-v1` の 2 verifier quorum が
-24h freshness window 内の `fresh` として確認していなければならない。
+24h freshness window 内の `fresh` として、かつ各 verifier response が 250ms request
+timeout budget に収まるものとして確認していなければならない。
 participant weights と threshold は `latency_weight_policy_digest` を経由して
 quorum digest に束縛される。
 未指定時は `all-participant-latency-pass-v1` として全 participant latency gate pass を要求する。
@@ -190,7 +193,7 @@ shared arbitration binding は
 gate ref / gate digest、drift gate ref / digest、refresh ref / digest / source digest set、
 threshold digest、target gate-set digest、timing gate digest、latency threshold digest、
 participant latency weight digest、latency weight policy authority ref / digest、
-latency weight policy verifier quorum ref / digest、latency quorum digest だけを保持し、
+latency weight policy verifier quorum ref / digest / timeout-bound flag、latency quorum digest だけを保持し、
 raw BioData / calibration / drift / refresh / timing / hardware adapter /
 weight policy authority / verifier / response / signature / gate payload は保存しない。
 
@@ -204,7 +207,7 @@ weight policy authority / verifier / response / signature / gate payload は保�
 6. **artifact family は同一 session 内限定** ── multi-scene family は 2-4 receipt を同一 session に束縛する
 7. **body map calibration 必須** ── session と receipt は `avatar_body_map_ref` / `proprioceptive_calibration_ref` / `body_map_alignment_ref` を必ず持つ
 8. **shared arbitration は guardian mediation 必須** ── multi-self loopback では participant map を省略せず、競合 focus は Guardian observe 下でのみ反映する
-9. **participant BioData gate は digest-only** ── shared BioData arbitration は各 participant の confidence gate、drift gate digest、fresh calibration refresh digest、latency timing gate digest、weighted quorum policy authority digest、live verifier quorum digest だけを束縛し、raw BioData / refresh / timing / weight-policy / verifier payload を保持しない
+9. **participant BioData gate は digest-only** ── shared BioData arbitration は各 participant の confidence gate、drift gate digest、fresh calibration refresh digest、latency timing gate digest、weighted quorum policy authority digest、live verifier quorum digest、request-timeout budget flag だけを束縛し、raw BioData / refresh / timing / weight-policy / verifier payload を保持しない
 
 ## reference runtime の扱い
 
@@ -227,7 +230,7 @@ weight policy authority / verifier / response / signature / gate payload は保�
   binding digest、raw payload redaction を検証する
 - 同じ demo は 3 participant の weighted latency quorum も返し、observer の timing drift が
   blocked でも self + peer の passing weight が threshold を満たし、weight policy authority digest が
-  bound かつ live verifier quorum が fresh の場合だけ acceptance する
+  bound かつ live verifier quorum が fresh で 250ms timeout-bound の場合だけ acceptance する
 - 同じ demo は `schema_contracts` manifest で self-only / shared の
   session、receipt、artifact family、BioData arbitration binding を public schema path へ束縛し、
   integration test が各 payload を schema に直接通す
@@ -243,7 +246,7 @@ weight policy authority / verifier / response / signature / gate payload は保�
 - `evals/interface/sensory_loopback_biodata_arbitration.yaml` で
   participant BioData confidence gate coverage、series drift gate pass、
   fresh calibration refresh propagation、participant hardware timing latency pass、
-  weighted latency quorum、weight policy authority binding、live verifier quorum freshness、
+  weighted latency quorum、weight policy authority binding、live verifier quorum freshness / timeout budget、
   binding digest、raw BioData / drift / refresh / timing / weight-policy / verifier /
   gate payload redaction を固定
 - `evals/interface/sensory_loopback_public_schema_contract.yaml` で
