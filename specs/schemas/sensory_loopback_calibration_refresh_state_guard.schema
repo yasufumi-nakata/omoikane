@@ -1,0 +1,165 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/sensory_loopback_calibration_refresh_state_guard.schema"
+title: SensoryLoopbackCalibrationRefreshStateGuard
+description: >
+  Digest-only guard that rechecks participant calibration refresh state during a
+  shared Sensory Loopback session and fail-closes delivery when any participant
+  refresh is expired, revoked, or stale, while retaining only refresh refs,
+  digest sets, revocation refs, and raw refresh / revocation redaction flags.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - profile_id
+  - guard_ref
+  - created_at
+  - observed_at_ref
+  - session_id
+  - biodata_arbitration_binding_ref
+  - biodata_arbitration_binding_digest
+  - participant_identity_ids
+  - participant_refresh_state_bindings
+  - participant_refresh_state_count
+  - participant_refresh_state_digest_set
+  - failed_participant_ids
+  - refresh_fail_closed
+  - delivery_blocked
+  - shared_session_hold_required
+  - safe_baseline_required
+  - guard_status
+  - storage_policy
+  - raw_refresh_payload_stored
+  - raw_revocation_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - guard_digest
+properties:
+  schema_version:
+    const: "1.0"
+  profile_id:
+    const: participant-calibration-refresh-state-fail-closed-v1
+  guard_ref:
+    type: string
+    pattern: "^loopback-calibration-refresh-state-guard://sl-refresh-guard-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  observed_at_ref:
+    type: string
+    minLength: 1
+  session_id:
+    type: string
+    minLength: 8
+  biodata_arbitration_binding_ref:
+    type: string
+    minLength: 1
+  biodata_arbitration_binding_digest:
+    type: string
+    minLength: 32
+  participant_identity_ids:
+    type: array
+    minItems: 2
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  participant_refresh_state_bindings:
+    type: array
+    minItems: 2
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - participant_identity_id
+        - calibration_refresh_ref
+        - calibration_refresh_digest
+        - calibration_refresh_source_digest_set
+        - previous_calibration_refresh_status
+        - current_calibration_refresh_status
+        - calibration_refresh_window_bound
+        - revocation_ref
+        - delivery_allowed
+        - fail_closed_reason
+        - raw_refresh_payload_stored
+        - raw_revocation_payload_stored
+      properties:
+        participant_identity_id:
+          type: string
+          minLength: 1
+        calibration_refresh_ref:
+          type: string
+          minLength: 1
+        calibration_refresh_digest:
+          type: string
+          minLength: 32
+        calibration_refresh_source_digest_set:
+          type: string
+          minLength: 32
+        previous_calibration_refresh_status:
+          const: fresh
+        current_calibration_refresh_status:
+          type: string
+          enum:
+            - fresh
+            - expired
+            - revoked
+            - stale
+        calibration_refresh_window_bound:
+          const: true
+        revocation_ref:
+          type: string
+        delivery_allowed:
+          type: boolean
+        fail_closed_reason:
+          type: string
+          enum:
+            - none
+            - refresh-expired
+            - refresh-revoked
+            - refresh-stale
+        raw_refresh_payload_stored:
+          const: false
+        raw_revocation_payload_stored:
+          const: false
+  participant_refresh_state_count:
+    type: integer
+    minimum: 2
+    maximum: 4
+  participant_refresh_state_digest_set:
+    type: string
+    minLength: 32
+  failed_participant_ids:
+    type: array
+    maxItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  refresh_fail_closed:
+    type: boolean
+  delivery_blocked:
+    type: boolean
+  shared_session_hold_required:
+    type: boolean
+  safe_baseline_required:
+    type: boolean
+  guard_status:
+    type: string
+    enum:
+      - pass
+      - blocked
+  storage_policy:
+    const: participant-refresh-state+revocation-ref-digest-only
+  raw_refresh_payload_stored:
+    const: false
+  raw_revocation_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  guard_digest:
+    type: string
+    minLength: 32

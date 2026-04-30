@@ -195,6 +195,8 @@
   - shared loopback の participant BioData confidence / feature-window drift gate / fresh calibration refresh receipt と hardware timing latency drift gate を同じ participant set / threshold authority digest に束縛し、3-4 participant の weighted latency quorum では participant weight / policy-authority digest / live verifier quorum / timeout-bound flag / failed participant / quorum digest だけを保持して raw BioData / refresh / timing / weight-policy / verifier payload を保存しない
 - `sensory_loopback_latency_weight_policy_verifier_quorum.schema`
   - weighted latency quorum の policy authority freshness を 2-verifier quorum、24h freshness window、250ms request-timeout digest set、response/signature digest set に束縛し、raw verifier / response / signature payload を保存しない
+- `sensory_loopback_calibration_refresh_state_guard.schema`
+  - shared loopback の途中 refresh state recheck で expired / revoked / stale participant refresh を fail-closed に伝播し、delivery block、shared session hold、safe baseline、revocation ref、guard digest だけを保持して raw refresh / revocation payload を保存しない
 - `sensory_loopback_receipt.schema`
 - `sensory_loopback_session.schema`
 - `staged_rollout_session.schema`

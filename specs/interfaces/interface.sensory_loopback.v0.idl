@@ -9,6 +9,7 @@ imports:
   sensory_loopback_artifact_family: ../schemas/sensory_loopback_artifact_family.schema
   sensory_loopback_biodata_arbitration_binding: ../schemas/sensory_loopback_biodata_arbitration_binding.schema
   sensory_loopback_latency_weight_policy_verifier_quorum: ../schemas/sensory_loopback_latency_weight_policy_verifier_quorum.schema
+  sensory_loopback_calibration_refresh_state_guard: ../schemas/sensory_loopback_calibration_refresh_state_guard.schema
 operations:
   open_session:
     summary: Bind one loopback session to a world-state anchor, virtual body anchor, avatar body-map calibration, and optional bounded shared-space context before delivery begins.
@@ -420,6 +421,47 @@ operations:
       - every participant latency gate must share the BioData threshold policy authority digest when authority is bound
       - the output keeps only gate refs/digests, drift gate refs/digests, refresh refs/digests/source digest sets, threshold digests, timing gate digests, target gate-set digests, participant latency weights, weight-policy authority refs/digests, verifier quorum refs/digests, and latency quorum digests
       - raw BioData, calibration, drift, refresh, timing, hardware adapter, weight-policy authority, verifier, response, signature, and gate payloads remain redacted
+  bind_participant_calibration_refresh_state_guard:
+    summary: Recheck participant calibration refresh state during a shared loopback session and fail-close delivery when any participant refresh is expired, revoked, or stale.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - biodata_arbitration_binding
+          - participant_refresh_states
+        properties:
+          biodata_arbitration_binding:
+            schema_ref: sensory_loopback_biodata_arbitration_binding
+            description: Existing shared participant BioData arbitration binding whose refresh refs and digests are being rechecked.
+          participant_refresh_states:
+            type: object
+            minProperties: 2
+            description: Mapping from participant identity id to fresh, expired, revoked, or stale.
+            additionalProperties:
+              type: string
+              enum:
+                - fresh
+                - expired
+                - revoked
+                - stale
+          participant_revocation_refs:
+            type: object
+            description: Mapping from participant identity id to a revocation registry ref, required only for revoked refresh states.
+            additionalProperties:
+              type: string
+          observed_at_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: sensory_loopback_calibration_refresh_state_guard
+    guarantees:
+      - participant_refresh_states must cover exactly the shared arbitration participant_identity_ids
+      - every state binding must reuse the arbitration binding's original refresh ref, refresh digest, source digest set, and freshness window flag
+      - current statuses of expired, revoked, or stale set refresh_fail_closed, delivery_blocked, shared_session_hold_required, and safe_baseline_required to true
+      - revoked statuses require a revocation_ref, while non-revoked statuses must not bind one
+      - guard_status remains pass only when every participant state is fresh
+      - the output keeps only arbitration binding refs/digests, refresh refs/digests/source digest sets, current status, revocation refs, and digest sets
+      - raw refresh, raw revocation, subjective-equivalence, and semantic thought payloads remain redacted
   deliver_bundle:
     summary: Deliver one bounded multi-sensory bundle with avatar body-map alignment evidence, optional shared-space owner arbitration, or degrade it into a guardian-controlled safe baseline.
     input:

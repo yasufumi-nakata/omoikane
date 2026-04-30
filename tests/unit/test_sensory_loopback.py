@@ -800,6 +800,68 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             binding["raw_latency_weight_policy_verifier_response_payload_stored"]
         )
 
+        refresh_state_guard = service.bind_participant_calibration_refresh_state_guard(
+            binding,
+            participant_refresh_states={
+                "identity://loopback-primary": "fresh",
+                "identity://loopback-peer": "expired",
+                "identity://loopback-observer": "revoked",
+            },
+            participant_revocation_refs={
+                "identity://loopback-observer": (
+                    "revocation-registry://unit/loopback-observer/calibration-refresh"
+                ),
+            },
+            observed_at_ref="timestamp://unit/loopback-refresh-state/check-1",
+        )
+        guard_validation = (
+            service.validate_participant_calibration_refresh_state_guard(
+                refresh_state_guard,
+            )
+        )
+        self.assertTrue(guard_validation["ok"])
+        self.assertTrue(guard_validation["session_bound"])
+        self.assertTrue(guard_validation["biodata_arbitration_binding_bound"])
+        self.assertEqual("blocked", guard_validation["guard_status"])
+        self.assertTrue(guard_validation["refresh_fail_closed"])
+        self.assertTrue(guard_validation["delivery_blocked"])
+        self.assertTrue(guard_validation["shared_session_hold_required"])
+        self.assertTrue(guard_validation["safe_baseline_required"])
+        self.assertEqual(
+            ["identity://loopback-peer", "identity://loopback-observer"],
+            guard_validation["failed_participant_ids"],
+        )
+        self.assertTrue(
+            guard_validation["participant_refresh_state_digest_set_bound"]
+        )
+        self.assertTrue(guard_validation["guard_digest_bound"])
+        self.assertFalse(refresh_state_guard["raw_refresh_payload_stored"])
+        self.assertFalse(refresh_state_guard["raw_revocation_payload_stored"])
+
+        tampered_guard = deepcopy(refresh_state_guard)
+        tampered_guard["participant_refresh_state_digest_set"] = "0" * 64
+        self.assertFalse(
+            service.validate_participant_calibration_refresh_state_guard(
+                tampered_guard,
+            )["ok"]
+        )
+        tampered_guard_digest = deepcopy(refresh_state_guard)
+        tampered_guard_digest["guard_digest"] = "0" * 64
+        self.assertFalse(
+            service.validate_participant_calibration_refresh_state_guard(
+                tampered_guard_digest,
+            )["ok"]
+        )
+        with self.assertRaisesRegex(ValueError, "revocation_ref"):
+            service.bind_participant_calibration_refresh_state_guard(
+                binding,
+                participant_refresh_states={
+                    "identity://loopback-primary": "fresh",
+                    "identity://loopback-peer": "fresh",
+                    "identity://loopback-observer": "revoked",
+                },
+            )
+
         tampered = deepcopy(binding)
         tampered["participant_latency_weight_digest"] = "0" * 64
         self.assertFalse(service.validate_participant_biodata_arbitration(tampered)["ok"])

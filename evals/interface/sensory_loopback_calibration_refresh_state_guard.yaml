@@ -1,0 +1,24 @@
+eval_id: sensory_loopback_calibration_refresh_state_guard
+target: interface.sensory_loopback
+level: L6
+description: >
+  Sensory Loopback が shared session の途中で participant calibration refresh state を
+  recheck し、expired / revoked refresh を検出した場合に delivery_blocked、
+  shared_session_hold_required、safe_baseline_required を fail-closed に揃え、
+  refresh state digest set と guard digest、revocation ref、raw refresh / revocation
+  payload redaction を保存すること
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
+expected:
+  validation_ok: true
+  shared_loopback_calibration_refresh_state_guard_ok: true
+  shared_loopback_calibration_refresh_fail_closed: true
+  shared_loopback_calibration_refresh_state_guard_digest_bound: true
+  shared_loopback_calibration_refresh_state_guard_raw_payload_redacted: true
+  weighted_latency_quorum_calibration_refresh_state_guard_ok: true
+  weighted_latency_quorum_calibration_refresh_fail_closed: true
+  weighted_latency_quorum_calibration_refresh_failed_participant_count: 2
+metric: boolean
+threshold: 1.0
+ethics_check: true

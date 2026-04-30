@@ -1258,13 +1258,26 @@ entries:
       - reference-runtime
     rationale: Required to serialize a fresh, 250ms timeout-bound live verifier quorum for weighted Sensory Loopback latency-weight policy authority before weighted latency quorum accepts blocked participant timing gates, while retaining only verifier refs, request-timeout digest sets, response/signature digests, and raw verifier/response/signature redaction flags.
   - priority: P1
+    kind: schema
+    file: specs/schemas/sensory_loopback_calibration_refresh_state_guard.schema
+    consumers:
+      - specs/interfaces/interface.sensory_loopback.v0.idl
+      - docs/02-subsystems/interface/sensory-loopback.md
+      - docs/07-reference-implementation/README.md
+      - evals/interface/sensory_loopback_calibration_refresh_state_guard.yaml
+      - evals/interface/sensory_loopback_public_schema_contract.yaml
+      - tests/integration/test_interface_schema_contracts.py
+      - reference-runtime
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to serialize the runtime recheck that propagates expired, revoked, or stale participant calibration refresh state into fail-closed shared Sensory Loopback delivery, session hold, safe baseline, digest-bound revocation refs, and raw refresh / revocation payload redaction.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.sensory_loopback.v0.idl
     consumers:
       - reference-runtime
       - docs/02-subsystems/interface/sensory-loopback.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make L6 sensory loopback delivery, Guardian hold, stabilization, avatar body-map calibration, BioData confidence-gated drift-threshold adjustment, shared collective/IMC arbitration, participant BioData refresh propagation and latency drift gate arbitration, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
+    rationale: Required to make L6 sensory loopback delivery, Guardian hold, stabilization, avatar body-map calibration, BioData confidence-gated drift-threshold adjustment, shared collective/IMC arbitration, participant BioData refresh propagation, mid-session refresh state fail-closed recheck, latency drift gate arbitration, and multi-scene artifact family capture machine-readable across docs, CLI, and runtime.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_guard.yaml
@@ -1294,6 +1307,14 @@ entries:
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, fresh calibration refresh propagation, hardware timing latency strict pass, weighted latency quorum policy-authority binding, binding digest evidence, and raw BioData/drift/refresh/timing/hardware/weight-policy/gate payload redaction before shared loopback arbitration accepts participant gates.
+  - priority: P1
+    kind: eval
+    file: evals/interface/sensory_loopback_calibration_refresh_state_guard.yaml
+    consumers:
+      - reference-runtime
+      - agents/builders/eval-builder.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects mid-session participant calibration refresh state recheck, expired / revoked refresh fail-closed propagation, delivery block, shared session hold, digest-bound revocation refs, and raw refresh / revocation payload redaction for shared Sensory Loopback sessions.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_public_schema_contract.yaml

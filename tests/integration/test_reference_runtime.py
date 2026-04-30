@@ -850,6 +850,22 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "shared_loopback_weighted_latency_quorum_failed_participant_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["shared_loopback_calibration_refresh_state_guard_ok"]
+        )
+        self.assertTrue(
+            result["validation"]["shared_loopback_calibration_refresh_fail_closed"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_calibration_refresh_state_guard_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_calibration_refresh_state_guard_raw_payload_redacted"
+            ]
+        )
         self.assertEqual("active", result["session"]["status"])
         self.assertTrue(result["session"]["avatar_body_map_ref"].startswith("avatar-body-map://"))
         self.assertEqual("bound", result["session"]["calibration_confidence_gate_status"])
@@ -887,6 +903,16 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(weighted_binding["latency_weight_policy_verifier_fresh"])
         self.assertTrue(weighted_binding["latency_weight_policy_verifier_timeout_bound"])
         self.assertFalse(weighted_binding["raw_latency_weight_policy_payload_stored"])
+        refresh_guard = result["shared_loopback"]["weighted_latency_quorum"][
+            "calibration_refresh_state_guard"
+        ]
+        self.assertEqual("blocked", refresh_guard["guard_status"])
+        self.assertTrue(refresh_guard["refresh_fail_closed"])
+        self.assertTrue(refresh_guard["delivery_blocked"])
+        self.assertTrue(refresh_guard["shared_session_hold_required"])
+        self.assertEqual(2, len(refresh_guard["failed_participant_ids"]))
+        self.assertFalse(refresh_guard["raw_refresh_payload_stored"])
+        self.assertFalse(refresh_guard["raw_revocation_payload_stored"])
         self.assertEqual(3, result["ledger_verification"]["category_counts"]["interface-sensory-loopback"])
         self.assertEqual(
             1,

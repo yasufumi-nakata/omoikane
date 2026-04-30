@@ -602,7 +602,7 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["public_schema_contract_bound"])
         schema_contracts = result["schema_contracts"]
-        self.assertEqual(12, len(schema_contracts))
+        self.assertEqual(13, len(schema_contracts))
         for contract in schema_contracts:
             self._assert_schema_valid(
                 contract["schema_path"],
@@ -651,6 +651,20 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(weighted["validation"]["calibration_refresh_fresh"])
         self.assertTrue(
             weighted["validation"]["participant_calibration_refresh_digest_set_bound"]
+        )
+        self.assertTrue(weighted["validation"]["calibration_refresh_state_guard_ok"])
+        self.assertTrue(weighted["validation"]["calibration_refresh_fail_closed"])
+        self.assertTrue(
+            weighted["validation"]["calibration_refresh_state_guard_digest_bound"]
+        )
+        self.assertTrue(
+            weighted["validation"][
+                "calibration_refresh_state_guard_raw_payload_redacted"
+            ]
+        )
+        self.assertEqual(
+            2,
+            len(weighted["validation"]["calibration_refresh_failed_participant_ids"]),
         )
 
 

@@ -885,6 +885,22 @@ class CliIntegrationTests(unittest.TestCase):
                 "shared_loopback_weighted_latency_policy_verifier_timeout_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["shared_loopback_calibration_refresh_state_guard_ok"]
+        )
+        self.assertTrue(
+            result["validation"]["shared_loopback_calibration_refresh_fail_closed"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_calibration_refresh_state_guard_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_calibration_refresh_state_guard_raw_payload_redacted"
+            ]
+        )
         self.assertEqual(3, result["artifact_family"]["scene_count"])
         self.assertEqual(2, result["artifact_family"]["guardian_intervention_count"])
         self.assertEqual("active", result["session"]["status"])
@@ -917,6 +933,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(weighted_binding["latency_weight_policy_verifier_fresh"])
         self.assertTrue(weighted_binding["latency_weight_policy_verifier_timeout_bound"])
         self.assertFalse(weighted_binding["raw_latency_weight_authority_payload_stored"])
+        refresh_guard = result["shared_loopback"]["weighted_latency_quorum"][
+            "calibration_refresh_state_guard"
+        ]
+        self.assertEqual("blocked", refresh_guard["guard_status"])
+        self.assertTrue(refresh_guard["delivery_blocked"])
+        self.assertTrue(refresh_guard["shared_session_hold_required"])
+        self.assertEqual(2, len(refresh_guard["failed_participant_ids"]))
+        self.assertFalse(refresh_guard["raw_refresh_payload_stored"])
+        self.assertFalse(refresh_guard["raw_revocation_payload_stored"])
 
     def test_connectome_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()

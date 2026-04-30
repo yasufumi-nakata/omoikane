@@ -4,7 +4,8 @@ level: L6
 description: >
   Sensory Loopback demo が self-only と collective-shared loopback の session、
   coherent / guardian-hold / stabilized / guardian-mediated receipt、artifact family、
-  weighted latency quorum binding、request-timeout-bound weight policy verifier quorum を
+  weighted latency quorum binding、request-timeout-bound weight policy verifier quorum、
+  calibration refresh state fail-closed guard を
   reviewer-facing public schema contract manifest に列挙し、各 payload を対応する
   public schema に直接 validation できること
 inputs:
@@ -14,13 +15,14 @@ expected:
   validation_ok: true
   public_schema_contract_profile: sensory-loopback-public-schema-contract-v1
   public_schema_contract_bound: true
-  schema_contract_count: 12
+  schema_contract_count: 13
   required_schema_paths:
     - specs/schemas/sensory_loopback_session.schema
     - specs/schemas/sensory_loopback_receipt.schema
     - specs/schemas/sensory_loopback_artifact_family.schema
     - specs/schemas/sensory_loopback_biodata_arbitration_binding.schema
     - specs/schemas/sensory_loopback_latency_weight_policy_verifier_quorum.schema
+    - specs/schemas/sensory_loopback_calibration_refresh_state_guard.schema
   shared_loopback_public_schema_bound: true
   artifact_family_public_schema_bound: true
 metric: boolean

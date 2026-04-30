@@ -68,6 +68,15 @@ SENSORY_LOOPBACK_BIODATA_ARBITRATION_STORAGE_POLICY = (
 SENSORY_LOOPBACK_PARTICIPANT_REFRESH_PROPAGATION_PROFILE = (
     "participant-calibration-refresh-propagation-v1"
 )
+SENSORY_LOOPBACK_CALIBRATION_REFRESH_STATE_GUARD_PROFILE = (
+    "participant-calibration-refresh-state-fail-closed-v1"
+)
+SENSORY_LOOPBACK_ALLOWED_CALIBRATION_REFRESH_STATES = {
+    "fresh",
+    "expired",
+    "revoked",
+    "stale",
+}
 SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE = (
     "participant-hardware-timing-latency-drift-gate-v1"
 )
@@ -114,6 +123,7 @@ class SensoryLoopbackService:
         self.biodata_arbitration_bindings: Dict[str, Dict[str, Any]] = {}
         self.participant_latency_drift_gates: Dict[str, Dict[str, Any]] = {}
         self.latency_weight_policy_verifier_quorums: Dict[str, Dict[str, Any]] = {}
+        self.calibration_refresh_state_guards: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -167,6 +177,15 @@ class SensoryLoopbackService:
                 "calibration_refresh_propagation_profile": (
                     SENSORY_LOOPBACK_PARTICIPANT_REFRESH_PROPAGATION_PROFILE
                 ),
+                "calibration_refresh_state_guard_profile": (
+                    SENSORY_LOOPBACK_CALIBRATION_REFRESH_STATE_GUARD_PROFILE
+                ),
+                "requires_calibration_refresh_state_guard_on_session_recheck": True,
+                "calibration_refresh_state_fail_closed_statuses": [
+                    "expired",
+                    "revoked",
+                    "stale",
+                ],
                 "requires_participant_latency_drift_gate": True,
                 "latency_drift_profile": (
                     SENSORY_LOOPBACK_PARTICIPANT_LATENCY_DRIFT_PROFILE
@@ -214,6 +233,7 @@ class SensoryLoopbackService:
                 "raw_latency_weight_policy_verifier_payload_stored": False,
                 "raw_latency_weight_policy_verifier_response_payload_stored": False,
                 "raw_latency_weight_policy_verifier_signature_payload_stored": False,
+                "raw_revocation_payload_stored": False,
             },
         }
 
@@ -1326,6 +1346,148 @@ class SensoryLoopbackService:
         )
         self.biodata_arbitration_bindings[binding_id] = binding
         return deepcopy(binding)
+
+    def bind_participant_calibration_refresh_state_guard(
+        self,
+        biodata_arbitration_binding: Mapping[str, Any],
+        *,
+        participant_refresh_states: Mapping[str, str],
+        participant_revocation_refs: Optional[Mapping[str, str]] = None,
+        observed_at_ref: str = "",
+    ) -> Dict[str, Any]:
+        if not isinstance(biodata_arbitration_binding, Mapping):
+            raise ValueError("biodata_arbitration_binding must be a mapping")
+        binding_validation = self.validate_participant_biodata_arbitration(
+            biodata_arbitration_binding,
+        )
+        if not binding_validation["ok"]:
+            raise ValueError(
+                "biodata arbitration binding is invalid: "
+                + "; ".join(binding_validation["errors"]),
+            )
+        if not isinstance(participant_refresh_states, Mapping):
+            raise ValueError("participant_refresh_states must be a mapping")
+        revocation_refs = participant_revocation_refs or {}
+        if not isinstance(revocation_refs, Mapping):
+            raise ValueError("participant_revocation_refs must be a mapping")
+
+        participant_ids = list(biodata_arbitration_binding["participant_identity_ids"])
+        if set(participant_refresh_states) != set(participant_ids):
+            raise ValueError(
+                "participant_refresh_states must cover exactly participant_identity_ids",
+            )
+        extra_revocation_keys = set(revocation_refs) - set(participant_ids)
+        if extra_revocation_keys:
+            raise ValueError(
+                "participant_revocation_refs contains unknown participant identity ids",
+            )
+
+        failure_reason_by_status = {
+            "fresh": "none",
+            "expired": "refresh-expired",
+            "revoked": "refresh-revoked",
+            "stale": "refresh-stale",
+        }
+        participant_state_bindings: List[Dict[str, Any]] = []
+        for participant_id, gate_binding in zip(
+            participant_ids,
+            biodata_arbitration_binding["participant_gate_bindings"],
+        ):
+            current_status = self._normalize_string(
+                participant_refresh_states[participant_id],
+                f"participant_refresh_states.{participant_id}",
+            )
+            if current_status not in SENSORY_LOOPBACK_ALLOWED_CALIBRATION_REFRESH_STATES:
+                raise ValueError(
+                    "participant_refresh_states entries must be one of "
+                    + ", ".join(sorted(SENSORY_LOOPBACK_ALLOWED_CALIBRATION_REFRESH_STATES)),
+                )
+            revocation_ref = self._normalize_string(
+                revocation_refs.get(participant_id, ""),
+                f"participant_revocation_refs.{participant_id}",
+            )
+            if current_status == "revoked" and not revocation_ref:
+                raise ValueError("revoked calibration refresh states require revocation_ref")
+            if current_status != "revoked" and revocation_ref:
+                raise ValueError(
+                    "participant_revocation_refs must be empty unless status is revoked",
+                )
+            failure_reason = failure_reason_by_status[current_status]
+            participant_state_bindings.append(
+                {
+                    "participant_identity_id": participant_id,
+                    "calibration_refresh_ref": gate_binding["calibration_refresh_ref"],
+                    "calibration_refresh_digest": gate_binding[
+                        "calibration_refresh_digest"
+                    ],
+                    "calibration_refresh_source_digest_set": gate_binding[
+                        "calibration_refresh_source_digest_set"
+                    ],
+                    "previous_calibration_refresh_status": gate_binding[
+                        "calibration_refresh_status"
+                    ],
+                    "current_calibration_refresh_status": current_status,
+                    "calibration_refresh_window_bound": gate_binding[
+                        "calibration_refresh_window_bound"
+                    ],
+                    "revocation_ref": revocation_ref,
+                    "delivery_allowed": current_status == "fresh",
+                    "fail_closed_reason": failure_reason,
+                    "raw_refresh_payload_stored": False,
+                    "raw_revocation_payload_stored": False,
+                }
+            )
+
+        failed_participant_ids = [
+            item["participant_identity_id"]
+            for item in participant_state_bindings
+            if item["current_calibration_refresh_status"] != "fresh"
+        ]
+        refresh_fail_closed = bool(failed_participant_ids)
+        guard_id = new_id("sl-refresh-guard")
+        guard = {
+            "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
+            "profile_id": SENSORY_LOOPBACK_CALIBRATION_REFRESH_STATE_GUARD_PROFILE,
+            "guard_ref": f"loopback-calibration-refresh-state-guard://{guard_id}",
+            "created_at": utc_now_iso(),
+            "observed_at_ref": self._normalize_string(
+                observed_at_ref,
+                "observed_at_ref",
+            )
+            or f"timestamp://sensory-loopback/refresh-state/{guard_id}",
+            "session_id": biodata_arbitration_binding["session_id"],
+            "biodata_arbitration_binding_ref": biodata_arbitration_binding[
+                "binding_ref"
+            ],
+            "biodata_arbitration_binding_digest": biodata_arbitration_binding[
+                "binding_digest"
+            ],
+            "participant_identity_ids": participant_ids,
+            "participant_refresh_state_bindings": participant_state_bindings,
+            "participant_refresh_state_count": len(participant_state_bindings),
+            "participant_refresh_state_digest_set": (
+                self._calibration_refresh_state_digest_set(
+                    biodata_arbitration_binding,
+                    participant_state_bindings,
+                )
+            ),
+            "failed_participant_ids": failed_participant_ids,
+            "refresh_fail_closed": refresh_fail_closed,
+            "delivery_blocked": refresh_fail_closed,
+            "shared_session_hold_required": refresh_fail_closed,
+            "safe_baseline_required": refresh_fail_closed,
+            "guard_status": "blocked" if refresh_fail_closed else "pass",
+            "storage_policy": "participant-refresh-state+revocation-ref-digest-only",
+            "raw_refresh_payload_stored": False,
+            "raw_revocation_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        guard["guard_digest"] = sha256_text(
+            canonical_json(self._calibration_refresh_state_guard_digest_payload(guard))
+        )
+        self.calibration_refresh_state_guards[guard["guard_ref"]] = guard
+        return deepcopy(guard)
 
     def bind_participant_latency_drift_gate(
         self,
@@ -3216,6 +3378,233 @@ class SensoryLoopbackService:
             "semantic_thought_content_generated": False,
         }
 
+    def validate_participant_calibration_refresh_state_guard(
+        self,
+        guard: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(guard, Mapping):
+            raise ValueError("guard must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "guard_ref",
+            "created_at",
+            "observed_at_ref",
+            "session_id",
+            "biodata_arbitration_binding_ref",
+            "biodata_arbitration_binding_digest",
+            "participant_refresh_state_digest_set",
+            "storage_policy",
+            "guard_digest",
+        ):
+            self._check_non_empty_string(guard.get(field_name), field_name, errors)
+        if guard.get("schema_version") != SENSORY_LOOPBACK_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {SENSORY_LOOPBACK_SCHEMA_VERSION}")
+        if guard.get("profile_id") != SENSORY_LOOPBACK_CALIBRATION_REFRESH_STATE_GUARD_PROFILE:
+            errors.append(
+                "profile_id must be "
+                f"{SENSORY_LOOPBACK_CALIBRATION_REFRESH_STATE_GUARD_PROFILE}",
+            )
+        if (
+            guard.get("storage_policy")
+            != "participant-refresh-state+revocation-ref-digest-only"
+        ):
+            errors.append(
+                "storage_policy must be participant-refresh-state+revocation-ref-digest-only",
+            )
+
+        participant_identity_ids = guard.get("participant_identity_ids")
+        if (
+            not isinstance(participant_identity_ids, list)
+            or len(participant_identity_ids) < 2
+            or len(participant_identity_ids) > SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS
+            or len(participant_identity_ids) != len(set(participant_identity_ids))
+        ):
+            errors.append("participant_identity_ids must be a unique shared participant list")
+            participant_identity_ids = []
+
+        state_bindings = guard.get("participant_refresh_state_bindings")
+        if not isinstance(state_bindings, list):
+            errors.append("participant_refresh_state_bindings must be a list")
+            state_bindings = []
+        if guard.get("participant_refresh_state_count") != len(state_bindings):
+            errors.append(
+                "participant_refresh_state_count must match participant_refresh_state_bindings length",
+            )
+        if participant_identity_ids and [
+            item.get("participant_identity_id")
+            for item in state_bindings
+            if isinstance(item, Mapping)
+        ] != participant_identity_ids:
+            errors.append(
+                "participant_refresh_state_bindings must follow participant_identity_ids order",
+            )
+
+        failed_participant_ids: List[str] = []
+        failure_reason_by_status = {
+            "fresh": "none",
+            "expired": "refresh-expired",
+            "revoked": "refresh-revoked",
+            "stale": "refresh-stale",
+        }
+        for index, state_binding in enumerate(state_bindings):
+            if not isinstance(state_binding, Mapping):
+                errors.append(f"participant_refresh_state_bindings[{index}] must be a mapping")
+                continue
+            for field_name in (
+                "participant_identity_id",
+                "calibration_refresh_ref",
+                "calibration_refresh_digest",
+                "calibration_refresh_source_digest_set",
+                "previous_calibration_refresh_status",
+                "current_calibration_refresh_status",
+                "fail_closed_reason",
+            ):
+                self._check_non_empty_string(
+                    state_binding.get(field_name),
+                    f"participant_refresh_state_bindings[{index}].{field_name}",
+                    errors,
+                )
+            current_status = state_binding.get("current_calibration_refresh_status")
+            if current_status not in SENSORY_LOOPBACK_ALLOWED_CALIBRATION_REFRESH_STATES:
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].current_calibration_refresh_status invalid",
+                )
+                current_status = "stale"
+            if state_binding.get("previous_calibration_refresh_status") != "fresh":
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].previous_calibration_refresh_status must be fresh",
+                )
+            if state_binding.get("calibration_refresh_window_bound") is not True:
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].calibration_refresh_window_bound must be true",
+                )
+            expected_delivery_allowed = current_status == "fresh"
+            if state_binding.get("delivery_allowed") != expected_delivery_allowed:
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].delivery_allowed mismatch",
+                )
+            expected_reason = failure_reason_by_status.get(str(current_status), "refresh-stale")
+            if state_binding.get("fail_closed_reason") != expected_reason:
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].fail_closed_reason mismatch",
+                )
+            revocation_ref = state_binding.get("revocation_ref")
+            if not isinstance(revocation_ref, str):
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].revocation_ref must be a string",
+                )
+                revocation_ref = ""
+            if current_status == "revoked" and not revocation_ref:
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].revocation_ref must be bound when revoked",
+                )
+            if current_status != "revoked" and revocation_ref:
+                errors.append(
+                    f"participant_refresh_state_bindings[{index}].revocation_ref must be empty unless revoked",
+                )
+            for field_name in ("raw_refresh_payload_stored", "raw_revocation_payload_stored"):
+                if state_binding.get(field_name) is not False:
+                    errors.append(
+                        f"participant_refresh_state_bindings[{index}].{field_name} must be false",
+                    )
+            if current_status != "fresh":
+                participant_id = state_binding.get("participant_identity_id")
+                if isinstance(participant_id, str):
+                    failed_participant_ids.append(participant_id)
+
+        refresh_fail_closed = bool(failed_participant_ids)
+        if guard.get("failed_participant_ids") != failed_participant_ids:
+            errors.append("failed_participant_ids mismatch")
+        for field_name in (
+            "refresh_fail_closed",
+            "delivery_blocked",
+            "shared_session_hold_required",
+            "safe_baseline_required",
+        ):
+            if guard.get(field_name) != refresh_fail_closed:
+                errors.append(f"{field_name} mismatch")
+        expected_guard_status = "blocked" if refresh_fail_closed else "pass"
+        if guard.get("guard_status") != expected_guard_status:
+            errors.append("guard_status mismatch")
+        for field_name in (
+            "raw_refresh_payload_stored",
+            "raw_revocation_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if guard.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        digest_binding = {
+            "binding_ref": guard.get("biodata_arbitration_binding_ref"),
+            "binding_digest": guard.get("biodata_arbitration_binding_digest"),
+        }
+        expected_digest_set = self._calibration_refresh_state_digest_set(
+            digest_binding,
+            state_bindings,
+        )
+        participant_refresh_state_digest_set_bound = (
+            bool(state_bindings)
+            and guard.get("participant_refresh_state_digest_set") == expected_digest_set
+        )
+        if not participant_refresh_state_digest_set_bound:
+            errors.append("participant_refresh_state_digest_set mismatch")
+        expected_guard_digest = sha256_text(
+            canonical_json(self._calibration_refresh_state_guard_digest_payload(guard))
+        )
+        guard_digest_bound = guard.get("guard_digest") == expected_guard_digest
+        if not guard_digest_bound:
+            errors.append("guard_digest mismatch")
+
+        session_bound = False
+        bound_session_id = guard.get("session_id")
+        if isinstance(bound_session_id, str) and bound_session_id in self.sessions:
+            session = self.sessions[bound_session_id]
+            session_bound = (
+                session["arbitration_required"] is True
+                and participant_identity_ids == session["participant_identity_ids"]
+            )
+            if not session_bound:
+                errors.append("guard must match the shared loopback session")
+
+        known_binding_bound = False
+        for binding in self.biodata_arbitration_bindings.values():
+            if binding.get("binding_ref") == guard.get("biodata_arbitration_binding_ref"):
+                known_binding_bound = (
+                    binding.get("binding_digest")
+                    == guard.get("biodata_arbitration_binding_digest")
+                    and binding.get("session_id") == guard.get("session_id")
+                    and binding.get("participant_identity_ids") == participant_identity_ids
+                )
+                if not known_binding_bound:
+                    errors.append("guard must match its BioData arbitration binding")
+                break
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "session_bound": session_bound,
+            "biodata_arbitration_binding_bound": known_binding_bound,
+            "guard_status": guard.get("guard_status"),
+            "refresh_fail_closed": refresh_fail_closed,
+            "failed_participant_ids": failed_participant_ids,
+            "delivery_blocked": guard.get("delivery_blocked") is True,
+            "shared_session_hold_required": (
+                guard.get("shared_session_hold_required") is True
+            ),
+            "safe_baseline_required": guard.get("safe_baseline_required") is True,
+            "participant_refresh_state_count": len(state_bindings),
+            "participant_refresh_state_digest_set_bound": (
+                participant_refresh_state_digest_set_bound
+            ),
+            "guard_digest_bound": guard_digest_bound,
+            "raw_refresh_payload_stored": False,
+            "raw_revocation_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+
     def _require_session(self, session_id: str) -> Dict[str, Any]:
         normalized_session_id = self._normalize_non_empty_string(session_id, "session_id")
         try:
@@ -4316,6 +4705,71 @@ class SensoryLoopbackService:
     ) -> Dict[str, Any]:
         payload = dict(quorum)
         payload.pop("verifier_quorum_digest", None)
+        return payload
+
+    @staticmethod
+    def _calibration_refresh_state_digest_set(
+        biodata_arbitration_binding: Mapping[str, Any],
+        participant_state_bindings: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        SENSORY_LOOPBACK_CALIBRATION_REFRESH_STATE_GUARD_PROFILE
+                    ),
+                    "biodata_arbitration_binding_ref": (
+                        biodata_arbitration_binding.get("binding_ref")
+                    ),
+                    "biodata_arbitration_binding_digest": (
+                        biodata_arbitration_binding.get("binding_digest")
+                    ),
+                    "participant_refresh_state_bindings": [
+                        {
+                            "participant_identity_id": binding.get(
+                                "participant_identity_id"
+                            ),
+                            "calibration_refresh_ref": binding.get(
+                                "calibration_refresh_ref"
+                            ),
+                            "calibration_refresh_digest": binding.get(
+                                "calibration_refresh_digest"
+                            ),
+                            "calibration_refresh_source_digest_set": binding.get(
+                                "calibration_refresh_source_digest_set"
+                            ),
+                            "previous_calibration_refresh_status": binding.get(
+                                "previous_calibration_refresh_status"
+                            ),
+                            "current_calibration_refresh_status": binding.get(
+                                "current_calibration_refresh_status"
+                            ),
+                            "calibration_refresh_window_bound": binding.get(
+                                "calibration_refresh_window_bound"
+                            ),
+                            "revocation_ref": binding.get("revocation_ref"),
+                            "delivery_allowed": binding.get("delivery_allowed"),
+                            "fail_closed_reason": binding.get("fail_closed_reason"),
+                            "raw_refresh_payload_stored": binding.get(
+                                "raw_refresh_payload_stored"
+                            ),
+                            "raw_revocation_payload_stored": binding.get(
+                                "raw_revocation_payload_stored"
+                            ),
+                        }
+                        for binding in participant_state_bindings
+                        if isinstance(binding, Mapping)
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
+    def _calibration_refresh_state_guard_digest_payload(
+        guard: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        payload = dict(guard)
+        payload.pop("guard_digest", None)
         return payload
 
     @staticmethod

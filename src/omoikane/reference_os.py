@@ -13291,6 +13291,24 @@ json.dump(response, sys.stdout)
                 ),
             )
         )
+        calibration_refresh_state_guard = (
+            self.sensory_loopback.bind_participant_calibration_refresh_state_guard(
+                weighted_latency_quorum_binding,
+                participant_refresh_states={
+                    identity.identity_id: "fresh",
+                    peer.identity_id: "expired",
+                    observer.identity_id: "revoked",
+                },
+                participant_revocation_refs={
+                    observer.identity_id: (
+                        "revocation-registry://atrium/weighted/observer-calibration/revoked"
+                    ),
+                },
+                observed_at_ref=(
+                    "timestamp://sensory-loopback/weighted/refresh-state/check-1"
+                ),
+            )
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="sensory_loopback.biodata_arbitration.bound",
@@ -13478,6 +13496,11 @@ json.dump(response, sys.stdout)
                 weighted_latency_policy_verifier_quorum,
             )
         )
+        calibration_refresh_state_guard_validation = (
+            self.sensory_loopback.validate_participant_calibration_refresh_state_guard(
+                calibration_refresh_state_guard,
+            )
+        )
         schema_contracts = [
             {
                 "payload_path": "session",
@@ -13556,6 +13579,19 @@ json.dump(response, sys.stdout)
                     "shared-loopback-weighted-latency-policy-verifier-quorum"
                 ),
             },
+            {
+                "payload_path": (
+                    "shared_loopback.weighted_latency_quorum."
+                    "calibration_refresh_state_guard"
+                ),
+                "schema_path": (
+                    "specs/schemas/"
+                    "sensory_loopback_calibration_refresh_state_guard.schema"
+                ),
+                "contract_role": (
+                    "shared-loopback-calibration-refresh-state-fail-closed"
+                ),
+            },
         ]
 
         return {
@@ -13622,10 +13658,12 @@ json.dump(response, sys.stdout)
                         "source_digest_set": weighted_latency_policy_source_digest_set,
                         "verifier_quorum": weighted_latency_policy_verifier_quorum,
                     },
+                    "calibration_refresh_state_guard": calibration_refresh_state_guard,
                     "validation": {
                         "ok": weighted_session_validation["ok"]
                         and weighted_latency_quorum_validation["ok"]
-                        and weighted_latency_policy_verifier_quorum_validation["ok"],
+                        and weighted_latency_policy_verifier_quorum_validation["ok"]
+                        and calibration_refresh_state_guard_validation["ok"],
                         "session_ok": weighted_session_validation["ok"],
                         "biodata_arbitration_ok": (
                             weighted_latency_quorum_validation["ok"]
@@ -13724,6 +13762,37 @@ json.dump(response, sys.stdout)
                                 "participant_calibration_refresh_digest_set_bound"
                             ]
                         ),
+                        "calibration_refresh_state_guard_ok": (
+                            calibration_refresh_state_guard_validation["ok"]
+                        ),
+                        "calibration_refresh_fail_closed": (
+                            calibration_refresh_state_guard_validation[
+                                "refresh_fail_closed"
+                            ]
+                        ),
+                        "calibration_refresh_failed_participant_ids": (
+                            calibration_refresh_state_guard_validation[
+                                "failed_participant_ids"
+                            ]
+                        ),
+                        "calibration_refresh_state_guard_digest_bound": (
+                            calibration_refresh_state_guard_validation[
+                                "participant_refresh_state_digest_set_bound"
+                            ]
+                            and calibration_refresh_state_guard_validation[
+                                "guard_digest_bound"
+                            ]
+                        ),
+                        "calibration_refresh_state_guard_raw_payload_redacted": (
+                            calibration_refresh_state_guard_validation[
+                                "raw_refresh_payload_stored"
+                            ]
+                            is False
+                            and calibration_refresh_state_guard_validation[
+                                "raw_revocation_payload_stored"
+                            ]
+                            is False
+                        ),
                     },
                 },
                 "receipts": {
@@ -13739,7 +13808,8 @@ json.dump(response, sys.stdout)
                     and shared_biodata_arbitration_validation["ok"]
                     and weighted_session_validation["ok"]
                     and weighted_latency_quorum_validation["ok"]
-                    and weighted_latency_policy_verifier_quorum_validation["ok"],
+                    and weighted_latency_policy_verifier_quorum_validation["ok"]
+                    and calibration_refresh_state_guard_validation["ok"],
                     "session_ok": shared_session_validation["ok"],
                     "aligned_ok": shared_aligned_validation["ok"],
                     "mediated_ok": shared_mediated_validation["ok"],
@@ -13812,6 +13882,7 @@ json.dump(response, sys.stdout)
                     "weighted_latency_quorum_ok": (
                         weighted_latency_quorum_validation["ok"]
                         and weighted_latency_policy_verifier_quorum_validation["ok"]
+                        and calibration_refresh_state_guard_validation["ok"]
                     ),
                     "weighted_latency_quorum_satisfied": (
                         weighted_latency_quorum_validation[
@@ -13849,6 +13920,32 @@ json.dump(response, sys.stdout)
                         ]
                         == [observer.identity_id]
                     ),
+                    "calibration_refresh_state_guard_ok": (
+                        calibration_refresh_state_guard_validation["ok"]
+                    ),
+                    "calibration_refresh_fail_closed": (
+                        calibration_refresh_state_guard_validation[
+                            "refresh_fail_closed"
+                        ]
+                    ),
+                    "calibration_refresh_state_guard_digest_bound": (
+                        calibration_refresh_state_guard_validation[
+                            "participant_refresh_state_digest_set_bound"
+                        ]
+                        and calibration_refresh_state_guard_validation[
+                            "guard_digest_bound"
+                        ]
+                    ),
+                    "calibration_refresh_state_guard_raw_payload_redacted": (
+                        calibration_refresh_state_guard_validation[
+                            "raw_refresh_payload_stored"
+                        ]
+                        is False
+                        and calibration_refresh_state_guard_validation[
+                            "raw_revocation_payload_stored"
+                        ]
+                        is False
+                    ),
                     "shared_space_mode_collective": shared_final_session["shared_space_mode"]
                     == "collective-shared",
                     "participant_bindings_complete": shared_mediated_validation[
@@ -13881,11 +13978,12 @@ json.dump(response, sys.stdout)
                 and shared_aligned_validation["ok"]
                 and shared_mediated_validation["ok"]
                 and shared_artifact_family_validation["ok"]
-                and shared_biodata_arbitration_validation["ok"]
-                and weighted_session_validation["ok"]
-                and weighted_latency_quorum_validation["ok"]
-                and weighted_latency_policy_verifier_quorum_validation["ok"]
-                and calibration_gate_validation["ok"],
+                    and shared_biodata_arbitration_validation["ok"]
+                    and weighted_session_validation["ok"]
+                    and weighted_latency_quorum_validation["ok"]
+                    and weighted_latency_policy_verifier_quorum_validation["ok"]
+                    and calibration_refresh_state_guard_validation["ok"]
+                    and calibration_gate_validation["ok"],
                 "coherent_ok": coherent_validation["ok"],
                 "degraded_ok": degraded_validation["ok"],
                 "stabilized_ok": stabilized_validation["ok"],
@@ -13947,7 +14045,8 @@ json.dump(response, sys.stdout)
                 and shared_biodata_arbitration_validation["ok"]
                 and weighted_session_validation["ok"]
                 and weighted_latency_quorum_validation["ok"]
-                and weighted_latency_policy_verifier_quorum_validation["ok"],
+                and weighted_latency_policy_verifier_quorum_validation["ok"]
+                and calibration_refresh_state_guard_validation["ok"],
                 "shared_loopback_collective_bound": shared_session_validation[
                     "shared_collective_bound"
                 ]
@@ -14035,6 +14134,7 @@ json.dump(response, sys.stdout)
                 "shared_loopback_weighted_latency_quorum_ok": (
                     weighted_latency_quorum_validation["ok"]
                     and weighted_latency_policy_verifier_quorum_validation["ok"]
+                    and calibration_refresh_state_guard_validation["ok"]
                 ),
                 "shared_loopback_weighted_latency_quorum_satisfied": (
                     weighted_latency_quorum_validation["latency_quorum_satisfied"]
@@ -14115,10 +14215,34 @@ json.dump(response, sys.stdout)
                     ]
                     == [observer.identity_id]
                 ),
+                "shared_loopback_calibration_refresh_state_guard_ok": (
+                    calibration_refresh_state_guard_validation["ok"]
+                ),
+                "shared_loopback_calibration_refresh_fail_closed": (
+                    calibration_refresh_state_guard_validation["refresh_fail_closed"]
+                ),
+                "shared_loopback_calibration_refresh_state_guard_digest_bound": (
+                    calibration_refresh_state_guard_validation[
+                        "participant_refresh_state_digest_set_bound"
+                    ]
+                    and calibration_refresh_state_guard_validation[
+                        "guard_digest_bound"
+                    ]
+                ),
+                "shared_loopback_calibration_refresh_state_guard_raw_payload_redacted": (
+                    calibration_refresh_state_guard_validation[
+                        "raw_refresh_payload_stored"
+                    ]
+                    is False
+                    and calibration_refresh_state_guard_validation[
+                        "raw_revocation_payload_stored"
+                    ]
+                    is False
+                ),
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
                 "public_schema_contract_profile": SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
-                "public_schema_contract_bound": len(schema_contracts) == 12
+                "public_schema_contract_bound": len(schema_contracts) == 13
                 and {contract["schema_path"] for contract in schema_contracts}
                 == {
                     "specs/schemas/sensory_loopback_session.schema",
@@ -14131,6 +14255,10 @@ json.dump(response, sys.stdout)
                     (
                         "specs/schemas/"
                         "sensory_loopback_latency_weight_policy_verifier_quorum.schema"
+                    ),
+                    (
+                        "specs/schemas/"
+                        "sensory_loopback_calibration_refresh_state_guard.schema"
                     ),
                 },
             },

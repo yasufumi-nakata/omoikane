@@ -1422,14 +1422,21 @@ shared arbitration が calibration / drift / refresh / timing / hardware adapter
 observer の latency gate が blocked でも self + peer の pass weight が threshold を満たす時だけ
 `latency_quorum_satisfied=true` とし、participant latency weight digest、
 weight policy authority digest、fresh verifier quorum digest、timeout-bound flag、quorum digest を public schema に通す。
+同じ weighted path は `participant-calibration-refresh-state-fail-closed-v1` guard も返し、
+peer の expired refresh と observer の revoked refresh を
+`delivery_blocked=true` / `shared_session_hold_required=true` / `safe_baseline_required=true` に伝播し、
+refresh state digest set、guard digest、revocation ref だけを保持して
+raw refresh / revocation payload を保存しない。
 さらに `sensory-loopback-public-schema-contract-v1` の `schema_contracts` manifest が
 self-only と shared loopback の session / receipt / artifact family / BioData arbitration binding payload、
-weighted latency quorum binding payload、timeout-bound weight policy verifier quorum payload を
+weighted latency quorum binding payload、timeout-bound weight policy verifier quorum payload、
+calibration refresh state guard payload を
 `sensory_loopback_session.schema` /
 `sensory_loopback_receipt.schema` /
 `sensory_loopback_artifact_family.schema` /
 `sensory_loopback_biodata_arbitration_binding.schema` /
-`sensory_loopback_latency_weight_policy_verifier_quorum.schema` へ列挙し、
+`sensory_loopback_latency_weight_policy_verifier_quorum.schema` /
+`sensory_loopback_calibration_refresh_state_guard.schema` へ列挙し、
 integration test が demo payload を public schema に直接通す。
 
 `version-demo` は hybrid versioning policy を JSON で可視化し、
