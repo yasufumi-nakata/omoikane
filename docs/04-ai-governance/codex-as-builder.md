@@ -42,7 +42,8 @@ bounded に再現できる。
 patch digest、changed file manifest digest、verification manifest digest、worker base commit、
 signed worker identity evidence、remote branch / PR metadata digest を
 `parallel_codex_worker_result_receipt` へ縮約し、remote source revocation status が
-`current-not-revoked` でない result と stale result、metadata 欠落を blocked のまま保持する。
+`current-not-revoked` でない result、revocation freshness window が expired の result、
+stale result、metadata 欠落を blocked のまま保持する。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

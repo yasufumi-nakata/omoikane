@@ -31,7 +31,10 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   raw worker identity payload は保存しない
 - remote branch / PR 由来の worker result は branch ref、PR ref、accepted source
   policy digest、review authority digest、current-not-revoked revocation digest を
-  remote metadata digest へ束縛し、raw remote metadata / revocation payload は保存しない
+  remote metadata digest へ束縛する
+- remote source revocation check は freshness window digest も持ち、
+  `fresh` 以外または 900 秒を超える window は fail-closed にする。raw remote
+  metadata / revocation / freshness payload は保存しない
 - user または他 worker の未確認変更を revert しない
 
 ## Integration

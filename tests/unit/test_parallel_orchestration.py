@@ -70,11 +70,21 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             "not-applicable",
             receipt["remote_source_revocation_status"],
         )
+        self.assertEqual(
+            "not-applicable",
+            receipt["remote_source_revocation_freshness_profile"],
+        )
+        self.assertEqual(
+            "not-applicable",
+            receipt["remote_source_revocation_freshness_status"],
+        )
+        self.assertEqual(0, receipt["remote_source_revocation_freshness_window_seconds"])
         self.assertTrue(validation["receipt_digest_bound"])
         self.assertFalse(receipt["raw_patch_payload_stored"])
         self.assertFalse(receipt["raw_worker_identity_payload_stored"])
         self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
         self.assertFalse(receipt["raw_remote_revocation_payload_stored"])
+        self.assertFalse(receipt["raw_remote_revocation_freshness_payload_stored"])
         self.assertFalse(receipt["raw_transcript_payload_stored"])
         self.assertFalse(receipt["raw_verification_payload_stored"])
 
@@ -121,10 +131,23 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             receipt["remote_source_revocation_status"],
         )
         self.assertTrue(validation["remote_source_revocation_digest_bound"])
+        self.assertTrue(validation["remote_source_revocation_freshness_digest_bound"])
         self.assertTrue(validation["remote_source_revocation_not_revoked"])
+        self.assertTrue(validation["remote_source_revocation_fresh"])
         self.assertTrue(validation["worker_identity_evidence_bound"])
+        self.assertEqual(
+            "remote-source-revocation-freshness-window-v1",
+            receipt["remote_source_revocation_freshness_profile"],
+        )
+        self.assertEqual("fresh", receipt["remote_source_revocation_freshness_status"])
+        self.assertGreater(receipt["remote_source_revocation_freshness_window_seconds"], 0)
+        self.assertLessEqual(
+            receipt["remote_source_revocation_freshness_window_seconds"],
+            900,
+        )
         self.assertFalse(receipt["raw_remote_metadata_payload_stored"])
         self.assertFalse(receipt["raw_remote_revocation_payload_stored"])
+        self.assertFalse(receipt["raw_remote_revocation_freshness_payload_stored"])
 
     def test_remote_branch_pr_worker_result_blocks_revoked_source(self) -> None:
         receipt = self.service.ingest_worker_result(
@@ -153,6 +176,36 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(validation["ready_for_main_checkout"])
         self.assertTrue(validation["remote_source_revocation_digest_bound"])
         self.assertFalse(validation["remote_source_revocation_not_revoked"])
+        self.assertTrue(validation["remote_source_revocation_fresh"])
+
+    def test_remote_branch_pr_worker_result_blocks_expired_revocation_freshness(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-remote-pr-worker",
+            worker_role="external",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=["src/omoikane/self_construction/parallel_orchestration.py"],
+            verification_results=_verification_results(),
+            result_summary="Remote worker result carries an expired revocation check.",
+            source_system="remote-branch-pr-worker-result",
+            remote_branch_ref="refs/remotes/origin/codex/expired-worker",
+            remote_pr_ref="pull-request://omoikane/130",
+            remote_source_revocation_freshness_status="expired",
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("blocked", receipt["integration_decision"])
+        self.assertIn(
+            "remote source revocation freshness status must be fresh",
+            receipt["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["remote_source_revocation_digest_bound"])
+        self.assertTrue(validation["remote_source_revocation_freshness_digest_bound"])
+        self.assertFalse(validation["remote_source_revocation_fresh"])
 
     def test_remote_branch_pr_worker_result_without_pr_metadata_blocks(self) -> None:
         receipt = self.service.ingest_worker_result(

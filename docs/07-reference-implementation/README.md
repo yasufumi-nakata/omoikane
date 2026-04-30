@@ -912,9 +912,10 @@ integrity Guardian 署名 digest だけに縮約し、raw worker identity payloa
 remote receipt は `remote_branch_ref`、`remote_pr_ref`、
 accepted source policy digest、review authority digest を
 `remote_metadata_digest` へ束縛し、さらに
-`remote_source_revocation_status=current-not-revoked` と revocation digest を同じ
-metadata digest に含める。revoked / stale source は schema-bound のまま blocked にし、
-raw remote metadata / revocation payload は保存しない。
+`remote_source_revocation_status=current-not-revoked`、revocation digest、
+`remote_source_revocation_freshness_status=fresh`、freshness window digest を同じ
+metadata digest に含める。revoked / stale / expired source は schema-bound のまま blocked にし、
+raw remote metadata / revocation / freshness payload は保存しない。
 blocked receipt は stale worker base commit を schema-bound に残しつつ
 `integration_decision=blocked` として fail-closed にする。
 同じ demo は Yaoyorozu worker dispatch receipt から

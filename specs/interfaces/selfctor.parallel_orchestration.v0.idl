@@ -101,6 +101,22 @@ operations:
           remote_source_revocation_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
+          remote_source_revocation_checked_at_ref:
+            type: string
+            minLength: 1
+          remote_source_revocation_freshness_window_seconds:
+            type: integer
+            minimum: 1
+            maximum: 900
+          remote_source_revocation_expires_at_ref:
+            type: string
+            minLength: 1
+          remote_source_revocation_freshness_status:
+            type: string
+            enum: [fresh, expired, not-applicable]
+          remote_source_revocation_freshness_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
           remote_metadata_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
@@ -111,7 +127,7 @@ operations:
       - direct worker results carry source_system=direct-worker-result and no upstream dispatch refs
       - remote branch / PR worker results carry source_system=remote-branch-pr-worker-result plus branch ref, PR ref, review authority digest, accepted source policy digest, current-not-revoked source revocation digest, and remote_metadata_digest
       - worker_identity_ref, worker_identity_digest, and integrity-guardian worker_identity_signature_digest are bound to patch digest and base/head commit evidence
-      - remote metadata and remote source revocation status are digest-bound and redacted before remote results can become accept-ready
+      - remote metadata, remote source revocation status, and revocation freshness window are digest-bound and redacted before remote results can become accept-ready
       - changed_files must remain inside both the repo-local allowed workspace prefixes and the worker ownership_scope
       - patch payload, raw worker identity payload, raw remote metadata payload, raw remote revocation payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
       - unittest discover and gap-report required verification commands must pass before main checkout integration is accepted

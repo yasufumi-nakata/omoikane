@@ -6,6 +6,8 @@ description: >
   before it is integrated into the main checkout, including signed worker
   identity evidence and remote branch / PR source metadata without storing raw
   worker identity, remote metadata, or remote revocation payloads.
+  Remote source revocation evidence also carries a bounded freshness window so
+  old current-not-revoked checks cannot be reused silently.
 type: object
 additionalProperties: false
 required:
@@ -29,6 +31,12 @@ required:
   - remote_source_revocation_ref
   - remote_source_revocation_status
   - remote_source_revocation_digest
+  - remote_source_revocation_freshness_profile
+  - remote_source_revocation_checked_at_ref
+  - remote_source_revocation_freshness_window_seconds
+  - remote_source_revocation_expires_at_ref
+  - remote_source_revocation_freshness_status
+  - remote_source_revocation_freshness_digest
   - remote_metadata_digest
   - remote_metadata_bound
   - worker_identity_profile
@@ -66,6 +74,7 @@ required:
   - raw_worker_identity_payload_stored
   - raw_remote_metadata_payload_stored
   - raw_remote_revocation_payload_stored
+  - raw_remote_revocation_freshness_payload_stored
   - raw_transcript_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -133,6 +142,28 @@ properties:
       - stale
       - not-applicable
   remote_source_revocation_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  remote_source_revocation_freshness_profile:
+    type: string
+    enum:
+      - remote-source-revocation-freshness-window-v1
+      - not-applicable
+  remote_source_revocation_checked_at_ref:
+    type: string
+  remote_source_revocation_freshness_window_seconds:
+    type: integer
+    minimum: 0
+    maximum: 900
+  remote_source_revocation_expires_at_ref:
+    type: string
+  remote_source_revocation_freshness_status:
+    type: string
+    enum:
+      - fresh
+      - expired
+      - not-applicable
+  remote_source_revocation_freshness_digest:
     type: string
     pattern: "^$|^[a-f0-9]{64}$"
   remote_metadata_digest:
@@ -260,6 +291,8 @@ properties:
   raw_remote_metadata_payload_stored:
     const: false
   raw_remote_revocation_payload_stored:
+    const: false
+  raw_remote_revocation_freshness_payload_stored:
     const: false
   raw_transcript_payload_stored:
     const: false
