@@ -1,0 +1,94 @@
+idl_version: 1
+kind: service
+namespace: selfctor.parallel_orchestration.v0
+service: ParallelCodexOrchestrationService
+summary: Bind parallel Codex worker results to digest-only receipts before main checkout integration.
+imports:
+  parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
+operations:
+  ingest_worker_result:
+    summary: Normalize one worker result, changed-file list, patch digest, and verification command set into a main-checkout ingestion receipt.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - worker_id
+          - worker_role
+          - worker_result_status
+          - main_checkout_head
+          - worker_base_commit
+          - ownership_scope
+          - changed_files
+          - verification_results
+          - result_summary
+        properties:
+          worker_id:
+            type: string
+            minLength: 1
+          worker_role:
+            type: string
+            enum: [explorer, worker, codex-exec, external]
+          worker_result_status:
+            type: string
+            enum: [completed, blocked, failed, stale]
+          main_checkout_head:
+            type: string
+            pattern: "^[a-f0-9]{40}$"
+          worker_base_commit:
+            type: string
+            pattern: "^[a-f0-9]{40}$"
+          ownership_scope:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          changed_files:
+            type: array
+            minItems: 1
+            items:
+              type: string
+              minLength: 1
+          verification_results:
+            type: array
+            minItems: 1
+          result_summary:
+            type: string
+            minLength: 1
+          patch_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+    output:
+      schema_ref: parallel_codex_worker_result_receipt
+    guarantees:
+      - worker_base_commit must match main_checkout_head before integration_decision can become accept-ready
+      - changed_files must remain inside both the repo-local allowed workspace prefixes and the worker ownership_scope
+      - patch payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields remain
+      - unittest discover and gap-report required verification commands must pass before main checkout integration is accepted
+      - blocked, stale, or failed worker results remain schema-bound but cannot be integrated
+  validate_worker_result_receipt:
+    summary: Recompute the changed-file manifest digest, verification manifest digest, receipt digest, and blocking reasons for a worker result receipt.
+    input:
+      schema_ref: parallel_codex_worker_result_receipt
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - ready_for_main_checkout
+          - errors
+        properties:
+          ok:
+            type: boolean
+          ready_for_main_checkout:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
+events:
+  selfctor.parallel_orchestration.worker_result_ingested:
+    payload:
+      schema_ref: parallel_codex_worker_result_receipt

@@ -16,6 +16,10 @@ from .builders import (
 )
 from .design_reader import DesignReaderPolicy, DesignReaderService
 from .gaps import GapScanner
+from .parallel_orchestration import (
+    ParallelCodexOrchestrationPolicy,
+    ParallelCodexOrchestrationService,
+)
 from .sandbox import SandboxSentinel, SandboxSignalProfile
 
 __all__ = [
@@ -26,6 +30,8 @@ __all__ = [
     "GapScanner",
     "LiveEnactmentPolicy",
     "LiveEnactmentService",
+    "ParallelCodexOrchestrationPolicy",
+    "ParallelCodexOrchestrationService",
     "PatchGeneratorPolicy",
     "PatchGeneratorService",
     "RollbackEnginePolicy",

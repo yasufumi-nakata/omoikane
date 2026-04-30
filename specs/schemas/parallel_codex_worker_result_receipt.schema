@@ -1,0 +1,177 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/parallel_codex_worker_result_receipt.schema"
+title: ParallelCodexWorkerResultReceipt
+description: >
+  Digest-only receipt for accepting or blocking one parallel Codex worker result
+  before it is integrated into the main checkout.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - generated_at
+  - profile_id
+  - integration_policy_profile
+  - reference_runbook_ref
+  - worker_id
+  - worker_role
+  - worker_result_status
+  - main_checkout_head
+  - worker_base_commit
+  - base_head_matches
+  - ownership_scope
+  - changed_files
+  - changed_file_count
+  - changed_file_manifest_digest
+  - patch_digest
+  - verification_results
+  - verification_command_count
+  - verification_manifest_digest
+  - required_verifications_passed
+  - blocking_reasons
+  - integration_decision
+  - result_summary
+  - raw_patch_payload_stored
+  - raw_transcript_payload_stored
+  - raw_verification_payload_stored
+  - receipt_digest
+  - receipt_ref
+properties:
+  kind:
+    const: parallel_codex_worker_result_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  receipt_id:
+    type: string
+    pattern: "^parallel-codex-result-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: parallel-codex-worker-result-ingestion-v1
+  integration_policy_profile:
+    const: main-checkout-worker-result-ingestion-v1
+  reference_runbook_ref:
+    const: references/parallel-codex-orchestration.md
+  worker_id:
+    type: string
+    minLength: 1
+  worker_role:
+    type: string
+    enum:
+      - explorer
+      - worker
+      - codex-exec
+      - external
+  worker_result_status:
+    type: string
+    enum:
+      - completed
+      - blocked
+      - failed
+      - stale
+  main_checkout_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  worker_base_commit:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  base_head_matches:
+    type: boolean
+  ownership_scope:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  changed_files:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  changed_file_count:
+    type: integer
+    minimum: 1
+  changed_file_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  patch_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  verification_results:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/verification_result"
+  verification_command_count:
+    type: integer
+    minimum: 1
+  verification_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  required_verifications_passed:
+    type: boolean
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  integration_decision:
+    type: string
+    enum:
+      - accept-ready
+      - blocked
+  result_summary:
+    type: string
+    minLength: 1
+  raw_patch_payload_stored:
+    const: false
+  raw_transcript_payload_stored:
+    const: false
+  raw_verification_payload_stored:
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_ref:
+    type: string
+    pattern: "^receipt://parallel-codex/parallel-codex-result-[a-f0-9]{12}$"
+$defs:
+  verification_result:
+    type: object
+    additionalProperties: false
+    required:
+      - command
+      - status
+      - exit_code
+      - stdout_digest
+      - stderr_digest
+      - raw_stdout_stored
+      - raw_stderr_stored
+    properties:
+      command:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        enum:
+          - pass
+          - fail
+          - timeout
+      exit_code:
+        type: integer
+      stdout_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      stderr_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      raw_stdout_stored:
+        const: false
+      raw_stderr_stored:
+        const: false

@@ -727,6 +727,26 @@ entries:
       - docs/07-reference-implementation/README.md
     rationale: Required to make regression-triggered builder rollback execution, reverse-apply command verification, reviewer verifier-network attestation, and live telemetry gate approval machine-readable in the L5 self-construction pipeline.
   - priority: P1
+    kind: schema
+    file: specs/schemas/parallel_codex_worker_result_receipt.schema
+    consumers:
+      - specs/interfaces/selfctor.parallel_orchestration.v0.idl
+      - reference-runtime
+      - references/parallel-codex-orchestration.md
+      - evals/continuity/parallel_codex_result_ingestion.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to serialize one digest-only parallel Codex worker result before main checkout integration, including worker base commit freshness, changed file manifest digest, verification manifest digest, patch digest, and raw worker payload redaction.
+  - priority: P1
+    kind: idl
+    file: specs/interfaces/selfctor.parallel_orchestration.v0.idl
+    consumers:
+      - reference-runtime
+      - specs/schemas/parallel_codex_worker_result_receipt.schema
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+      - docs/07-reference-implementation/README.md
+    rationale: Required to make parallel Codex worker result ingestion and fail-closed stale worker blocking machine-readable in the L5 self-construction pipeline.
+  - priority: P1
     kind: eval
     file: evals/continuity/design_reader_handoff.yaml
     consumers:
@@ -3249,6 +3269,15 @@ entries:
       - agents/guardians/integrity-guardian.yaml
       - docs/07-reference-implementation/README.md
     rationale: Protects integrity reviewer quorum, verifier-network receipt binding, and rollback plan attestation before telemetry gate approval.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/parallel_codex_result_ingestion.yaml
+    consumers:
+      - reference-runtime
+      - references/parallel-codex-orchestration.md
+      - specs/schemas/parallel_codex_worker_result_receipt.schema
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects parallel Codex worker result ingestion receipts from stale worker base commits, unbound patch or verification manifests, and raw worker payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

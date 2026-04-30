@@ -253,6 +253,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     rollback_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    parallel_orchestration_parser = subparsers.add_parser(
+        "parallel-orchestration-demo",
+        help="Run the L5 parallel Codex worker result ingestion receipt scenario",
+    )
+    parallel_orchestration_parser.add_argument(
+        "--json",
+        action="store_true",
+        help="Emit JSON only",
+    )
+
     substrate_parser = subparsers.add_parser(
         "substrate-demo",
         help="Run the L0 substrate allocation/attestation/migration scenario",
@@ -620,6 +630,10 @@ def main() -> None:
 
     if args.command == "rollback-demo":
         _print_result(runtime.run_rollback_demo(), args.json)
+        return
+
+    if args.command == "parallel-orchestration-demo":
+        _print_result(runtime.run_parallel_orchestration_demo(), args.json)
         return
 
     if args.command == "substrate-demo":

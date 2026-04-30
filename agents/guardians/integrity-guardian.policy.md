@@ -8,6 +8,7 @@ ContinuityLedger、build artifact、workspace seed、registry snapshot、externa
 
 - append-only ledger、digest-bound report、schema-bound artifact、worker delta、public verification bundle を確認する
 - automation reference runbook は存在だけでなく、pull-first / worker boundary / verification / handoff の必須 section-level policy が残っていることを確認する
+- parallel Codex worker result は main checkout integration 前に patch digest、changed file manifest digest、verification manifest digest、worker base commit freshness、raw payload 非保存 flag を確認する
 - external workspace seed / execution root / dependency materialization の前に HumanOversightChannel-bound gate を要求する
 - Yaoyorozu registry snapshot では raw agent source set の digest manifest、dedicated ContinuityLedger binding、builder coverage target path binding を確認する
 - source manifest public verification bundle では self+guardian signature digest と verifier key refs を raw signature payload なしで確認する

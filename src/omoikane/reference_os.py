@@ -129,6 +129,7 @@ from .self_construction import (
     DifferentialEvaluatorService,
     GapScanner,
     LiveEnactmentService,
+    ParallelCodexOrchestrationService,
     PatchGeneratorService,
     RollbackEngineService,
     RolloutPlannerService,
@@ -271,6 +272,7 @@ class OmoikaneReferenceOS:
         self.sandbox_apply = SandboxApplyService()
         self.rollout_planner = RolloutPlannerService()
         self.rollback_engine = RollbackEngineService()
+        self.parallel_orchestration = ParallelCodexOrchestrationService()
         self.amendment = AmendmentService()
         self.oversight = OversightService(trust_service=self.trust)
         self.naming = NamingService()
@@ -916,6 +918,184 @@ class OmoikaneReferenceOS:
             substrate="reference-runtime",
         )
         return self.gap_scanner.bind_continuity_ledger_entry(report, ledger_entry)
+
+    def run_parallel_orchestration_demo(self) -> Dict[str, Any]:
+        main_checkout_head = "a" * 40
+        stale_worker_head = "b" * 40
+        verification_results = [
+            {
+                "command": "PYTHONPATH=src python3 -m unittest discover -s tests -t .",
+                "status": "pass",
+                "exit_code": 0,
+                "stdout_excerpt": "610 tests passed",
+                "stderr_excerpt": "",
+            },
+            {
+                "command": "PYTHONPATH=src python3 -m omoikane.cli gap-report --json",
+                "status": "pass",
+                "exit_code": 0,
+                "stdout_excerpt": "all_zero true",
+                "stderr_excerpt": "",
+            },
+            {
+                "command": "PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json",
+                "status": "pass",
+                "exit_code": 0,
+                "stdout_excerpt": "ready receipt schema-bound",
+                "stderr_excerpt": "",
+            },
+        ]
+        ownership_scope = [
+            "src/omoikane/self_construction/",
+            "tests/unit/",
+            "tests/integration/",
+            "specs/interfaces/",
+            "specs/schemas/",
+            "evals/continuity/",
+            "docs/",
+            "agents/",
+            "meta/decision-log/",
+            "references/",
+        ]
+        changed_files = [
+            "src/omoikane/self_construction/parallel_orchestration.py",
+            "tests/unit/test_parallel_orchestration.py",
+            "tests/integration/test_parallel_orchestration_schema_contracts.py",
+            "specs/interfaces/selfctor.parallel_orchestration.v0.idl",
+            "specs/schemas/parallel_codex_worker_result_receipt.schema",
+            "evals/continuity/parallel_codex_result_ingestion.yaml",
+            "docs/02-subsystems/self-construction/README.md",
+            "docs/07-reference-implementation/README.md",
+            "agents/guardians/integrity-guardian.yaml",
+            "meta/decision-log/2026-04-30_parallel-codex-worker-result-ingestion.md",
+            "references/parallel-codex-orchestration.md",
+        ]
+        ready_receipt = self.parallel_orchestration.ingest_worker_result(
+            worker_id="codex-worker-reference-runtime",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=main_checkout_head,
+            worker_base_commit=main_checkout_head,
+            ownership_scope=ownership_scope,
+            changed_files=changed_files,
+            verification_results=verification_results,
+            result_summary=(
+                "Worker result carries patch digest, changed files, and verification "
+                "receipts before main checkout integration."
+            ),
+        )
+        blocked_receipt = self.parallel_orchestration.ingest_worker_result(
+            worker_id="codex-worker-stale-readonly",
+            worker_role="explorer",
+            worker_result_status="stale",
+            main_checkout_head=main_checkout_head,
+            worker_base_commit=stale_worker_head,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=["src/omoikane/self_construction/parallel_orchestration.py"],
+            verification_results=verification_results[:2],
+            result_summary=(
+                "Stale worker result remains digest-bound but is blocked from main "
+                "checkout integration."
+            ),
+        )
+        ready_validation = self.parallel_orchestration.validate_worker_result_receipt(
+            ready_receipt,
+        )
+        blocked_validation = self.parallel_orchestration.validate_worker_result_receipt(
+            blocked_receipt,
+        )
+        ledger_entry = self.ledger.append(
+            identity_id="omoikane-reference-runtime",
+            event_type="selfctor.parallel_orchestration.worker_result_ingested",
+            payload={
+                "ready_receipt_ref": ready_receipt["receipt_ref"],
+                "ready_receipt_digest": ready_receipt["receipt_digest"],
+                "ready_changed_file_manifest_digest": ready_receipt[
+                    "changed_file_manifest_digest"
+                ],
+                "ready_verification_manifest_digest": ready_receipt[
+                    "verification_manifest_digest"
+                ],
+                "blocked_receipt_ref": blocked_receipt["receipt_ref"],
+                "blocked_receipt_digest": blocked_receipt["receipt_digest"],
+                "raw_patch_payload_stored": False,
+                "raw_transcript_payload_stored": False,
+                "raw_verification_payload_stored": False,
+            },
+            actor="ParallelCodexOrchestrationService",
+            category="selfctor-parallel-orchestration",
+            layer="L5",
+            signature_roles=["self", "guardian"],
+            substrate="reference-runtime",
+        )
+        schema_contracts = [
+            {
+                "payload_path": "ready_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_worker_result_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-ready-worker-result-ingestion",
+            },
+            {
+                "payload_path": "blocked_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_worker_result_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-blocked-stale-worker-result",
+            },
+        ]
+        return {
+            "policy": self.parallel_orchestration.policy(),
+            "schema_contracts": schema_contracts,
+            "ready_receipt": ready_receipt,
+            "blocked_receipt": blocked_receipt,
+            "ledger_entry_ref": f"ledger://continuity-ledger/{ledger_entry.entry_hash}",
+            "ledger_entry_hash": ledger_entry.entry_hash,
+            "ledger_payload_ref": ledger_entry.payload_ref,
+            "validation": {
+                "ok": (
+                    ready_validation["ok"]
+                    and blocked_validation["ok"]
+                    and ready_validation["ready_for_main_checkout"]
+                    and not blocked_validation["ready_for_main_checkout"]
+                ),
+                "ready_receipt_ok": ready_validation["ok"],
+                "ready_for_main_checkout": ready_validation[
+                    "ready_for_main_checkout"
+                ],
+                "ready_changed_file_manifest_digest_bound": ready_validation[
+                    "changed_file_manifest_digest_bound"
+                ],
+                "ready_verification_manifest_digest_bound": ready_validation[
+                    "verification_manifest_digest_bound"
+                ],
+                "ready_required_verifications_passed": ready_validation[
+                    "required_verifications_passed"
+                ],
+                "ready_receipt_digest_bound": ready_validation[
+                    "receipt_digest_bound"
+                ],
+                "ready_raw_payload_redacted": (
+                    ready_validation["raw_patch_payload_redacted"]
+                    and ready_validation["raw_transcript_payload_redacted"]
+                    and ready_validation["raw_verification_payload_redacted"]
+                ),
+                "blocked_receipt_ok": blocked_validation["ok"],
+                "blocked_stale_worker_result": not blocked_validation[
+                    "ready_for_main_checkout"
+                ],
+                "blocked_base_head_mismatch": not blocked_validation[
+                    "base_head_matches"
+                ],
+                "blocked_receipt_digest_bound": blocked_validation[
+                    "receipt_digest_bound"
+                ],
+                "ledger_bound": bool(ledger_entry.entry_hash)
+                and ledger_entry.payload_ref.startswith("cas://sha256/"),
+            },
+        }
 
     def run_version_demo(self) -> Dict[str, Any]:
         repo_root = Path(__file__).resolve().parents[2]

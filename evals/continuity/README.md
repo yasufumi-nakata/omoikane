@@ -134,6 +134,11 @@ gap-report が automation の pull-first / coverage / verification / parallel Co
 orchestration runbook 欠落と必須 section-level policy 欠落を
 high-priority task として検出できるか。
 
+### Parallel Codex Result Ingestion
+parallel-orchestration-demo が worker result の patch digest、changed file manifest、
+verification manifest、worker base commit freshness を main checkout integration 前の
+schema-bound receipt として固定し、stale worker result を fail-closed にできるか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 
@@ -164,6 +169,7 @@ high-priority task として検出できるか。
 - `memory_crystal_compaction.yaml`
 - `memory_edit_recall_buffer.yaml`
 - `memory_replication_quorum.yaml`
+- `parallel_codex_result_ingestion.yaml`
 - `patch_generator_direct_contract.yaml`
 - `procedural_actuation_bridge.yaml`
 - `procedural_preview_contract.yaml`

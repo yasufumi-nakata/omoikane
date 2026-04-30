@@ -31,13 +31,16 @@ Codex（または同等の Builder LLM）は docs/ と specs/ を読み取り、
 
 reference runtime には `design-reader-demo` / `builder-demo` があり、
 `selfctor.design_reader.v0` / `selfctor.patch_generator.v0` / `selfctor.diff_eval.v0` / `selfctor.rollout.v0` /
-`selfctor.rollback.v0`
+`selfctor.rollback.v0` / `selfctor.parallel_orchestration.v0`
 の contract に沿って
 `design_delta_scan_receipt` による git-bound docs/spec delta scan、
 section-level `section_changes` と `planning_cues` を含む `design_delta_manifest` handoff、
 fail-closed `build_request` emit、runtime/tests/evals/docs/meta にまたがる target-aware patch descriptor 生成、Mirage Self への sandbox apply、
 parsed baseline/sandbox observation と comparison digest に加え temp workspace command evidence も持つ A/B eval、rollout classify、Stage 0/1/2/3 rollout、regression 時の rollback execution を
 bounded に再現できる。
+`parallel-orchestration-demo` は subagent / worker / `codex exec` の成果を main checkout に取り込む前に
+patch digest、changed file manifest digest、verification manifest digest、worker base commit を
+`parallel_codex_worker_result_receipt` へ縮約し、stale result を blocked のまま保持する。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

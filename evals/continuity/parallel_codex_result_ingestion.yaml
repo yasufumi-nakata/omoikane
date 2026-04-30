@@ -1,0 +1,26 @@
+eval_id: parallel_codex_result_ingestion
+target: selfctor.parallel_orchestration
+summary: >
+  parallel-orchestration-demo が worker result の patch digest、changed files、
+  verification result、base commit freshness を main checkout integration 前の
+  digest-only receipt として固定し、stale worker result を fail-closed にすること
+checks:
+  - name: parallel Codex worker result ingestion smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
+expect:
+  schema_valid: true
+  ready_receipt_profile: parallel-codex-worker-result-ingestion-v1
+  ready_for_main_checkout: true
+  ready_changed_file_manifest_digest_bound: true
+  ready_verification_manifest_digest_bound: true
+  ready_required_verifications_passed: true
+  ready_receipt_digest_bound: true
+  blocked_stale_worker_result: true
+  blocked_base_head_mismatch: true
+  ledger_bound: true
+  raw_patch_payload_stored: false
+  raw_transcript_payload_stored: false
+  raw_verification_payload_stored: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

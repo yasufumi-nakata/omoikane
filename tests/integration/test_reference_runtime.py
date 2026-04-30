@@ -946,6 +946,27 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("Veto", result["blocked_patch"]["ethics"]["status"])
         self.assertGreaterEqual(len(result["ledger_snapshot"]), 4)
 
+    def test_parallel_orchestration_demo_binds_worker_result_ingestion(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_parallel_orchestration_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["ready_for_main_checkout"])
+        self.assertTrue(
+            result["validation"]["ready_changed_file_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["ready_verification_manifest_digest_bound"])
+        self.assertTrue(result["validation"]["ready_required_verifications_passed"])
+        self.assertTrue(result["validation"]["ready_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["ready_raw_payload_redacted"])
+        self.assertTrue(result["validation"]["blocked_stale_worker_result"])
+        self.assertTrue(result["validation"]["blocked_base_head_mismatch"])
+        self.assertTrue(result["validation"]["blocked_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["ledger_bound"])
+        self.assertEqual("accept-ready", result["ready_receipt"]["integration_decision"])
+        self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
+
     def test_gap_report_reads_repo(self) -> None:
         runtime = OmoikaneReferenceOS()
         repo_root = Path(__file__).resolve().parents[2]

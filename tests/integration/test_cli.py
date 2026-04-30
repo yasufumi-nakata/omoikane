@@ -77,6 +77,25 @@ class CliIntegrationTests(unittest.TestCase):
             )
         )
 
+    def test_parallel_orchestration_demo_emits_worker_result_receipts(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "parallel-orchestration-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["ready_for_main_checkout"])
+        self.assertTrue(result["validation"]["blocked_stale_worker_result"])
+        self.assertEqual(
+            "parallel-codex-worker-result-ingestion-v1",
+            result["ready_receipt"]["profile_id"],
+        )
+        self.assertEqual("blocked", result["blocked_receipt"]["integration_decision"])
+
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()
 

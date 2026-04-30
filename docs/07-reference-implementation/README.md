@@ -87,6 +87,7 @@ PYTHONPATH=src python3 -m omoikane.cli sandbox-demo --json
 PYTHONPATH=src python3 -m omoikane.cli builder-demo --json
 PYTHONPATH=src python3 -m omoikane.cli builder-live-demo --json
 PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json
+PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
 python3 -m unittest discover -s tests -t .
@@ -897,6 +898,16 @@ self / council / guardian の 3 者通知を
 1 シナリオで確認する。
 公開 `builder_rollback_session.schema` とは
 `max_reverted_patch_count=5` を含む rollback policy contract まで同期する。
+
+`parallel-orchestration-demo` は L5 parallel Codex orchestration の reference contract
+(`selfctor.parallel_orchestration.v0`) を JSON で可視化し、
+subagent / worker / `codex exec` の成果を main checkout に混ぜる前に
+`parallel_codex_worker_result_receipt` へ縮約する。
+ready receipt は worker base commit と main checkout head の一致、ownership scope 内の
+changed file manifest digest、patch digest、unittest / gap-report verification digest を束縛し、
+raw patch payload、raw transcript、raw verification output は保存しない。
+blocked receipt は stale worker base commit を schema-bound に残しつつ
+`integration_decision=blocked` として fail-closed にする。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、
