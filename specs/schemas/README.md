@@ -192,7 +192,9 @@
 - `semantic_procedural_handoff.schema`
 - `sensory_loopback_artifact_family.schema`
 - `sensory_loopback_biodata_arbitration_binding.schema`
-  - shared loopback の participant BioData confidence / feature-window drift gate / fresh calibration refresh receipt と hardware timing latency drift gate を同じ participant set / threshold authority digest に束縛し、3-4 participant の weighted latency quorum では participant weight / policy-authority digest / failed participant / quorum digest だけを保持して raw BioData / refresh / timing / weight-policy payload を保存しない
+  - shared loopback の participant BioData confidence / feature-window drift gate / fresh calibration refresh receipt と hardware timing latency drift gate を同じ participant set / threshold authority digest に束縛し、3-4 participant の weighted latency quorum では participant weight / policy-authority digest / live verifier quorum / failed participant / quorum digest だけを保持して raw BioData / refresh / timing / weight-policy / verifier payload を保存しない
+- `sensory_loopback_latency_weight_policy_verifier_quorum.schema`
+  - weighted latency quorum の policy authority freshness を 2-verifier quorum、24h freshness window、response/signature digest set に束縛し、raw verifier / response / signature payload を保存しない
 - `sensory_loopback_receipt.schema`
 - `sensory_loopback_session.schema`
 - `staged_rollout_session.schema`

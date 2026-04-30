@@ -5,9 +5,11 @@ description: >
   Digest-only binding that distributes participant-specific BioData calibration
   confidence, feature-window drift gates, fresh calibration refresh receipts,
   and hardware timing latency gates into one shared Sensory Loopback arbitration
-  session, including weighted latency quorum policy-authority binding when used,
+  session, including weighted latency quorum policy-authority and live verifier
+  quorum binding when used,
   without storing raw BioData, calibration, drift, refresh, timing,
-  hardware adapter, weight policy authority, or gate payloads.
+  hardware adapter, weight policy authority, verifier, response, signature, or
+  gate payloads.
 type: object
 additionalProperties: false
 required:
@@ -42,6 +44,14 @@ required:
   - latency_weight_policy_status
   - latency_weight_policy_bound
   - latency_weight_policy_digest
+  - latency_weight_policy_verifier_profile
+  - latency_weight_policy_verifier_quorum_ref
+  - latency_weight_policy_verifier_quorum_digest
+  - latency_weight_policy_verifier_source_digest_set
+  - latency_weight_policy_verifier_status
+  - latency_weight_policy_verifier_freshness_status
+  - latency_weight_policy_verifier_bound
+  - latency_weight_policy_verifier_fresh
   - latency_quorum_pass_weight
   - latency_quorum_failed_participant_ids
   - latency_quorum_satisfied
@@ -64,6 +74,9 @@ required:
   - raw_latency_threshold_payload_stored
   - raw_latency_weight_policy_payload_stored
   - raw_latency_weight_authority_payload_stored
+  - raw_latency_weight_policy_verifier_payload_stored
+  - raw_latency_weight_policy_verifier_response_payload_stored
+  - raw_latency_weight_policy_verifier_signature_payload_stored
   - subjective_equivalence_claimed
   - semantic_thought_content_generated
   - binding_digest
@@ -370,6 +383,31 @@ properties:
   latency_weight_policy_digest:
     type: string
     minLength: 32
+  latency_weight_policy_verifier_profile:
+    type: string
+    enum:
+      - not-bound
+      - weighted-latency-policy-live-verifier-quorum-v1
+  latency_weight_policy_verifier_quorum_ref:
+    type: string
+  latency_weight_policy_verifier_quorum_digest:
+    type: string
+  latency_weight_policy_verifier_source_digest_set:
+    type: string
+  latency_weight_policy_verifier_status:
+    type: string
+    enum:
+      - complete
+      - not-bound
+  latency_weight_policy_verifier_freshness_status:
+    type: string
+    enum:
+      - fresh
+      - not-bound
+  latency_weight_policy_verifier_bound:
+    type: boolean
+  latency_weight_policy_verifier_fresh:
+    type: boolean
   latency_quorum_pass_weight:
     type: number
     minimum: 0
@@ -421,6 +459,12 @@ properties:
   raw_latency_weight_policy_payload_stored:
     const: false
   raw_latency_weight_authority_payload_stored:
+    const: false
+  raw_latency_weight_policy_verifier_payload_stored:
+    const: false
+  raw_latency_weight_policy_verifier_response_payload_stored:
+    const: false
+  raw_latency_weight_policy_verifier_signature_payload_stored:
     const: false
   subjective_equivalence_claimed:
     const: false

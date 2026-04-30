@@ -13244,6 +13244,18 @@ json.dump(response, sys.stdout)
                 }
             )
         )
+        weighted_latency_policy_verifier_quorum = (
+            self.sensory_loopback.bind_latency_weight_policy_verifier_quorum(
+                authority_ref=weighted_latency_policy_authority_ref,
+                authority_digest=weighted_latency_policy_authority_digest,
+                source_digest_set=weighted_latency_policy_source_digest_set,
+                verifier_refs=[
+                    "latency-weight-policy-verifier://jp-13/primary",
+                    "latency-weight-policy-verifier://sg-01/backup",
+                ],
+                verifier_jurisdictions=["JP-13", "SG-01"],
+            )
+        )
         weighted_latency_quorum_binding = (
             self.sensory_loopback.bind_participant_biodata_arbitration(
                 weighted_session["session_id"],
@@ -13273,6 +13285,9 @@ json.dump(response, sys.stdout)
                 ),
                 latency_weight_policy_source_digest_set=(
                     weighted_latency_policy_source_digest_set
+                ),
+                latency_weight_policy_verifier_quorum=(
+                    weighted_latency_policy_verifier_quorum
                 ),
             )
         )
@@ -13523,6 +13538,19 @@ json.dump(response, sys.stdout)
                 ),
                 "contract_role": "shared-loopback-weighted-latency-quorum-binding",
             },
+            {
+                "payload_path": (
+                    "shared_loopback.weighted_latency_quorum."
+                    "latency_weight_policy_authority.verifier_quorum"
+                ),
+                "schema_path": (
+                    "specs/schemas/"
+                    "sensory_loopback_latency_weight_policy_verifier_quorum.schema"
+                ),
+                "contract_role": (
+                    "shared-loopback-weighted-latency-policy-verifier-quorum"
+                ),
+            },
         ]
 
         return {
@@ -13587,6 +13615,7 @@ json.dump(response, sys.stdout)
                         "authority_ref": weighted_latency_policy_authority_ref,
                         "authority_digest": weighted_latency_policy_authority_digest,
                         "source_digest_set": weighted_latency_policy_source_digest_set,
+                        "verifier_quorum": weighted_latency_policy_verifier_quorum,
                     },
                     "validation": {
                         "ok": weighted_session_validation["ok"]
@@ -13643,6 +13672,26 @@ json.dump(response, sys.stdout)
                         "latency_weight_policy_status": (
                             weighted_latency_quorum_validation[
                                 "latency_weight_policy_status"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_bound": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_verifier_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_fresh": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_verifier_fresh"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_status": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_verifier_status"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_freshness_status": (
+                            weighted_latency_quorum_validation[
+                                "latency_weight_policy_verifier_freshness_status"
                             ]
                         ),
                         "calibration_refresh_fresh": (
@@ -13756,6 +13805,14 @@ json.dump(response, sys.stdout)
                         ]
                         and weighted_latency_quorum_validation[
                             "latency_quorum_digest_bound"
+                        ]
+                    ),
+                    "weighted_latency_policy_verifier_bound": (
+                        weighted_latency_quorum_validation[
+                            "latency_weight_policy_verifier_bound"
+                        ]
+                        and weighted_latency_quorum_validation[
+                            "latency_weight_policy_verifier_fresh"
                         ]
                     ),
                     "weighted_latency_quorum_failed_participant_bound": (
@@ -13972,9 +14029,31 @@ json.dump(response, sys.stdout)
                         "latency_weight_policy_digest_bound"
                     ]
                     and weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_bound"
+                    ]
+                    and weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_fresh"
+                    ]
+                    and weighted_latency_quorum_validation[
                         "latency_weight_policy_status"
                     ]
                     == "complete"
+                ),
+                "shared_loopback_weighted_latency_policy_verifier_bound": (
+                    weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_bound"
+                    ]
+                    and weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_fresh"
+                    ]
+                    and weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_status"
+                    ]
+                    == "complete"
+                    and weighted_latency_quorum_validation[
+                        "latency_weight_policy_verifier_freshness_status"
+                    ]
+                    == "fresh"
                 ),
                 "shared_loopback_weighted_latency_quorum_failed_participant_bound": (
                     weighted_latency_quorum_validation[
@@ -13985,7 +14064,7 @@ json.dump(response, sys.stdout)
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
                 "public_schema_contract_profile": SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
-                "public_schema_contract_bound": len(schema_contracts) == 11
+                "public_schema_contract_bound": len(schema_contracts) == 12
                 and {contract["schema_path"] for contract in schema_contracts}
                 == {
                     "specs/schemas/sensory_loopback_session.schema",
@@ -13994,6 +14073,10 @@ json.dump(response, sys.stdout)
                     (
                         "specs/schemas/"
                         "sensory_loopback_biodata_arbitration_binding.schema"
+                    ),
+                    (
+                        "specs/schemas/"
+                        "sensory_loopback_latency_weight_policy_verifier_quorum.schema"
                     ),
                 },
             },

@@ -82,6 +82,20 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             threshold_policy_source_digest_set="f" * 64,
         )
 
+    @staticmethod
+    def _fake_latency_weight_policy_verifier_quorum(
+        service: SensoryLoopbackService,
+        *,
+        authority_ref: str = "latency-weight-policy-authority://unit/shared-weight-policy",
+        authority_digest: str = "9" * 64,
+        source_digest_set: str = "8" * 64,
+    ) -> dict:
+        return service.bind_latency_weight_policy_verifier_quorum(
+            authority_ref=authority_ref,
+            authority_digest=authority_digest,
+            source_digest_set=source_digest_set,
+        )
+
     def test_coherent_bundle_preserves_immersion_and_digest_only_audit(self) -> None:
         service = SensoryLoopbackService()
         session = service.open_session(
@@ -711,16 +725,19 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
             },
             participant_latency_weights={
                 "identity://loopback-primary": 0.4,
-                "identity://loopback-peer": 0.4,
-                "identity://loopback-observer": 0.2,
-            },
-            latency_quorum_threshold=0.75,
-            latency_weight_policy_authority_ref=(
-                "latency-weight-policy-authority://unit/shared-weight-policy"
-            ),
-            latency_weight_policy_authority_digest="9" * 64,
-            latency_weight_policy_source_digest_set="8" * 64,
-        )
+            "identity://loopback-peer": 0.4,
+            "identity://loopback-observer": 0.2,
+        },
+        latency_quorum_threshold=0.75,
+        latency_weight_policy_authority_ref=(
+            "latency-weight-policy-authority://unit/shared-weight-policy"
+        ),
+        latency_weight_policy_authority_digest="9" * 64,
+        latency_weight_policy_source_digest_set="8" * 64,
+        latency_weight_policy_verifier_quorum=(
+            self._fake_latency_weight_policy_verifier_quorum(service)
+        ),
+    )
         validation = service.validate_participant_biodata_arbitration(binding)
 
         self.assertTrue(validation["ok"])
@@ -738,11 +755,22 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertTrue(validation["latency_weight_policy_bound"])
         self.assertTrue(validation["latency_weight_policy_digest_bound"])
         self.assertEqual("complete", validation["latency_weight_policy_status"])
+        self.assertTrue(validation["latency_weight_policy_verifier_bound"])
+        self.assertTrue(validation["latency_weight_policy_verifier_fresh"])
+        self.assertEqual("complete", validation["latency_weight_policy_verifier_status"])
+        self.assertEqual(
+            "fresh",
+            validation["latency_weight_policy_verifier_freshness_status"],
+        )
         self.assertTrue(validation["latency_quorum_digest_bound"])
         self.assertTrue(validation["all_calibration_refresh_receipts_fresh"])
         self.assertTrue(validation["participant_calibration_refresh_digest_set_bound"])
         self.assertFalse(binding["raw_latency_weight_policy_payload_stored"])
         self.assertFalse(binding["raw_latency_weight_authority_payload_stored"])
+        self.assertFalse(binding["raw_latency_weight_policy_verifier_payload_stored"])
+        self.assertFalse(
+            binding["raw_latency_weight_policy_verifier_response_payload_stored"]
+        )
 
         tampered = deepcopy(binding)
         tampered["participant_latency_weight_digest"] = "0" * 64
@@ -752,6 +780,57 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
         self.assertFalse(
             service.validate_participant_biodata_arbitration(tampered_policy)["ok"]
         )
+        tampered_verifier = deepcopy(binding)
+        tampered_verifier["latency_weight_policy_verifier_quorum_digest"] = "0" * 64
+        self.assertFalse(
+            service.validate_participant_biodata_arbitration(tampered_verifier)["ok"]
+        )
+        with self.assertRaisesRegex(
+            ValueError,
+            "latency_weight_policy_verifier_quorum",
+        ):
+            service.bind_participant_biodata_arbitration(
+                session["session_id"],
+                participant_gate_receipts={
+                    "identity://loopback-primary": self._fake_biodata_confidence_gate(
+                        "identity://loopback-primary",
+                        "a-self",
+                    ),
+                    "identity://loopback-peer": self._fake_biodata_confidence_gate(
+                        "identity://loopback-peer",
+                        "b-peer",
+                    ),
+                    "identity://loopback-observer": self._fake_biodata_confidence_gate(
+                        "identity://loopback-observer",
+                        "c-observer",
+                    ),
+                },
+                participant_latency_drift_gates={
+                    "identity://loopback-primary": self._fake_participant_latency_drift_gate(
+                        service,
+                        "identity://loopback-primary",
+                        "self",
+                    ),
+                    "identity://loopback-peer": self._fake_participant_latency_drift_gate(
+                        service,
+                        "identity://loopback-peer",
+                        "peer",
+                        observed_latency_ms=54.0,
+                    ),
+                    "identity://loopback-observer": blocked_latency_gate,
+                },
+                participant_latency_weights={
+                    "identity://loopback-primary": 0.4,
+                    "identity://loopback-peer": 0.4,
+                    "identity://loopback-observer": 0.2,
+                },
+                latency_quorum_threshold=0.75,
+                latency_weight_policy_authority_ref=(
+                    "latency-weight-policy-authority://unit/shared-weight-policy"
+                ),
+                latency_weight_policy_authority_digest="9" * 64,
+                latency_weight_policy_source_digest_set="8" * 64,
+            )
         with self.assertRaisesRegex(
             ValueError,
             "weighted latency quorum requires latency_weight_policy_authority_ref",

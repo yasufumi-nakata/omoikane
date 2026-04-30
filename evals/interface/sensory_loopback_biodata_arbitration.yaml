@@ -6,7 +6,8 @@ description: >
   BioData calibration confidence gate、feature-window drift gate、fresh calibration refresh receipt を
   shared arbitration binding に digest-only で束縛し、hardware timing latency drift gate も
   同じ participant set と threshold authority digest に結び、weighted latency quorum の
-  participant weights は policy-authority digest に束縛し、raw BioData / refresh / timing / weight-policy payload を保存しないこと
+  participant weights は policy-authority digest と fresh live verifier quorum に束縛し、
+  raw BioData / refresh / timing / weight-policy / verifier payload を保存しないこと
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli sensory-loopback-demo --json
@@ -23,6 +24,7 @@ expected:
   shared_loopback_weighted_latency_quorum_satisfied: true
   shared_loopback_weighted_latency_quorum_digest_bound: true
   shared_loopback_weighted_latency_policy_bound: true
+  shared_loopback_weighted_latency_policy_verifier_bound: true
 metric: boolean
 threshold: 1.0
 ethics_check: true

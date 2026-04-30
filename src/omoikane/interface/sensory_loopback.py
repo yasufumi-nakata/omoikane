@@ -80,6 +80,11 @@ SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE = "weighted-latency-quorum-v1"
 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE = (
     "weighted-latency-quorum-authority-v1"
 )
+SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE = (
+    "weighted-latency-policy-live-verifier-quorum-v1"
+)
+SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD = 2
+SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS = 24
 SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS = 3
 SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES = {
     "self-exclusive",
@@ -107,6 +112,7 @@ class SensoryLoopbackService:
         self.artifact_families: Dict[str, Dict[str, Any]] = {}
         self.biodata_arbitration_bindings: Dict[str, Dict[str, Any]] = {}
         self.participant_latency_drift_gates: Dict[str, Dict[str, Any]] = {}
+        self.latency_weight_policy_verifier_quorums: Dict[str, Dict[str, Any]] = {}
 
     def reference_profile(self) -> Dict[str, Any]:
         return {
@@ -174,7 +180,17 @@ class SensoryLoopbackService:
                 "latency_weight_policy_profile": (
                     SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE
                 ),
+                "latency_weight_policy_verifier_profile": (
+                    SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE
+                ),
                 "requires_latency_weight_policy_authority_for_weighted_quorum": True,
+                "requires_latency_weight_policy_verifier_for_weighted_quorum": True,
+                "latency_weight_policy_verifier_quorum_threshold": (
+                    SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD
+                ),
+                "latency_weight_policy_freshness_hours": (
+                    SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
+                ),
                 "weighted_latency_min_participants": (
                     SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS
                 ),
@@ -190,6 +206,9 @@ class SensoryLoopbackService:
                 "raw_hardware_adapter_payload_stored": False,
                 "raw_latency_weight_policy_payload_stored": False,
                 "raw_latency_weight_authority_payload_stored": False,
+                "raw_latency_weight_policy_verifier_payload_stored": False,
+                "raw_latency_weight_policy_verifier_response_payload_stored": False,
+                "raw_latency_weight_policy_verifier_signature_payload_stored": False,
             },
         }
 
@@ -849,6 +868,7 @@ class SensoryLoopbackService:
         latency_weight_policy_authority_ref: str = "",
         latency_weight_policy_authority_digest: str = "",
         latency_weight_policy_source_digest_set: str = "",
+        latency_weight_policy_verifier_quorum: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         session = self._require_session(session_id)
         if not session["arbitration_required"]:
@@ -875,6 +895,9 @@ class SensoryLoopbackService:
             latency_weight_policy_authority_digest=latency_weight_policy_authority_digest,
             latency_weight_policy_source_digest_set=(
                 latency_weight_policy_source_digest_set
+            ),
+            latency_weight_policy_verifier_quorum=(
+                latency_weight_policy_verifier_quorum
             ),
         )
 
@@ -1236,6 +1259,30 @@ class SensoryLoopbackService:
             "latency_weight_policy_digest": latency_quorum[
                 "latency_weight_policy_digest"
             ],
+            "latency_weight_policy_verifier_profile": latency_quorum_policy[
+                "weight_policy_verifier_profile"
+            ],
+            "latency_weight_policy_verifier_quorum_ref": latency_quorum_policy[
+                "weight_policy_verifier_quorum_ref"
+            ],
+            "latency_weight_policy_verifier_quorum_digest": latency_quorum_policy[
+                "weight_policy_verifier_quorum_digest"
+            ],
+            "latency_weight_policy_verifier_source_digest_set": latency_quorum_policy[
+                "weight_policy_verifier_source_digest_set"
+            ],
+            "latency_weight_policy_verifier_status": latency_quorum_policy[
+                "weight_policy_verifier_status"
+            ],
+            "latency_weight_policy_verifier_freshness_status": latency_quorum_policy[
+                "weight_policy_verifier_freshness_status"
+            ],
+            "latency_weight_policy_verifier_bound": latency_quorum_policy[
+                "weight_policy_verifier_bound"
+            ],
+            "latency_weight_policy_verifier_fresh": latency_quorum_policy[
+                "weight_policy_verifier_fresh"
+            ],
             "latency_quorum_pass_weight": latency_quorum["pass_weight"],
             "latency_quorum_failed_participant_ids": latency_quorum[
                 "failed_participant_ids"
@@ -1260,6 +1307,9 @@ class SensoryLoopbackService:
             "raw_latency_threshold_payload_stored": False,
             "raw_latency_weight_policy_payload_stored": False,
             "raw_latency_weight_authority_payload_stored": False,
+            "raw_latency_weight_policy_verifier_payload_stored": False,
+            "raw_latency_weight_policy_verifier_response_payload_stored": False,
+            "raw_latency_weight_policy_verifier_signature_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -1371,6 +1421,159 @@ class SensoryLoopbackService:
         )
         self.participant_latency_drift_gates[gate["timing_gate_ref"]] = gate
         return deepcopy(gate)
+
+    def bind_latency_weight_policy_verifier_quorum(
+        self,
+        *,
+        authority_ref: str,
+        authority_digest: str,
+        source_digest_set: str,
+        verifier_refs: Optional[Sequence[str]] = None,
+        verifier_jurisdictions: Optional[Sequence[str]] = None,
+    ) -> Dict[str, Any]:
+        normalized_authority_ref = self._normalize_non_empty_string(
+            authority_ref,
+            "authority_ref",
+        )
+        normalized_authority_digest = self._normalize_non_empty_string(
+            authority_digest,
+            "authority_digest",
+        )
+        normalized_source_digest_set = self._normalize_non_empty_string(
+            source_digest_set,
+            "source_digest_set",
+        )
+        raw_refs = verifier_refs or (
+            "latency-weight-policy-verifier://jp-13/primary",
+            "latency-weight-policy-verifier://sg-01/backup",
+        )
+        raw_jurisdictions = verifier_jurisdictions or ("JP-13", "SG-01")
+        refs = [
+            self._normalize_non_empty_string(verifier_ref, "verifier_ref")
+            for verifier_ref in raw_refs
+        ]
+        jurisdictions = [
+            self._normalize_non_empty_string(
+                verifier_jurisdiction,
+                "verifier_jurisdiction",
+            )
+            for verifier_jurisdiction in raw_jurisdictions
+        ]
+        if len(refs) != len(jurisdictions):
+            raise ValueError(
+                "verifier_refs and verifier_jurisdictions must have the same length"
+            )
+        if len(refs) < SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD:
+            raise ValueError(
+                "latency weight policy verifier quorum requires at least "
+                f"{SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD} verifiers",
+            )
+        if len(refs) != len(set(refs)) or len(jurisdictions) != len(set(jurisdictions)):
+            raise ValueError(
+                "latency weight policy verifier quorum refs and jurisdictions must be unique"
+            )
+
+        observed_at = utc_now_iso()
+        receipts: List[Dict[str, Any]] = []
+        for normalized_verifier_ref, normalized_jurisdiction in zip(
+            refs,
+            jurisdictions,
+        ):
+            response_digest = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE,
+                        "verifier_ref": normalized_verifier_ref,
+                        "jurisdiction": normalized_jurisdiction,
+                        "authority_ref": normalized_authority_ref,
+                        "authority_digest": normalized_authority_digest,
+                        "source_digest_set": normalized_source_digest_set,
+                        "observed_at": observed_at,
+                        "freshness_window_hours": (
+                            SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
+                        ),
+                        "freshness_status": "fresh",
+                        "verifier_status": "accepted",
+                    }
+                )
+            )
+            signing_key_ref = (
+                f"verifier-key://{normalized_jurisdiction.lower()}/"
+                "latency-weight-policy"
+            )
+            response_signature_digest = sha256_text(
+                canonical_json(
+                    {
+                        "verifier_ref": normalized_verifier_ref,
+                        "jurisdiction": normalized_jurisdiction,
+                        "response_digest": response_digest,
+                        "signing_key_ref": signing_key_ref,
+                    }
+                )
+            )
+            receipts.append(
+                {
+                    "verifier_ref": normalized_verifier_ref,
+                    "jurisdiction": normalized_jurisdiction,
+                    "observed_at": observed_at,
+                    "authority_ref": normalized_authority_ref,
+                    "authority_digest": normalized_authority_digest,
+                    "source_digest_set": normalized_source_digest_set,
+                    "freshness_window_hours": (
+                        SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
+                    ),
+                    "freshness_status": "fresh",
+                    "verifier_status": "accepted",
+                    "response_digest": response_digest,
+                    "signing_key_ref": signing_key_ref,
+                    "response_signature_digest": response_signature_digest,
+                    "raw_response_payload_stored": False,
+                    "raw_signature_payload_stored": False,
+                }
+            )
+
+        quorum_id = new_id("sl-latency-policy-quorum")
+        quorum = {
+            "schema_version": SENSORY_LOOPBACK_SCHEMA_VERSION,
+            "profile_id": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE,
+            "verifier_quorum_ref": (
+                f"latency-weight-policy-verifier-quorum://{quorum_id}"
+            ),
+            "authority_ref": normalized_authority_ref,
+            "authority_digest": normalized_authority_digest,
+            "source_digest_set": normalized_source_digest_set,
+            "accepted_verifier_refs": refs,
+            "verifier_jurisdictions": jurisdictions,
+            "verifier_receipts": receipts,
+            "verifier_response_digest_set": (
+                self._latency_weight_policy_verifier_response_digest_set(receipts)
+            ),
+            "verifier_signature_digest_set": (
+                self._latency_weight_policy_verifier_signature_digest_set(receipts)
+            ),
+            "quorum_threshold": (
+                SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD
+            ),
+            "quorum_status": "complete",
+            "freshness_window_hours": (
+                SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS
+            ),
+            "freshness_status": "fresh",
+            "authority_freshness_bound": True,
+            "source_digest_set_bound": True,
+            "raw_verifier_payload_stored": False,
+            "raw_response_payload_stored": False,
+            "raw_signature_payload_stored": False,
+        }
+        quorum["verifier_quorum_digest"] = sha256_text(
+            canonical_json(
+                self._latency_weight_policy_verifier_quorum_digest_payload(quorum)
+            )
+        )
+        self.latency_weight_policy_verifier_quorums[
+            quorum["verifier_quorum_ref"]
+        ] = quorum
+        return deepcopy(quorum)
 
     def snapshot(self, session_id: str) -> Dict[str, Any]:
         return deepcopy(self._require_session(session_id))
@@ -2247,6 +2450,192 @@ class SensoryLoopbackService:
             "raw_authority_payload_stored": False,
         }
 
+    def validate_latency_weight_policy_verifier_quorum(
+        self,
+        quorum: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(quorum, Mapping):
+            raise ValueError("quorum must be a mapping")
+
+        errors: List[str] = []
+        for field_name in (
+            "verifier_quorum_ref",
+            "authority_ref",
+            "authority_digest",
+            "source_digest_set",
+            "verifier_response_digest_set",
+            "verifier_signature_digest_set",
+            "verifier_quorum_digest",
+        ):
+            self._check_non_empty_string(quorum.get(field_name), field_name, errors)
+        if quorum.get("schema_version") != SENSORY_LOOPBACK_SCHEMA_VERSION:
+            errors.append(f"schema_version must be {SENSORY_LOOPBACK_SCHEMA_VERSION}")
+        if quorum.get("profile_id") != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE:
+            errors.append(
+                "profile_id must be "
+                f"{SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE}",
+            )
+        accepted_refs = quorum.get("accepted_verifier_refs")
+        if (
+            not isinstance(accepted_refs, list)
+            or len(accepted_refs)
+            < SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD
+            or len(accepted_refs) != len(set(accepted_refs))
+        ):
+            errors.append("accepted_verifier_refs must be a unique quorum list")
+            accepted_refs = []
+        jurisdictions = quorum.get("verifier_jurisdictions")
+        if (
+            not isinstance(jurisdictions, list)
+            or len(jurisdictions)
+            < SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD
+            or len(jurisdictions) != len(set(jurisdictions))
+        ):
+            errors.append("verifier_jurisdictions must be a unique quorum list")
+            jurisdictions = []
+        receipts = quorum.get("verifier_receipts")
+        if not isinstance(receipts, list):
+            errors.append("verifier_receipts must be a list")
+            receipts = []
+        if len(receipts) != len(accepted_refs):
+            errors.append("verifier_receipts must match accepted_verifier_refs length")
+        if quorum.get("quorum_threshold") != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD:
+            errors.append(
+                "quorum_threshold must be "
+                f"{SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD}",
+            )
+        if quorum.get("quorum_status") != "complete":
+            errors.append("quorum_status must be complete")
+        if quorum.get("freshness_window_hours") != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS:
+            errors.append(
+                "freshness_window_hours must be "
+                f"{SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS}",
+            )
+        if quorum.get("freshness_status") != "fresh":
+            errors.append("freshness_status must be fresh")
+        if quorum.get("authority_freshness_bound") is not True:
+            errors.append("authority_freshness_bound must be true")
+        if quorum.get("source_digest_set_bound") is not True:
+            errors.append("source_digest_set_bound must be true")
+
+        authority_ref = quorum.get("authority_ref", "")
+        authority_digest = quorum.get("authority_digest", "")
+        source_digest_set = quorum.get("source_digest_set", "")
+        for index, receipt in enumerate(receipts):
+            if not isinstance(receipt, Mapping):
+                errors.append(f"verifier_receipts[{index}] must be a mapping")
+                continue
+            if index < len(accepted_refs) and receipt.get("verifier_ref") != accepted_refs[index]:
+                errors.append(
+                    f"verifier_receipts[{index}].verifier_ref must follow accepted_verifier_refs order",
+                )
+            if index < len(jurisdictions) and receipt.get("jurisdiction") != jurisdictions[index]:
+                errors.append(
+                    f"verifier_receipts[{index}].jurisdiction must follow verifier_jurisdictions order",
+                )
+            for field_name in (
+                "verifier_ref",
+                "jurisdiction",
+                "observed_at",
+                "authority_ref",
+                "authority_digest",
+                "source_digest_set",
+                "response_digest",
+                "signing_key_ref",
+                "response_signature_digest",
+            ):
+                self._check_non_empty_string(
+                    receipt.get(field_name),
+                    f"verifier_receipts[{index}].{field_name}",
+                    errors,
+                )
+            if receipt.get("authority_ref") != authority_ref:
+                errors.append(f"verifier_receipts[{index}].authority_ref mismatch")
+            if receipt.get("authority_digest") != authority_digest:
+                errors.append(f"verifier_receipts[{index}].authority_digest mismatch")
+            if receipt.get("source_digest_set") != source_digest_set:
+                errors.append(f"verifier_receipts[{index}].source_digest_set mismatch")
+            if receipt.get("freshness_window_hours") != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS:
+                errors.append(
+                    f"verifier_receipts[{index}].freshness_window_hours mismatch",
+                )
+            if receipt.get("freshness_status") != "fresh":
+                errors.append(f"verifier_receipts[{index}].freshness_status must be fresh")
+            if receipt.get("verifier_status") != "accepted":
+                errors.append(f"verifier_receipts[{index}].verifier_status must be accepted")
+            for field_name in (
+                "raw_response_payload_stored",
+                "raw_signature_payload_stored",
+            ):
+                if receipt.get(field_name) is not False:
+                    errors.append(f"verifier_receipts[{index}].{field_name} must be false")
+            expected_response_digest = sha256_text(
+                canonical_json(
+                    self._latency_weight_policy_verifier_response_digest_payload(
+                        receipt,
+                    )
+                )
+            )
+            if receipt.get("response_digest") != expected_response_digest:
+                errors.append(f"verifier_receipts[{index}].response_digest mismatch")
+            expected_signature_digest = sha256_text(
+                canonical_json(
+                    self._latency_weight_policy_verifier_signature_digest_payload(
+                        receipt,
+                    )
+                )
+            )
+            if receipt.get("response_signature_digest") != expected_signature_digest:
+                errors.append(
+                    f"verifier_receipts[{index}].response_signature_digest mismatch",
+                )
+
+        response_digest_set_bound = (
+            bool(receipts)
+            and quorum.get("verifier_response_digest_set")
+            == self._latency_weight_policy_verifier_response_digest_set(receipts)
+        )
+        if not response_digest_set_bound:
+            errors.append("verifier_response_digest_set mismatch")
+        signature_digest_set_bound = (
+            bool(receipts)
+            and quorum.get("verifier_signature_digest_set")
+            == self._latency_weight_policy_verifier_signature_digest_set(receipts)
+        )
+        if not signature_digest_set_bound:
+            errors.append("verifier_signature_digest_set mismatch")
+        expected_quorum_digest = sha256_text(
+            canonical_json(
+                self._latency_weight_policy_verifier_quorum_digest_payload(quorum)
+            )
+        )
+        quorum_digest_bound = quorum.get("verifier_quorum_digest") == expected_quorum_digest
+        if not quorum_digest_bound:
+            errors.append("verifier_quorum_digest mismatch")
+        for field_name in (
+            "raw_verifier_payload_stored",
+            "raw_response_payload_stored",
+            "raw_signature_payload_stored",
+        ):
+            if quorum.get(field_name) is not False:
+                errors.append(f"{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "quorum_status": quorum.get("quorum_status"),
+            "freshness_status": quorum.get("freshness_status"),
+            "accepted_verifier_count": len(receipts),
+            "response_digest_set_bound": response_digest_set_bound,
+            "signature_digest_set_bound": signature_digest_set_bound,
+            "quorum_digest_bound": quorum_digest_bound,
+            "authority_freshness_bound": quorum.get("authority_freshness_bound") is True,
+            "source_digest_set_bound": quorum.get("source_digest_set_bound") is True,
+            "raw_verifier_payload_stored": False,
+            "raw_response_payload_stored": False,
+            "raw_signature_payload_stored": False,
+        }
+
     def validate_participant_biodata_arbitration(
         self,
         binding: Mapping[str, Any],
@@ -2545,6 +2934,10 @@ class SensoryLoopbackService:
             latency_weight_policy_bound,
             latency_weight_policy_digest_bound,
             latency_weight_policy_status,
+            latency_weight_policy_verifier_bound,
+            latency_weight_policy_verifier_fresh,
+            latency_weight_policy_verifier_status,
+            latency_weight_policy_verifier_freshness_status,
             latency_quorum_digest_bound,
         ) = self._validate_latency_quorum_fields(
             binding,
@@ -2637,6 +3030,14 @@ class SensoryLoopbackService:
             and participant_latency_digest_set_bound
             and participant_latency_weight_digest_bound
             and latency_weight_policy_digest_bound
+            and (
+                latency_quorum_profile
+                == SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE
+                or (
+                    latency_weight_policy_verifier_bound
+                    and latency_weight_policy_verifier_fresh
+                )
+            )
             and latency_quorum_digest_bound
             else "blocked"
         )
@@ -2655,6 +3056,9 @@ class SensoryLoopbackService:
             "raw_latency_threshold_payload_stored",
             "raw_latency_weight_policy_payload_stored",
             "raw_latency_weight_authority_payload_stored",
+            "raw_latency_weight_policy_verifier_payload_stored",
+            "raw_latency_weight_policy_verifier_response_payload_stored",
+            "raw_latency_weight_policy_verifier_signature_payload_stored",
             "subjective_equivalence_claimed",
             "semantic_thought_content_generated",
         ):
@@ -2698,6 +3102,18 @@ class SensoryLoopbackService:
             "latency_weight_policy_bound": latency_weight_policy_bound,
             "latency_weight_policy_digest_bound": latency_weight_policy_digest_bound,
             "latency_weight_policy_status": latency_weight_policy_status,
+            "latency_weight_policy_verifier_bound": (
+                latency_weight_policy_verifier_bound
+            ),
+            "latency_weight_policy_verifier_fresh": (
+                latency_weight_policy_verifier_fresh
+            ),
+            "latency_weight_policy_verifier_status": (
+                latency_weight_policy_verifier_status
+            ),
+            "latency_weight_policy_verifier_freshness_status": (
+                latency_weight_policy_verifier_freshness_status
+            ),
             "latency_quorum_digest_bound": latency_quorum_digest_bound,
             "binding_digest_bound": binding_digest_bound,
             "all_participant_gates_bound": all_participant_gates_bound,
@@ -2721,6 +3137,9 @@ class SensoryLoopbackService:
             "raw_latency_threshold_payload_stored": False,
             "raw_latency_weight_policy_payload_stored": False,
             "raw_latency_weight_authority_payload_stored": False,
+            "raw_latency_weight_policy_verifier_payload_stored": False,
+            "raw_latency_weight_policy_verifier_response_payload_stored": False,
+            "raw_latency_weight_policy_verifier_signature_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
         }
@@ -2973,6 +3392,7 @@ class SensoryLoopbackService:
         latency_weight_policy_authority_ref: str,
         latency_weight_policy_authority_digest: str,
         latency_weight_policy_source_digest_set: str,
+        latency_weight_policy_verifier_quorum: Optional[Mapping[str, Any]],
     ) -> Dict[str, Any]:
         weight_policy_authority_ref = self._normalize_string(
             latency_weight_policy_authority_ref,
@@ -2991,6 +3411,10 @@ class SensoryLoopbackService:
             or latency_quorum_threshold is not None
         )
         if not weighted_requested:
+            if latency_weight_policy_verifier_quorum is not None:
+                raise ValueError(
+                    "latency weight policy verifier quorum is only valid for weighted quorum",
+                )
             if (
                 weight_policy_authority_ref
                 or weight_policy_authority_digest
@@ -3009,6 +3433,14 @@ class SensoryLoopbackService:
                 "weight_policy_source_digest_set": "",
                 "weight_policy_status": "not-bound",
                 "weight_policy_bound": False,
+                "weight_policy_verifier_profile": "not-bound",
+                "weight_policy_verifier_quorum_ref": "",
+                "weight_policy_verifier_quorum_digest": "",
+                "weight_policy_verifier_source_digest_set": "",
+                "weight_policy_verifier_status": "not-bound",
+                "weight_policy_verifier_freshness_status": "not-bound",
+                "weight_policy_verifier_bound": False,
+                "weight_policy_verifier_fresh": False,
             }
         if participant_latency_weights is None:
             raise ValueError("participant_latency_weights are required for weighted quorum")
@@ -3026,6 +3458,29 @@ class SensoryLoopbackService:
             raise ValueError(
                 "weighted latency quorum requires at least "
                 f"{SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS} participants",
+            )
+        if latency_weight_policy_verifier_quorum is None:
+            raise ValueError(
+                "weighted latency quorum requires latency_weight_policy_verifier_quorum",
+            )
+        verifier_validation = self.validate_latency_weight_policy_verifier_quorum(
+            latency_weight_policy_verifier_quorum,
+        )
+        if not verifier_validation["ok"]:
+            raise ValueError(
+                "latency weight policy verifier quorum is invalid: "
+                + "; ".join(verifier_validation["errors"]),
+            )
+        if (
+            latency_weight_policy_verifier_quorum.get("authority_ref")
+            != weight_policy_authority_ref
+            or latency_weight_policy_verifier_quorum.get("authority_digest")
+            != weight_policy_authority_digest
+            or latency_weight_policy_verifier_quorum.get("source_digest_set")
+            != weight_policy_source_digest_set
+        ):
+            raise ValueError(
+                "latency weight policy verifier quorum must bind the same authority and source digest set",
             )
         weights = self._normalize_participant_latency_weights(
             participant_ids,
@@ -3051,6 +3506,26 @@ class SensoryLoopbackService:
             "weight_policy_source_digest_set": weight_policy_source_digest_set,
             "weight_policy_status": "complete",
             "weight_policy_bound": True,
+            "weight_policy_verifier_profile": (
+                SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE
+            ),
+            "weight_policy_verifier_quorum_ref": str(
+                latency_weight_policy_verifier_quorum["verifier_quorum_ref"]
+            ),
+            "weight_policy_verifier_quorum_digest": str(
+                latency_weight_policy_verifier_quorum["verifier_quorum_digest"]
+            ),
+            "weight_policy_verifier_source_digest_set": str(
+                latency_weight_policy_verifier_quorum["source_digest_set"]
+            ),
+            "weight_policy_verifier_status": str(
+                latency_weight_policy_verifier_quorum["quorum_status"]
+            ),
+            "weight_policy_verifier_freshness_status": str(
+                latency_weight_policy_verifier_quorum["freshness_status"]
+            ),
+            "weight_policy_verifier_bound": True,
+            "weight_policy_verifier_fresh": True,
         }
 
     @staticmethod
@@ -3136,6 +3611,30 @@ class SensoryLoopbackService:
             ),
             weight_policy_status=str(policy["weight_policy_status"]),
             weight_policy_bound=bool(policy["weight_policy_bound"]),
+            weight_policy_verifier_profile=str(
+                policy["weight_policy_verifier_profile"]
+            ),
+            weight_policy_verifier_quorum_ref=str(
+                policy["weight_policy_verifier_quorum_ref"]
+            ),
+            weight_policy_verifier_quorum_digest=str(
+                policy["weight_policy_verifier_quorum_digest"]
+            ),
+            weight_policy_verifier_source_digest_set=str(
+                policy["weight_policy_verifier_source_digest_set"]
+            ),
+            weight_policy_verifier_status=str(
+                policy["weight_policy_verifier_status"]
+            ),
+            weight_policy_verifier_freshness_status=str(
+                policy["weight_policy_verifier_freshness_status"]
+            ),
+            weight_policy_verifier_bound=bool(
+                policy["weight_policy_verifier_bound"]
+            ),
+            weight_policy_verifier_fresh=bool(
+                policy["weight_policy_verifier_fresh"]
+            ),
         )
         latency_quorum_digest = self._latency_quorum_digest(
             profile_id=policy["profile_id"],
@@ -3166,7 +3665,23 @@ class SensoryLoopbackService:
         participant_latency_bindings: Sequence[Mapping[str, Any]],
         participant_latency_digest_set: Any,
         errors: List[str],
-    ) -> Tuple[str, float, Dict[str, float], bool, float, List[str], bool, bool, bool, str, bool]:
+    ) -> Tuple[
+        str,
+        float,
+        Dict[str, float],
+        bool,
+        float,
+        List[str],
+        bool,
+        bool,
+        bool,
+        str,
+        bool,
+        bool,
+        str,
+        str,
+        bool,
+    ]:
         profile = binding.get("latency_quorum_profile")
         if profile not in {
             SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE,
@@ -3245,6 +3760,42 @@ class SensoryLoopbackService:
         if not isinstance(weight_policy_bound, bool):
             errors.append("latency_weight_policy_bound must be a boolean")
             weight_policy_bound = False
+        weight_policy_verifier_profile = binding.get(
+            "latency_weight_policy_verifier_profile",
+        )
+        weight_policy_verifier_quorum_ref = self._normalize_string_for_validation(
+            binding.get("latency_weight_policy_verifier_quorum_ref", ""),
+            "latency_weight_policy_verifier_quorum_ref",
+            errors,
+        )
+        weight_policy_verifier_quorum_digest = self._normalize_string_for_validation(
+            binding.get("latency_weight_policy_verifier_quorum_digest", ""),
+            "latency_weight_policy_verifier_quorum_digest",
+            errors,
+        )
+        weight_policy_verifier_source_digest_set = self._normalize_string_for_validation(
+            binding.get("latency_weight_policy_verifier_source_digest_set", ""),
+            "latency_weight_policy_verifier_source_digest_set",
+            errors,
+        )
+        weight_policy_verifier_status = binding.get(
+            "latency_weight_policy_verifier_status",
+        )
+        weight_policy_verifier_freshness_status = binding.get(
+            "latency_weight_policy_verifier_freshness_status",
+        )
+        weight_policy_verifier_bound = binding.get(
+            "latency_weight_policy_verifier_bound",
+        )
+        if not isinstance(weight_policy_verifier_bound, bool):
+            errors.append("latency_weight_policy_verifier_bound must be a boolean")
+            weight_policy_verifier_bound = False
+        weight_policy_verifier_fresh = binding.get(
+            "latency_weight_policy_verifier_fresh",
+        )
+        if not isinstance(weight_policy_verifier_fresh, bool):
+            errors.append("latency_weight_policy_verifier_fresh must be a boolean")
+            weight_policy_verifier_fresh = False
         if profile == SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE:
             if weight_policy_profile != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE:
                 errors.append(
@@ -3269,6 +3820,45 @@ class SensoryLoopbackService:
             ):
                 if not field_value:
                     errors.append(f"{field_name} must be bound for weighted quorum")
+            if (
+                weight_policy_verifier_profile
+                != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE
+            ):
+                errors.append(
+                    "weighted latency quorum must bind live verifier quorum profile",
+                )
+            if weight_policy_verifier_status != "complete":
+                errors.append(
+                    "weighted latency quorum verifier quorum must be complete",
+                )
+            if weight_policy_verifier_freshness_status != "fresh":
+                errors.append(
+                    "weighted latency quorum verifier quorum must be fresh",
+                )
+            if weight_policy_verifier_bound is not True:
+                errors.append("weighted latency quorum verifier quorum must be bound")
+            if weight_policy_verifier_fresh is not True:
+                errors.append("weighted latency quorum verifier quorum must be fresh")
+            for field_name, field_value in (
+                (
+                    "latency_weight_policy_verifier_quorum_ref",
+                    weight_policy_verifier_quorum_ref,
+                ),
+                (
+                    "latency_weight_policy_verifier_quorum_digest",
+                    weight_policy_verifier_quorum_digest,
+                ),
+                (
+                    "latency_weight_policy_verifier_source_digest_set",
+                    weight_policy_verifier_source_digest_set,
+                ),
+            ):
+                if not field_value:
+                    errors.append(f"{field_name} must be bound for weighted quorum")
+            if weight_policy_verifier_source_digest_set != weight_policy_source_digest_set:
+                errors.append(
+                    "latency_weight_policy_verifier_source_digest_set must match latency_weight_policy_source_digest_set",
+                )
         else:
             if weight_policy_profile != "not-bound":
                 errors.append("strict latency quorum must not bind weight policy profile")
@@ -3282,6 +3872,24 @@ class SensoryLoopbackService:
                 or weight_policy_source_digest_set
             ):
                 errors.append("strict latency quorum weight policy authority must be empty")
+            if weight_policy_verifier_profile != "not-bound":
+                errors.append("strict latency quorum must not bind verifier profile")
+            if weight_policy_verifier_status != "not-bound":
+                errors.append("strict latency quorum verifier status must be not-bound")
+            if weight_policy_verifier_freshness_status != "not-bound":
+                errors.append(
+                    "strict latency quorum verifier freshness status must be not-bound",
+                )
+            if weight_policy_verifier_bound is not False:
+                errors.append("strict latency quorum verifier must not be bound")
+            if weight_policy_verifier_fresh is not False:
+                errors.append("strict latency quorum verifier must not be fresh")
+            if (
+                weight_policy_verifier_quorum_ref
+                or weight_policy_verifier_quorum_digest
+                or weight_policy_verifier_source_digest_set
+            ):
+                errors.append("strict latency quorum verifier refs must be empty")
         expected_weight_policy_digest = self._latency_weight_policy_digest(
             profile_id=str(profile),
             threshold=threshold,
@@ -3293,6 +3901,20 @@ class SensoryLoopbackService:
             weight_policy_source_digest_set=weight_policy_source_digest_set,
             weight_policy_status=str(weight_policy_status),
             weight_policy_bound=bool(weight_policy_bound),
+            weight_policy_verifier_profile=str(weight_policy_verifier_profile),
+            weight_policy_verifier_quorum_ref=weight_policy_verifier_quorum_ref,
+            weight_policy_verifier_quorum_digest=(
+                weight_policy_verifier_quorum_digest
+            ),
+            weight_policy_verifier_source_digest_set=(
+                weight_policy_verifier_source_digest_set
+            ),
+            weight_policy_verifier_status=str(weight_policy_verifier_status),
+            weight_policy_verifier_freshness_status=str(
+                weight_policy_verifier_freshness_status
+            ),
+            weight_policy_verifier_bound=bool(weight_policy_verifier_bound),
+            weight_policy_verifier_fresh=bool(weight_policy_verifier_fresh),
         )
         latency_weight_policy_digest_bound = (
             binding.get("latency_weight_policy_digest") == expected_weight_policy_digest
@@ -3361,6 +3983,10 @@ class SensoryLoopbackService:
             bool(weight_policy_bound),
             latency_weight_policy_digest_bound,
             str(weight_policy_status),
+            bool(weight_policy_verifier_bound),
+            bool(weight_policy_verifier_fresh),
+            str(weight_policy_verifier_status),
+            str(weight_policy_verifier_freshness_status),
             latency_quorum_digest_bound,
         )
 
@@ -3475,6 +4101,86 @@ class SensoryLoopbackService:
         )
 
     @staticmethod
+    def _latency_weight_policy_verifier_response_digest_set(
+        verifier_receipts: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE,
+                    "verifier_response_digests": [
+                        {
+                            "verifier_ref": receipt.get("verifier_ref"),
+                            "jurisdiction": receipt.get("jurisdiction"),
+                            "response_digest": receipt.get("response_digest"),
+                            "freshness_status": receipt.get("freshness_status"),
+                        }
+                        for receipt in verifier_receipts
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
+    def _latency_weight_policy_verifier_signature_digest_set(
+        verifier_receipts: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE,
+                    "verifier_signature_digests": [
+                        {
+                            "verifier_ref": receipt.get("verifier_ref"),
+                            "jurisdiction": receipt.get("jurisdiction"),
+                            "response_signature_digest": receipt.get(
+                                "response_signature_digest"
+                            ),
+                            "signing_key_ref": receipt.get("signing_key_ref"),
+                        }
+                        for receipt in verifier_receipts
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
+    def _latency_weight_policy_verifier_response_digest_payload(
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE,
+            "verifier_ref": receipt.get("verifier_ref"),
+            "jurisdiction": receipt.get("jurisdiction"),
+            "authority_ref": receipt.get("authority_ref"),
+            "authority_digest": receipt.get("authority_digest"),
+            "source_digest_set": receipt.get("source_digest_set"),
+            "observed_at": receipt.get("observed_at"),
+            "freshness_window_hours": receipt.get("freshness_window_hours"),
+            "freshness_status": receipt.get("freshness_status"),
+            "verifier_status": receipt.get("verifier_status"),
+        }
+
+    @staticmethod
+    def _latency_weight_policy_verifier_signature_digest_payload(
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "verifier_ref": receipt.get("verifier_ref"),
+            "jurisdiction": receipt.get("jurisdiction"),
+            "response_digest": receipt.get("response_digest"),
+            "signing_key_ref": receipt.get("signing_key_ref"),
+        }
+
+    @staticmethod
+    def _latency_weight_policy_verifier_quorum_digest_payload(
+        quorum: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        payload = dict(quorum)
+        payload.pop("verifier_quorum_digest", None)
+        return payload
+
+    @staticmethod
     def _participant_latency_weight_digest(
         profile_id: str,
         threshold: float,
@@ -3503,6 +4209,14 @@ class SensoryLoopbackService:
         weight_policy_source_digest_set: str,
         weight_policy_status: str,
         weight_policy_bound: bool,
+        weight_policy_verifier_profile: str,
+        weight_policy_verifier_quorum_ref: str,
+        weight_policy_verifier_quorum_digest: str,
+        weight_policy_verifier_source_digest_set: str,
+        weight_policy_verifier_status: str,
+        weight_policy_verifier_freshness_status: str,
+        weight_policy_verifier_bound: bool,
+        weight_policy_verifier_fresh: bool,
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -3525,6 +4239,30 @@ class SensoryLoopbackService:
                     ),
                     "latency_weight_policy_status": weight_policy_status,
                     "latency_weight_policy_bound": weight_policy_bound,
+                    "latency_weight_policy_verifier_profile": (
+                        weight_policy_verifier_profile
+                    ),
+                    "latency_weight_policy_verifier_quorum_ref": (
+                        weight_policy_verifier_quorum_ref
+                    ),
+                    "latency_weight_policy_verifier_quorum_digest": (
+                        weight_policy_verifier_quorum_digest
+                    ),
+                    "latency_weight_policy_verifier_source_digest_set": (
+                        weight_policy_verifier_source_digest_set
+                    ),
+                    "latency_weight_policy_verifier_status": (
+                        weight_policy_verifier_status
+                    ),
+                    "latency_weight_policy_verifier_freshness_status": (
+                        weight_policy_verifier_freshness_status
+                    ),
+                    "latency_weight_policy_verifier_bound": (
+                        weight_policy_verifier_bound
+                    ),
+                    "latency_weight_policy_verifier_fresh": (
+                        weight_policy_verifier_fresh
+                    ),
                 }
             )
         )

@@ -1245,6 +1245,19 @@ entries:
       - reference-runtime
     rationale: Required to serialize participant-specific BioData confidence, feature-window drift gate, fresh calibration refresh propagation, hardware timing latency drift gate distribution, and optional 3-4 participant weighted latency quorum with policy-authority digest binding into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, refresh, timing, hardware adapter, weight-policy authority, or gate payload retention.
   - priority: P1
+    kind: schema
+    file: specs/schemas/sensory_loopback_latency_weight_policy_verifier_quorum.schema
+    consumers:
+      - specs/interfaces/interface.sensory_loopback.v0.idl
+      - specs/schemas/sensory_loopback_biodata_arbitration_binding.schema
+      - docs/02-subsystems/interface/sensory-loopback.md
+      - docs/07-reference-implementation/README.md
+      - evals/interface/sensory_loopback_biodata_arbitration.yaml
+      - evals/interface/sensory_loopback_public_schema_contract.yaml
+      - tests/integration/test_interface_schema_contracts.py
+      - reference-runtime
+    rationale: Required to serialize a fresh live verifier quorum for weighted Sensory Loopback latency-weight policy authority before weighted latency quorum accepts blocked participant timing gates, while retaining only verifier refs, response/signature digests, and raw verifier/response/signature redaction flags.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.sensory_loopback.v0.idl
     consumers:
