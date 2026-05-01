@@ -87,6 +87,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             counts["worktree_workspace_marker_count"],
         )
         self.assertEqual(
+            report["tracked_generated_artifact_count"],
+            counts["tracked_generated_artifact_count"],
+        )
+        self.assertEqual(
             report["untracked_generated_artifact_count"],
             counts["untracked_generated_artifact_count"],
         )
@@ -134,6 +138,13 @@ class GapReportSchemaContractTests(unittest.TestCase):
             any(
                 entry["path"] == "git:tracked-worktree-diff"
                 and entry["surface_pattern"] == "git:tracked-worktree-diff"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+        self.assertTrue(
+            any(
+                entry["path"] == "git:tracked-generated-artifacts"
+                and entry["surface_pattern"] == "git:tracked-generated-artifacts"
                 for entry in receipt["scan_surface_digests"]
             )
         )

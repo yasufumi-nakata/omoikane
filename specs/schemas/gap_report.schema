@@ -3,7 +3,7 @@ $id: "https://omoikane.dev/specs/schemas/gap_report.schema"
 title: GapReport
 description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
-  including tracked worktree marker-residue checks, untracked generated artifact
+  including tracked worktree marker-residue checks, tracked/untracked generated artifact
   hygiene checks, and a digest-bound scan receipt for automation gating.
 type: object
 additionalProperties: false
@@ -20,6 +20,7 @@ required:
   - future_work_hit_count
   - implementation_stub_count
   - worktree_workspace_marker_count
+  - tracked_generated_artifact_count
   - untracked_generated_artifact_count
   - decision_log_residual_count
   - decision_log_frontier_count
@@ -36,6 +37,7 @@ required:
   - future_work_hits
   - implementation_stub_hits
   - worktree_workspace_marker_hits
+  - tracked_generated_artifact_hits
   - untracked_generated_artifact_hits
   - decision_log_residual_hits
   - decision_log_frontier_hits
@@ -76,6 +78,9 @@ properties:
     type: integer
     minimum: 0
   worktree_workspace_marker_count:
+    type: integer
+    minimum: 0
+  tracked_generated_artifact_count:
     type: integer
     minimum: 0
   untracked_generated_artifact_count:
@@ -147,6 +152,10 @@ properties:
     items:
       $ref: "#/$defs/gap_hit"
   worktree_workspace_marker_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  tracked_generated_artifact_hits:
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -294,6 +303,7 @@ properties:
           - future_work_hit_count
           - implementation_stub_count
           - worktree_workspace_marker_count
+          - tracked_generated_artifact_count
           - untracked_generated_artifact_count
           - decision_log_residual_count
           - decision_log_frontier_count
@@ -331,6 +341,9 @@ properties:
             type: integer
             minimum: 0
           worktree_workspace_marker_count:
+            type: integer
+            minimum: 0
+          tracked_generated_artifact_count:
             type: integer
             minimum: 0
           untracked_generated_artifact_count:
@@ -483,6 +496,8 @@ $defs:
           - generated-artifact
       untracked_artifact_status:
         const: untracked-generated-artifact
+      tracked_artifact_status:
+        const: tracked-generated-artifact
       raw_artifact_payload_stored:
         const: false
       required_section:
@@ -501,6 +516,7 @@ examples:
     future_work_hit_count: 0
     implementation_stub_count: 0
     worktree_workspace_marker_count: 0
+    tracked_generated_artifact_count: 0
     untracked_generated_artifact_count: 0
     decision_log_residual_count: 0
     decision_log_frontier_count: 0
@@ -517,6 +533,7 @@ examples:
     future_work_hits: []
     implementation_stub_hits: []
     worktree_workspace_marker_hits: []
+    tracked_generated_artifact_hits: []
     untracked_generated_artifact_hits: []
     decision_log_residual_hits: []
     decision_log_frontier_hits: []
@@ -560,6 +577,7 @@ examples:
         future_work_hit_count: 0
         implementation_stub_count: 0
         worktree_workspace_marker_count: 0
+        tracked_generated_artifact_count: 0
         untracked_generated_artifact_count: 0
         decision_log_residual_count: 0
         decision_log_frontier_count: 0

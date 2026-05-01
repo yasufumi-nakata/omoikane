@@ -110,6 +110,7 @@ class GapScannerTests(unittest.TestCase):
                 receipt["counts"]["missing_required_reference_policy_section_count"],
             )
             self.assertEqual(0, receipt["counts"]["worktree_workspace_marker_count"])
+            self.assertEqual(0, receipt["counts"]["tracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["untracked_generated_artifact_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
@@ -275,6 +276,62 @@ class GapScannerTests(unittest.TestCase):
             )
             self.assertEqual(
                 sha256_text("artifacts/parallel-codex/worker.patch\n"),
+                surface_digest["sha256"],
+            )
+
+    def test_scan_reports_tracked_generated_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            artifact_path = repo_root / "build" / "gap-report.json"
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            artifact_path.write_text("{\"generated\": true}\n", encoding="utf-8")
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap with generated artifact",
+            )
+
+            report = GapScanner().scan(repo_root)
+            hit = report["tracked_generated_artifact_hits"][0]
+
+            self.assertEqual(1, report["tracked_generated_artifact_count"])
+            self.assertEqual("build/gap-report.json", hit["path"])
+            self.assertEqual("packaging-output", hit["artifact_class"])
+            self.assertEqual(
+                "tracked-generated-artifact",
+                hit["tracked_artifact_status"],
+            )
+            self.assertFalse(hit["raw_artifact_payload_stored"])
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"]["tracked_generated_artifact_count"],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "tracked-generated-artifact"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:tracked-generated-artifacts"
+            )
+            self.assertEqual(
+                "git:tracked-generated-artifacts",
+                surface_digest["surface_pattern"],
+            )
+            self.assertEqual(
+                sha256_text("build/gap-report.json\n"),
                 surface_digest["sha256"],
             )
 

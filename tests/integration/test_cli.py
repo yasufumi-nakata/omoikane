@@ -30,6 +30,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual([], result["catalog_coverage_gap_hits"])
         self.assertEqual(0, result["implementation_stub_count"])
         self.assertEqual([], result["implementation_stub_hits"])
+        self.assertEqual(0, result["tracked_generated_artifact_count"])
+        self.assertEqual([], result["tracked_generated_artifact_hits"])
         self.assertEqual(0, result["untracked_generated_artifact_count"])
         self.assertEqual([], result["untracked_generated_artifact_hits"])
         self.assertIn("decision_log_residual_count", result)

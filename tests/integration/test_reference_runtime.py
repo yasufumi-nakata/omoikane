@@ -1213,6 +1213,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual([], report["implementation_stub_hits"])
         self.assertEqual(0, report["worktree_workspace_marker_count"])
         self.assertEqual([], report["worktree_workspace_marker_hits"])
+        self.assertEqual(0, report["tracked_generated_artifact_count"])
+        self.assertEqual([], report["tracked_generated_artifact_hits"])
         self.assertEqual(0, report["untracked_generated_artifact_count"])
         self.assertEqual([], report["untracked_generated_artifact_hits"])
         self.assertIn("decision_log_residual_count", report)

@@ -119,12 +119,18 @@ residual `future work` に加え、
 さらに tracked worktree diff を `git:tracked-worktree-diff` の digest-bound
 scan surface として扱い、dirty diff に残った workspace marker residue を
 `worktree_workspace_marker_hits` として all-zero gate の外へ出す。
+さらに `git ls-files` 由来の追跡対象生成物を
+`git:tracked-generated-artifacts` の digest-bound scan surface として扱い、
+`artifacts/` / `build/` / `dist/` / `htmlcov/` / `.coverage` / `coverage.xml` /
+`*.patch` / `*.pyc` / `*.egg-info` に該当する path を
+`tracked_generated_artifact_hits` として all-zero gate の外へ出す。
+raw artifact payload は読まず、path manifest digest だけを保持する。
 さらに `git ls-files --others --exclude-standard` 由来の未追跡生成物を
 `git:untracked-generated-artifacts` の digest-bound scan surface として扱い、
 `artifacts/` / `build/` / `dist/` / `htmlcov/` / `.coverage` / `coverage.xml` /
 `*.patch` / `*.pyc` / `*.egg-info` に該当する path を
 `untracked_generated_artifact_hits` として all-zero gate の外へ出す。
-raw artifact payload は読まず、path manifest digest だけを保持する。
+同じく raw artifact payload は読まず、path manifest digest だけを保持する。
 最新 decision log 日付に残る `residual gap` / `unresolved gap` の bullet も
 `decision_log_residual_hits` として JSON で列挙する。
 同じ最新日付の後続 decision log が `closes_next_gaps` で閉じた item は除外され、
