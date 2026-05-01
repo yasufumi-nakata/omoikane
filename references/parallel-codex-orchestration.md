@@ -79,14 +79,15 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - conflict が残る場合は merge せず、blocked state と再開条件を報告する
 - `integration-ready` batch を main checkout に適用する直前には
   `parallel_codex_integration_execution_receipt.schema` で source batch digest、
-  current checkout head、ordered apply step digest、patch artifact digest、
-  `git apply --check patch://...` の command receipt digest を含む pre-apply
+  current checkout head、ordered apply step digest、repo-local patch artifact manifest digest、
+  repo-local `artifacts/parallel-codex/*.patch` path、
+  `git apply --check artifacts/parallel-codex/*.patch` の command receipt digest を含む pre-apply
   dry-run manifest、post-apply verification manifest を束縛し、raw batch /
   apply plan / dry-run / worker receipt / verification payload は保存しない
 - source batch が blocked、current head が batch head と不一致、または post-apply
   verification が未達の場合は `execution_decision=blocked` のまま commit へ進まない
 - apply 前 dry-run が step 単位で失敗した場合、または dry-run command が
-  対象 patch artifact ref/digest に束縛されていない場合も
+  対象 repo-local patch artifact path/ref/digest に束縛されていない場合も
   `execution_decision=blocked` のまま checkout mutation や commit へ進まない
 
 ## Verification

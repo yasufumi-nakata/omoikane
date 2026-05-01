@@ -3,7 +3,8 @@ target: selfctor.parallel_orchestration
 summary: >
   parallel-orchestration-demo が integration-ready batch receipt を main checkout
   適用直前の execution receipt へ縮約し、source batch digest、current head、
-  ordered apply plan digest、patch artifact digest に束縛された command-bound
+  ordered apply plan digest、repo-local patch artifact manifest digest、
+  `artifacts/parallel-codex/*.patch` path に束縛された command-bound
   git apply dry-run manifest、post-apply verification manifest、raw batch /
   apply / dry-run / worker / verification payload 非保存を固定すること
 checks:
@@ -15,6 +16,8 @@ expect:
   execution_source_batch_receipt_digest_bound: true
   execution_current_head_matches_batch: true
   execution_apply_plan_digest_bound: true
+  execution_patch_artifact_manifest_digest_bound: true
+  execution_repo_local_patch_artifacts_bound: true
   execution_pre_apply_dry_run_manifest_digest_bound: true
   execution_pre_apply_dry_run_command_bound: true
   execution_pre_apply_patch_artifact_digest_bound: true

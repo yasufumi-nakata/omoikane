@@ -1013,6 +1013,19 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertEqual(2, execution["apply_step_count"])
         for step in execution["apply_steps"]:
             self.assertTrue(step["patch_artifact_ref"].startswith("patch://parallel-codex/"))
+            self.assertEqual(
+                "repo-local-patch-artifact-binding-v1",
+                step["patch_artifact_profile"],
+            )
+            self.assertEqual("repo-local-patch-file", step["patch_artifact_source"])
+            self.assertTrue(
+                step["patch_artifact_path"].startswith("artifacts/parallel-codex/")
+            )
+            self.assertTrue(step["patch_artifact_path"].endswith(".patch"))
+            self.assertEqual(
+                step["patch_artifact_path"],
+                step["patch_artifact_command_target"],
+            )
             self.assertTrue(step["patch_artifact_digest"])
             self.assertFalse(step["raw_patch_payload_stored"])
         self.assertTrue(validation["ok"])
@@ -1020,6 +1033,8 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["source_batch_receipt_digest_bound"])
         self.assertTrue(validation["current_head_matches_batch"])
         self.assertTrue(validation["apply_plan_digest_bound"])
+        self.assertTrue(validation["patch_artifact_manifest_digest_bound"])
+        self.assertTrue(validation["repo_local_patch_artifacts_bound"])
         self.assertTrue(validation["pre_apply_dry_run_manifest_digest_bound"])
         self.assertTrue(validation["pre_apply_dry_run_passed"])
         self.assertTrue(validation["post_apply_verification_manifest_digest_bound"])
@@ -1038,8 +1053,22 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
                 dry_run["command_profile"],
             )
             self.assertEqual(
-                f"git apply --check {dry_run['patch_artifact_ref']}",
+                "repo-local-patch-artifact-binding-v1",
+                dry_run["patch_artifact_profile"],
+            )
+            self.assertEqual("repo-local-patch-file", dry_run["patch_artifact_source"])
+            self.assertTrue(
+                dry_run["patch_artifact_path"].startswith(
+                    "artifacts/parallel-codex/"
+                )
+            )
+            self.assertEqual(
+                f"git apply --check {dry_run['patch_artifact_path']}",
                 dry_run["command"],
+            )
+            self.assertEqual(
+                dry_run["patch_artifact_path"],
+                dry_run["patch_artifact_command_target"],
             )
             self.assertTrue(dry_run["patch_artifact_digest_bound"])
             self.assertTrue(dry_run["command_receipt_digest"])

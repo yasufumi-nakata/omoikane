@@ -957,8 +957,9 @@ schema-bound のまま `blocked` になり、raw worker receipt payload、raw co
 payload、raw verification output は保存しない。
 integration-ready batch はさらに
 `parallel_codex_integration_execution_receipt` へ縮約され、source batch receipt digest、
-current checkout head、ordered apply step digest、patch artifact ref/digest、
-`git apply --check patch://...` の command receipt digest を含む
+current checkout head、ordered apply step digest、repo-local patch artifact manifest
+digest、`artifacts/parallel-codex/*.patch` path/ref/digest、
+`git apply --check artifacts/parallel-codex/*.patch` の command receipt digest を含む
 pre-apply dry-run manifest、post-apply verification manifest を commit 前に固定する。
 conflict batch 由来の execution、dry-run failed execution、patch artifact に束縛されない
 dry-run command は schema-bound のまま `blocked` になり、

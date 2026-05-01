@@ -148,7 +148,8 @@ unrelated ancestry result を fail-closed にできるか。
 parallel-orchestration-demo が integration-ready batch receipt を source batch
 digest、current checkout head、ordered apply step digest、pre-apply dry-run
 manifest、post-apply verification manifest に束縛し、さらに dry-run command を
-patch artifact digest 付きの `git apply --check patch://...` receipt に固定して、
+repo-local patch artifact path/digest 付きの
+`git apply --check artifacts/parallel-codex/*.patch` receipt に固定して、
 conflict batch 由来、dry-run failed execution、または command-unbound dry-run を
 fail-closed にできるか。
 
