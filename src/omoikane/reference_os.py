@@ -970,6 +970,7 @@ class OmoikaneReferenceOS:
             "specs/catalog.yaml",
             "evals/continuity/parallel_codex_result_ingestion.yaml",
             "evals/continuity/parallel_codex_integration_batch.yaml",
+            "evals/continuity/README.md",
             "docs/02-subsystems/self-construction/README.md",
             "docs/04-ai-governance/codex-as-builder.md",
             "docs/07-reference-implementation/README.md",
@@ -985,6 +986,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-content-identity.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-ancestry-binding.md",
             "meta/decision-log/2026-05-01_parallel-codex-integration-batch-conflict-arbitration.md",
+            "meta/decision-log/2026-05-01_parallel-codex-workspace-marker-diff-classifier.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1113,6 +1115,15 @@ class OmoikaneReferenceOS:
             workspace_marker_only_changed_files=[
                 "docs/02-subsystems/agentic/README.md",
             ],
+            workspace_diff_by_file={
+                "docs/02-subsystems/agentic/README.md": (
+                    "diff --git a/docs/02-subsystems/agentic/README.md "
+                    "b/docs/02-subsystems/agentic/README.md\n"
+                    "@@\n"
+                    "+# workspace-enacted: patch-marker-only "
+                    "target=docs/02-subsystems/agentic/README.md\n"
+                )
+            },
             verification_results=verification_results[:2],
             result_summary=(
                 "Worker result that only appends workspace-enacted marker comments "
@@ -1360,6 +1371,9 @@ class OmoikaneReferenceOS:
                 "marker_only_receipt_digest": marker_only_receipt["receipt_digest"],
                 "marker_only_hygiene_digest": marker_only_receipt[
                     "workspace_marker_hygiene_digest"
+                ],
+                "marker_only_classifier_digest": marker_only_receipt[
+                    "workspace_marker_classifier_digest"
                 ],
                 "marker_only_hygiene_status": marker_only_receipt[
                     "workspace_marker_hygiene_status"
@@ -1728,6 +1742,12 @@ class OmoikaneReferenceOS:
                 ],
                 "marker_only_hygiene_digest_bound": marker_only_validation[
                     "workspace_marker_hygiene_digest_bound"
+                ],
+                "marker_only_classifier_digest_bound": marker_only_validation[
+                    "workspace_marker_classifier_digest_bound"
+                ],
+                "marker_only_classifier_detected": marker_only_validation[
+                    "workspace_marker_classifier_marker_only_detected"
                 ],
                 "marker_only_change_blocked": marker_only_validation[
                     "workspace_marker_only_change_blocked"

@@ -59,6 +59,9 @@ PARALLEL_CODEX_REMOTE_SOURCE_ANCESTRY_PROFILE = (
 PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE = (
     "workspace-enacted-marker-hygiene-v1"
 )
+PARALLEL_CODEX_WORKSPACE_MARKER_CLASSIFIER_PROFILE = (
+    "repo-local-workspace-marker-diff-classifier-v1"
+)
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_OK_STATUS = "current-not-revoked"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS = "not-applicable"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_FRESH_STATUS = "fresh"
@@ -198,6 +201,9 @@ class ParallelCodexOrchestrationPolicy:
             "workspace_marker_hygiene_profile": (
                 PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE
             ),
+            "workspace_marker_classifier_profile": (
+                PARALLEL_CODEX_WORKSPACE_MARKER_CLASSIFIER_PROFILE
+            ),
             "remote_metadata_profile": PARALLEL_CODEX_REMOTE_METADATA_PROFILE,
             "remote_source_revocation_profile": (
                 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_PROFILE
@@ -288,6 +294,7 @@ class ParallelCodexOrchestrationService:
         verification_results: Sequence[Mapping[str, Any]],
         result_summary: str,
         workspace_marker_only_changed_files: Sequence[str] = (),
+        workspace_diff_by_file: Mapping[str, str] | None = None,
         patch_digest: str = "",
         source_system: str = "direct-worker-result",
         upstream_receipt_ref: str = "",
@@ -333,8 +340,26 @@ class ParallelCodexOrchestrationService:
         normalized_source_system = source_system.strip() or "direct-worker-result"
         normalized_scope = _dedupe_strings(ownership_scope)
         normalized_files = _dedupe_strings(changed_files)
+        workspace_marker_diff_summaries = self.classify_workspace_marker_diff_summaries(
+            changed_files=normalized_files,
+            workspace_diff_by_file=workspace_diff_by_file or {},
+        )
+        classifier_marker_files = self._workspace_marker_classifier_marker_files(
+            workspace_marker_diff_summaries,
+        )
         normalized_workspace_marker_files = _dedupe_strings(
-            workspace_marker_only_changed_files,
+            [
+                *workspace_marker_only_changed_files,
+                *classifier_marker_files,
+            ],
+        )
+        workspace_marker_classifier_digest = (
+            self._workspace_marker_classifier_digest(
+                workspace_marker_diff_summaries=workspace_marker_diff_summaries,
+                workspace_marker_only_changed_files=(
+                    normalized_workspace_marker_files
+                ),
+            )
         )
         workspace_marker_hygiene_status = self._workspace_marker_hygiene_status(
             changed_files=normalized_files,
@@ -344,6 +369,7 @@ class ParallelCodexOrchestrationService:
             changed_files=normalized_files,
             workspace_marker_only_changed_files=normalized_workspace_marker_files,
             workspace_marker_hygiene_status=workspace_marker_hygiene_status,
+            workspace_marker_classifier_digest=workspace_marker_classifier_digest,
         )
         normalized_upstream_refs = _dedupe_strings(upstream_patch_candidate_receipt_refs)
         normalized_upstream_digests = _dedupe_strings(
@@ -510,6 +536,16 @@ class ParallelCodexOrchestrationService:
             ),
             "workspace_marker_hygiene_profile": (
                 PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE
+            ),
+            "workspace_marker_classifier_profile": (
+                PARALLEL_CODEX_WORKSPACE_MARKER_CLASSIFIER_PROFILE
+            ),
+            "workspace_marker_diff_summaries": workspace_marker_diff_summaries,
+            "workspace_marker_diff_summary_count": len(
+                workspace_marker_diff_summaries,
+            ),
+            "workspace_marker_classifier_digest": (
+                workspace_marker_classifier_digest
             ),
             "workspace_marker_only_changed_files": normalized_workspace_marker_files,
             "workspace_marker_only_change_count": len(
@@ -947,10 +983,25 @@ class ParallelCodexOrchestrationService:
         workspace_marker_only_changed_files = list(
             receipt.get("workspace_marker_only_changed_files", []),
         )
+        workspace_marker_diff_summaries = list(
+            receipt.get("workspace_marker_diff_summaries", []),
+        )
         verification_results = list(receipt.get("verification_results", []))
         expected_blocking_reasons = self._derive_blocking_reasons(receipt)
         expected_integration_decision = (
             "blocked" if expected_blocking_reasons else "accept-ready"
+        )
+        expected_workspace_marker_classifier_digest = (
+            self._workspace_marker_classifier_digest(
+                workspace_marker_diff_summaries=workspace_marker_diff_summaries,
+                workspace_marker_only_changed_files=(
+                    workspace_marker_only_changed_files
+                ),
+            )
+        )
+        workspace_marker_classifier_digest_bound = (
+            receipt.get("workspace_marker_classifier_digest")
+            == expected_workspace_marker_classifier_digest
         )
         expected_workspace_marker_hygiene_status = (
             self._workspace_marker_hygiene_status(
@@ -973,6 +1024,9 @@ class ParallelCodexOrchestrationService:
                 ),
                 workspace_marker_hygiene_status=(
                     expected_workspace_marker_hygiene_status
+                ),
+                workspace_marker_classifier_digest=(
+                    expected_workspace_marker_classifier_digest
                 ),
             )
         )
@@ -1497,11 +1551,17 @@ class ParallelCodexOrchestrationService:
             workspace_marker_only_changed_files,
         ):
             errors.append("workspace_marker_only_change_count mismatch")
+        if receipt.get("workspace_marker_diff_summary_count") != len(
+            workspace_marker_diff_summaries,
+        ):
+            errors.append("workspace_marker_diff_summary_count mismatch")
         if (
             receipt.get("workspace_marker_hygiene_status")
             != expected_workspace_marker_hygiene_status
         ):
             errors.append("workspace_marker_hygiene_status mismatch")
+        if not workspace_marker_classifier_digest_bound:
+            errors.append("workspace_marker_classifier_digest mismatch")
         if receipt.get("verification_command_count") != len(verification_results):
             errors.append("verification_command_count mismatch")
         if receipt.get("blocking_reasons") != expected_blocking_reasons:
@@ -1548,6 +1608,14 @@ class ParallelCodexOrchestrationService:
             "verification_manifest_digest_bound": verification_digest_bound,
             "workspace_marker_hygiene_digest_bound": (
                 workspace_marker_hygiene_digest_bound
+            ),
+            "workspace_marker_classifier_digest_bound": (
+                workspace_marker_classifier_digest_bound
+            ),
+            "workspace_marker_classifier_marker_only_detected": bool(
+                self._workspace_marker_classifier_marker_files(
+                    workspace_marker_diff_summaries,
+                )
             ),
             "workspace_marker_hygiene_clean": (
                 receipt.get("workspace_marker_hygiene_status")
@@ -1950,6 +2018,9 @@ class ParallelCodexOrchestrationService:
         changed_files = list(receipt.get("changed_files", []))
         workspace_marker_only_changed_files = list(
             receipt.get("workspace_marker_only_changed_files", []),
+        )
+        workspace_marker_diff_summaries = list(
+            receipt.get("workspace_marker_diff_summaries", []),
         )
         verification_results = list(receipt.get("verification_results", []))
 
@@ -2690,14 +2761,49 @@ class ParallelCodexOrchestrationService:
             != PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE
         ):
             reasons.append("workspace_marker_hygiene_profile mismatch")
+        if (
+            receipt.get("workspace_marker_classifier_profile")
+            != PARALLEL_CODEX_WORKSPACE_MARKER_CLASSIFIER_PROFILE
+        ):
+            reasons.append("workspace_marker_classifier_profile mismatch")
+        if receipt.get("workspace_marker_diff_summary_count") != len(
+            workspace_marker_diff_summaries,
+        ):
+            reasons.append("workspace_marker_diff_summary_count mismatch")
         if receipt.get("workspace_marker_only_change_count") != len(
             workspace_marker_only_changed_files,
         ):
             reasons.append("workspace_marker_only_change_count mismatch")
+        reasons.extend(
+            self._workspace_marker_diff_summary_reasons(
+                workspace_marker_diff_summaries=workspace_marker_diff_summaries,
+                changed_files=changed_files,
+            )
+        )
         marker_file_set = set(workspace_marker_only_changed_files)
         changed_file_set = set(changed_files)
         if not marker_file_set.issubset(changed_file_set):
             reasons.append("workspace marker-only files must be subset of changed_files")
+        classifier_marker_files = self._workspace_marker_classifier_marker_files(
+            workspace_marker_diff_summaries,
+        )
+        if not set(classifier_marker_files).issubset(marker_file_set):
+            reasons.append(
+                "workspace marker classifier files must be reflected in workspace_marker_only_changed_files"
+            )
+        expected_workspace_marker_classifier_digest = (
+            self._workspace_marker_classifier_digest(
+                workspace_marker_diff_summaries=workspace_marker_diff_summaries,
+                workspace_marker_only_changed_files=(
+                    workspace_marker_only_changed_files
+                ),
+            )
+        )
+        if (
+            receipt.get("workspace_marker_classifier_digest")
+            != expected_workspace_marker_classifier_digest
+        ):
+            reasons.append("workspace_marker_classifier_digest mismatch")
         expected_workspace_marker_hygiene_status = (
             self._workspace_marker_hygiene_status(
                 changed_files=changed_files,
@@ -2724,6 +2830,9 @@ class ParallelCodexOrchestrationService:
             changed_files=changed_files,
             workspace_marker_only_changed_files=workspace_marker_only_changed_files,
             workspace_marker_hygiene_status=expected_workspace_marker_hygiene_status,
+            workspace_marker_classifier_digest=(
+                expected_workspace_marker_classifier_digest
+            ),
         ):
             reasons.append("workspace_marker_hygiene_digest mismatch")
         if receipt.get("raw_workspace_marker_payload_stored") is not False:
@@ -2743,6 +2852,157 @@ class ParallelCodexOrchestrationService:
     @staticmethod
     def _changed_file_manifest_digest(changed_files: Sequence[str]) -> str:
         return sha256_text(canonical_json({"changed_files": list(changed_files)}))
+
+    @staticmethod
+    def classify_workspace_marker_diff_summaries(
+        *,
+        changed_files: Sequence[str],
+        workspace_diff_by_file: Mapping[str, str],
+    ) -> list[Dict[str, Any]]:
+        """Classify repo-local diffs without persisting raw diff payloads."""
+
+        summaries: list[Dict[str, Any]] = []
+        normalized_files = _dedupe_strings(changed_files)
+        for file_path in normalized_files:
+            diff_text = str(workspace_diff_by_file.get(file_path, ""))
+            if not diff_text:
+                continue
+            added_line_count = 0
+            removed_line_count = 0
+            marker_added_line_count = 0
+            non_marker_added_line_count = 0
+            for line in diff_text.splitlines():
+                if line.startswith("+++") or line.startswith("---"):
+                    continue
+                if line.startswith("+"):
+                    added_line_count += 1
+                    if "workspace-enacted:" in line[1:].strip():
+                        marker_added_line_count += 1
+                    else:
+                        non_marker_added_line_count += 1
+                elif line.startswith("-"):
+                    removed_line_count += 1
+            if added_line_count == 0 and removed_line_count == 0:
+                continue
+            classifier_status = (
+                "marker-only"
+                if (
+                    added_line_count > 0
+                    and removed_line_count == 0
+                    and marker_added_line_count == added_line_count
+                    and non_marker_added_line_count == 0
+                )
+                else "substantive"
+            )
+            summaries.append(
+                {
+                    "file_path": file_path,
+                    "diff_digest": sha256_text(diff_text),
+                    "added_line_count": added_line_count,
+                    "removed_line_count": removed_line_count,
+                    "marker_added_line_count": marker_added_line_count,
+                    "non_marker_added_line_count": non_marker_added_line_count,
+                    "classifier_status": classifier_status,
+                    "raw_diff_payload_stored": False,
+                }
+            )
+        return sorted(summaries, key=lambda summary: summary["file_path"])
+
+    @staticmethod
+    def _workspace_marker_classifier_marker_files(
+        workspace_marker_diff_summaries: Sequence[Mapping[str, Any]],
+    ) -> list[str]:
+        return _dedupe_strings(
+            [
+                str(summary.get("file_path", "")).strip()
+                for summary in workspace_marker_diff_summaries
+                if summary.get("classifier_status") == "marker-only"
+            ]
+        )
+
+    @staticmethod
+    def _workspace_marker_classifier_digest(
+        *,
+        workspace_marker_diff_summaries: Sequence[Mapping[str, Any]],
+        workspace_marker_only_changed_files: Sequence[str],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_WORKSPACE_MARKER_CLASSIFIER_PROFILE
+                    ),
+                    "workspace_marker_diff_summaries": [
+                        dict(summary) for summary in workspace_marker_diff_summaries
+                    ],
+                    "workspace_marker_only_changed_files": list(
+                        workspace_marker_only_changed_files,
+                    ),
+                }
+            )
+        )
+
+    @staticmethod
+    def _workspace_marker_diff_summary_reasons(
+        *,
+        workspace_marker_diff_summaries: Sequence[Mapping[str, Any]],
+        changed_files: Sequence[str],
+    ) -> list[str]:
+        reasons: list[str] = []
+        changed_file_set = set(changed_files)
+        seen_paths: set[str] = set()
+        for summary in workspace_marker_diff_summaries:
+            file_path = str(summary.get("file_path", "")).strip()
+            if not file_path:
+                reasons.append("workspace marker diff summary file_path must not be empty")
+                continue
+            if file_path in seen_paths:
+                reasons.append("workspace marker diff summary file_path must be unique")
+            seen_paths.add(file_path)
+            if file_path not in changed_file_set:
+                reasons.append(
+                    "workspace marker diff summary file_path must be in changed_files"
+                )
+            if not _is_sha256(summary.get("diff_digest")):
+                reasons.append("workspace marker diff summary digest must be sha256")
+            added_line_count = _coerce_int(summary.get("added_line_count"), -1)
+            removed_line_count = _coerce_int(summary.get("removed_line_count"), -1)
+            marker_added_line_count = _coerce_int(
+                summary.get("marker_added_line_count"),
+                -1,
+            )
+            non_marker_added_line_count = _coerce_int(
+                summary.get("non_marker_added_line_count"),
+                -1,
+            )
+            if min(
+                added_line_count,
+                removed_line_count,
+                marker_added_line_count,
+                non_marker_added_line_count,
+            ) < 0:
+                reasons.append("workspace marker diff summary counts must be non-negative")
+            if marker_added_line_count + non_marker_added_line_count != added_line_count:
+                reasons.append(
+                    "workspace marker diff summary added counts must sum to added_line_count"
+                )
+            classifier_status = summary.get("classifier_status")
+            if classifier_status not in {"marker-only", "substantive"}:
+                reasons.append("workspace marker diff summary classifier_status mismatch")
+            if classifier_status == "marker-only" and not (
+                added_line_count > 0
+                and removed_line_count == 0
+                and marker_added_line_count == added_line_count
+                and non_marker_added_line_count == 0
+            ):
+                reasons.append(
+                    "marker-only diff summary must contain only added workspace markers"
+                )
+            if summary.get("raw_diff_payload_stored") is not False:
+                reasons.append(
+                    "workspace marker diff summary raw_diff_payload_stored must be false"
+                )
+        return reasons
 
     @staticmethod
     def _workspace_marker_hygiene_status(
@@ -2766,6 +3026,7 @@ class ParallelCodexOrchestrationService:
         changed_files: Sequence[str],
         workspace_marker_only_changed_files: Sequence[str],
         workspace_marker_hygiene_status: str,
+        workspace_marker_classifier_digest: str,
     ) -> str:
         return sha256_text(
             canonical_json(
@@ -2777,6 +3038,9 @@ class ParallelCodexOrchestrationService:
                     ),
                     "workspace_marker_hygiene_status": (
                         workspace_marker_hygiene_status
+                    ),
+                    "workspace_marker_classifier_digest": (
+                        workspace_marker_classifier_digest
                     ),
                 }
             )

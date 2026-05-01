@@ -1002,9 +1002,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["blocked_receipt_digest_bound"])
         self.assertTrue(result["validation"]["marker_only_result_blocked"])
         self.assertTrue(result["validation"]["marker_only_hygiene_digest_bound"])
+        self.assertTrue(result["validation"]["marker_only_classifier_digest_bound"])
+        self.assertTrue(result["validation"]["marker_only_classifier_detected"])
         self.assertTrue(result["validation"]["marker_only_change_blocked"])
         self.assertTrue(
             result["validation"]["marker_only_raw_workspace_marker_payload_redacted"]
+        )
+        self.assertEqual(
+            "marker-only",
+            result["marker_only_receipt"]["workspace_marker_diff_summaries"][0][
+                "classifier_status"
+            ],
         )
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]

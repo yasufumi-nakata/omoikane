@@ -6,7 +6,8 @@ summary: >
   branch / PR metadata、remote source revocation check、freshness window、
   signed provider timestamp、timestamp replay guard、remote source content identity、
   remote source main-head ancestry を main checkout integration 前の digest-only receipt として
-  固定し、stale worker result、workspace-enacted marker-only result、unrelated ancestry result を fail-closed にすること
+  固定し、repo-local diff classifier で検出した workspace-enacted marker-only result、
+  stale worker result、unrelated ancestry result を fail-closed にすること
 checks:
   - name: parallel Codex worker result ingestion smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -60,6 +61,8 @@ expect:
   blocked_base_head_mismatch: true
   marker_only_result_blocked: true
   marker_only_hygiene_digest_bound: true
+  marker_only_classifier_digest_bound: true
+  marker_only_classifier_detected: true
   marker_only_change_blocked: true
   marker_only_raw_workspace_marker_payload_redacted: true
   yaoyorozu_bridge_ready_for_main_checkout: true

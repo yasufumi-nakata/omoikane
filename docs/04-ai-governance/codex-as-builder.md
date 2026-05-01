@@ -40,7 +40,8 @@ parsed baseline/sandbox observation と comparison digest に加え temp workspa
 bounded に再現できる。
 `parallel-orchestration-demo` は subagent / worker / `codex exec` の成果を main checkout に取り込む前に
 patch digest、changed file manifest digest、verification manifest digest、worker base commit、
-signed worker identity evidence、workspace marker hygiene digest、
+signed worker identity evidence、repo-local workspace marker diff classifier digest、
+workspace marker hygiene digest、
 remote branch / PR metadata digest を
 `parallel_codex_worker_result_receipt` へ縮約し、remote source revocation status が
 `current-not-revoked` でない result、revocation freshness window が expired の result、
@@ -54,8 +55,9 @@ worker base commit と merge-base commit が main checkout head に一致する
 ancestry digest へも束縛する。`bound` でない content identity や
 `ancestor-bound` でない ancestry result も blocked のまま保持する。
 raw remote content / ancestry payload は保存しない。
-workspace-enacted marker-only payload は別 digest に縮約され、marker だけの worker
-result は blocked のまま保持される。
+workspace-enacted marker-only payload は raw diff を保存せずに diff digest、
+line counts、classifier status へ縮約され、marker だけの worker result は
+blocked のまま保持される。
 複数の accept-ready receipt を main checkout に混ぜる前には
 `parallel_codex_integration_batch_receipt` で receipt set digest、digest/ref 順の
 ordered integration digest、blocked-receipt quarantine manifest digest、

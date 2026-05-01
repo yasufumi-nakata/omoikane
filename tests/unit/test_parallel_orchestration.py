@@ -125,6 +125,13 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
 
     def test_workspace_marker_only_worker_result_blocks_integration(self) -> None:
         marker_path = "docs/02-subsystems/agentic/README.md"
+        marker_diff = (
+            "diff --git a/docs/02-subsystems/agentic/README.md "
+            "b/docs/02-subsystems/agentic/README.md\n"
+            "@@\n"
+            "+# workspace-enacted: patch-unit-marker "
+            "target=docs/02-subsystems/agentic/README.md\n"
+        )
         receipt = self.service.ingest_worker_result(
             worker_id="codex-marker-only-worker",
             worker_role="worker",
@@ -133,7 +140,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             worker_base_commit=MAIN_HEAD,
             ownership_scope=["docs/"],
             changed_files=[marker_path],
-            workspace_marker_only_changed_files=[marker_path],
+            workspace_diff_by_file={marker_path: marker_diff},
             verification_results=_verification_results(),
             result_summary="Worker result only appends workspace-enacted markers.",
         )
@@ -151,8 +158,73 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertFalse(validation["ready_for_main_checkout"])
         self.assertTrue(validation["workspace_marker_only_change_blocked"])
+        self.assertTrue(validation["workspace_marker_classifier_digest_bound"])
+        self.assertTrue(validation["workspace_marker_classifier_marker_only_detected"])
+        self.assertEqual(1, receipt["workspace_marker_diff_summary_count"])
+        self.assertEqual(
+            "marker-only",
+            receipt["workspace_marker_diff_summaries"][0]["classifier_status"],
+        )
+        self.assertFalse(
+            receipt["workspace_marker_diff_summaries"][0]["raw_diff_payload_stored"]
+        )
         self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
         self.assertFalse(receipt["raw_workspace_marker_payload_stored"])
+
+    def test_workspace_marker_diff_classifier_marks_substantive_diff_reviewed(self) -> None:
+        marker_path = "docs/02-subsystems/agentic/README.md"
+        substantive_path = "tests/unit/test_parallel_orchestration.py"
+        marker_diff = (
+            "diff --git a/docs/02-subsystems/agentic/README.md "
+            "b/docs/02-subsystems/agentic/README.md\n"
+            "@@\n"
+            "+# workspace-enacted: patch-unit-marker "
+            "target=docs/02-subsystems/agentic/README.md\n"
+        )
+        substantive_diff = (
+            "diff --git a/tests/unit/test_parallel_orchestration.py "
+            "b/tests/unit/test_parallel_orchestration.py\n"
+            "@@\n"
+            "+self.assertTrue(validation['workspace_marker_classifier_digest_bound'])\n"
+        )
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-marker-classifier-worker",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["docs/", "tests/unit/"],
+            changed_files=[marker_path, substantive_path],
+            workspace_diff_by_file={
+                marker_path: marker_diff,
+                substantive_path: substantive_diff,
+            },
+            verification_results=_verification_results(),
+            result_summary=(
+                "Repo-local diff classifier separates marker-only and "
+                "substantive changed files."
+            ),
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("accept-ready", receipt["integration_decision"])
+        self.assertEqual(
+            "marker-only-reviewed",
+            receipt["workspace_marker_hygiene_status"],
+        )
+        self.assertEqual([marker_path], receipt["workspace_marker_only_changed_files"])
+        self.assertEqual(2, receipt["workspace_marker_diff_summary_count"])
+        self.assertEqual(
+            ["marker-only", "substantive"],
+            [
+                summary["classifier_status"]
+                for summary in receipt["workspace_marker_diff_summaries"]
+            ],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["workspace_marker_classifier_digest_bound"])
+        self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
 
     def test_workspace_marker_hygiene_allows_substantive_payload_with_reviewed_marker(self) -> None:
         marker_path = "docs/02-subsystems/agentic/README.md"
@@ -181,6 +253,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["ready_for_main_checkout"])
         self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
+        self.assertTrue(validation["workspace_marker_classifier_digest_bound"])
 
     def test_remote_branch_pr_worker_result_requires_review_metadata(self) -> None:
         receipt = self.service.ingest_worker_result(

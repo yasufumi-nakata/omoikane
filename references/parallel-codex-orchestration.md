@@ -28,6 +28,9 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   で patch digest、changed file manifest digest、verification manifest digest、
   worker base commit、signed worker identity evidence、workspace marker hygiene digest
   を束縛する
+- workspace marker hygiene は repo-local diff classifier の summary
+  (`diff_digest`、added / removed line count、marker-added line count、
+  classifier status) を digest-bound にし、raw diff text は保存しない
 - 複数 worker result を同じ main checkout へ混ぜる場合は
   `parallel_codex_integration_batch_receipt.schema` で accept-ready receipt だけを
   digest/ref 順に決定的に並べ、blocked / stale / marker-only receipt を隔離し、
