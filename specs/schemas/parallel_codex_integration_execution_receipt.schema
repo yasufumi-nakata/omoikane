@@ -10,9 +10,9 @@ description: >
   command-bound git-apply-check pre-apply dry-run receipts, required
   verification manifest, post-apply verification context binding to the apply
   plan / patch artifact manifest / pre-apply dry-run manifest, digest-only
-  checkout mutation / commit attestation, and raw batch / worker / patch /
-  dry-run / verification / checkout mutation payload redaction before a commit
-  is accepted from the main checkout.
+  checkout mutation attestation, commit finalization gate digest, and raw batch /
+  worker / patch / dry-run / verification / checkout mutation / finalization
+  payload redaction before a commit is accepted from the main checkout.
 type: object
 additionalProperties: false
 required:
@@ -75,6 +75,19 @@ required:
   - checkout_mutation_post_apply_verification_context_digest_bound
   - checkout_mutation_changed_file_owner_manifest_digest_bound
   - checkout_mutation_attested
+  - commit_finalization_profile
+  - commit_finalization_status
+  - commit_finalization_ref
+  - commit_finalization_digest
+  - commit_finalization_source_batch_digest_bound
+  - commit_finalization_apply_plan_digest_bound
+  - commit_finalization_patch_artifact_manifest_digest_bound
+  - commit_finalization_pre_apply_dry_run_manifest_digest_bound
+  - commit_finalization_post_apply_verification_context_digest_bound
+  - commit_finalization_checkout_mutation_event_digest_bound
+  - commit_finalization_changed_file_owner_manifest_digest_bound
+  - commit_finalization_required_verifications_bound
+  - commit_finalization_ready
   - required_verifications_passed
   - blocking_reasons
   - execution_decision
@@ -83,6 +96,7 @@ required:
   - raw_apply_plan_payload_stored
   - raw_pre_apply_dry_run_payload_stored
   - raw_checkout_mutation_payload_stored
+  - raw_commit_finalization_payload_stored
   - raw_worker_receipt_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -255,6 +269,37 @@ properties:
     type: boolean
   checkout_mutation_attested:
     type: boolean
+  commit_finalization_profile:
+    const: main-checkout-commit-finalization-gate-v1
+  commit_finalization_status:
+    type: string
+    enum:
+      - ready
+      - blocked
+  commit_finalization_ref:
+    type: string
+    pattern: "^commit-finalization://parallel-codex/[a-f0-9]{12}$"
+  commit_finalization_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  commit_finalization_source_batch_digest_bound:
+    type: boolean
+  commit_finalization_apply_plan_digest_bound:
+    type: boolean
+  commit_finalization_patch_artifact_manifest_digest_bound:
+    type: boolean
+  commit_finalization_pre_apply_dry_run_manifest_digest_bound:
+    type: boolean
+  commit_finalization_post_apply_verification_context_digest_bound:
+    type: boolean
+  commit_finalization_checkout_mutation_event_digest_bound:
+    type: boolean
+  commit_finalization_changed_file_owner_manifest_digest_bound:
+    type: boolean
+  commit_finalization_required_verifications_bound:
+    type: boolean
+  commit_finalization_ready:
+    type: boolean
   required_verifications_passed:
     type: boolean
   blocking_reasons:
@@ -277,6 +322,8 @@ properties:
   raw_pre_apply_dry_run_payload_stored:
     const: false
   raw_checkout_mutation_payload_stored:
+    const: false
+  raw_commit_finalization_payload_stored:
     const: false
   raw_worker_receipt_payload_stored:
     const: false

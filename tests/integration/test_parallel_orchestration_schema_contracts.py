@@ -388,8 +388,23 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_checkout_mutation_context_bound"]
         )
+        self.assertTrue(
+            result["validation"]["execution_commit_finalization_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_commit_finalization_context_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_commit_finalization_ready"])
+        self.assertEqual(
+            "main-checkout-commit-finalization-gate-v1",
+            result["execution_receipt"]["commit_finalization_profile"],
+        )
+        self.assertEqual("ready", result["execution_receipt"]["commit_finalization_status"])
         self.assertFalse(
             result["execution_receipt"]["raw_checkout_mutation_payload_stored"]
+        )
+        self.assertFalse(
+            result["execution_receipt"]["raw_commit_finalization_payload_stored"]
         )
         self.assertEqual(
             "blocked",

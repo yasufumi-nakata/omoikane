@@ -86,6 +86,11 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   apply plan / patch artifact manifest / pre-apply dry-run manifest に束縛された
   apply context digest、checkout mutation event digest を束縛し、raw batch /
   apply plan / dry-run / worker receipt / verification / checkout mutation payload は保存しない
+- commit finalization gate は source batch digest、current checkout head、apply plan digest、
+  patch artifact manifest digest、pre-apply dry-run manifest digest、
+  post-apply verification context digest、checkout mutation event digest、
+  post-apply head、changed-file owner manifest digest、passing verification state を
+  束縛し、未 ready の execution を commit へ進めない
 - source batch が blocked、current head が batch head と不一致、または post-apply
   verification が未達の場合は `execution_decision=blocked` のまま commit へ進まない
 - post-apply verification context が apply plan digest、repo-local patch artifact

@@ -163,7 +163,7 @@
 - `parallel_codex_integration_batch_receipt.schema`
   - 複数の Parallel Codex worker receipt を main checkout 統合前に決定的順序へ並べ、blocked receipt を quarantine manifest digest へ隔離し、changed-file owner manifest と conflict digest で overlap を blocked にする batch receipt を固定する
 - `parallel_codex_integration_execution_receipt.schema`
-  - integration-ready batch receipt を main checkout 適用直前の ordered apply plan、repo-local patch artifact manifest、`artifacts/parallel-codex/*.patch` path、command-bound git-apply-check dry-run receipt、post-apply verification manifest、apply context digest、checkout mutation event digest に縮約し、source batch digest、current head、apply step digest、apply plan / patch artifact / pre-apply dry-run / checkout mutation digest binding、raw batch / apply / dry-run / worker / verification / checkout mutation payload 非保存を固定する
+  - integration-ready batch receipt を main checkout 適用直前の ordered apply plan、repo-local patch artifact manifest、`artifacts/parallel-codex/*.patch` path、command-bound git-apply-check dry-run receipt、post-apply verification manifest、apply context digest、checkout mutation event digest、commit finalization digest に縮約し、source batch digest、current head、apply step digest、apply plan / patch artifact / pre-apply dry-run / checkout mutation / commit finalization digest binding、raw batch / apply / dry-run / worker / verification / checkout mutation / commit finalization payload 非保存を固定する
 - `patch_descriptor.schema`
 - `perception_frame.schema`
 - `perception_shift.schema`

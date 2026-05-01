@@ -992,6 +992,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-workspace-marker-diff-classifier.md",
             "meta/decision-log/2026-05-02_parallel-codex-post-apply-verification-context.md",
             "meta/decision-log/2026-05-02_parallel-codex-checkout-mutation-attestation.md",
+            "meta/decision-log/2026-05-02_parallel-codex-commit-finalization-gate.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1489,6 +1490,15 @@ class OmoikaneReferenceOS:
                 "execution_checkout_mutation_post_apply_head": execution_receipt[
                     "checkout_mutation_post_apply_head"
                 ],
+                "execution_commit_finalization_ref": execution_receipt[
+                    "commit_finalization_ref"
+                ],
+                "execution_commit_finalization_digest": execution_receipt[
+                    "commit_finalization_digest"
+                ],
+                "execution_commit_finalization_status": execution_receipt[
+                    "commit_finalization_status"
+                ],
                 "conflict_execution_receipt_ref": conflict_execution_receipt[
                     "receipt_ref"
                 ],
@@ -1512,6 +1522,7 @@ class OmoikaneReferenceOS:
                 "raw_apply_plan_payload_stored": False,
                 "raw_pre_apply_dry_run_payload_stored": False,
                 "raw_checkout_mutation_payload_stored": False,
+                "raw_commit_finalization_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -2042,6 +2053,15 @@ class OmoikaneReferenceOS:
                 "execution_checkout_mutation_attested": (
                     execution_validation["checkout_mutation_attested"]
                 ),
+                "execution_commit_finalization_digest_bound": (
+                    execution_validation["commit_finalization_digest_bound"]
+                ),
+                "execution_commit_finalization_context_bound": (
+                    execution_validation["commit_finalization_context_bound"]
+                ),
+                "execution_commit_finalization_ready": (
+                    execution_validation["commit_finalization_ready"]
+                ),
                 "execution_raw_batch_payload_redacted": (
                     execution_validation["raw_batch_payload_redacted"]
                 ),
@@ -2053,6 +2073,9 @@ class OmoikaneReferenceOS:
                 ),
                 "execution_raw_checkout_mutation_payload_redacted": (
                     execution_validation["raw_checkout_mutation_payload_redacted"]
+                ),
+                "execution_raw_commit_finalization_payload_redacted": (
+                    execution_validation["raw_commit_finalization_payload_redacted"]
                 ),
                 "execution_raw_worker_receipt_payload_redacted": (
                     execution_validation["raw_worker_receipt_payload_redacted"]

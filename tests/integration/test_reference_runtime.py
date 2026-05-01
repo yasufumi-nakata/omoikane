@@ -1125,6 +1125,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_checkout_mutation_context_bound"]
         )
+        self.assertTrue(
+            result["validation"]["execution_commit_finalization_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_commit_finalization_context_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_commit_finalization_ready"])
         self.assertTrue(result["validation"]["execution_required_verifications_passed"])
         self.assertTrue(result["validation"]["execution_raw_batch_payload_redacted"])
         self.assertTrue(
@@ -1135,6 +1142,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"]["execution_raw_checkout_mutation_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_raw_commit_finalization_payload_redacted"]
         )
         self.assertTrue(
             result["validation"]["execution_raw_worker_receipt_payload_redacted"]

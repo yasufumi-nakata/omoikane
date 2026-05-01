@@ -179,6 +179,13 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_checkout_mutation_event_digest_bound"]
         )
+        self.assertTrue(
+            result["validation"]["execution_commit_finalization_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_commit_finalization_context_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_commit_finalization_ready"])
         self.assertTrue(result["validation"]["conflict_execution_blocked"])
         self.assertEqual(
             "parallel-codex-integration-execution-plan-v1",

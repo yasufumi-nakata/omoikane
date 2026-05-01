@@ -71,14 +71,18 @@ current checkout head、ordered apply step digest、repo-local patch artifact ma
 digest、`artifacts/parallel-codex/*.patch` path、
 command-bound `git apply --check artifacts/parallel-codex/*.patch` dry-run receipt、
 post-apply verification manifest、apply context digest、checkout mutation event
-digest を commit 前に固定する。blocked batch、stale checkout head、dry-run failed
+digest、commit finalization digest を commit 前に固定する。blocked batch、stale checkout head、dry-run failed
 execution、または patch artifact に束縛されない dry-run command は blocked のまま保持し、
 post-apply verification が apply plan / patch artifact manifest / pre-apply dry-run
 manifest に束縛されない execution と、checkout mutation attestation が pre/post
 head、apply plan、patch artifact manifest、dry-run manifest、verification context、
 changed-file owner manifest に束縛されない execution も fail-closed にする。
-raw batch / apply plan / dry-run / worker receipt / verification / checkout mutation
-payload は保存しない。
+commit finalization gate は source batch digest、current checkout head、apply plan digest、
+patch artifact manifest digest、pre-apply dry-run manifest digest、post-apply verification
+context digest、checkout mutation event digest、post-apply head、changed-file owner
+manifest digest、passing verification state を束縛し、未 ready の execution を
+commit へ進めない。raw batch / apply plan / dry-run / worker receipt / verification /
+checkout mutation / commit finalization payload は保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、
