@@ -1013,6 +1013,36 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_worker_identity_evidence_bound"]
         )
+        self.assertTrue(result["validation"]["batch_receipt_ok"])
+        self.assertTrue(result["validation"]["batch_ready_for_integration"])
+        self.assertTrue(
+            result["validation"]["batch_input_receipt_set_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["batch_ordered_integration_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["batch_changed_file_owner_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["batch_conflict_free"])
+        self.assertTrue(result["validation"]["batch_blocked_receipts_quarantined"])
+        self.assertTrue(result["validation"]["batch_required_verifications_passed"])
+        self.assertTrue(
+            result["validation"]["batch_raw_worker_receipt_payload_redacted"]
+        )
+        self.assertTrue(result["validation"]["batch_raw_conflict_payload_redacted"])
+        self.assertTrue(result["validation"]["conflict_batch_receipt_ok"])
+        self.assertTrue(result["validation"]["conflict_batch_result_blocked"])
+        self.assertTrue(result["validation"]["conflict_batch_conflict_digest_bound"])
+        self.assertTrue(
+            result["validation"][
+                "conflict_batch_changed_file_owner_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(result["validation"]["conflict_batch_conflict_blocked"])
+        self.assertTrue(
+            result["validation"]["conflict_batch_raw_conflict_payload_redacted"]
+        )
         self.assertTrue(result["validation"]["ledger_bound"])
         self.assertEqual("accept-ready", result["ready_receipt"]["integration_decision"])
         self.assertEqual("accept-ready", result["remote_receipt"]["integration_decision"])
@@ -1037,6 +1067,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
             "yaoyorozu-worker-dispatch",
             result["yaoyorozu_bridge_receipt"]["source_system"],
         )
+        self.assertEqual("integration-ready", result["batch_receipt"]["batch_decision"])
+        self.assertEqual("blocked", result["conflict_batch_receipt"]["batch_decision"])
+        self.assertEqual(0, result["batch_receipt"]["conflict_count"])
+        self.assertGreater(result["conflict_batch_receipt"]["conflict_count"], 0)
 
     def test_gap_report_reads_repo(self) -> None:
         runtime = OmoikaneReferenceOS()

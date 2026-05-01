@@ -1,0 +1,32 @@
+eval_id: parallel_codex_integration_batch
+target: selfctor.parallel_orchestration
+summary: >
+  parallel-orchestration-demo が複数の Parallel Codex worker result receipt を
+  main checkout 統合前に batch receipt へ縮約し、accept-ready receipt の決定的順序、
+  blocked receipt の隔離、changed-file owner manifest、conflict digest、raw worker
+  receipt / conflict payload 非保存を固定すること
+checks:
+  - name: parallel Codex integration batch arbitration smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
+expect:
+  batch_receipt_profile: parallel-codex-integration-batch-arbitration-v1
+  batch_ready_for_integration: true
+  batch_input_receipt_set_digest_bound: true
+  batch_ordered_integration_digest_bound: true
+  batch_changed_file_owner_manifest_digest_bound: true
+  batch_conflict_free: true
+  batch_blocked_receipts_quarantined: true
+  batch_required_verifications_passed: true
+  batch_raw_worker_receipt_payload_redacted: true
+  batch_raw_conflict_payload_redacted: true
+  conflict_batch_result_blocked: true
+  conflict_batch_conflict_digest_bound: true
+  conflict_batch_changed_file_owner_manifest_digest_bound: true
+  conflict_batch_conflict_blocked: true
+  conflict_batch_raw_conflict_payload_redacted: true
+  raw_worker_receipt_payload_stored: false
+  raw_conflict_payload_stored: false
+  raw_verification_payload_stored: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

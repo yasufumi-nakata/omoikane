@@ -659,6 +659,121 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(receipt["raw_upstream_payload_stored"])
         self.assertFalse(receipt["raw_worker_identity_payload_stored"])
 
+    def test_integration_batch_orders_ready_receipts_and_quarantines_blocked(self) -> None:
+        first_receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+            ],
+            verification_results=_verification_results(),
+            result_summary="Runtime orchestration patch is ready.",
+        )
+        second_receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-tests",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["tests/unit/"],
+            changed_files=["tests/unit/test_parallel_orchestration.py"],
+            verification_results=_verification_results(),
+            result_summary="Unit test patch is ready.",
+        )
+        blocked_receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-stale",
+            worker_role="explorer",
+            worker_result_status="stale",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit="b" * 40,
+            ownership_scope=["docs/"],
+            changed_files=["docs/07-reference-implementation/README.md"],
+            verification_results=_verification_results(),
+            result_summary="Stale read-only result must stay quarantined.",
+        )
+
+        batch = self.service.plan_integration_batch(
+            receipts=[blocked_receipt, second_receipt, first_receipt],
+            main_checkout_head=MAIN_HEAD,
+            verification_results=_verification_results(),
+            result_summary="Two disjoint ready receipts can be integrated.",
+        )
+        validation = self.service.validate_integration_batch_receipt(batch)
+
+        self.assertEqual("integration-ready", batch["batch_decision"])
+        self.assertEqual(3, batch["source_receipt_count"])
+        self.assertEqual(1, batch["quarantined_receipt_count"])
+        self.assertEqual(2, len(batch["ordered_integration_receipt_refs"]))
+        self.assertEqual(
+            sorted(
+                [first_receipt["receipt_digest"], second_receipt["receipt_digest"]],
+            ),
+            batch["ordered_integration_receipt_digests"],
+        )
+        self.assertEqual([blocked_receipt["receipt_ref"]], batch["quarantined_receipt_refs"])
+        self.assertTrue(batch["blocked_receipts_quarantined"])
+        self.assertEqual(0, batch["conflict_count"])
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["ready_for_integration"])
+        self.assertTrue(validation["input_receipt_set_digest_bound"])
+        self.assertTrue(validation["ordered_integration_digest_bound"])
+        self.assertTrue(validation["changed_file_owner_manifest_digest_bound"])
+        self.assertTrue(validation["conflict_free"])
+        self.assertTrue(validation["blocked_receipts_quarantined"])
+        self.assertFalse(batch["raw_worker_receipt_payload_stored"])
+        self.assertFalse(batch["raw_conflict_payload_stored"])
+        self.assertFalse(batch["raw_verification_payload_stored"])
+
+    def test_integration_batch_blocks_changed_file_conflicts(self) -> None:
+        changed_file = "src/omoikane/self_construction/parallel_orchestration.py"
+        first_receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime-a",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[changed_file],
+            verification_results=_verification_results(),
+            result_summary="First runtime patch is ready.",
+        )
+        second_receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime-b",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[changed_file],
+            verification_results=_verification_results(),
+            result_summary="Second runtime patch overlaps the first.",
+        )
+
+        batch = self.service.plan_integration_batch(
+            receipts=[first_receipt, second_receipt],
+            main_checkout_head=MAIN_HEAD,
+            verification_results=_verification_results(),
+            result_summary="Overlapping ready receipts must be blocked.",
+        )
+        validation = self.service.validate_integration_batch_receipt(batch)
+
+        self.assertEqual("blocked", batch["batch_decision"])
+        self.assertEqual(1, batch["conflict_count"])
+        self.assertEqual(changed_file, batch["changed_file_conflicts"][0]["file_path"])
+        self.assertIn(
+            "changed file conflicts must be resolved before integration",
+            batch["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_integration"])
+        self.assertTrue(validation["conflict_blocked"])
+        self.assertTrue(validation["conflict_digest_bound"])
+        self.assertTrue(validation["changed_file_owner_manifest_digest_bound"])
+
 
 if __name__ == "__main__":
     unittest.main()

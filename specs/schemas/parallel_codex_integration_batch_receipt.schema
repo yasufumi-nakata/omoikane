@@ -1,0 +1,360 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/parallel_codex_integration_batch_receipt.schema"
+title: ParallelCodexIntegrationBatchReceipt
+description: >
+  Digest-only receipt for reducing multiple Parallel Codex worker-result
+  receipts into one main-checkout integration batch. The batch deterministically
+  orders accept-ready receipts, quarantines blocked receipts, detects changed
+  file overlap before integration, and keeps raw worker receipt, conflict, and
+  verification payloads out of the persisted artifact.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - generated_at
+  - profile_id
+  - integration_policy_profile
+  - reference_runbook_ref
+  - main_checkout_head
+  - batch_ordering_profile
+  - conflict_arbitration_profile
+  - source_receipt_count
+  - input_receipt_refs
+  - input_receipt_digests
+  - input_receipt_set_digest
+  - accept_ready_receipt_refs
+  - accept_ready_receipt_digests
+  - quarantined_receipt_refs
+  - quarantined_receipt_digests
+  - quarantined_receipt_count
+  - blocked_receipts_quarantined
+  - ordered_integration_receipt_refs
+  - ordered_integration_receipt_digests
+  - ordered_integration_digest
+  - changed_file_owners
+  - changed_file_owner_manifest_digest
+  - changed_file_conflicts
+  - conflict_count
+  - conflict_digest
+  - batch_main_head_status
+  - mismatched_main_head_receipt_refs
+  - mismatched_main_head_receipt_digests
+  - verification_results
+  - verification_command_count
+  - verification_manifest_digest
+  - required_verifications_passed
+  - blocking_reasons
+  - batch_decision
+  - result_summary
+  - raw_worker_receipt_payload_stored
+  - raw_conflict_payload_stored
+  - raw_verification_payload_stored
+  - receipt_digest
+  - receipt_ref
+properties:
+  kind:
+    const: parallel_codex_integration_batch_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  receipt_id:
+    type: string
+    pattern: "^parallel-codex-batch-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: parallel-codex-integration-batch-arbitration-v1
+  integration_policy_profile:
+    const: main-checkout-worker-result-ingestion-v1
+  reference_runbook_ref:
+    const: references/parallel-codex-orchestration.md
+  main_checkout_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  batch_ordering_profile:
+    const: receipt-digest-then-ref-deterministic-v1
+  conflict_arbitration_profile:
+    const: disjoint-changed-file-conflict-arbitration-v1
+  source_receipt_count:
+    type: integer
+    minimum: 1
+  input_receipt_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  input_receipt_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  input_receipt_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  accept_ready_receipt_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  accept_ready_receipt_digests:
+    type: array
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  quarantined_receipt_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  quarantined_receipt_digests:
+    type: array
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  quarantined_receipt_count:
+    type: integer
+    minimum: 0
+  blocked_receipts_quarantined:
+    const: true
+  ordered_integration_receipt_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  ordered_integration_receipt_digests:
+    type: array
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  ordered_integration_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  changed_file_owners:
+    type: array
+    items:
+      $ref: "#/$defs/changed_file_owner"
+  changed_file_owner_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  changed_file_conflicts:
+    type: array
+    items:
+      $ref: "#/$defs/changed_file_conflict"
+  conflict_count:
+    type: integer
+    minimum: 0
+  conflict_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  batch_main_head_status:
+    type: string
+    enum:
+      - consistent
+      - mismatch
+  mismatched_main_head_receipt_refs:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  mismatched_main_head_receipt_digests:
+    type: array
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  verification_results:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/verification_result"
+  verification_command_count:
+    type: integer
+    minimum: 1
+  verification_manifest_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  required_verifications_passed:
+    type: boolean
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+      minLength: 1
+  batch_decision:
+    type: string
+    enum:
+      - integration-ready
+      - blocked
+  result_summary:
+    type: string
+    minLength: 1
+  raw_worker_receipt_payload_stored:
+    const: false
+  raw_conflict_payload_stored:
+    const: false
+  raw_verification_payload_stored:
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_ref:
+    type: string
+    pattern: "^receipt://parallel-codex/parallel-codex-batch-[a-f0-9]{12}$"
+$defs:
+  verification_result:
+    type: object
+    additionalProperties: false
+    required:
+      - command
+      - status
+      - exit_code
+      - stdout_digest
+      - stderr_digest
+      - raw_stdout_stored
+      - raw_stderr_stored
+    properties:
+      command:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        enum:
+          - pass
+          - fail
+      exit_code:
+        type: integer
+      stdout_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      stderr_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      raw_stdout_stored:
+        const: false
+      raw_stderr_stored:
+        const: false
+  changed_file_owner:
+    type: object
+    additionalProperties: false
+    required:
+      - file_path
+      - receipt_ref
+      - receipt_digest
+      - worker_id
+      - source_system
+    properties:
+      file_path:
+        type: string
+        minLength: 1
+      receipt_ref:
+        type: string
+        minLength: 1
+      receipt_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      worker_id:
+        type: string
+        minLength: 1
+      source_system:
+        type: string
+        minLength: 1
+  changed_file_conflict:
+    type: object
+    additionalProperties: false
+    required:
+      - file_path
+      - receipt_refs
+      - receipt_digests
+      - worker_ids
+    properties:
+      file_path:
+        type: string
+        minLength: 1
+      receipt_refs:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          minLength: 1
+      receipt_digests:
+        type: array
+        minItems: 2
+        uniqueItems: true
+        items:
+          type: string
+          pattern: "^[a-f0-9]{64}$"
+      worker_ids:
+        type: array
+        minItems: 2
+        items:
+          type: string
+          minLength: 1
+examples:
+  - kind: parallel_codex_integration_batch_receipt
+    schema_version: 1.0.0
+    receipt_id: parallel-codex-batch-0123456789ab
+    generated_at: "2026-05-01T00:00:00+00:00"
+    profile_id: parallel-codex-integration-batch-arbitration-v1
+    integration_policy_profile: main-checkout-worker-result-ingestion-v1
+    reference_runbook_ref: references/parallel-codex-orchestration.md
+    main_checkout_head: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    batch_ordering_profile: receipt-digest-then-ref-deterministic-v1
+    conflict_arbitration_profile: disjoint-changed-file-conflict-arbitration-v1
+    source_receipt_count: 1
+    input_receipt_refs:
+      - receipt://parallel-codex/parallel-codex-result-0123456789ab
+    input_receipt_digests:
+      - "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    input_receipt_set_digest: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    accept_ready_receipt_refs:
+      - receipt://parallel-codex/parallel-codex-result-0123456789ab
+    accept_ready_receipt_digests:
+      - "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    quarantined_receipt_refs: []
+    quarantined_receipt_digests: []
+    quarantined_receipt_count: 0
+    blocked_receipts_quarantined: true
+    ordered_integration_receipt_refs:
+      - receipt://parallel-codex/parallel-codex-result-0123456789ab
+    ordered_integration_receipt_digests:
+      - "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    ordered_integration_digest: "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+    changed_file_owners:
+      - file_path: src/omoikane/self_construction/parallel_orchestration.py
+        receipt_ref: receipt://parallel-codex/parallel-codex-result-0123456789ab
+        receipt_digest: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        worker_id: codex-worker
+        source_system: direct-worker-result
+    changed_file_owner_manifest_digest: "dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd"
+    changed_file_conflicts: []
+    conflict_count: 0
+    conflict_digest: "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+    batch_main_head_status: consistent
+    mismatched_main_head_receipt_refs: []
+    mismatched_main_head_receipt_digests: []
+    verification_results:
+      - command: PYTHONPATH=src python3 -m unittest discover -s tests -t .
+        status: pass
+        exit_code: 0
+        stdout_digest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        stderr_digest: "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+        raw_stdout_stored: false
+        raw_stderr_stored: false
+    verification_command_count: 1
+    verification_manifest_digest: "1111111111111111111111111111111111111111111111111111111111111111"
+    required_verifications_passed: true
+    blocking_reasons: []
+    batch_decision: integration-ready
+    result_summary: Integration batch is conflict-free.
+    raw_worker_receipt_payload_stored: false
+    raw_conflict_payload_stored: false
+    raw_verification_payload_stored: false
+    receipt_digest: "2222222222222222222222222222222222222222222222222222222222222222"
+    receipt_ref: receipt://parallel-codex/parallel-codex-batch-0123456789ab

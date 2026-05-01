@@ -67,6 +67,7 @@ capabilities:
   - parallel-codex.worker-identity-evidence.attest
   - parallel-codex.remote-source-revocation.attest
   - parallel-codex.remote-source-revocation-freshness.attest
+  - parallel-codex.integration-batch-conflict.attest
   - parallel-codex.yaoyorozu-dispatch-bridge.attest
   - ethics.consent-authenticity-redaction.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest
@@ -126,6 +127,7 @@ oversight_scope_refs:
   - docs/02-subsystems/agentic/yaoyorozu-roster.md
   - specs/schemas/gap_report.schema
   - specs/schemas/parallel_codex_worker_result_receipt.schema
+  - specs/schemas/parallel_codex_integration_batch_receipt.schema
   - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
   - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
   - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
@@ -140,6 +142,7 @@ oversight_scope_refs:
   - evals/continuity/gap_report_scan_receipt.yaml
   - evals/continuity/gap_scanner_required_reference_files.yaml
   - evals/continuity/parallel_codex_result_ingestion.yaml
+  - evals/continuity/parallel_codex_integration_batch.yaml
   - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
   - evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
   - evals/agentic/yaoyorozu_source_manifest_public_verification.yaml
@@ -162,6 +165,7 @@ when_to_invoke: |
   - Yaoyorozu researcher evidence verifier の live transport quorum / signed response / freshness window を検証する時
   - Yaoyorozu worker dispatch plan / receipt が source manifest public verification bundle ref/digest を worker launch 前後で維持していることを検証する時
   - EWA regulator permit verifier / quorum が legal execution digest、permit status、regulator API response digest、API certificate digest、verifier key digest、multi-jurisdiction threshold policy、verifier roster、revocation registry に束縛され、raw permit / response / policy / roster payload と decision authority を保持しないことを検証する時
+  - Parallel Codex integration batch が ordered integration digest、changed-file owner manifest digest、conflict digest、blocked receipt quarantine、required verification manifest、raw worker receipt / conflict payload 非保存を満たしていることを検証する時
   - EWA emergency stop と post-actuation audit が authorization を gate した regulator permit quorum receipt/digest/status を保持し、permit revocation readback を digest-only forced stop trigger として raw payload なしで束縛し、permit quorum / revocation 証跡を停止・監査経路で失わないことを検証する時
   - MemoryCrystal replication の key succession receipt が 3-of-5 share、2 Guardian attestation、successor key digest、rotation ledger ref、JP-13 signer roster policy digest、identity-guardian / integrity-guardian signature digest、JP-13 + SG-01 multi-jurisdiction signer roster quorum digest、quorum threshold policy registry digest と authority signature digest に束縛され、raw key / raw shard / raw jurisdiction policy / raw quorum threshold policy / raw signer roster payload を保存していないことを検証する時
   - MemoryCrystal replication の long-term media renewal receipt が coldstore / trustee の renewed media proof、readback digest、migration attestation digest、3650 日 refresh interval、1000 年 target horizon に束縛され、raw media / raw readback payload を保存していないことを検証する時

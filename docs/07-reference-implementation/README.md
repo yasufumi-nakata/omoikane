@@ -943,6 +943,14 @@ changed files を取り出し、`upstream_binding_digest` と derived `patch_dig
 Yaoyorozu bridge receipt も同じ worker identity evidence に束縛される。
 raw dispatch payload、raw patch payload、raw worker identity payload は
 Parallel Codex 側へ保存しない。
+複数 receipt を同じ main checkout へ取り込む段階では
+`parallel_codex_integration_batch_receipt` が receipt set digest、
+digest/ref 順の ordered integration digest、changed-file owner manifest digest、
+conflict digest、quarantined blocked receipt refs/digests を固定する。
+ready receipt と Yaoyorozu bridge receipt のように changed files が disjoint な batch は
+`integration-ready` になる一方、ready receipt 同士でも同じ file を触る batch は
+schema-bound のまま `blocked` になり、raw worker receipt payload、raw conflict
+payload、raw verification output は保存しない。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

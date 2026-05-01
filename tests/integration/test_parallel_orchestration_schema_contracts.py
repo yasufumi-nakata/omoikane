@@ -76,7 +76,15 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
             result["yaoyorozu_bridge_receipt"],
         )
-        self.assertEqual(7, len(result["schema_contracts"]))
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_integration_batch_receipt.schema",
+            result["batch_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_integration_batch_receipt.schema",
+            result["conflict_batch_receipt"],
+        )
+        self.assertEqual(9, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
         self.assertTrue(result["validation"]["ready_workspace_marker_hygiene_clean"])
@@ -182,6 +190,42 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             result["validation"][
                 "yaoyorozu_bridge_raw_worker_identity_payload_redacted"
             ]
+        )
+        self.assertEqual(
+            "parallel-codex-integration-batch-arbitration-v1",
+            result["batch_receipt"]["profile_id"],
+        )
+        self.assertEqual("integration-ready", result["batch_receipt"]["batch_decision"])
+        self.assertTrue(result["validation"]["batch_receipt_ok"])
+        self.assertTrue(result["validation"]["batch_ready_for_integration"])
+        self.assertTrue(
+            result["validation"]["batch_input_receipt_set_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["batch_ordered_integration_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["batch_changed_file_owner_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["batch_conflict_free"])
+        self.assertTrue(result["validation"]["batch_blocked_receipts_quarantined"])
+        self.assertTrue(result["validation"]["batch_required_verifications_passed"])
+        self.assertTrue(
+            result["validation"]["batch_raw_worker_receipt_payload_redacted"]
+        )
+        self.assertTrue(result["validation"]["batch_raw_conflict_payload_redacted"])
+        self.assertEqual("blocked", result["conflict_batch_receipt"]["batch_decision"])
+        self.assertTrue(result["validation"]["conflict_batch_receipt_ok"])
+        self.assertTrue(result["validation"]["conflict_batch_result_blocked"])
+        self.assertTrue(result["validation"]["conflict_batch_conflict_digest_bound"])
+        self.assertTrue(
+            result["validation"][
+                "conflict_batch_changed_file_owner_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(result["validation"]["conflict_batch_conflict_blocked"])
+        self.assertTrue(
+            result["validation"]["conflict_batch_raw_conflict_payload_redacted"]
         )
         self.assertTrue(result["validation"]["ledger_bound"])
 

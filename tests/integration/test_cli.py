@@ -125,6 +125,19 @@ class CliIntegrationTests(unittest.TestCase):
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
         )
         self.assertTrue(result["validation"]["yaoyorozu_bridge_patch_candidates_bound"])
+        self.assertTrue(result["validation"]["batch_ready_for_integration"])
+        self.assertTrue(result["validation"]["batch_blocked_receipts_quarantined"])
+        self.assertTrue(
+            result["validation"]["batch_changed_file_owner_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["conflict_batch_result_blocked"])
+        self.assertTrue(result["validation"]["conflict_batch_conflict_blocked"])
+        self.assertEqual(
+            "parallel-codex-integration-batch-arbitration-v1",
+            result["batch_receipt"]["profile_id"],
+        )
+        self.assertEqual("integration-ready", result["batch_receipt"]["batch_decision"])
+        self.assertEqual("blocked", result["conflict_batch_receipt"]["batch_decision"])
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()

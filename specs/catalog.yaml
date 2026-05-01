@@ -734,18 +734,33 @@ entries:
       - reference-runtime
       - references/parallel-codex-orchestration.md
       - evals/continuity/parallel_codex_result_ingestion.yaml
+      - evals/continuity/parallel_codex_integration_batch.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize one digest-only parallel Codex worker result before main checkout integration, including worker base commit freshness, changed file manifest digest, workspace marker hygiene digest, verification manifest digest, patch digest, signed worker identity evidence, remote branch / PR metadata binding, remote source revocation binding, remote source revocation freshness binding, signed provider timestamp binding, timestamp replay guard binding, remote source content identity binding, remote source main-head ancestry binding, Yaoyorozu upstream dispatch / patch candidate digest binding, and raw worker / marker / identity / remote / revocation / freshness / timestamp / replay-guard / source-content / source-ancestry / upstream payload redaction.
+    rationale: Required to serialize one digest-only parallel Codex worker result before main checkout integration, including worker base commit freshness, changed file manifest digest, workspace marker hygiene digest, verification manifest digest, patch digest, signed worker identity evidence, remote branch / PR metadata binding, remote source revocation binding, remote source revocation freshness binding, signed provider timestamp binding, timestamp replay guard binding, remote source content identity binding, remote source main-head ancestry binding, Yaoyorozu upstream dispatch / patch candidate digest binding, integration batch receipt inputs, and raw worker / marker / identity / remote / revocation / freshness / timestamp / replay-guard / source-content / source-ancestry / upstream payload redaction.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/parallel_codex_integration_batch_receipt.schema
+    consumers:
+      - specs/interfaces/selfctor.parallel_orchestration.v0.idl
+      - reference-runtime
+      - references/parallel-codex-orchestration.md
+      - evals/continuity/parallel_codex_integration_batch.yaml
+      - docs/02-subsystems/self-construction/README.md
+      - docs/04-ai-governance/codex-as-builder.md
+      - docs/07-reference-implementation/README.md
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to serialize a deterministic Parallel Codex integration batch before main checkout mutation, including input receipt-set digest, accept-ready ordering digest, quarantined blocked receipt refs/digests, changed-file owner manifest digest, conflict digest, required verification manifest, integration-ready / blocked decision, and raw worker receipt / conflict / verification payload redaction.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.parallel_orchestration.v0.idl
     consumers:
       - reference-runtime
       - specs/schemas/parallel_codex_worker_result_receipt.schema
+      - specs/schemas/parallel_codex_integration_batch_receipt.schema
       - docs/02-subsystems/self-construction/README.md
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make parallel Codex worker result ingestion, signed worker identity evidence binding, workspace marker hygiene, remote branch / PR metadata binding, remote source revocation freshness, signed provider timestamp, timestamp replay guard checking, remote source content identity, remote source main-head ancestry, Yaoyorozu dispatch-to-ingestion bridging, and fail-closed stale / marker-only / content-mismatch / unrelated-ancestry worker blocking machine-readable in the L5 self-construction pipeline.
+    rationale: Required to make parallel Codex worker result ingestion, signed worker identity evidence binding, workspace marker hygiene, remote branch / PR metadata binding, remote source revocation freshness, signed provider timestamp, timestamp replay guard checking, remote source content identity, remote source main-head ancestry, Yaoyorozu dispatch-to-ingestion bridging, deterministic integration batch ordering, changed-file conflict arbitration, blocked receipt quarantine, and fail-closed stale / marker-only / content-mismatch / unrelated-ancestry worker blocking machine-readable in the L5 self-construction pipeline.
   - priority: P1
     kind: eval
     file: evals/continuity/design_reader_handoff.yaml
@@ -3278,6 +3293,16 @@ entries:
       - specs/schemas/parallel_codex_worker_result_receipt.schema
       - agents/guardians/integrity-guardian.yaml
     rationale: Protects parallel Codex worker result ingestion receipts from stale worker base commits, marker-only workspace-enacted payloads, unbound signed worker identity evidence, unbound remote branch / PR metadata, revoked, stale, freshness-expired, unsigned-timestamp, replayed-timestamp, content-mismatch, or unrelated-ancestry remote source evidence, unbound Yaoyorozu upstream dispatch / patch candidate receipts, unbound patch or verification manifests, and raw worker / marker / identity / remote / revocation / freshness / timestamp / replay-guard / source-content / source-ancestry / upstream payload storage.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/parallel_codex_integration_batch.yaml
+    consumers:
+      - reference-runtime
+      - references/parallel-codex-orchestration.md
+      - specs/schemas/parallel_codex_worker_result_receipt.schema
+      - specs/schemas/parallel_codex_integration_batch_receipt.schema
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects Parallel Codex batch integration from nondeterministic worker receipt ordering, unquarantined blocked receipts, missing changed-file owner manifests, unresolved changed-file conflicts, missing verification manifests, and raw worker receipt / conflict / verification payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

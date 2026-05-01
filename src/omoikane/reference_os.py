@@ -965,13 +965,17 @@ class OmoikaneReferenceOS:
             "tests/integration/test_reference_runtime.py",
             "specs/interfaces/selfctor.parallel_orchestration.v0.idl",
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
+            "specs/schemas/parallel_codex_integration_batch_receipt.schema",
             "specs/schemas/README.md",
             "specs/catalog.yaml",
             "evals/continuity/parallel_codex_result_ingestion.yaml",
+            "evals/continuity/parallel_codex_integration_batch.yaml",
             "docs/02-subsystems/self-construction/README.md",
             "docs/04-ai-governance/codex-as-builder.md",
             "docs/07-reference-implementation/README.md",
             "agents/guardians/integrity-guardian.yaml",
+            "agents/guardians/integrity-guardian.policy.md",
+            "tests/integration/test_cli.py",
             "meta/decision-log/2026-05-01_parallel-codex-worker-identity-evidence.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-metadata.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-revocation-check.md",
@@ -980,6 +984,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-timestamp-replay-guard.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-content-identity.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-ancestry-binding.md",
+            "meta/decision-log/2026-05-01_parallel-codex-integration-batch-conflict-arbitration.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1165,6 +1170,30 @@ class OmoikaneReferenceOS:
                 verification_results=verification_results,
             )
         )
+        batch_receipt = self.parallel_orchestration.plan_integration_batch(
+            receipts=[
+                ready_receipt,
+                blocked_receipt,
+                marker_only_receipt,
+                yaoyorozu_bridge_receipt,
+            ],
+            main_checkout_head=main_checkout_head,
+            verification_results=verification_results,
+            result_summary=(
+                "Accept-ready worker results are ordered deterministically, "
+                "blocked receipts are quarantined, and changed-file ownership "
+                "is conflict-free before integration."
+            ),
+        )
+        conflict_batch_receipt = self.parallel_orchestration.plan_integration_batch(
+            receipts=[ready_receipt, remote_receipt],
+            main_checkout_head=main_checkout_head,
+            verification_results=verification_results,
+            result_summary=(
+                "Overlapping accept-ready worker receipts remain schema-bound "
+                "but blocked until the changed-file conflict is resolved."
+            ),
+        )
         ready_validation = self.parallel_orchestration.validate_worker_result_receipt(
             ready_receipt,
         )
@@ -1192,6 +1221,16 @@ class OmoikaneReferenceOS:
         yaoyorozu_bridge_validation = (
             self.parallel_orchestration.validate_worker_result_receipt(
                 yaoyorozu_bridge_receipt,
+            )
+        )
+        batch_validation = (
+            self.parallel_orchestration.validate_integration_batch_receipt(
+                batch_receipt,
+            )
+        )
+        conflict_batch_validation = (
+            self.parallel_orchestration.validate_integration_batch_receipt(
+                conflict_batch_receipt,
             )
         )
         ledger_entry = self.ledger.append(
@@ -1337,6 +1376,25 @@ class OmoikaneReferenceOS:
                 "yaoyorozu_bridge_worker_identity_digest": (
                     yaoyorozu_bridge_receipt["worker_identity_digest"]
                 ),
+                "batch_receipt_ref": batch_receipt["receipt_ref"],
+                "batch_receipt_digest": batch_receipt["receipt_digest"],
+                "batch_ordered_integration_digest": batch_receipt[
+                    "ordered_integration_digest"
+                ],
+                "batch_changed_file_owner_manifest_digest": batch_receipt[
+                    "changed_file_owner_manifest_digest"
+                ],
+                "batch_conflict_digest": batch_receipt["conflict_digest"],
+                "batch_quarantined_receipt_digests": batch_receipt[
+                    "quarantined_receipt_digests"
+                ],
+                "conflict_batch_receipt_ref": conflict_batch_receipt["receipt_ref"],
+                "conflict_batch_receipt_digest": conflict_batch_receipt[
+                    "receipt_digest"
+                ],
+                "conflict_batch_conflict_digest": conflict_batch_receipt[
+                    "conflict_digest"
+                ],
                 "raw_patch_payload_stored": False,
                 "raw_upstream_payload_stored": False,
                 "raw_worker_identity_payload_stored": False,
@@ -1348,6 +1406,8 @@ class OmoikaneReferenceOS:
                 "raw_remote_revocation_timestamp_replay_guard_payload_stored": False,
                 "raw_remote_source_content_payload_stored": False,
                 "raw_remote_source_ancestry_payload_stored": False,
+                "raw_worker_receipt_payload_stored": False,
+                "raw_conflict_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1416,6 +1476,22 @@ class OmoikaneReferenceOS:
                 ),
                 "contract_role": "yaoyorozu-dispatch-to-parallel-codex-ingestion",
             },
+            {
+                "payload_path": "batch_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_integration_batch_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-integration-batch-ready",
+            },
+            {
+                "payload_path": "conflict_batch_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_integration_batch_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-integration-batch-conflict",
+            },
         ]
         return {
             "policy": self.parallel_orchestration.policy(),
@@ -1427,6 +1503,8 @@ class OmoikaneReferenceOS:
             "blocked_receipt": blocked_receipt,
             "marker_only_receipt": marker_only_receipt,
             "yaoyorozu_bridge_receipt": yaoyorozu_bridge_receipt,
+            "batch_receipt": batch_receipt,
+            "conflict_batch_receipt": conflict_batch_receipt,
             "ledger_entry_ref": f"ledger://continuity-ledger/{ledger_entry.entry_hash}",
             "ledger_entry_hash": ledger_entry.entry_hash,
             "ledger_payload_ref": ledger_entry.payload_ref,
@@ -1437,7 +1515,10 @@ class OmoikaneReferenceOS:
                     and marker_only_validation["ok"]
                     and remote_validation["ok"]
                     and content_mismatch_validation["ok"]
+                    and unrelated_ancestry_validation["ok"]
                     and yaoyorozu_bridge_validation["ok"]
+                    and batch_validation["ok"]
+                    and conflict_batch_validation["ok"]
                     and ready_validation["ready_for_main_checkout"]
                     and remote_validation["ready_for_main_checkout"]
                     and yaoyorozu_bridge_validation["ready_for_main_checkout"]
@@ -1445,6 +1526,8 @@ class OmoikaneReferenceOS:
                     and not unrelated_ancestry_validation["ready_for_main_checkout"]
                     and not blocked_validation["ready_for_main_checkout"]
                     and not marker_only_validation["ready_for_main_checkout"]
+                    and batch_validation["ready_for_integration"]
+                    and not conflict_batch_validation["ready_for_integration"]
                 ),
                 "ready_receipt_ok": ready_validation["ok"],
                 "ready_for_main_checkout": ready_validation[
@@ -1673,6 +1756,50 @@ class OmoikaneReferenceOS:
                     yaoyorozu_bridge_validation[
                         "raw_worker_identity_payload_redacted"
                     ]
+                ),
+                "batch_receipt_ok": batch_validation["ok"],
+                "batch_ready_for_integration": batch_validation[
+                    "ready_for_integration"
+                ],
+                "batch_input_receipt_set_digest_bound": batch_validation[
+                    "input_receipt_set_digest_bound"
+                ],
+                "batch_ordered_integration_digest_bound": batch_validation[
+                    "ordered_integration_digest_bound"
+                ],
+                "batch_changed_file_owner_manifest_digest_bound": (
+                    batch_validation["changed_file_owner_manifest_digest_bound"]
+                ),
+                "batch_conflict_free": batch_validation["conflict_free"],
+                "batch_blocked_receipts_quarantined": batch_validation[
+                    "blocked_receipts_quarantined"
+                ],
+                "batch_required_verifications_passed": batch_validation[
+                    "required_verifications_passed"
+                ],
+                "batch_raw_worker_receipt_payload_redacted": batch_validation[
+                    "raw_worker_receipt_payload_redacted"
+                ],
+                "batch_raw_conflict_payload_redacted": batch_validation[
+                    "raw_conflict_payload_redacted"
+                ],
+                "conflict_batch_receipt_ok": conflict_batch_validation["ok"],
+                "conflict_batch_result_blocked": (
+                    not conflict_batch_validation["ready_for_integration"]
+                ),
+                "conflict_batch_conflict_digest_bound": (
+                    conflict_batch_validation["conflict_digest_bound"]
+                ),
+                "conflict_batch_changed_file_owner_manifest_digest_bound": (
+                    conflict_batch_validation[
+                        "changed_file_owner_manifest_digest_bound"
+                    ]
+                ),
+                "conflict_batch_conflict_blocked": conflict_batch_validation[
+                    "conflict_blocked"
+                ],
+                "conflict_batch_raw_conflict_payload_redacted": (
+                    conflict_batch_validation["raw_conflict_payload_redacted"]
                 ),
                 "ledger_bound": bool(ledger_entry.entry_hash)
                 and ledger_entry.payload_ref.startswith("cas://sha256/"),

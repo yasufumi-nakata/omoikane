@@ -172,6 +172,7 @@ remote source main-head ancestry を main checkout integration 前の schema-bou
 - `memory_crystal_compaction.yaml`
 - `memory_edit_recall_buffer.yaml`
 - `memory_replication_quorum.yaml`
+- `parallel_codex_integration_batch.yaml`
 - `parallel_codex_result_ingestion.yaml`
 - `patch_generator_direct_contract.yaml`
 - `procedural_actuation_bridge.yaml`
