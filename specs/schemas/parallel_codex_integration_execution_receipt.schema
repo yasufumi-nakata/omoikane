@@ -9,9 +9,10 @@ description: >
   repo-local patch artifact path / digest bindings,
   command-bound git-apply-check pre-apply dry-run receipts, required
   verification manifest, post-apply verification context binding to the apply
-  plan / patch artifact manifest / pre-apply dry-run manifest, and raw batch /
-  worker / patch / dry-run / verification payload redaction before a commit is
-  made from the main checkout.
+  plan / patch artifact manifest / pre-apply dry-run manifest, digest-only
+  checkout mutation / commit attestation, and raw batch / worker / patch /
+  dry-run / verification / checkout mutation payload redaction before a commit
+  is accepted from the main checkout.
 type: object
 additionalProperties: false
 required:
@@ -59,6 +60,21 @@ required:
   - post_apply_verification_pre_apply_manifest_digest_bound
   - post_apply_verification_context_digest
   - post_apply_verification_context_bound
+  - checkout_mutation_attestation_profile
+  - checkout_mutation_event_profile
+  - checkout_mutation_source
+  - checkout_mutation_status
+  - checkout_mutation_event_ref
+  - checkout_mutation_event_digest
+  - checkout_mutation_pre_apply_head
+  - checkout_mutation_post_apply_head
+  - checkout_mutation_head_advanced
+  - checkout_mutation_apply_plan_digest_bound
+  - checkout_mutation_patch_artifact_manifest_digest_bound
+  - checkout_mutation_pre_apply_dry_run_manifest_digest_bound
+  - checkout_mutation_post_apply_verification_context_digest_bound
+  - checkout_mutation_changed_file_owner_manifest_digest_bound
+  - checkout_mutation_attested
   - required_verifications_passed
   - blocking_reasons
   - execution_decision
@@ -66,6 +82,7 @@ required:
   - raw_batch_payload_stored
   - raw_apply_plan_payload_stored
   - raw_pre_apply_dry_run_payload_stored
+  - raw_checkout_mutation_payload_stored
   - raw_worker_receipt_payload_stored
   - raw_verification_payload_stored
   - receipt_digest
@@ -199,6 +216,45 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   post_apply_verification_context_bound:
     type: boolean
+  checkout_mutation_attestation_profile:
+    const: main-checkout-mutation-attestation-v1
+  checkout_mutation_event_profile:
+    const: digest-bound-checkout-mutation-event-v1
+  checkout_mutation_source:
+    type: string
+    minLength: 1
+  checkout_mutation_status:
+    type: string
+    enum:
+      - attested
+      - unattested
+      - mismatch
+  checkout_mutation_event_ref:
+    type: string
+    pattern: "^checkout-mutation://parallel-codex/[a-f0-9]{12}$"
+  checkout_mutation_event_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  checkout_mutation_pre_apply_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  checkout_mutation_post_apply_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  checkout_mutation_head_advanced:
+    type: boolean
+  checkout_mutation_apply_plan_digest_bound:
+    type: boolean
+  checkout_mutation_patch_artifact_manifest_digest_bound:
+    type: boolean
+  checkout_mutation_pre_apply_dry_run_manifest_digest_bound:
+    type: boolean
+  checkout_mutation_post_apply_verification_context_digest_bound:
+    type: boolean
+  checkout_mutation_changed_file_owner_manifest_digest_bound:
+    type: boolean
+  checkout_mutation_attested:
+    type: boolean
   required_verifications_passed:
     type: boolean
   blocking_reasons:
@@ -219,6 +275,8 @@ properties:
   raw_apply_plan_payload_stored:
     const: false
   raw_pre_apply_dry_run_payload_stored:
+    const: false
+  raw_checkout_mutation_payload_stored:
     const: false
   raw_worker_receipt_payload_stored:
     const: false

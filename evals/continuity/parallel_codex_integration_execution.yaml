@@ -6,8 +6,8 @@ summary: >
   ordered apply plan digest、repo-local patch artifact manifest digest、
   `artifacts/parallel-codex/*.patch` path に束縛された command-bound
   git apply dry-run manifest、post-apply verification manifest とその apply
-  context digest、raw batch / apply / dry-run / worker / verification payload
-  非保存を固定すること
+  context digest、checkout mutation attestation、raw batch / apply / dry-run /
+  worker / verification / checkout mutation payload 非保存を固定すること
 checks:
   - name: parallel Codex integration execution smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -30,10 +30,14 @@ expect:
   execution_post_apply_verification_apply_plan_digest_bound: true
   execution_post_apply_verification_patch_artifact_manifest_digest_bound: true
   execution_post_apply_verification_pre_apply_manifest_digest_bound: true
+  execution_checkout_mutation_event_digest_bound: true
+  execution_checkout_mutation_context_bound: true
+  execution_checkout_mutation_attested: true
   execution_required_verifications_passed: true
   execution_raw_batch_payload_redacted: true
   execution_raw_apply_plan_payload_redacted: true
   execution_raw_pre_apply_dry_run_payload_redacted: true
+  execution_raw_checkout_mutation_payload_redacted: true
   execution_raw_worker_receipt_payload_redacted: true
   execution_raw_verification_payload_redacted: true
   conflict_execution_blocked: true
@@ -42,6 +46,7 @@ expect:
   raw_batch_payload_stored: false
   raw_apply_plan_payload_stored: false
   raw_pre_apply_dry_run_payload_stored: false
+  raw_checkout_mutation_payload_stored: false
   raw_worker_receipt_payload_stored: false
   raw_verification_payload_stored: false
 metric: boolean

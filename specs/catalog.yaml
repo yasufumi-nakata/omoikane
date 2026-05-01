@@ -762,7 +762,7 @@ entries:
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize a Parallel Codex integration-ready batch immediately before main checkout commit, including source batch receipt digest binding, current checkout head matching, ordered apply step digest, repo-local patch artifact manifest digest, artifacts/parallel-codex/*.patch path binding, command-bound git apply dry-run receipt, post-apply verification manifest, post-apply verification context binding to the apply plan / patch artifact manifest / pre-apply dry-run manifest, ready-to-apply / blocked decision, and raw batch / apply plan / dry-run / worker receipt / verification payload redaction.
+    rationale: Required to serialize a Parallel Codex integration-ready batch immediately before main checkout commit, including source batch receipt digest binding, current checkout head matching, ordered apply step digest, repo-local patch artifact manifest digest, artifacts/parallel-codex/*.patch path binding, command-bound git apply dry-run receipt, post-apply verification manifest, post-apply verification context binding to the apply plan / patch artifact manifest / pre-apply dry-run manifest, checkout mutation attestation binding to pre/post head and apply context, ready-to-apply / blocked decision, and raw batch / apply plan / dry-run / worker receipt / verification / checkout mutation payload redaction.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.parallel_orchestration.v0.idl

@@ -381,6 +381,16 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
                 "execution_post_apply_verification_pre_apply_manifest_digest_bound"
             ]
         )
+        self.assertTrue(result["validation"]["execution_checkout_mutation_attested"])
+        self.assertTrue(
+            result["validation"]["execution_checkout_mutation_event_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_checkout_mutation_context_bound"]
+        )
+        self.assertFalse(
+            result["execution_receipt"]["raw_checkout_mutation_payload_stored"]
+        )
         self.assertEqual(
             "blocked",
             result["conflict_execution_receipt"]["execution_decision"],

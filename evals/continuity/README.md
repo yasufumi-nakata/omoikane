@@ -147,10 +147,11 @@ unrelated ancestry result を fail-closed にできるか。
 ### Parallel Codex Integration Execution
 parallel-orchestration-demo が integration-ready batch receipt を source batch
 digest、current checkout head、ordered apply step digest、pre-apply dry-run
-manifest、post-apply verification manifest に束縛し、さらに dry-run command を
+manifest、post-apply verification manifest、checkout mutation event digest に束縛し、さらに dry-run command を
 repo-local patch artifact path/digest 付きの
 `git apply --check artifacts/parallel-codex/*.patch` receipt に固定して、
-conflict batch 由来、dry-run failed execution、または command-unbound dry-run を
+conflict batch 由来、dry-run failed execution、command-unbound dry-run、または
+checkout mutation attestation 未束縛 execution を
 fail-closed にできるか。
 
 ### Subjective Continuity Self-Report

@@ -991,6 +991,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-integration-execution-plan.md",
             "meta/decision-log/2026-05-01_parallel-codex-workspace-marker-diff-classifier.md",
             "meta/decision-log/2026-05-02_parallel-codex-post-apply-verification-context.md",
+            "meta/decision-log/2026-05-02_parallel-codex-checkout-mutation-attestation.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1479,6 +1480,15 @@ class OmoikaneReferenceOS:
                 "execution_post_apply_verification_context_digest": (
                     execution_receipt["post_apply_verification_context_digest"]
                 ),
+                "execution_checkout_mutation_event_ref": execution_receipt[
+                    "checkout_mutation_event_ref"
+                ],
+                "execution_checkout_mutation_event_digest": execution_receipt[
+                    "checkout_mutation_event_digest"
+                ],
+                "execution_checkout_mutation_post_apply_head": execution_receipt[
+                    "checkout_mutation_post_apply_head"
+                ],
                 "conflict_execution_receipt_ref": conflict_execution_receipt[
                     "receipt_ref"
                 ],
@@ -1501,6 +1511,7 @@ class OmoikaneReferenceOS:
                 "raw_batch_payload_stored": False,
                 "raw_apply_plan_payload_stored": False,
                 "raw_pre_apply_dry_run_payload_stored": False,
+                "raw_checkout_mutation_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -2019,6 +2030,18 @@ class OmoikaneReferenceOS:
                 "execution_required_verifications_passed": (
                     execution_validation["required_verifications_passed"]
                 ),
+                "execution_checkout_mutation_event_digest_bound": (
+                    execution_validation["checkout_mutation_event_digest_bound"]
+                ),
+                "execution_checkout_mutation_heads_bound": (
+                    execution_validation["checkout_mutation_heads_bound"]
+                ),
+                "execution_checkout_mutation_context_bound": (
+                    execution_validation["checkout_mutation_context_bound"]
+                ),
+                "execution_checkout_mutation_attested": (
+                    execution_validation["checkout_mutation_attested"]
+                ),
                 "execution_raw_batch_payload_redacted": (
                     execution_validation["raw_batch_payload_redacted"]
                 ),
@@ -2027,6 +2050,9 @@ class OmoikaneReferenceOS:
                 ),
                 "execution_raw_pre_apply_dry_run_payload_redacted": (
                     execution_validation["raw_pre_apply_dry_run_payload_redacted"]
+                ),
+                "execution_raw_checkout_mutation_payload_redacted": (
+                    execution_validation["raw_checkout_mutation_payload_redacted"]
                 ),
                 "execution_raw_worker_receipt_payload_redacted": (
                     execution_validation["raw_worker_receipt_payload_redacted"]

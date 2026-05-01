@@ -1051,11 +1051,23 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(
             validation["post_apply_verification_pre_apply_manifest_digest_bound"]
         )
+        self.assertTrue(validation["checkout_mutation_event_digest_bound"])
+        self.assertTrue(validation["checkout_mutation_heads_bound"])
+        self.assertTrue(validation["checkout_mutation_context_bound"])
+        self.assertTrue(validation["checkout_mutation_attested"])
         self.assertTrue(validation["required_verifications_passed"])
         self.assertEqual(
             "post-apply-verification-apply-context-binding-v1",
             execution["post_apply_verification_context_profile"],
         )
+        self.assertEqual(
+            "main-checkout-mutation-attestation-v1",
+            execution["checkout_mutation_attestation_profile"],
+        )
+        self.assertEqual("attested", execution["checkout_mutation_status"])
+        self.assertTrue(execution["checkout_mutation_attested"])
+        self.assertTrue(execution["checkout_mutation_head_advanced"])
+        self.assertFalse(execution["raw_checkout_mutation_payload_stored"])
         self.assertTrue(execution["post_apply_verification_context_bound"])
         self.assertTrue(execution["post_apply_verification_context_digest"])
         self.assertEqual(
@@ -1096,6 +1108,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(execution["raw_batch_payload_stored"])
         self.assertFalse(execution["raw_apply_plan_payload_stored"])
         self.assertFalse(execution["raw_pre_apply_dry_run_payload_stored"])
+        self.assertFalse(execution["raw_checkout_mutation_payload_stored"])
         self.assertFalse(execution["raw_worker_receipt_payload_stored"])
         self.assertFalse(execution["raw_verification_payload_stored"])
 
@@ -1249,6 +1262,48 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(validation["ready_to_apply"])
         self.assertFalse(validation["post_apply_verification_context_digest_bound"])
         self.assertFalse(validation["post_apply_verification_context_bound"])
+
+    def test_integration_execution_blocks_unattested_checkout_mutation(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+            ],
+            verification_results=_verification_results(),
+            result_summary="Runtime orchestration patch is ready.",
+        )
+        batch = self.service.plan_integration_batch(
+            receipts=[receipt],
+            main_checkout_head=MAIN_HEAD,
+            verification_results=_verification_results(),
+            result_summary="Single ready receipt can be rehearsed.",
+        )
+
+        execution = self.service.plan_integration_execution(
+            batch_receipt=batch,
+            current_checkout_head=MAIN_HEAD,
+            post_apply_verification_results=_verification_results(),
+            checkout_mutation_attestation={
+                "checkout_mutation_status": "unattested",
+            },
+            result_summary="Missing checkout mutation attestation blocks commit.",
+        )
+        validation = self.service.validate_integration_execution_receipt(execution)
+
+        self.assertEqual("blocked", execution["execution_decision"])
+        self.assertIn(
+            "checkout mutation attestation must be bound before commit",
+            execution["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_to_apply"])
+        self.assertTrue(validation["checkout_mutation_event_digest_bound"])
+        self.assertFalse(validation["checkout_mutation_attested"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
         changed_file = "src/omoikane/self_construction/parallel_orchestration.py"

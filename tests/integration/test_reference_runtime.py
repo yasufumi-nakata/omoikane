@@ -1118,6 +1118,13 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "execution_post_apply_verification_pre_apply_manifest_digest_bound"
             ]
         )
+        self.assertTrue(result["validation"]["execution_checkout_mutation_attested"])
+        self.assertTrue(
+            result["validation"]["execution_checkout_mutation_event_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_checkout_mutation_context_bound"]
+        )
         self.assertTrue(result["validation"]["execution_required_verifications_passed"])
         self.assertTrue(result["validation"]["execution_raw_batch_payload_redacted"])
         self.assertTrue(
@@ -1125,6 +1132,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"]["execution_raw_pre_apply_dry_run_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_raw_checkout_mutation_payload_redacted"]
         )
         self.assertTrue(
             result["validation"]["execution_raw_worker_receipt_payload_redacted"]

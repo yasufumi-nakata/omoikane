@@ -45,6 +45,15 @@ PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE = (
 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE = (
     "post-apply-verification-apply-context-binding-v1"
 )
+PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_PROFILE = (
+    "main-checkout-mutation-attestation-v1"
+)
+PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_EVENT_PROFILE = (
+    "digest-bound-checkout-mutation-event-v1"
+)
+PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_SOURCE = (
+    "reference-runtime-checkout-mutation-attestation"
+)
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -241,6 +250,12 @@ class ParallelCodexOrchestrationPolicy:
             "integration_execution_post_verify_context_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE
             ),
+            "integration_execution_checkout_mutation_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_PROFILE
+            ),
+            "integration_execution_checkout_mutation_event_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_EVENT_PROFILE
+            ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
             "allowed_workspace_prefixes": list(self.allowed_workspace_prefixes),
@@ -327,6 +342,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_batch_payload_stored": False,
             "raw_apply_plan_payload_stored": False,
             "raw_pre_apply_dry_run_payload_stored": False,
+            "raw_checkout_mutation_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -1048,6 +1064,7 @@ class ParallelCodexOrchestrationService:
         current_checkout_head: str,
         pre_apply_dry_run_results: Sequence[Mapping[str, Any]] | None = None,
         post_apply_verification_results: Sequence[Mapping[str, Any]],
+        checkout_mutation_attestation: Mapping[str, Any] | None = None,
         result_summary: str,
     ) -> Dict[str, Any]:
         batch_validation = self.validate_integration_batch_receipt(batch_receipt)
@@ -1099,6 +1116,20 @@ class ParallelCodexOrchestrationService:
                     post_apply_verification_manifest_digest
                 ),
             )
+        )
+        checkout_mutation = self._normalize_checkout_mutation_attestation(
+            checkout_mutation_attestation=checkout_mutation_attestation,
+            source_batch_receipt_digest=batch_receipt_digest,
+            current_checkout_head=normalized_current_head,
+            apply_plan_digest=apply_plan_digest,
+            patch_artifact_manifest_digest=patch_artifact_manifest_digest,
+            pre_apply_dry_run_manifest_digest=pre_apply_dry_run_manifest_digest,
+            post_apply_verification_context_digest=(
+                post_apply_verification_context_digest
+            ),
+            changed_file_owner_manifest_digest=str(
+                batch_receipt.get("changed_file_owner_manifest_digest", ""),
+            ).strip(),
         )
         receipt = {
             "kind": "parallel_codex_integration_execution_receipt",
@@ -1190,6 +1221,7 @@ class ParallelCodexOrchestrationService:
             "post_apply_verification_context_bound": (
                 _is_sha256(post_apply_verification_context_digest)
             ),
+            **checkout_mutation,
             "required_verifications_passed": self._required_verifications_passed(
                 normalized_verifications,
             ),
@@ -1199,6 +1231,7 @@ class ParallelCodexOrchestrationService:
             "raw_batch_payload_stored": False,
             "raw_apply_plan_payload_stored": False,
             "raw_pre_apply_dry_run_payload_stored": False,
+            "raw_checkout_mutation_payload_stored": False,
             "raw_worker_receipt_payload_stored": False,
             "raw_verification_payload_stored": False,
             "receipt_digest": "",
@@ -1307,6 +1340,75 @@ class ParallelCodexOrchestrationService:
             and post_apply_verification_pre_apply_manifest_digest_bound
             and post_apply_verification_manifest_digest_bound
         )
+        checkout_mutation_event_digest_bound = (
+            receipt.get("checkout_mutation_event_digest")
+            == self._checkout_mutation_event_digest(
+                checkout_mutation_source=str(
+                    receipt.get("checkout_mutation_source", ""),
+                ),
+                checkout_mutation_event_ref=str(
+                    receipt.get("checkout_mutation_event_ref", ""),
+                ),
+                source_batch_receipt_digest=str(
+                    receipt.get("source_batch_receipt_digest", ""),
+                ),
+                current_checkout_head=str(receipt.get("current_checkout_head", "")),
+                checkout_mutation_pre_apply_head=str(
+                    receipt.get("checkout_mutation_pre_apply_head", ""),
+                ),
+                checkout_mutation_post_apply_head=str(
+                    receipt.get("checkout_mutation_post_apply_head", ""),
+                ),
+                apply_plan_digest=str(receipt.get("apply_plan_digest", "")),
+                patch_artifact_manifest_digest=str(
+                    receipt.get("patch_artifact_manifest_digest", ""),
+                ),
+                pre_apply_dry_run_manifest_digest=str(
+                    receipt.get("pre_apply_dry_run_manifest_digest", ""),
+                ),
+                post_apply_verification_context_digest=str(
+                    receipt.get("post_apply_verification_context_digest", ""),
+                ),
+                changed_file_owner_manifest_digest=str(
+                    receipt.get("changed_file_owner_manifest_digest", ""),
+                ),
+            )
+        )
+        checkout_mutation_heads_bound = (
+            receipt.get("checkout_mutation_pre_apply_head")
+            == receipt.get("current_checkout_head")
+            and _is_commit(receipt.get("checkout_mutation_post_apply_head"))
+            and receipt.get("checkout_mutation_post_apply_head")
+            != receipt.get("checkout_mutation_pre_apply_head")
+        )
+        checkout_mutation_context_bound = (
+            receipt.get("checkout_mutation_apply_plan_digest_bound") is True
+            and apply_plan_digest_bound
+            and receipt.get("checkout_mutation_patch_artifact_manifest_digest_bound")
+            is True
+            and patch_artifact_manifest_digest_bound
+            and receipt.get("checkout_mutation_pre_apply_dry_run_manifest_digest_bound")
+            is True
+            and pre_apply_dry_run_manifest_digest_bound
+            and receipt.get(
+                "checkout_mutation_post_apply_verification_context_digest_bound",
+            )
+            is True
+            and post_apply_verification_context_digest_bound
+            and receipt.get(
+                "checkout_mutation_changed_file_owner_manifest_digest_bound",
+            )
+            is True
+            and _is_sha256(receipt.get("changed_file_owner_manifest_digest"))
+        )
+        checkout_mutation_attested = (
+            receipt.get("checkout_mutation_status") == "attested"
+            and receipt.get("checkout_mutation_attested") is True
+            and checkout_mutation_event_digest_bound
+            and checkout_mutation_heads_bound
+            and checkout_mutation_context_bound
+            and receipt.get("raw_checkout_mutation_payload_stored") is False
+        )
         apply_step_patch_artifact_digest_bound = all(
             step.get("patch_artifact_digest")
             == self._integration_execution_patch_artifact_digest(
@@ -1375,6 +1477,16 @@ class ParallelCodexOrchestrationService:
             != PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE
         ):
             errors.append("post_apply_verification_context_profile mismatch")
+        if (
+            receipt.get("checkout_mutation_attestation_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_PROFILE
+        ):
+            errors.append("checkout_mutation_attestation_profile mismatch")
+        if (
+            receipt.get("checkout_mutation_event_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_EVENT_PROFILE
+        ):
+            errors.append("checkout_mutation_event_profile mismatch")
         if len(receipt.get("ordered_integration_receipt_refs", [])) != len(
             receipt.get("ordered_integration_receipt_digests", []),
         ):
@@ -1419,6 +1531,12 @@ class ParallelCodexOrchestrationService:
             errors.append("post_apply_verification_context_digest mismatch")
         if not post_apply_verification_context_bound:
             errors.append("post_apply_verification_context_bound mismatch")
+        if not checkout_mutation_event_digest_bound:
+            errors.append("checkout_mutation_event_digest mismatch")
+        if not checkout_mutation_heads_bound:
+            errors.append("checkout mutation heads must bind current and post-apply heads")
+        if not checkout_mutation_context_bound:
+            errors.append("checkout mutation context digest binding mismatch")
         if receipt.get("blocking_reasons") != expected_blocking_reasons:
             errors.append("blocking_reasons mismatch")
         if receipt.get("execution_decision") != expected_decision:
@@ -1431,6 +1549,8 @@ class ParallelCodexOrchestrationService:
             errors.append("raw_apply_plan_payload_stored must be false")
         if receipt.get("raw_pre_apply_dry_run_payload_stored") is not False:
             errors.append("raw_pre_apply_dry_run_payload_stored must be false")
+        if receipt.get("raw_checkout_mutation_payload_stored") is not False:
+            errors.append("raw_checkout_mutation_payload_stored must be false")
         if receipt.get("raw_worker_receipt_payload_stored") is not False:
             errors.append("raw_worker_receipt_payload_stored must be false")
         if receipt.get("raw_verification_payload_stored") is not False:
@@ -1489,6 +1609,12 @@ class ParallelCodexOrchestrationService:
             "post_apply_verification_context_bound": (
                 post_apply_verification_context_bound
             ),
+            "checkout_mutation_event_digest_bound": (
+                checkout_mutation_event_digest_bound
+            ),
+            "checkout_mutation_heads_bound": checkout_mutation_heads_bound,
+            "checkout_mutation_context_bound": checkout_mutation_context_bound,
+            "checkout_mutation_attested": checkout_mutation_attested,
             "required_verifications_passed": self._required_verifications_passed(
                 verification_results,
             ),
@@ -1508,6 +1634,9 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_pre_apply_dry_run_payload_redacted": (
                 receipt.get("raw_pre_apply_dry_run_payload_stored") is False
+            ),
+            "raw_checkout_mutation_payload_redacted": (
+                receipt.get("raw_checkout_mutation_payload_stored") is False
             ),
             "raw_worker_receipt_payload_redacted": (
                 receipt.get("raw_worker_receipt_payload_stored") is False
@@ -3014,6 +3143,194 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    def _normalize_checkout_mutation_attestation(
+        self,
+        *,
+        checkout_mutation_attestation: Mapping[str, Any] | None,
+        source_batch_receipt_digest: str,
+        current_checkout_head: str,
+        apply_plan_digest: str,
+        patch_artifact_manifest_digest: str,
+        pre_apply_dry_run_manifest_digest: str,
+        post_apply_verification_context_digest: str,
+        changed_file_owner_manifest_digest: str,
+    ) -> Dict[str, Any]:
+        source = dict(checkout_mutation_attestation or {})
+        attestation_source = str(
+            source.get(
+                "checkout_mutation_source",
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_SOURCE,
+            )
+        ).strip()
+        pre_apply_head = str(
+            source.get("checkout_mutation_pre_apply_head", current_checkout_head),
+        ).strip()
+        post_apply_head = str(
+            source.get("checkout_mutation_post_apply_head", ""),
+        ).strip()
+        if not _is_commit(post_apply_head):
+            post_apply_head = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": (
+                            PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_PROFILE
+                        ),
+                        "source_batch_receipt_digest": source_batch_receipt_digest,
+                        "current_checkout_head": current_checkout_head,
+                        "apply_plan_digest": apply_plan_digest,
+                        "patch_artifact_manifest_digest": (
+                            patch_artifact_manifest_digest
+                        ),
+                        "pre_apply_dry_run_manifest_digest": (
+                            pre_apply_dry_run_manifest_digest
+                        ),
+                        "post_apply_verification_context_digest": (
+                            post_apply_verification_context_digest
+                        ),
+                    }
+                )
+            )[:40]
+        event_ref = str(source.get("checkout_mutation_event_ref", "")).strip()
+        if not event_ref:
+            event_ref = (
+                "checkout-mutation://parallel-codex/"
+                f"{sha256_text(source_batch_receipt_digest + apply_plan_digest)[:12]}"
+            )
+        event_digest = str(source.get("checkout_mutation_event_digest", "")).strip()
+        expected_event_digest = self._checkout_mutation_event_digest(
+            checkout_mutation_source=attestation_source,
+            checkout_mutation_event_ref=event_ref,
+            source_batch_receipt_digest=source_batch_receipt_digest,
+            current_checkout_head=current_checkout_head,
+            checkout_mutation_pre_apply_head=pre_apply_head,
+            checkout_mutation_post_apply_head=post_apply_head,
+            apply_plan_digest=apply_plan_digest,
+            patch_artifact_manifest_digest=patch_artifact_manifest_digest,
+            pre_apply_dry_run_manifest_digest=pre_apply_dry_run_manifest_digest,
+            post_apply_verification_context_digest=(
+                post_apply_verification_context_digest
+            ),
+            changed_file_owner_manifest_digest=changed_file_owner_manifest_digest,
+        )
+        if not _is_sha256(event_digest):
+            event_digest = expected_event_digest
+        status = str(source.get("checkout_mutation_status", "attested")).strip()
+        apply_plan_bound = bool(
+            source.get("checkout_mutation_apply_plan_digest_bound", True),
+        )
+        patch_manifest_bound = bool(
+            source.get(
+                "checkout_mutation_patch_artifact_manifest_digest_bound",
+                True,
+            ),
+        )
+        dry_run_bound = bool(
+            source.get("checkout_mutation_pre_apply_dry_run_manifest_digest_bound", True),
+        )
+        verification_context_bound = bool(
+            source.get(
+                "checkout_mutation_post_apply_verification_context_digest_bound",
+                True,
+            ),
+        )
+        changed_owner_bound = bool(
+            source.get(
+                "checkout_mutation_changed_file_owner_manifest_digest_bound",
+                True,
+            ),
+        )
+        head_advanced = _is_commit(post_apply_head) and post_apply_head != pre_apply_head
+        attested = (
+            status == "attested"
+            and event_digest == expected_event_digest
+            and pre_apply_head == current_checkout_head
+            and head_advanced
+            and apply_plan_bound
+            and patch_manifest_bound
+            and dry_run_bound
+            and verification_context_bound
+            and changed_owner_bound
+        )
+        return {
+            "checkout_mutation_attestation_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_PROFILE
+            ),
+            "checkout_mutation_event_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_EVENT_PROFILE
+            ),
+            "checkout_mutation_source": attestation_source,
+            "checkout_mutation_status": status,
+            "checkout_mutation_event_ref": event_ref,
+            "checkout_mutation_event_digest": event_digest,
+            "checkout_mutation_pre_apply_head": pre_apply_head,
+            "checkout_mutation_post_apply_head": post_apply_head,
+            "checkout_mutation_head_advanced": head_advanced,
+            "checkout_mutation_apply_plan_digest_bound": apply_plan_bound,
+            "checkout_mutation_patch_artifact_manifest_digest_bound": (
+                patch_manifest_bound
+            ),
+            "checkout_mutation_pre_apply_dry_run_manifest_digest_bound": (
+                dry_run_bound
+            ),
+            "checkout_mutation_post_apply_verification_context_digest_bound": (
+                verification_context_bound
+            ),
+            "checkout_mutation_changed_file_owner_manifest_digest_bound": (
+                changed_owner_bound
+            ),
+            "checkout_mutation_attested": attested,
+            "raw_checkout_mutation_payload_stored": False,
+        }
+
+    @staticmethod
+    def _checkout_mutation_event_digest(
+        *,
+        checkout_mutation_source: str,
+        checkout_mutation_event_ref: str,
+        source_batch_receipt_digest: str,
+        current_checkout_head: str,
+        checkout_mutation_pre_apply_head: str,
+        checkout_mutation_post_apply_head: str,
+        apply_plan_digest: str,
+        patch_artifact_manifest_digest: str,
+        pre_apply_dry_run_manifest_digest: str,
+        post_apply_verification_context_digest: str,
+        changed_file_owner_manifest_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_EVENT_PROFILE
+                    ),
+                    "checkout_mutation_source": checkout_mutation_source,
+                    "checkout_mutation_event_ref": checkout_mutation_event_ref,
+                    "source_batch_receipt_digest": source_batch_receipt_digest,
+                    "current_checkout_head": current_checkout_head,
+                    "checkout_mutation_pre_apply_head": (
+                        checkout_mutation_pre_apply_head
+                    ),
+                    "checkout_mutation_post_apply_head": (
+                        checkout_mutation_post_apply_head
+                    ),
+                    "apply_plan_digest": apply_plan_digest,
+                    "patch_artifact_manifest_digest": (
+                        patch_artifact_manifest_digest
+                    ),
+                    "pre_apply_dry_run_manifest_digest": (
+                        pre_apply_dry_run_manifest_digest
+                    ),
+                    "post_apply_verification_context_digest": (
+                        post_apply_verification_context_digest
+                    ),
+                    "changed_file_owner_manifest_digest": (
+                        changed_file_owner_manifest_digest
+                    ),
+                    "raw_checkout_mutation_payload_stored": False,
+                }
+            )
+        )
+
     @staticmethod
     def _pre_apply_dry_run_passed(
         pre_apply_dry_run_results: Sequence[Mapping[str, Any]],
@@ -3221,6 +3538,76 @@ class ParallelCodexOrchestrationService:
             reasons.append("post_apply_verification_context_digest mismatch")
         if receipt.get("post_apply_verification_context_bound") is not True:
             reasons.append("post_apply_verification_context_bound must be true")
+        if (
+            receipt.get("checkout_mutation_attestation_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_PROFILE
+        ):
+            reasons.append("checkout_mutation_attestation_profile mismatch")
+        if (
+            receipt.get("checkout_mutation_event_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_EVENT_PROFILE
+        ):
+            reasons.append("checkout_mutation_event_profile mismatch")
+        expected_checkout_mutation_digest = self._checkout_mutation_event_digest(
+            checkout_mutation_source=str(
+                receipt.get("checkout_mutation_source", ""),
+            ),
+            checkout_mutation_event_ref=str(
+                receipt.get("checkout_mutation_event_ref", ""),
+            ),
+            source_batch_receipt_digest=str(
+                receipt.get("source_batch_receipt_digest", ""),
+            ),
+            current_checkout_head=str(receipt.get("current_checkout_head", "")),
+            checkout_mutation_pre_apply_head=str(
+                receipt.get("checkout_mutation_pre_apply_head", ""),
+            ),
+            checkout_mutation_post_apply_head=str(
+                receipt.get("checkout_mutation_post_apply_head", ""),
+            ),
+            apply_plan_digest=str(receipt.get("apply_plan_digest", "")),
+            patch_artifact_manifest_digest=str(
+                receipt.get("patch_artifact_manifest_digest", ""),
+            ),
+            pre_apply_dry_run_manifest_digest=str(
+                receipt.get("pre_apply_dry_run_manifest_digest", ""),
+            ),
+            post_apply_verification_context_digest=str(
+                receipt.get("post_apply_verification_context_digest", ""),
+            ),
+            changed_file_owner_manifest_digest=str(
+                receipt.get("changed_file_owner_manifest_digest", ""),
+            ),
+        )
+        if receipt.get("checkout_mutation_event_digest") != expected_checkout_mutation_digest:
+            reasons.append("checkout_mutation_event_digest mismatch")
+        if receipt.get("checkout_mutation_pre_apply_head") != receipt.get(
+            "current_checkout_head",
+        ):
+            reasons.append("checkout mutation pre-apply head must match current head")
+        if not _is_commit(receipt.get("checkout_mutation_post_apply_head")):
+            reasons.append("checkout mutation post-apply head must be a commit hash")
+        if receipt.get("checkout_mutation_head_advanced") is not True:
+            reasons.append("checkout mutation must advance the checkout head")
+        if receipt.get("checkout_mutation_apply_plan_digest_bound") is not True:
+            reasons.append("checkout mutation must bind apply plan digest")
+        if receipt.get("checkout_mutation_patch_artifact_manifest_digest_bound") is not True:
+            reasons.append("checkout mutation must bind patch artifact manifest digest")
+        if receipt.get("checkout_mutation_pre_apply_dry_run_manifest_digest_bound") is not True:
+            reasons.append("checkout mutation must bind pre-apply dry-run manifest digest")
+        if (
+            receipt.get(
+                "checkout_mutation_post_apply_verification_context_digest_bound",
+            )
+            is not True
+        ):
+            reasons.append("checkout mutation must bind post-apply verification context")
+        if receipt.get("checkout_mutation_changed_file_owner_manifest_digest_bound") is not True:
+            reasons.append("checkout mutation must bind changed-file owner manifest")
+        if receipt.get("checkout_mutation_status") != "attested":
+            reasons.append("checkout mutation status must be attested")
+        if receipt.get("checkout_mutation_attested") is not True:
+            reasons.append("checkout mutation attestation must be bound before commit")
         if not receipt.get("required_verifications_passed"):
             reasons.append("post-apply required verification commands must pass")
         if receipt.get("raw_batch_payload_stored") is not False:
@@ -3229,6 +3616,8 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw_apply_plan_payload_stored must be false")
         if receipt.get("raw_pre_apply_dry_run_payload_stored") is not False:
             reasons.append("raw_pre_apply_dry_run_payload_stored must be false")
+        if receipt.get("raw_checkout_mutation_payload_stored") is not False:
+            reasons.append("raw_checkout_mutation_payload_stored must be false")
         if receipt.get("raw_worker_receipt_payload_stored") is not False:
             reasons.append("raw_worker_receipt_payload_stored must be false")
         if receipt.get("raw_verification_payload_stored") is not False:

@@ -84,8 +84,8 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   `git apply --check artifacts/parallel-codex/*.patch` の command receipt digest を含む pre-apply
   dry-run manifest、post-apply verification manifest、post-apply verification が
   apply plan / patch artifact manifest / pre-apply dry-run manifest に束縛された
-  apply context digest を束縛し、raw batch /
-  apply plan / dry-run / worker receipt / verification payload は保存しない
+  apply context digest、checkout mutation event digest を束縛し、raw batch /
+  apply plan / dry-run / worker receipt / verification / checkout mutation payload は保存しない
 - source batch が blocked、current head が batch head と不一致、または post-apply
   verification が未達の場合は `execution_decision=blocked` のまま commit へ進まない
 - post-apply verification context が apply plan digest、repo-local patch artifact
@@ -94,6 +94,10 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - apply 前 dry-run が step 単位で失敗した場合、または dry-run command が
   対象 repo-local patch artifact path/ref/digest に束縛されていない場合も
   `execution_decision=blocked` のまま checkout mutation や commit へ進まない
+- checkout mutation attestation が pre-apply head、post-apply head、apply plan
+  digest、patch artifact manifest digest、pre-apply dry-run manifest digest、
+  post-apply verification context digest、changed-file owner manifest digest に
+  束縛されていない場合も `execution_decision=blocked` のまま commit へ進まない
 
 ## Verification
 
