@@ -146,6 +146,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["execution_ready_to_apply"])
         self.assertTrue(result["validation"]["execution_apply_plan_digest_bound"])
         self.assertTrue(
+            result["validation"]["execution_pre_apply_dry_run_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_pre_apply_dry_run_passed"])
+        self.assertTrue(
             result["validation"][
                 "execution_post_apply_verification_manifest_digest_bound"
             ]

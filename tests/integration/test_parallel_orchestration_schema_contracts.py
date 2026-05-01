@@ -270,6 +270,10 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["execution_apply_plan_digest_bound"])
         self.assertTrue(
+            result["validation"]["execution_pre_apply_dry_run_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_pre_apply_dry_run_passed"])
+        self.assertTrue(
             result["validation"][
                 "execution_post_apply_verification_manifest_digest_bound"
             ]
@@ -282,6 +286,9 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["conflict_execution_blocked"])
         self.assertTrue(
             result["validation"]["conflict_execution_blocked_on_source_batch"]
+        )
+        self.assertTrue(
+            result["conflict_execution_receipt"]["pre_apply_dry_run_passed"]
         )
         self.assertTrue(result["validation"]["ledger_bound"])
 

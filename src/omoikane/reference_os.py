@@ -1214,7 +1214,8 @@ class OmoikaneReferenceOS:
             post_apply_verification_results=verification_results,
             result_summary=(
                 "Integration-ready batch is reduced into ordered apply steps "
-                "and post-apply verification evidence before main checkout commit."
+                "with pre-apply dry-run and post-apply verification evidence "
+                "before main checkout commit."
             ),
         )
         conflict_execution_receipt = (
@@ -1452,6 +1453,9 @@ class OmoikaneReferenceOS:
                 "execution_apply_plan_digest": execution_receipt[
                     "apply_plan_digest"
                 ],
+                "execution_pre_apply_dry_run_manifest_digest": execution_receipt[
+                    "pre_apply_dry_run_manifest_digest"
+                ],
                 "execution_post_apply_verification_manifest_digest": (
                     execution_receipt["post_apply_verification_manifest_digest"]
                 ),
@@ -1476,6 +1480,7 @@ class OmoikaneReferenceOS:
                 "raw_conflict_payload_stored": False,
                 "raw_batch_payload_stored": False,
                 "raw_apply_plan_payload_stored": False,
+                "raw_pre_apply_dry_run_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1916,6 +1921,12 @@ class OmoikaneReferenceOS:
                 "execution_apply_plan_digest_bound": (
                     execution_validation["apply_plan_digest_bound"]
                 ),
+                "execution_pre_apply_dry_run_manifest_digest_bound": (
+                    execution_validation["pre_apply_dry_run_manifest_digest_bound"]
+                ),
+                "execution_pre_apply_dry_run_passed": (
+                    execution_validation["pre_apply_dry_run_passed"]
+                ),
                 "execution_post_apply_verification_manifest_digest_bound": (
                     execution_validation[
                         "post_apply_verification_manifest_digest_bound"
@@ -1929,6 +1940,9 @@ class OmoikaneReferenceOS:
                 ),
                 "execution_raw_apply_plan_payload_redacted": (
                     execution_validation["raw_apply_plan_payload_redacted"]
+                ),
+                "execution_raw_pre_apply_dry_run_payload_redacted": (
+                    execution_validation["raw_pre_apply_dry_run_payload_redacted"]
                 ),
                 "execution_raw_worker_receipt_payload_redacted": (
                     execution_validation["raw_worker_receipt_payload_redacted"]

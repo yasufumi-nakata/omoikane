@@ -1067,6 +1067,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["execution_current_head_matches_batch"])
         self.assertTrue(result["validation"]["execution_apply_plan_digest_bound"])
         self.assertTrue(
+            result["validation"]["execution_pre_apply_dry_run_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_pre_apply_dry_run_passed"])
+        self.assertTrue(
             result["validation"][
                 "execution_post_apply_verification_manifest_digest_bound"
             ]
@@ -1075,6 +1079,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["execution_raw_batch_payload_redacted"])
         self.assertTrue(
             result["validation"]["execution_raw_apply_plan_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_raw_pre_apply_dry_run_payload_redacted"]
         )
         self.assertTrue(
             result["validation"]["execution_raw_worker_receipt_payload_redacted"]

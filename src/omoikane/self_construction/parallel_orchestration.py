@@ -27,6 +27,9 @@ PARALLEL_CODEX_INTEGRATION_EXECUTION_PROFILE = (
 PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE = (
     "ordered-receipt-apply-plan-digest-v1"
 )
+PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE = (
+    "pre-apply-dry-run-check-v1"
+)
 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE = (
     "post-apply-required-verification-v1"
 )
@@ -202,6 +205,9 @@ class ParallelCodexOrchestrationPolicy:
             "integration_execution_apply_plan_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE
             ),
+            "integration_execution_dry_run_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE
+            ),
             "integration_execution_post_verify_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
             ),
@@ -284,6 +290,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_conflict_payload_stored": False,
             "raw_batch_payload_stored": False,
             "raw_apply_plan_payload_stored": False,
+            "raw_pre_apply_dry_run_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -999,6 +1006,7 @@ class ParallelCodexOrchestrationService:
         *,
         batch_receipt: Mapping[str, Any],
         current_checkout_head: str,
+        pre_apply_dry_run_results: Sequence[Mapping[str, Any]] | None = None,
         post_apply_verification_results: Sequence[Mapping[str, Any]],
         result_summary: str,
     ) -> Dict[str, Any]:
@@ -1012,6 +1020,10 @@ class ParallelCodexOrchestrationService:
             ordered_receipt_refs=ordered_refs,
             ordered_receipt_digests=ordered_digests,
             changed_file_owners=changed_file_owners,
+        )
+        normalized_dry_runs = self._normalize_pre_apply_dry_run_results(
+            pre_apply_dry_run_results,
+            apply_steps=apply_steps,
         )
         normalized_verifications = self._normalize_verification_results(
             post_apply_verification_results,
@@ -1064,6 +1076,18 @@ class ParallelCodexOrchestrationService:
             "apply_plan_digest": self._integration_execution_apply_plan_digest(
                 apply_steps=apply_steps,
             ),
+            "pre_apply_dry_run_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE
+            ),
+            "pre_apply_dry_run_results": normalized_dry_runs,
+            "pre_apply_dry_run_result_count": len(normalized_dry_runs),
+            "pre_apply_dry_run_manifest_digest": (
+                self._pre_apply_dry_run_manifest_digest(normalized_dry_runs)
+            ),
+            "pre_apply_dry_run_passed": self._pre_apply_dry_run_passed(
+                normalized_dry_runs,
+                apply_steps=apply_steps,
+            ),
             "post_apply_verification_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
             ),
@@ -1080,6 +1104,7 @@ class ParallelCodexOrchestrationService:
             "result_summary": result_summary,
             "raw_batch_payload_stored": False,
             "raw_apply_plan_payload_stored": False,
+            "raw_pre_apply_dry_run_payload_stored": False,
             "raw_worker_receipt_payload_stored": False,
             "raw_verification_payload_stored": False,
             "receipt_digest": "",
@@ -1102,6 +1127,9 @@ class ParallelCodexOrchestrationService:
     ) -> Dict[str, Any]:
         errors: list[str] = []
         apply_steps = list(receipt.get("apply_steps", []))
+        pre_apply_dry_run_results = list(
+            receipt.get("pre_apply_dry_run_results", []),
+        )
         verification_results = list(
             receipt.get("post_apply_verification_results", []),
         )
@@ -1118,6 +1146,10 @@ class ParallelCodexOrchestrationService:
         post_apply_verification_manifest_digest_bound = (
             receipt.get("post_apply_verification_manifest_digest")
             == self._verification_manifest_digest(verification_results)
+        )
+        pre_apply_dry_run_manifest_digest_bound = (
+            receipt.get("pre_apply_dry_run_manifest_digest")
+            == self._pre_apply_dry_run_manifest_digest(pre_apply_dry_run_results)
         )
         receipt_digest_bound = receipt.get("receipt_digest") == self._receipt_digest(
             receipt,
@@ -1137,6 +1169,11 @@ class ParallelCodexOrchestrationService:
         ):
             errors.append("apply_plan_profile mismatch")
         if (
+            receipt.get("pre_apply_dry_run_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE
+        ):
+            errors.append("pre_apply_dry_run_profile mismatch")
+        if (
             receipt.get("post_apply_verification_profile")
             != PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
         ):
@@ -1147,12 +1184,18 @@ class ParallelCodexOrchestrationService:
             errors.append("ordered receipt refs and digests must have equal length")
         if receipt.get("apply_step_count") != len(apply_steps):
             errors.append("apply_step_count mismatch")
+        if receipt.get("pre_apply_dry_run_result_count") != len(
+            pre_apply_dry_run_results,
+        ):
+            errors.append("pre_apply_dry_run_result_count mismatch")
         if receipt.get("post_apply_verification_command_count") != len(
             verification_results,
         ):
             errors.append("post_apply_verification_command_count mismatch")
         if not apply_plan_digest_bound:
             errors.append("apply_plan_digest mismatch")
+        if not pre_apply_dry_run_manifest_digest_bound:
+            errors.append("pre_apply_dry_run_manifest_digest mismatch")
         if not post_apply_verification_manifest_digest_bound:
             errors.append("post_apply_verification_manifest_digest mismatch")
         if receipt.get("blocking_reasons") != expected_blocking_reasons:
@@ -1165,6 +1208,8 @@ class ParallelCodexOrchestrationService:
             errors.append("raw_batch_payload_stored must be false")
         if receipt.get("raw_apply_plan_payload_stored") is not False:
             errors.append("raw_apply_plan_payload_stored must be false")
+        if receipt.get("raw_pre_apply_dry_run_payload_stored") is not False:
+            errors.append("raw_pre_apply_dry_run_payload_stored must be false")
         if receipt.get("raw_worker_receipt_payload_stored") is not False:
             errors.append("raw_worker_receipt_payload_stored must be false")
         if receipt.get("raw_verification_payload_stored") is not False:
@@ -1184,6 +1229,13 @@ class ParallelCodexOrchestrationService:
                 receipt.get("current_head_matches_batch") is True
             ),
             "apply_plan_digest_bound": apply_plan_digest_bound,
+            "pre_apply_dry_run_manifest_digest_bound": (
+                pre_apply_dry_run_manifest_digest_bound
+            ),
+            "pre_apply_dry_run_passed": self._pre_apply_dry_run_passed(
+                pre_apply_dry_run_results,
+                apply_steps=apply_steps,
+            ),
             "post_apply_verification_manifest_digest_bound": (
                 post_apply_verification_manifest_digest_bound
             ),
@@ -1203,6 +1255,9 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_apply_plan_payload_redacted": (
                 receipt.get("raw_apply_plan_payload_stored") is False
+            ),
+            "raw_pre_apply_dry_run_payload_redacted": (
+                receipt.get("raw_pre_apply_dry_run_payload_stored") is False
             ),
             "raw_worker_receipt_payload_redacted": (
                 receipt.get("raw_worker_receipt_payload_stored") is False
@@ -2265,12 +2320,130 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    def _normalize_pre_apply_dry_run_results(
+        self,
+        pre_apply_dry_run_results: Sequence[Mapping[str, Any]] | None,
+        *,
+        apply_steps: Sequence[Mapping[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        source_results = (
+            list(pre_apply_dry_run_results)
+            if pre_apply_dry_run_results is not None
+            else [
+                {
+                    "step_index": step.get("step_index", index),
+                    "receipt_ref": step.get("receipt_ref", ""),
+                    "receipt_digest": step.get("receipt_digest", ""),
+                    "command": f"git apply --check {step.get('receipt_ref', '')}",
+                    "status": "pass",
+                    "exit_code": 0,
+                    "stdout_excerpt": "pre-apply dry run passed",
+                    "stderr_excerpt": "",
+                }
+                for index, step in enumerate(apply_steps, start=1)
+            ]
+        )
+        step_by_index = {
+            int(step.get("step_index", index)): step
+            for index, step in enumerate(apply_steps, start=1)
+        }
+        normalized: list[Dict[str, Any]] = []
+        for index, result in enumerate(source_results, start=1):
+            step_index = _coerce_int(result.get("step_index"), index)
+            step = step_by_index.get(step_index, {})
+            stdout_digest = str(result.get("stdout_digest", "")).strip()
+            stderr_digest = str(result.get("stderr_digest", "")).strip()
+            if not _is_sha256(stdout_digest):
+                stdout_digest = sha256_text(str(result.get("stdout_excerpt", "")))
+            if not _is_sha256(stderr_digest):
+                stderr_digest = sha256_text(str(result.get("stderr_excerpt", "")))
+            normalized.append(
+                {
+                    "step_index": step_index,
+                    "receipt_ref": str(
+                        result.get("receipt_ref", step.get("receipt_ref", "")),
+                    ).strip(),
+                    "receipt_digest": str(
+                        result.get("receipt_digest", step.get("receipt_digest", "")),
+                    ).strip(),
+                    "command": str(result.get("command", "")).strip(),
+                    "status": str(result.get("status", "")).strip(),
+                    "exit_code": _coerce_int(result.get("exit_code"), 0),
+                    "stdout_digest": stdout_digest,
+                    "stderr_digest": stderr_digest,
+                    "raw_stdout_stored": False,
+                    "raw_stderr_stored": False,
+                }
+            )
+        return normalized
+
+    @staticmethod
+    def _pre_apply_dry_run_manifest_digest(
+        pre_apply_dry_run_results: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE,
+                    "pre_apply_dry_run_results": [
+                        {
+                            "step_index": result.get("step_index", 0),
+                            "receipt_ref": result.get("receipt_ref", ""),
+                            "receipt_digest": result.get("receipt_digest", ""),
+                            "command": result.get("command", ""),
+                            "status": result.get("status", ""),
+                            "exit_code": result.get("exit_code", 0),
+                            "stdout_digest": result.get("stdout_digest", ""),
+                            "stderr_digest": result.get("stderr_digest", ""),
+                        }
+                        for result in pre_apply_dry_run_results
+                    ],
+                }
+            )
+        )
+
+    @staticmethod
+    def _pre_apply_dry_run_passed(
+        pre_apply_dry_run_results: Sequence[Mapping[str, Any]],
+        *,
+        apply_steps: Sequence[Mapping[str, Any]],
+    ) -> bool:
+        if len(pre_apply_dry_run_results) != len(apply_steps):
+            return False
+        expected_pairs = {
+            (
+                int(step.get("step_index", 0)),
+                step.get("receipt_ref", ""),
+                step.get("receipt_digest", ""),
+            )
+            for step in apply_steps
+        }
+        observed_pairs = {
+            (
+                int(result.get("step_index", 0)),
+                result.get("receipt_ref", ""),
+                result.get("receipt_digest", ""),
+            )
+            for result in pre_apply_dry_run_results
+        }
+        return (
+            bool(pre_apply_dry_run_results)
+            and observed_pairs == expected_pairs
+            and all(
+                result.get("status") == "pass" and result.get("exit_code") == 0
+                for result in pre_apply_dry_run_results
+            )
+        )
+
     def _derive_execution_blocking_reasons(
         self,
         receipt: Mapping[str, Any],
     ) -> list[str]:
         reasons: list[str] = []
         apply_steps = list(receipt.get("apply_steps", []))
+        pre_apply_dry_run_results = list(
+            receipt.get("pre_apply_dry_run_results", []),
+        )
         verification_results = list(
             receipt.get("post_apply_verification_results", []),
         )
@@ -2319,6 +2492,28 @@ class ParallelCodexOrchestrationService:
         ):
             reasons.append("apply_plan_digest mismatch")
         if (
+            receipt.get("pre_apply_dry_run_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE
+        ):
+            reasons.append("pre_apply_dry_run_profile mismatch")
+        if receipt.get("pre_apply_dry_run_result_count") != len(
+            pre_apply_dry_run_results,
+        ):
+            reasons.append("pre_apply_dry_run_result_count mismatch")
+        if (
+            receipt.get("pre_apply_dry_run_manifest_digest")
+            != self._pre_apply_dry_run_manifest_digest(pre_apply_dry_run_results)
+        ):
+            reasons.append("pre_apply_dry_run_manifest_digest mismatch")
+        computed_pre_apply_dry_run_passed = self._pre_apply_dry_run_passed(
+            pre_apply_dry_run_results,
+            apply_steps=apply_steps,
+        )
+        if receipt.get("pre_apply_dry_run_passed") != computed_pre_apply_dry_run_passed:
+            reasons.append("pre_apply_dry_run_passed mismatch")
+        if not computed_pre_apply_dry_run_passed:
+            reasons.append("pre-apply dry-run checks must pass")
+        if (
             receipt.get("post_apply_verification_manifest_digest")
             != self._verification_manifest_digest(verification_results)
         ):
@@ -2329,6 +2524,8 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw_batch_payload_stored must be false")
         if receipt.get("raw_apply_plan_payload_stored") is not False:
             reasons.append("raw_apply_plan_payload_stored must be false")
+        if receipt.get("raw_pre_apply_dry_run_payload_stored") is not False:
+            reasons.append("raw_pre_apply_dry_run_payload_stored must be false")
         if receipt.get("raw_worker_receipt_payload_stored") is not False:
             reasons.append("raw_worker_receipt_payload_stored must be false")
         if receipt.get("raw_verification_payload_stored") is not False:

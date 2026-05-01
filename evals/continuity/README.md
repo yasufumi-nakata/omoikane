@@ -145,8 +145,9 @@ result、marker-only result、unrelated ancestry result を fail-closed にで�
 
 ### Parallel Codex Integration Execution
 parallel-orchestration-demo が integration-ready batch receipt を source batch
-digest、current checkout head、ordered apply step digest、post-apply verification
-manifest に束縛し、conflict batch 由来の execution を fail-closed にできるか。
+digest、current checkout head、ordered apply step digest、pre-apply dry-run
+manifest、post-apply verification manifest に束縛し、conflict batch 由来または
+dry-run failed execution を fail-closed にできるか。
 
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。

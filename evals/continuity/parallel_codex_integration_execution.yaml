@@ -3,8 +3,8 @@ target: selfctor.parallel_orchestration
 summary: >
   parallel-orchestration-demo が integration-ready batch receipt を main checkout
   適用直前の execution receipt へ縮約し、source batch digest、current head、
-  ordered apply plan digest、post-apply verification manifest、raw batch / apply /
-  worker / verification payload 非保存を固定すること
+  ordered apply plan digest、pre-apply dry-run manifest、post-apply verification
+  manifest、raw batch / apply / dry-run / worker / verification payload 非保存を固定すること
 checks:
   - name: parallel Codex integration execution smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -14,10 +14,13 @@ expect:
   execution_source_batch_receipt_digest_bound: true
   execution_current_head_matches_batch: true
   execution_apply_plan_digest_bound: true
+  execution_pre_apply_dry_run_manifest_digest_bound: true
+  execution_pre_apply_dry_run_passed: true
   execution_post_apply_verification_manifest_digest_bound: true
   execution_required_verifications_passed: true
   execution_raw_batch_payload_redacted: true
   execution_raw_apply_plan_payload_redacted: true
+  execution_raw_pre_apply_dry_run_payload_redacted: true
   execution_raw_worker_receipt_payload_redacted: true
   execution_raw_verification_payload_redacted: true
   conflict_execution_blocked: true
@@ -25,6 +28,7 @@ expect:
   conflict_execution_apply_plan_digest_bound: true
   raw_batch_payload_stored: false
   raw_apply_plan_payload_stored: false
+  raw_pre_apply_dry_run_payload_stored: false
   raw_worker_receipt_payload_stored: false
   raw_verification_payload_stored: false
 metric: boolean
