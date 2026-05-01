@@ -60,6 +60,15 @@ PARALLEL_CODEX_INTEGRATION_EXECUTION_CHECKOUT_MUTATION_SOURCE = (
 PARALLEL_CODEX_INTEGRATION_EXECUTION_COMMIT_FINALIZATION_PROFILE = (
     "main-checkout-commit-finalization-gate-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PROFILE = (
+    "origin-main-post-commit-publication-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE = (
+    "command-bound-git-push-origin-main-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE = (
+    "command-bound-git-ls-remote-origin-main-v1"
+)
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -268,6 +277,15 @@ class ParallelCodexOrchestrationPolicy:
             "integration_execution_commit_finalization_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_COMMIT_FINALIZATION_PROFILE
             ),
+            "post_commit_publication_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PROFILE
+            ),
+            "post_commit_publication_push_command_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
+            ),
+            "post_commit_publication_remote_verify_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+            ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
             "allowed_workspace_prefixes": list(self.allowed_workspace_prefixes),
@@ -357,6 +375,11 @@ class ParallelCodexOrchestrationPolicy:
             "raw_patch_artifact_cleanup_payload_stored": False,
             "raw_checkout_mutation_payload_stored": False,
             "raw_commit_finalization_payload_stored": False,
+            "raw_post_commit_publication_payload_stored": False,
+            "raw_push_stdout_stored": False,
+            "raw_push_stderr_stored": False,
+            "raw_remote_verification_stdout_stored": False,
+            "raw_remote_verification_stderr_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -1995,6 +2018,307 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_verification_payload_redacted": (
                 receipt.get("raw_verification_payload_stored") is False
+            ),
+        }
+
+    def plan_post_commit_publication(
+        self,
+        *,
+        execution_receipt: Mapping[str, Any],
+        local_commit_head: str,
+        remote_head: str,
+        result_summary: str,
+        remote_name: str = "origin",
+        remote_ref: str = "refs/heads/main",
+        push_result: Mapping[str, Any] | None = None,
+        remote_verification_result: Mapping[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        execution_validation = self.validate_integration_execution_receipt(
+            execution_receipt,
+        )
+        normalized_local_head = local_commit_head.strip()
+        normalized_remote_head = remote_head.strip()
+        normalized_remote_name = remote_name.strip() or "origin"
+        normalized_remote_ref = remote_ref.strip() or "refs/heads/main"
+        remote_tracking_ref = normalized_remote_ref.replace(
+            "refs/heads/",
+            f"refs/remotes/{normalized_remote_name}/",
+            1,
+        )
+        push_command = (
+            f"git push {normalized_remote_name} HEAD:{normalized_remote_ref}"
+        )
+        remote_verification_command = (
+            f"git ls-remote {normalized_remote_name} {normalized_remote_ref}"
+        )
+        normalized_push_result = self._normalize_post_commit_publication_command(
+            push_result or {},
+            default_command=push_command,
+            command_profile=(
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
+            ),
+        )
+        normalized_remote_verification_result = (
+            self._normalize_post_commit_publication_command(
+                remote_verification_result or {
+                    "stdout_excerpt": (
+                        f"{normalized_remote_head}\t{normalized_remote_ref}"
+                    ),
+                },
+                default_command=remote_verification_command,
+                command_profile=(
+                    PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+                ),
+            )
+        )
+        source_execution_digest = str(
+            execution_receipt.get("receipt_digest", ""),
+        ).strip()
+        source_post_apply_head = str(
+            execution_receipt.get("checkout_mutation_post_apply_head", ""),
+        ).strip()
+        source_commit_finalization_digest = str(
+            execution_receipt.get("commit_finalization_digest", ""),
+        ).strip()
+        receipt = {
+            "kind": "parallel_codex_post_commit_publication_receipt",
+            "schema_version": "1.0.0",
+            "receipt_id": new_id("parallel-codex-publication"),
+            "generated_at": utc_now_iso(),
+            "profile_id": PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PROFILE,
+            "integration_policy_profile": self._policy.profile_id,
+            "reference_runbook_ref": self._policy.reference_runbook_ref,
+            "source_execution_receipt_ref": str(
+                execution_receipt.get("receipt_ref", ""),
+            ).strip(),
+            "source_execution_receipt_digest": source_execution_digest,
+            "source_execution_receipt_digest_bound": (
+                _is_sha256(source_execution_digest)
+                and source_execution_digest
+                == self._receipt_digest(execution_receipt)
+            ),
+            "source_execution_decision": str(
+                execution_receipt.get("execution_decision", ""),
+            ).strip(),
+            "source_execution_ready_to_apply": execution_validation[
+                "ready_to_apply"
+            ],
+            "source_execution_commit_finalization_ref": str(
+                execution_receipt.get("commit_finalization_ref", ""),
+            ).strip(),
+            "source_execution_commit_finalization_digest": (
+                source_commit_finalization_digest
+            ),
+            "source_execution_commit_finalization_ready": (
+                execution_validation["commit_finalization_ready"]
+            ),
+            "source_execution_post_apply_head": source_post_apply_head,
+            "local_commit_head": normalized_local_head,
+            "local_commit_head_matches_source": (
+                normalized_local_head == source_post_apply_head
+            ),
+            "remote_name": normalized_remote_name,
+            "remote_ref": normalized_remote_ref,
+            "remote_tracking_ref": remote_tracking_ref,
+            "remote_head": normalized_remote_head,
+            "remote_head_matches_local_commit": (
+                normalized_remote_head == normalized_local_head
+            ),
+            "push_command_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
+            ),
+            "push_command_result": normalized_push_result,
+            "push_command_receipt_digest": normalized_push_result[
+                "command_receipt_digest"
+            ],
+            "remote_verification_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+            ),
+            "remote_verification_result": normalized_remote_verification_result,
+            "remote_verification_command_receipt_digest": (
+                normalized_remote_verification_result["command_receipt_digest"]
+            ),
+            "publication_digest": "",
+            "publication_status": "blocked",
+            "ready_for_github_handoff": False,
+            "blocking_reasons": [],
+            "result_summary": result_summary,
+            "raw_execution_payload_stored": False,
+            "raw_post_commit_publication_payload_stored": False,
+            "raw_push_stdout_stored": False,
+            "raw_push_stderr_stored": False,
+            "raw_remote_verification_stdout_stored": False,
+            "raw_remote_verification_stderr_stored": False,
+            "receipt_digest": "",
+        }
+        receipt["publication_digest"] = self._post_commit_publication_digest(
+            receipt,
+        )
+        receipt["receipt_ref"] = (
+            f"receipt://parallel-codex/{receipt['receipt_id']}"
+        )
+        receipt["blocking_reasons"] = (
+            self._derive_post_commit_publication_blocking_reasons(receipt)
+        )
+        receipt["publication_status"] = (
+            "blocked" if receipt["blocking_reasons"] else "published"
+        )
+        receipt["ready_for_github_handoff"] = not receipt["blocking_reasons"]
+        receipt["receipt_digest"] = self._receipt_digest(receipt)
+        return receipt
+
+    def validate_post_commit_publication_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: list[str] = []
+        expected_blocking_reasons = (
+            self._derive_post_commit_publication_blocking_reasons(receipt)
+        )
+        expected_status = (
+            "blocked" if expected_blocking_reasons else "published"
+        )
+        push_command = (
+            f"git push {receipt.get('remote_name', '')} "
+            f"HEAD:{receipt.get('remote_ref', '')}"
+        )
+        remote_verification_command = (
+            f"git ls-remote {receipt.get('remote_name', '')} "
+            f"{receipt.get('remote_ref', '')}"
+        )
+        push_result = dict(receipt.get("push_command_result", {}))
+        remote_verification_result = dict(
+            receipt.get("remote_verification_result", {}),
+        )
+        push_command_digest_bound = (
+            receipt.get("push_command_receipt_digest")
+            == self._post_commit_publication_command_receipt_digest(push_result)
+            and push_result.get("command_receipt_digest")
+            == receipt.get("push_command_receipt_digest")
+        )
+        remote_verification_digest_bound = (
+            receipt.get("remote_verification_command_receipt_digest")
+            == self._post_commit_publication_command_receipt_digest(
+                remote_verification_result,
+            )
+            and remote_verification_result.get("command_receipt_digest")
+            == receipt.get("remote_verification_command_receipt_digest")
+        )
+        publication_digest_bound = (
+            receipt.get("publication_digest")
+            == self._post_commit_publication_digest(receipt)
+        )
+        receipt_digest_bound = (
+            receipt.get("receipt_digest") == self._receipt_digest(receipt)
+        )
+
+        if receipt.get("kind") != "parallel_codex_post_commit_publication_receipt":
+            errors.append("kind must be parallel_codex_post_commit_publication_receipt")
+        if receipt.get("profile_id") != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PROFILE:
+            errors.append("profile_id mismatch")
+        if receipt.get("integration_policy_profile") != self._policy.profile_id:
+            errors.append("integration_policy_profile mismatch")
+        if receipt.get("reference_runbook_ref") != self._policy.reference_runbook_ref:
+            errors.append("reference_runbook_ref mismatch")
+        if (
+            receipt.get("push_command_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
+        ):
+            errors.append("push_command_profile mismatch")
+        if (
+            receipt.get("remote_verification_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+        ):
+            errors.append("remote_verification_profile mismatch")
+        if push_result.get("command") != push_command:
+            errors.append("push command must target origin main")
+        if remote_verification_result.get("command") != remote_verification_command:
+            errors.append("remote verification command mismatch")
+        if not push_command_digest_bound:
+            errors.append("push_command_receipt_digest mismatch")
+        if not remote_verification_digest_bound:
+            errors.append("remote_verification_command_receipt_digest mismatch")
+        if not publication_digest_bound:
+            errors.append("publication_digest mismatch")
+        if receipt.get("blocking_reasons") != expected_blocking_reasons:
+            errors.append("blocking_reasons mismatch")
+        if receipt.get("publication_status") != expected_status:
+            errors.append("publication_status mismatch")
+        if receipt.get("ready_for_github_handoff") != (
+            expected_status == "published"
+        ):
+            errors.append("ready_for_github_handoff mismatch")
+        if not receipt_digest_bound:
+            errors.append("receipt_digest mismatch")
+        if receipt.get("raw_execution_payload_stored") is not False:
+            errors.append("raw_execution_payload_stored must be false")
+        if receipt.get("raw_post_commit_publication_payload_stored") is not False:
+            errors.append("raw_post_commit_publication_payload_stored must be false")
+        if receipt.get("raw_push_stdout_stored") is not False:
+            errors.append("raw_push_stdout_stored must be false")
+        if receipt.get("raw_push_stderr_stored") is not False:
+            errors.append("raw_push_stderr_stored must be false")
+        if receipt.get("raw_remote_verification_stdout_stored") is not False:
+            errors.append("raw_remote_verification_stdout_stored must be false")
+        if receipt.get("raw_remote_verification_stderr_stored") is not False:
+            errors.append("raw_remote_verification_stderr_stored must be false")
+
+        return {
+            "ok": not errors,
+            "ready_for_github_handoff": (
+                receipt.get("ready_for_github_handoff") is True
+                and expected_status == "published"
+                and not expected_blocking_reasons
+            ),
+            "errors": errors,
+            "source_execution_receipt_digest_bound": (
+                receipt.get("source_execution_receipt_digest_bound") is True
+                and _is_sha256(receipt.get("source_execution_receipt_digest"))
+            ),
+            "source_execution_ready_to_apply": (
+                receipt.get("source_execution_ready_to_apply") is True
+            ),
+            "source_execution_commit_finalization_ready": (
+                receipt.get("source_execution_commit_finalization_ready") is True
+            ),
+            "local_commit_head_bound": _is_commit(
+                receipt.get("local_commit_head"),
+            ),
+            "local_commit_head_matches_source": (
+                receipt.get("local_commit_head_matches_source") is True
+            ),
+            "remote_head_matches_local_commit": (
+                receipt.get("remote_head_matches_local_commit") is True
+            ),
+            "push_command_digest_bound": push_command_digest_bound,
+            "push_command_passed": (
+                push_result.get("status") == "pass"
+                and push_result.get("exit_code") == 0
+            ),
+            "remote_verification_digest_bound": (
+                remote_verification_digest_bound
+            ),
+            "remote_verification_passed": (
+                remote_verification_result.get("status") == "pass"
+                and remote_verification_result.get("exit_code") == 0
+            ),
+            "publication_digest_bound": publication_digest_bound,
+            "receipt_digest_bound": receipt_digest_bound,
+            "raw_publication_payload_redacted": (
+                receipt.get("raw_post_commit_publication_payload_stored")
+                is False
+            ),
+            "raw_push_output_redacted": (
+                receipt.get("raw_push_stdout_stored") is False
+                and receipt.get("raw_push_stderr_stored") is False
+                and push_result.get("raw_stdout_stored") is False
+                and push_result.get("raw_stderr_stored") is False
+            ),
+            "raw_remote_verification_output_redacted": (
+                receipt.get("raw_remote_verification_stdout_stored") is False
+                and receipt.get("raw_remote_verification_stderr_stored") is False
+                and remote_verification_result.get("raw_stdout_stored") is False
+                and remote_verification_result.get("raw_stderr_stored") is False
             ),
         }
 
@@ -3994,6 +4318,128 @@ class ParallelCodexOrchestrationService:
             "raw_commit_finalization_payload_stored": False,
         }
 
+    def _normalize_post_commit_publication_command(
+        self,
+        result: Mapping[str, Any],
+        *,
+        default_command: str,
+        command_profile: str,
+    ) -> Dict[str, Any]:
+        stdout_digest = str(result.get("stdout_digest", "")).strip()
+        stderr_digest = str(result.get("stderr_digest", "")).strip()
+        if not _is_sha256(stdout_digest):
+            stdout_digest = sha256_text(str(result.get("stdout_excerpt", "")))
+        if not _is_sha256(stderr_digest):
+            stderr_digest = sha256_text(str(result.get("stderr_excerpt", "")))
+        normalized = {
+            "command_profile": command_profile,
+            "command": str(result.get("command", default_command)).strip()
+            or default_command,
+            "status": str(result.get("status", "pass")).strip() or "pass",
+            "exit_code": _coerce_int(result.get("exit_code", 0)),
+            "stdout_digest": stdout_digest,
+            "stderr_digest": stderr_digest,
+            "raw_stdout_stored": False,
+            "raw_stderr_stored": False,
+        }
+        command_receipt_digest = str(
+            result.get("command_receipt_digest", ""),
+        ).strip()
+        if not _is_sha256(command_receipt_digest):
+            command_receipt_digest = (
+                self._post_commit_publication_command_receipt_digest(
+                    normalized,
+                )
+            )
+        normalized["command_receipt_digest"] = command_receipt_digest
+        return normalized
+
+    @staticmethod
+    def _post_commit_publication_command_receipt_digest(
+        result: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "command_profile": result.get("command_profile", ""),
+                    "command": result.get("command", ""),
+                    "status": result.get("status", ""),
+                    "exit_code": result.get("exit_code", 0),
+                    "stdout_digest": result.get("stdout_digest", ""),
+                    "stderr_digest": result.get("stderr_digest", ""),
+                    "raw_stdout_stored": False,
+                    "raw_stderr_stored": False,
+                }
+            )
+        )
+
+    def _post_commit_publication_digest(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PROFILE,
+                    "source_execution_receipt_ref": receipt.get(
+                        "source_execution_receipt_ref",
+                        "",
+                    ),
+                    "source_execution_receipt_digest": receipt.get(
+                        "source_execution_receipt_digest",
+                        "",
+                    ),
+                    "source_execution_receipt_digest_bound": receipt.get(
+                        "source_execution_receipt_digest_bound",
+                        False,
+                    ),
+                    "source_execution_ready_to_apply": receipt.get(
+                        "source_execution_ready_to_apply",
+                        False,
+                    ),
+                    "source_execution_commit_finalization_digest": receipt.get(
+                        "source_execution_commit_finalization_digest",
+                        "",
+                    ),
+                    "source_execution_commit_finalization_ready": receipt.get(
+                        "source_execution_commit_finalization_ready",
+                        False,
+                    ),
+                    "source_execution_post_apply_head": receipt.get(
+                        "source_execution_post_apply_head",
+                        "",
+                    ),
+                    "local_commit_head": receipt.get("local_commit_head", ""),
+                    "local_commit_head_matches_source": receipt.get(
+                        "local_commit_head_matches_source",
+                        False,
+                    ),
+                    "remote_name": receipt.get("remote_name", ""),
+                    "remote_ref": receipt.get("remote_ref", ""),
+                    "remote_tracking_ref": receipt.get("remote_tracking_ref", ""),
+                    "remote_head": receipt.get("remote_head", ""),
+                    "remote_head_matches_local_commit": receipt.get(
+                        "remote_head_matches_local_commit",
+                        False,
+                    ),
+                    "push_command_receipt_digest": receipt.get(
+                        "push_command_receipt_digest",
+                        "",
+                    ),
+                    "remote_verification_command_receipt_digest": receipt.get(
+                        "remote_verification_command_receipt_digest",
+                        "",
+                    ),
+                    "raw_execution_payload_stored": False,
+                    "raw_post_commit_publication_payload_stored": False,
+                    "raw_push_stdout_stored": False,
+                    "raw_push_stderr_stored": False,
+                    "raw_remote_verification_stdout_stored": False,
+                    "raw_remote_verification_stderr_stored": False,
+                }
+            )
+        )
+
     @staticmethod
     def _pre_apply_dry_run_passed(
         pre_apply_dry_run_results: Sequence[Mapping[str, Any]],
@@ -4458,6 +4904,123 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw_worker_receipt_payload_stored must be false")
         if receipt.get("raw_verification_payload_stored") is not False:
             reasons.append("raw_verification_payload_stored must be false")
+        return reasons
+
+    def _derive_post_commit_publication_blocking_reasons(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> list[str]:
+        reasons: list[str] = []
+        push_result = dict(receipt.get("push_command_result", {}))
+        remote_verification_result = dict(
+            receipt.get("remote_verification_result", {}),
+        )
+        remote_name = str(receipt.get("remote_name", "")).strip()
+        remote_ref = str(receipt.get("remote_ref", "")).strip()
+        expected_push_command = f"git push {remote_name} HEAD:{remote_ref}"
+        expected_remote_command = f"git ls-remote {remote_name} {remote_ref}"
+
+        if receipt.get("profile_id") != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PROFILE:
+            reasons.append("profile_id mismatch")
+        if receipt.get("source_execution_receipt_digest_bound") is not True:
+            reasons.append("source execution receipt digest must be bound")
+        if not _is_sha256(receipt.get("source_execution_receipt_digest")):
+            reasons.append("source execution receipt digest must be sha256")
+        if receipt.get("source_execution_decision") != "ready-to-apply":
+            reasons.append("source execution must be ready-to-apply before publish")
+        if receipt.get("source_execution_ready_to_apply") is not True:
+            reasons.append("source execution validation must be ready")
+        if receipt.get("source_execution_commit_finalization_ready") is not True:
+            reasons.append("commit finalization must be ready before publish")
+        if not _is_sha256(
+            receipt.get("source_execution_commit_finalization_digest"),
+        ):
+            reasons.append("commit finalization digest must be sha256")
+        if not _is_commit(receipt.get("source_execution_post_apply_head")):
+            reasons.append("source execution post-apply head must be a commit hash")
+        if not _is_commit(receipt.get("local_commit_head")):
+            reasons.append("local commit head must be a commit hash")
+        if receipt.get("local_commit_head_matches_source") is not True:
+            reasons.append("local commit head must match source execution head")
+        if not _is_commit(receipt.get("remote_head")):
+            reasons.append("remote head must be a commit hash")
+        if receipt.get("remote_head_matches_local_commit") is not True:
+            reasons.append("remote head must match local commit head")
+        if receipt.get("remote_name") != "origin":
+            reasons.append("remote_name must be origin")
+        if receipt.get("remote_ref") != "refs/heads/main":
+            reasons.append("remote_ref must be refs/heads/main")
+        if receipt.get("remote_tracking_ref") != "refs/remotes/origin/main":
+            reasons.append("remote_tracking_ref must be refs/remotes/origin/main")
+        if (
+            receipt.get("push_command_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
+        ):
+            reasons.append("push_command_profile mismatch")
+        if (
+            receipt.get("remote_verification_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+        ):
+            reasons.append("remote_verification_profile mismatch")
+        if push_result.get("command_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
+        ):
+            reasons.append("push command result profile mismatch")
+        if push_result.get("command") != expected_push_command:
+            reasons.append("push command must be git push origin HEAD:refs/heads/main")
+        if push_result.get("status") != "pass" or push_result.get("exit_code") != 0:
+            reasons.append("push command must pass before GitHub handoff")
+        if (
+            receipt.get("push_command_receipt_digest")
+            != self._post_commit_publication_command_receipt_digest(push_result)
+            or push_result.get("command_receipt_digest")
+            != receipt.get("push_command_receipt_digest")
+        ):
+            reasons.append("push_command_receipt_digest mismatch")
+        if push_result.get("raw_stdout_stored") is not False:
+            reasons.append("raw push stdout must not be stored")
+        if push_result.get("raw_stderr_stored") is not False:
+            reasons.append("raw push stderr must not be stored")
+        if remote_verification_result.get("command_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+        ):
+            reasons.append("remote verification result profile mismatch")
+        if remote_verification_result.get("command") != expected_remote_command:
+            reasons.append("remote verification command mismatch")
+        if (
+            remote_verification_result.get("status") != "pass"
+            or remote_verification_result.get("exit_code") != 0
+        ):
+            reasons.append("remote verification command must pass")
+        if (
+            receipt.get("remote_verification_command_receipt_digest")
+            != self._post_commit_publication_command_receipt_digest(
+                remote_verification_result,
+            )
+            or remote_verification_result.get("command_receipt_digest")
+            != receipt.get("remote_verification_command_receipt_digest")
+        ):
+            reasons.append("remote_verification_command_receipt_digest mismatch")
+        if remote_verification_result.get("raw_stdout_stored") is not False:
+            reasons.append("raw remote verification stdout must not be stored")
+        if remote_verification_result.get("raw_stderr_stored") is not False:
+            reasons.append("raw remote verification stderr must not be stored")
+        if receipt.get("publication_digest") != self._post_commit_publication_digest(
+            receipt,
+        ):
+            reasons.append("publication_digest mismatch")
+        if receipt.get("raw_execution_payload_stored") is not False:
+            reasons.append("raw_execution_payload_stored must be false")
+        if receipt.get("raw_post_commit_publication_payload_stored") is not False:
+            reasons.append("raw_post_commit_publication_payload_stored must be false")
+        if receipt.get("raw_push_stdout_stored") is not False:
+            reasons.append("raw_push_stdout_stored must be false")
+        if receipt.get("raw_push_stderr_stored") is not False:
+            reasons.append("raw_push_stderr_stored must be false")
+        if receipt.get("raw_remote_verification_stdout_stored") is not False:
+            reasons.append("raw_remote_verification_stdout_stored must be false")
+        if receipt.get("raw_remote_verification_stderr_stored") is not False:
+            reasons.append("raw_remote_verification_stderr_stored must be false")
         return reasons
 
     def _derive_batch_blocking_reasons(self, receipt: Mapping[str, Any]) -> list[str]:

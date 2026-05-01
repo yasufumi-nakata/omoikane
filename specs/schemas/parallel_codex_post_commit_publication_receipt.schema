@@ -1,0 +1,201 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/parallel_codex_post_commit_publication_receipt.schema"
+title: ParallelCodexPostCommitPublicationReceipt
+description: >
+  Digest-only receipt for binding a commit-finalized Parallel Codex integration
+  execution to a command-level origin/main push and remote-head verification
+  before GitHub handoff. The receipt keeps raw execution, push, and remote
+  verification payloads redacted while preserving command and publication
+  digests.
+type: object
+additionalProperties: false
+required:
+  - kind
+  - schema_version
+  - receipt_id
+  - generated_at
+  - profile_id
+  - integration_policy_profile
+  - reference_runbook_ref
+  - source_execution_receipt_ref
+  - source_execution_receipt_digest
+  - source_execution_receipt_digest_bound
+  - source_execution_decision
+  - source_execution_ready_to_apply
+  - source_execution_commit_finalization_ref
+  - source_execution_commit_finalization_digest
+  - source_execution_commit_finalization_ready
+  - source_execution_post_apply_head
+  - local_commit_head
+  - local_commit_head_matches_source
+  - remote_name
+  - remote_ref
+  - remote_tracking_ref
+  - remote_head
+  - remote_head_matches_local_commit
+  - push_command_profile
+  - push_command_result
+  - push_command_receipt_digest
+  - remote_verification_profile
+  - remote_verification_result
+  - remote_verification_command_receipt_digest
+  - publication_digest
+  - publication_status
+  - ready_for_github_handoff
+  - blocking_reasons
+  - result_summary
+  - raw_execution_payload_stored
+  - raw_post_commit_publication_payload_stored
+  - raw_push_stdout_stored
+  - raw_push_stderr_stored
+  - raw_remote_verification_stdout_stored
+  - raw_remote_verification_stderr_stored
+  - receipt_digest
+  - receipt_ref
+properties:
+  kind:
+    const: parallel_codex_post_commit_publication_receipt
+  schema_version:
+    type: string
+    pattern: "^[0-9]+\\.[0-9]+\\.[0-9]+$"
+  receipt_id:
+    type: string
+    pattern: "^parallel-codex-publication-[a-f0-9]{12}$"
+  generated_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: origin-main-post-commit-publication-v1
+  integration_policy_profile:
+    const: main-checkout-worker-result-ingestion-v1
+  reference_runbook_ref:
+    const: references/parallel-codex-orchestration.md
+  source_execution_receipt_ref:
+    type: string
+    pattern: "^receipt://parallel-codex/parallel-codex-execution-[a-f0-9]{12}$"
+  source_execution_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_execution_receipt_digest_bound:
+    type: boolean
+  source_execution_decision:
+    enum:
+      - ready-to-apply
+      - blocked
+  source_execution_ready_to_apply:
+    type: boolean
+  source_execution_commit_finalization_ref:
+    type: string
+    pattern: "^commit-finalization://parallel-codex/[a-f0-9]{12}$"
+  source_execution_commit_finalization_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_execution_commit_finalization_ready:
+    type: boolean
+  source_execution_post_apply_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  local_commit_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  local_commit_head_matches_source:
+    type: boolean
+  remote_name:
+    const: origin
+  remote_ref:
+    const: refs/heads/main
+  remote_tracking_ref:
+    const: refs/remotes/origin/main
+  remote_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  remote_head_matches_local_commit:
+    type: boolean
+  push_command_profile:
+    const: command-bound-git-push-origin-main-v1
+  push_command_result:
+    $ref: "#/$defs/command_result"
+  push_command_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  remote_verification_profile:
+    const: command-bound-git-ls-remote-origin-main-v1
+  remote_verification_result:
+    $ref: "#/$defs/command_result"
+  remote_verification_command_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  publication_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  publication_status:
+    enum:
+      - published
+      - blocked
+  ready_for_github_handoff:
+    type: boolean
+  blocking_reasons:
+    type: array
+    items:
+      type: string
+  result_summary:
+    type: string
+    minLength: 1
+  raw_execution_payload_stored:
+    const: false
+  raw_post_commit_publication_payload_stored:
+    const: false
+  raw_push_stdout_stored:
+    const: false
+  raw_push_stderr_stored:
+    const: false
+  raw_remote_verification_stdout_stored:
+    const: false
+  raw_remote_verification_stderr_stored:
+    const: false
+  receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  receipt_ref:
+    type: string
+    pattern: "^receipt://parallel-codex/parallel-codex-publication-[a-f0-9]{12}$"
+$defs:
+  command_result:
+    type: object
+    additionalProperties: false
+    required:
+      - command_profile
+      - command
+      - status
+      - exit_code
+      - stdout_digest
+      - stderr_digest
+      - raw_stdout_stored
+      - raw_stderr_stored
+      - command_receipt_digest
+    properties:
+      command_profile:
+        enum:
+          - command-bound-git-push-origin-main-v1
+          - command-bound-git-ls-remote-origin-main-v1
+      command:
+        type: string
+        minLength: 1
+      status:
+        type: string
+        minLength: 1
+      exit_code:
+        type: integer
+      stdout_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      stderr_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      raw_stdout_stored:
+        const: false
+      raw_stderr_stored:
+        const: false
+      command_receipt_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"

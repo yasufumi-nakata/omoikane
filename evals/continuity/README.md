@@ -195,6 +195,7 @@ commit finalization gate 未 ready execution を fail-closed にできるか。
 - `memory_replication_quorum.yaml`
 - `parallel_codex_integration_batch.yaml`
 - `parallel_codex_integration_execution.yaml`
+- `parallel_codex_post_commit_publication.yaml`
 - `parallel_codex_result_ingestion.yaml`
 - `patch_generator_direct_contract.yaml`
 - `procedural_actuation_bridge.yaml`

@@ -31,6 +31,33 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.service = ParallelCodexOrchestrationService()
 
+    def _ready_execution_receipt(self) -> dict[str, object]:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+            ],
+            verification_results=_verification_results(),
+            result_summary="Runtime orchestration patch is ready.",
+        )
+        batch = self.service.plan_integration_batch(
+            receipts=[receipt],
+            main_checkout_head=MAIN_HEAD,
+            verification_results=_verification_results(),
+            result_summary="Single ready receipt can be rehearsed.",
+        )
+        return self.service.plan_integration_execution(
+            batch_receipt=batch,
+            current_checkout_head=MAIN_HEAD,
+            post_apply_verification_results=_verification_results(),
+            result_summary="Commit finalization digest binds apply evidence.",
+        )
+
     def test_completed_worker_result_is_ready_when_scope_and_verification_pass(self) -> None:
         receipt = self.service.ingest_worker_result(
             worker_id="codex-worker-unit",
@@ -1444,6 +1471,75 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(validation["ready_to_apply"])
         self.assertFalse(validation["commit_finalization_digest_bound"])
         self.assertFalse(validation["commit_finalization_ready"])
+
+    def test_post_commit_publication_binds_origin_main_handoff(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            result_summary="Publication to origin/main is ready.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual(
+            "parallel_codex_post_commit_publication_receipt",
+            publication["kind"],
+        )
+        self.assertEqual("published", publication["publication_status"])
+        self.assertTrue(publication["ready_for_github_handoff"])
+        self.assertEqual([], publication["blocking_reasons"])
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["source_execution_receipt_digest_bound"])
+        self.assertTrue(validation["source_execution_commit_finalization_ready"])
+        self.assertTrue(validation["local_commit_head_matches_source"])
+        self.assertTrue(validation["remote_head_matches_local_commit"])
+        self.assertTrue(validation["push_command_digest_bound"])
+        self.assertTrue(validation["remote_verification_digest_bound"])
+        self.assertTrue(validation["publication_digest_bound"])
+        self.assertEqual(
+            "git push origin HEAD:refs/heads/main",
+            publication["push_command_result"]["command"],
+        )
+        self.assertEqual(
+            "git ls-remote origin refs/heads/main",
+            publication["remote_verification_result"]["command"],
+        )
+        self.assertFalse(publication["raw_post_commit_publication_payload_stored"])
+        self.assertFalse(publication["raw_push_stdout_stored"])
+        self.assertFalse(publication["raw_push_stderr_stored"])
+        self.assertFalse(publication["raw_remote_verification_stdout_stored"])
+        self.assertFalse(publication["raw_remote_verification_stderr_stored"])
+
+    def test_post_commit_publication_blocks_remote_head_mismatch(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head="d" * 40,
+            result_summary="Publication blocks when origin/main is stale.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "remote head must match local commit head",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["publication_digest_bound"])
+        self.assertFalse(validation["remote_head_matches_local_commit"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
         changed_file = "src/omoikane/self_construction/parallel_orchestration.py"

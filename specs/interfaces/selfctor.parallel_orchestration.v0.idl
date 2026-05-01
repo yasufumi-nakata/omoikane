@@ -2,11 +2,12 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff or structured patch-segment classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, repo-local patch artifact bindings, command-bound git apply dry-run manifests, context-bound post-apply verification manifests, checkout mutation attestations, patch artifact cleanup receipts, and commit finalization gates before main checkout integration.
+summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff or structured patch-segment classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, repo-local patch artifact bindings, command-bound git apply dry-run manifests, context-bound post-apply verification manifests, checkout mutation attestations, patch artifact cleanup receipts, commit finalization gates, and post-commit origin/main publication receipts before GitHub handoff.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
   parallel_codex_integration_batch_receipt: ../schemas/parallel_codex_integration_batch_receipt.schema
   parallel_codex_integration_execution_receipt: ../schemas/parallel_codex_integration_execution_receipt.schema
+  parallel_codex_post_commit_publication_receipt: ../schemas/parallel_codex_post_commit_publication_receipt.schema
 operations:
   ingest_worker_result:
     summary: Normalize one worker result, changed-file list, patch digest, and verification command set into a main-checkout ingestion receipt.
@@ -345,6 +346,68 @@ operations:
       - patch artifact cleanup must bind the ordered `artifacts/parallel-codex/*.patch` paths, patch artifact manifest digest, pre-apply dry-run manifest digest, checkout mutation event digest, and post-apply head; retained artifacts keep execution_decision blocked before commit
       - commit finalization gate must bind source batch digest, current checkout head, apply plan digest, patch artifact manifest digest, pre-apply dry-run manifest digest, post-apply verification context digest, checkout mutation event digest, post-apply head, patch artifact cleanup digest, changed-file owner manifest digest, and passing verification state before commit
       - conflict, worker receipt, batch, patch, dry-run stdout/stderr, verification stdout/stderr, checkout mutation event payload, patch cleanup payload, commit finalization payload, and other raw payloads are never stored
+  plan_post_commit_publication:
+    summary: Bind a commit-finalized integration execution receipt to a command-level `git push origin HEAD:refs/heads/main` receipt and `git ls-remote origin refs/heads/main` remote-head verification receipt before GitHub handoff.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - execution_receipt
+          - local_commit_head
+          - remote_head
+          - result_summary
+        properties:
+          execution_receipt:
+            schema_ref: parallel_codex_integration_execution_receipt
+          local_commit_head:
+            type: string
+            pattern: "^[a-f0-9]{40}$"
+          remote_head:
+            type: string
+            pattern: "^[a-f0-9]{40}$"
+          remote_name:
+            const: origin
+          remote_ref:
+            const: refs/heads/main
+          push_result:
+            type: object
+            additionalProperties: true
+          remote_verification_result:
+            type: object
+            additionalProperties: true
+          result_summary:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: parallel_codex_post_commit_publication_receipt
+    guarantees:
+      - source execution receipt digest must be bound and validation-ready before publication_status can become published
+      - source commit finalization must be ready before a push result can be treated as GitHub handoff evidence
+      - local commit head must match the source execution post-apply head and remote head must match that local commit
+      - push command is fixed to `git push origin HEAD:refs/heads/main` and remote verification command is fixed to `git ls-remote origin refs/heads/main`
+      - push and remote verification stdout/stderr are stored only as digests, and publication_digest binds source execution, local head, remote head, and command receipts
+  validate_post_commit_publication_receipt:
+    summary: Recompute post-commit publication command digests, publication digest, receipt digest, and blocking reasons.
+    input:
+      schema_ref: parallel_codex_post_commit_publication_receipt
+    output:
+      inline_schema:
+        type: object
+        additionalProperties: false
+        required:
+          - ok
+          - ready_for_github_handoff
+          - errors
+        properties:
+          ok:
+            type: boolean
+          ready_for_github_handoff:
+            type: boolean
+          errors:
+            type: array
+            items:
+              type: string
   validate_worker_result_receipt:
     summary: Recompute the changed-file manifest digest, verification manifest digest, receipt digest, and blocking reasons for a worker result receipt.
     input:
@@ -418,3 +481,6 @@ events:
   selfctor.parallel_orchestration.integration_execution_planned:
     payload:
       schema_ref: parallel_codex_integration_execution_receipt
+  selfctor.parallel_orchestration.post_commit_publication_planned:
+    payload:
+      schema_ref: parallel_codex_post_commit_publication_receipt

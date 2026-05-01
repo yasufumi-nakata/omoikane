@@ -16,6 +16,7 @@ OS 自身が自身の設計図を読み、改修パッチを生成・検証・�
 - `DesignReader` ── docs/ と specs/ を解釈し、git-bound `design_delta_scan_receipt`、section-level `section_changes`、`planning_cues`、fail-closed `design_delta_manifest` / build_request handoff を生成
 - `PatchGenerator` ── `build_request` を読み、immutable boundary と workspace scope を検証したうえで planning cue / target subsystem / output path に整列した multi-file patch descriptor を生成する（Codex 系）
 - `ParallelCodexOrchestration` ── subagent / worker / `codex exec` / remote branch / PR / Yaoyorozu worker dispatch の成果を main checkout に混ぜる前に、worker base commit、ownership scope、changed file manifest digest、repo-local workspace marker diff classifier digest または structured patch-segment manifest digest、workspace marker hygiene digest、patch digest、signed worker identity evidence、remote metadata digest、remote source revocation digest、remote source revocation freshness digest、signed provider timestamp digest、timestamp replay guard digest、remote source content identity digest、remote source ancestry digest、verification manifest digest、upstream dispatch / patch candidate digest を `parallel_codex_worker_result_receipt` として束縛し、さらに複数 receipt の統合前には `parallel_codex_integration_batch_receipt` で決定的順序、blocked receipt quarantine manifest digest、changed-file owner manifest、conflict digest を固定してから統合可否を決める。適用直前には `parallel_codex_integration_execution_receipt` で source batch digest、current checkout head、ordered apply plan digest、repo-local patch artifact manifest digest、`artifacts/parallel-codex/*.patch` path、command-bound `git apply --check artifacts/parallel-codex/*.patch` dry-run receipt、post-apply verification manifest と apply context digest、checkout mutation event digest、patch artifact cleanup digest、commit finalization digest を固定する。stale / failed / blocked result、marker-only result、content identity mismatch result、unrelated ancestry result、changed-file conflict batch、dry-run failed execution、patch artifact に束縛されない dry-run command、post-apply verification が apply plan / patch artifact / pre-apply dry-run digest に束縛されない execution、checkout mutation attestation が pre/post head と apply context に束縛されない execution、patch artifact cleanup が未 verified の execution、commit finalization gate が未 ready の execution、blocked batch 由来 execution は fail-closed にする
+  commit 後は `parallel_codex_post_commit_publication_receipt` で source execution digest、commit finalization ready 状態、local commit head、`git push origin HEAD:refs/heads/main` command receipt、`git ls-remote origin refs/heads/main` remote-head verification receipt、publication digest を固定し、origin/main の remote head が local commit と一致しない handoff を fail-closed にする
 - `Sandboxer` ── Mirage Self の生成・隔離
 - `LiveEnactment` ── patch descriptor を temp workspace に materialize する前に artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を確認し、actual eval command を実行して cleanup / oversight gate 付き receipt を返す
 - `DifferentialEvaluator` ── `must_pass` eval を選定し、parsed baseline/sandbox evidence と comparison digest に加え、必要時は temp workspace の actual command run を `diff_eval_execution_receipt` として束縛して promote/hold/rollback 判定を返す
@@ -95,6 +96,13 @@ changed-file owner manifest に束縛されない execution、commit finalizatio
 source batch / apply / dry-run / verification / mutation / patch cleanup evidence に
 束縛されない execution、または patch artifact cleanup が `removed` として検証されない
 execution は blocked のまま commit へ進めない。
+commit finalization gate が ready になった execution だけが
+`parallel_codex_post_commit_publication_receipt` に進み、local commit head、
+origin/main remote head、command-bound `git push origin HEAD:refs/heads/main`
+receipt、command-bound `git ls-remote origin refs/heads/main` receipt を
+publication digest に束縛する。push 失敗、remote head mismatch、
+source execution / commit finalization が未 ready の場合は schema-bound のまま
+`ready_for_github_handoff=false` に留まる。
 
 ## Mirage Self（サンドボックス自我）
 

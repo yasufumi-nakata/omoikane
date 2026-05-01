@@ -89,10 +89,18 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             result["execution_receipt"],
         )
         self._assert_schema_valid(
+            "specs/schemas/parallel_codex_post_commit_publication_receipt.schema",
+            result["post_commit_publication_receipt"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/parallel_codex_integration_execution_receipt.schema",
             result["conflict_execution_receipt"],
         )
-        self.assertEqual(11, len(result["schema_contracts"]))
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_post_commit_publication_receipt.schema",
+            result["blocked_post_commit_publication_receipt"],
+        )
+        self.assertEqual(13, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
         self.assertTrue(result["validation"]["ready_workspace_marker_hygiene_clean"])
@@ -443,6 +451,63 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertFalse(
             result["execution_receipt"]["raw_commit_finalization_payload_stored"]
         )
+        self.assertTrue(
+            result["validation"]["post_commit_publication_receipt_ok"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_ready_for_github_handoff"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["post_commit_publication_source_execution_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_commit_finalization_ready"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_local_commit_matches_source"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["post_commit_publication_remote_head_matches"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_push_command_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_remote_verification_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_publication_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["post_commit_publication_raw_payload_redacted"]
+        )
+        self.assertEqual(
+            "published",
+            result["post_commit_publication_receipt"]["publication_status"],
+        )
+        self.assertEqual(
+            "git push origin HEAD:refs/heads/main",
+            result["post_commit_publication_receipt"]["push_command_result"][
+                "command"
+            ],
+        )
+        self.assertFalse(
+            result["post_commit_publication_receipt"][
+                "raw_post_commit_publication_payload_stored"
+            ]
+        )
         self.assertEqual(
             "blocked",
             result["conflict_execution_receipt"]["execution_decision"],
@@ -454,6 +519,20 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["conflict_execution_receipt"]["pre_apply_dry_run_passed"]
+        )
+        self.assertTrue(
+            result["validation"]["blocked_post_commit_publication_receipt_ok"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "blocked_post_commit_publication_result_blocked"
+            ]
+        )
+        self.assertEqual(
+            "blocked",
+            result["blocked_post_commit_publication_receipt"][
+                "publication_status"
+            ],
         )
         self.assertTrue(result["validation"]["ledger_bound"])
 

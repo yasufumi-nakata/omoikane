@@ -1173,6 +1173,50 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["conflict_execution_blocked_on_source_batch"]
         )
+        self.assertTrue(
+            result["validation"]["post_commit_publication_receipt_ok"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_ready_for_github_handoff"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_push_command_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_remote_verification_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_publication_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["post_commit_publication_raw_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"]["blocked_post_commit_publication_receipt_ok"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "blocked_post_commit_publication_result_blocked"
+            ]
+        )
+        self.assertEqual(
+            "published",
+            result["post_commit_publication_receipt"]["publication_status"],
+        )
+        self.assertEqual(
+            "blocked",
+            result["blocked_post_commit_publication_receipt"][
+                "publication_status"
+            ],
+        )
         self.assertTrue(result["validation"]["ledger_bound"])
         self.assertEqual("accept-ready", result["ready_receipt"]["integration_decision"])
         self.assertEqual("accept-ready", result["remote_receipt"]["integration_decision"])

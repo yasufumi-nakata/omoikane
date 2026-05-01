@@ -135,6 +135,7 @@ oversight_scope_refs:
   - specs/schemas/parallel_codex_worker_result_receipt.schema
   - specs/schemas/parallel_codex_integration_batch_receipt.schema
   - specs/schemas/parallel_codex_integration_execution_receipt.schema
+  - specs/schemas/parallel_codex_post_commit_publication_receipt.schema
   - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
   - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
   - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
@@ -151,6 +152,7 @@ oversight_scope_refs:
   - evals/continuity/parallel_codex_result_ingestion.yaml
   - evals/continuity/parallel_codex_integration_batch.yaml
   - evals/continuity/parallel_codex_integration_execution.yaml
+  - evals/continuity/parallel_codex_post_commit_publication.yaml
   - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
   - evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
   - evals/agentic/yaoyorozu_source_manifest_public_verification.yaml

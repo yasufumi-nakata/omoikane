@@ -1,0 +1,26 @@
+eval_id: parallel_codex_post_commit_publication
+target: selfctor.parallel_orchestration
+summary: >
+  parallel-orchestration-demo が commit-finalized execution receipt を
+  origin/main 公開レシートへ縮約し、source execution digest、local commit head、
+  remote head、command-bound git push receipt、command-bound git ls-remote
+  verification receipt、publication digest、raw execution / push / remote
+  verification payload 非保存を固定すること
+checks:
+  - name: parallel Codex post-commit publication smoke
+    command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
+expect:
+  post_commit_publication_ready_for_github_handoff: true
+  post_commit_publication_source_execution_bound: true
+  post_commit_publication_commit_finalization_ready: true
+  post_commit_publication_local_commit_matches_source: true
+  post_commit_publication_remote_head_matches: true
+  post_commit_publication_push_command_digest_bound: true
+  post_commit_publication_remote_verification_digest_bound: true
+  post_commit_publication_publication_digest_bound: true
+  post_commit_publication_raw_payload_redacted: true
+  blocked_post_commit_publication_result_blocked: true
+  blocked_post_commit_publication_publication_digest_bound: true
+metric: boolean
+threshold: 1.0
+ethics_check: true

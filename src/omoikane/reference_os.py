@@ -967,11 +967,13 @@ class OmoikaneReferenceOS:
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
             "specs/schemas/parallel_codex_integration_batch_receipt.schema",
             "specs/schemas/parallel_codex_integration_execution_receipt.schema",
+            "specs/schemas/parallel_codex_post_commit_publication_receipt.schema",
             "specs/schemas/README.md",
             "specs/catalog.yaml",
             "evals/continuity/parallel_codex_result_ingestion.yaml",
             "evals/continuity/parallel_codex_integration_batch.yaml",
             "evals/continuity/parallel_codex_integration_execution.yaml",
+            "evals/continuity/parallel_codex_post_commit_publication.yaml",
             "evals/continuity/README.md",
             "docs/02-subsystems/self-construction/README.md",
             "docs/04-ai-governance/codex-as-builder.md",
@@ -993,6 +995,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-02_parallel-codex-post-apply-verification-context.md",
             "meta/decision-log/2026-05-02_parallel-codex-checkout-mutation-attestation.md",
             "meta/decision-log/2026-05-02_parallel-codex-commit-finalization-gate.md",
+            "meta/decision-log/2026-05-02_parallel-codex-post-commit-publication.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1230,6 +1233,33 @@ class OmoikaneReferenceOS:
                 ),
             )
         )
+        post_commit_publication_receipt = (
+            self.parallel_orchestration.plan_post_commit_publication(
+                execution_receipt=execution_receipt,
+                local_commit_head=execution_receipt[
+                    "checkout_mutation_post_apply_head"
+                ],
+                remote_head=execution_receipt["checkout_mutation_post_apply_head"],
+                result_summary=(
+                    "Commit-finalized Parallel Codex execution is bound to a "
+                    "command-level origin/main push receipt and a remote-head "
+                    "verification receipt before GitHub handoff."
+                ),
+            )
+        )
+        blocked_post_commit_publication_receipt = (
+            self.parallel_orchestration.plan_post_commit_publication(
+                execution_receipt=conflict_execution_receipt,
+                local_commit_head=conflict_execution_receipt[
+                    "checkout_mutation_post_apply_head"
+                ],
+                remote_head="d" * 40,
+                result_summary=(
+                    "Blocked execution remains digest-bound but cannot be "
+                    "published to origin/main."
+                ),
+            )
+        )
         ready_validation = self.parallel_orchestration.validate_worker_result_receipt(
             ready_receipt,
         )
@@ -1277,6 +1307,16 @@ class OmoikaneReferenceOS:
         conflict_execution_validation = (
             self.parallel_orchestration.validate_integration_execution_receipt(
                 conflict_execution_receipt,
+            )
+        )
+        post_commit_publication_validation = (
+            self.parallel_orchestration.validate_post_commit_publication_receipt(
+                post_commit_publication_receipt,
+            )
+        )
+        blocked_post_commit_publication_validation = (
+            self.parallel_orchestration.validate_post_commit_publication_receipt(
+                blocked_post_commit_publication_receipt,
             )
         )
         ledger_entry = self.ledger.append(
@@ -1511,6 +1551,40 @@ class OmoikaneReferenceOS:
                 "execution_commit_finalization_status": execution_receipt[
                     "commit_finalization_status"
                 ],
+                "post_commit_publication_receipt_ref": (
+                    post_commit_publication_receipt["receipt_ref"]
+                ),
+                "post_commit_publication_receipt_digest": (
+                    post_commit_publication_receipt["receipt_digest"]
+                ),
+                "post_commit_publication_digest": (
+                    post_commit_publication_receipt["publication_digest"]
+                ),
+                "post_commit_publication_status": (
+                    post_commit_publication_receipt["publication_status"]
+                ),
+                "post_commit_publication_remote_ref": (
+                    post_commit_publication_receipt["remote_ref"]
+                ),
+                "post_commit_publication_remote_head": (
+                    post_commit_publication_receipt["remote_head"]
+                ),
+                "post_commit_publication_push_command_digest": (
+                    post_commit_publication_receipt[
+                        "push_command_receipt_digest"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_digest": (
+                    post_commit_publication_receipt[
+                        "remote_verification_command_receipt_digest"
+                    ]
+                ),
+                "blocked_post_commit_publication_receipt_ref": (
+                    blocked_post_commit_publication_receipt["receipt_ref"]
+                ),
+                "blocked_post_commit_publication_receipt_digest": (
+                    blocked_post_commit_publication_receipt["receipt_digest"]
+                ),
                 "conflict_execution_receipt_ref": conflict_execution_receipt[
                     "receipt_ref"
                 ],
@@ -1536,6 +1610,11 @@ class OmoikaneReferenceOS:
                 "raw_checkout_mutation_payload_stored": False,
                 "raw_patch_artifact_cleanup_payload_stored": False,
                 "raw_commit_finalization_payload_stored": False,
+                "raw_post_commit_publication_payload_stored": False,
+                "raw_push_stdout_stored": False,
+                "raw_push_stderr_stored": False,
+                "raw_remote_verification_stdout_stored": False,
+                "raw_remote_verification_stderr_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1629,12 +1708,28 @@ class OmoikaneReferenceOS:
                 "contract_role": "parallel-codex-integration-execution-ready",
             },
             {
+                "payload_path": "post_commit_publication_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_post_commit_publication_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-post-commit-publication-ready",
+            },
+            {
                 "payload_path": "conflict_execution_receipt",
                 "schema_path": (
                     "specs/schemas/"
                     "parallel_codex_integration_execution_receipt.schema"
                 ),
                 "contract_role": "parallel-codex-integration-execution-blocked",
+            },
+            {
+                "payload_path": "blocked_post_commit_publication_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_post_commit_publication_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-post-commit-publication-blocked",
             },
         ]
         return {
@@ -1651,6 +1746,10 @@ class OmoikaneReferenceOS:
             "conflict_batch_receipt": conflict_batch_receipt,
             "execution_receipt": execution_receipt,
             "conflict_execution_receipt": conflict_execution_receipt,
+            "post_commit_publication_receipt": post_commit_publication_receipt,
+            "blocked_post_commit_publication_receipt": (
+                blocked_post_commit_publication_receipt
+            ),
             "ledger_entry_ref": f"ledger://continuity-ledger/{ledger_entry.entry_hash}",
             "ledger_entry_hash": ledger_entry.entry_hash,
             "ledger_payload_ref": ledger_entry.payload_ref,
@@ -1667,6 +1766,8 @@ class OmoikaneReferenceOS:
                     and conflict_batch_validation["ok"]
                     and execution_validation["ok"]
                     and conflict_execution_validation["ok"]
+                    and post_commit_publication_validation["ok"]
+                    and blocked_post_commit_publication_validation["ok"]
                     and ready_validation["ready_for_main_checkout"]
                     and remote_validation["ready_for_main_checkout"]
                     and yaoyorozu_bridge_validation["ready_for_main_checkout"]
@@ -1678,6 +1779,12 @@ class OmoikaneReferenceOS:
                     and not conflict_batch_validation["ready_for_integration"]
                     and execution_validation["ready_to_apply"]
                     and not conflict_execution_validation["ready_to_apply"]
+                    and post_commit_publication_validation[
+                        "ready_for_github_handoff"
+                    ]
+                    and not blocked_post_commit_publication_validation[
+                        "ready_for_github_handoff"
+                    ]
                 ),
                 "ready_receipt_ok": ready_validation["ok"],
                 "ready_for_main_checkout": ready_validation[
@@ -2141,6 +2248,73 @@ class OmoikaneReferenceOS:
                 ),
                 "execution_raw_verification_payload_redacted": (
                     execution_validation["raw_verification_payload_redacted"]
+                ),
+                "post_commit_publication_receipt_ok": (
+                    post_commit_publication_validation["ok"]
+                ),
+                "post_commit_publication_ready_for_github_handoff": (
+                    post_commit_publication_validation[
+                        "ready_for_github_handoff"
+                    ]
+                ),
+                "post_commit_publication_source_execution_bound": (
+                    post_commit_publication_validation[
+                        "source_execution_receipt_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_commit_finalization_ready": (
+                    post_commit_publication_validation[
+                        "source_execution_commit_finalization_ready"
+                    ]
+                ),
+                "post_commit_publication_local_commit_matches_source": (
+                    post_commit_publication_validation[
+                        "local_commit_head_matches_source"
+                    ]
+                ),
+                "post_commit_publication_remote_head_matches": (
+                    post_commit_publication_validation[
+                        "remote_head_matches_local_commit"
+                    ]
+                ),
+                "post_commit_publication_push_command_digest_bound": (
+                    post_commit_publication_validation[
+                        "push_command_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_digest_bound": (
+                    post_commit_publication_validation[
+                        "remote_verification_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_publication_digest_bound": (
+                    post_commit_publication_validation[
+                        "publication_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_raw_payload_redacted": (
+                    post_commit_publication_validation[
+                        "raw_publication_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_push_output_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_remote_verification_output_redacted"
+                    ]
+                ),
+                "blocked_post_commit_publication_receipt_ok": (
+                    blocked_post_commit_publication_validation["ok"]
+                ),
+                "blocked_post_commit_publication_result_blocked": (
+                    not blocked_post_commit_publication_validation[
+                        "ready_for_github_handoff"
+                    ]
+                ),
+                "blocked_post_commit_publication_publication_digest_bound": (
+                    blocked_post_commit_publication_validation[
+                        "publication_digest_bound"
+                    ]
                 ),
                 "conflict_execution_receipt_ok": conflict_execution_validation["ok"],
                 "conflict_execution_blocked": (

@@ -91,6 +91,11 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   post-apply verification context digest、checkout mutation event digest、
   post-apply head、patch artifact cleanup digest、changed-file owner manifest digest、
   passing verification state を束縛し、未 ready の execution を commit へ進めない
+- post-commit publication receipt は commit-finalized execution receipt digest、
+  local commit head、origin/main remote head、`git push origin HEAD:refs/heads/main`
+  command receipt digest、`git ls-remote origin refs/heads/main` remote verification
+  digest を publication digest に束縛し、remote head が local commit と一致しない
+  handoff は `ready_for_github_handoff=false` のまま fail-closed にする
 - patch artifact cleanup receipt は ordered apply step の
   `artifacts/parallel-codex/*.patch` path、patch artifact manifest digest、
   pre-apply dry-run manifest digest、checkout mutation event digest、post-apply head を
