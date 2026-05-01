@@ -15,6 +15,7 @@ expected:
   all_zero: true
   missing_required_reference_policy_section_count: 0
   worktree_workspace_marker_count: 0
+  untracked_generated_artifact_count: 0
   validation_ok: true
   counts_match_report: true
   report_digest_bound: true
@@ -33,6 +34,8 @@ expected:
   raw_report_payload_stored: false
   raw_surface_payload_stored: false
   tracked_worktree_diff_surface_bound: true
+  untracked_generated_artifacts_surface_bound: true
+  raw_artifact_payload_stored: false
   raw_continuity_event_payload_stored: false
 metric: boolean
 threshold: 1.0

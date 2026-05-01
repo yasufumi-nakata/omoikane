@@ -61,6 +61,7 @@ capabilities:
   - gap-report.reference-policy-sections.attest
   - gap-report.implementation-stub.attest
   - gap-report.worktree-marker-residue.attest
+  - gap-report.untracked-generated-artifact.attest
   - gap-report.scan-receipt.attest
   - gap-report.continuity-ledger-binding.attest
   - gap-report.continuity-ledger-entry.attest
@@ -204,6 +205,7 @@ when_to_invoke: |
   - gap-report が repo-local reference runbook の必須 section-level policy 欠落を `missing_required_reference_policy_sections` として検出していることを検証する時
   - gap-report が非抽象 runtime path に残る `NotImplementedError` stub を `implementation_stub_hits` として検出し、Backend 抽象 hook だけを除外していることを検証する時
   - gap-report が tracked worktree diff の workspace marker residue を `worktree_workspace_marker_hits` として検出し、raw diff payload を保存しないことを検証する時
+  - gap-report が未追跡生成物を `untracked_generated_artifact_hits` として検出し、`git:untracked-generated-artifacts` surface digest だけに束縛して raw artifact payload を読まないことを検証する時
   - gap-report の scan_receipt が all-zero 判定、prioritized task count、scan surface、report digest、surface digest manifest、raw report / raw surface payload 非保存に束縛されていることを検証する時
   - gap-report の scan_receipt が continuity_event_ref / continuity_event_digest を返し、raw continuity event payload を保存しないことを検証する時
   - gap-report の scan_receipt が実 ContinuityLedger entry ref / hash / payload ref と self+guardian 署名 role に束縛されていることを検証する時

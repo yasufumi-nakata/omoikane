@@ -108,6 +108,24 @@ IMPLEMENTATION_STUB_GLOB = "src/omoikane/**/*.py"
 IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES = ("Backend",)
 WORKTREE_DIFF_SCAN_SURFACE = "git:tracked-worktree-diff"
 WORKTREE_WORKSPACE_MARKER_PREFIX = "# workspace-enacted:"
+UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:untracked-generated-artifacts"
+UNTRACKED_GENERATED_ARTIFACT_PREFIXES = (
+    "artifacts/",
+    "build/",
+    "dist/",
+    "htmlcov/",
+)
+UNTRACKED_GENERATED_ARTIFACT_FILENAMES = (
+    ".coverage",
+    "coverage.xml",
+)
+UNTRACKED_GENERATED_ARTIFACT_SUFFIXES = (
+    ".patch",
+    ".pyc",
+)
+UNTRACKED_GENERATED_ARTIFACT_PART_SUFFIXES = (
+    ".egg-info",
+)
 SCAN_RECEIPT_SURFACES = (
     "meta/open-questions.md",
     "references/*.md",
@@ -122,6 +140,7 @@ SCAN_RECEIPT_SURFACES = (
     "src/omoikane/**/*.py",
     "meta/decision-log/*.md",
     WORKTREE_DIFF_SCAN_SURFACE,
+    UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE,
 )
 
 
@@ -144,6 +163,9 @@ class GapScanner:
         future_work_hits = self._future_work_hits(repo_root)
         implementation_stub_hits = self._implementation_stub_hits(repo_root)
         worktree_workspace_marker_hits = self._worktree_workspace_marker_hits(repo_root)
+        untracked_generated_artifact_hits = (
+            self._untracked_generated_artifact_hits(repo_root)
+        )
         decision_log_gap_hits = self._decision_log_gap_hits(repo_root)
         decision_log_residual_hits = [
             hit for hit in decision_log_gap_hits if hit["kind"] == "decision-log-residual"
@@ -233,6 +255,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in untracked_generated_artifact_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "untracked-generated-artifact",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in decision_log_frontier_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -281,6 +311,9 @@ class GapScanner:
             "future_work_hit_count": len(future_work_hits),
             "implementation_stub_count": len(implementation_stub_hits),
             "worktree_workspace_marker_count": len(worktree_workspace_marker_hits),
+            "untracked_generated_artifact_count": len(
+                untracked_generated_artifact_hits
+            ),
             "decision_log_residual_count": len(decision_log_residual_hits),
             "decision_log_frontier_count": len(decision_log_frontier_hits),
             "open_questions": open_questions,
@@ -298,6 +331,7 @@ class GapScanner:
             "future_work_hits": future_work_hits,
             "implementation_stub_hits": implementation_stub_hits,
             "worktree_workspace_marker_hits": worktree_workspace_marker_hits,
+            "untracked_generated_artifact_hits": untracked_generated_artifact_hits,
             "decision_log_residual_hits": decision_log_residual_hits,
             "decision_log_frontier_hits": decision_log_frontier_hits,
             "prioritized_tasks": prioritized_tasks,
@@ -323,6 +357,9 @@ class GapScanner:
             "implementation_stub_count": int(report["implementation_stub_count"]),
             "worktree_workspace_marker_count": int(
                 report["worktree_workspace_marker_count"]
+            ),
+            "untracked_generated_artifact_count": int(
+                report["untracked_generated_artifact_count"]
             ),
             "decision_log_residual_count": int(report["decision_log_residual_count"]),
             "decision_log_frontier_count": int(report["decision_log_frontier_count"]),
@@ -509,6 +546,19 @@ class GapScanner:
                     }
                 )
                 continue
+            if pattern == UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE:
+                artifact_text = GapScanner._untracked_generated_artifact_manifest_text(
+                    repo_root
+                )
+                entries.append(
+                    {
+                        "surface_pattern": pattern,
+                        "path": pattern,
+                        "sha256": sha256_text(artifact_text),
+                        "byte_length": len(artifact_text.encode("utf-8")),
+                    }
+                )
+                continue
             if any(marker in pattern for marker in ("*", "?", "[")):
                 candidates = sorted(path for path in repo_root.glob(pattern) if path.is_file())
             else:
@@ -559,6 +609,96 @@ class GapScanner:
         if result.returncode != 0:
             return ""
         return result.stdout
+
+    @staticmethod
+    def _untracked_files(repo_root: Path) -> List[str]:
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "ls-files",
+                    "--others",
+                    "--exclude-standard",
+                    "-z",
+                ],
+                check=False,
+                capture_output=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+        if result.returncode != 0:
+            return []
+        decoded = result.stdout.decode("utf-8", errors="ignore")
+        return sorted(path for path in decoded.split("\0") if path)
+
+    @staticmethod
+    def _is_untracked_generated_artifact(path: str) -> bool:
+        normalized = path.strip().lstrip("./")
+        if not normalized:
+            return False
+        if normalized in UNTRACKED_GENERATED_ARTIFACT_FILENAMES:
+            return True
+        if normalized.startswith(UNTRACKED_GENERATED_ARTIFACT_PREFIXES):
+            return True
+        if normalized.endswith(UNTRACKED_GENERATED_ARTIFACT_SUFFIXES):
+            return True
+        return any(
+            part.endswith(UNTRACKED_GENERATED_ARTIFACT_PART_SUFFIXES)
+            for part in normalized.split("/")
+        )
+
+    @classmethod
+    def _untracked_generated_artifact_paths(cls, repo_root: Path) -> List[str]:
+        return [
+            path
+            for path in cls._untracked_files(repo_root)
+            if cls._is_untracked_generated_artifact(path)
+        ]
+
+    @classmethod
+    def _untracked_generated_artifact_manifest_text(cls, repo_root: Path) -> str:
+        paths = cls._untracked_generated_artifact_paths(repo_root)
+        return "\n".join(paths) + ("\n" if paths else "")
+
+    def _untracked_generated_artifact_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, Any]]:
+        hits: List[Dict[str, Any]] = []
+        for path in self._untracked_generated_artifact_paths(repo_root):
+            hits.append(
+                {
+                    "kind": "untracked-generated-artifact",
+                    "path": path,
+                    "line": (
+                        "untracked generated artifact remains outside the "
+                        "completion contract"
+                    ),
+                    "artifact_class": self._untracked_generated_artifact_class(path),
+                    "untracked_artifact_status": "untracked-generated-artifact",
+                    "raw_artifact_payload_stored": False,
+                }
+            )
+        return hits
+
+    @staticmethod
+    def _untracked_generated_artifact_class(path: str) -> str:
+        normalized = path.strip().lstrip("./")
+        if normalized in UNTRACKED_GENERATED_ARTIFACT_FILENAMES:
+            return "coverage-output"
+        if normalized.startswith("artifacts/") or normalized.endswith(".patch"):
+            return "patch-or-artifact-output"
+        if normalized.startswith(("build/", "dist/")) or any(
+            part.endswith(".egg-info") for part in normalized.split("/")
+        ):
+            return "packaging-output"
+        if normalized.startswith("htmlcov/"):
+            return "coverage-output"
+        if normalized.endswith(".pyc"):
+            return "python-bytecode"
+        return "generated-artifact"
 
     def _worktree_workspace_marker_hits(
         self, repo_root: Path

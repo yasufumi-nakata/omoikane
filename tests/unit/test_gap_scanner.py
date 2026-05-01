@@ -110,6 +110,7 @@ class GapScannerTests(unittest.TestCase):
                 receipt["counts"]["missing_required_reference_policy_section_count"],
             )
             self.assertEqual(0, receipt["counts"]["worktree_workspace_marker_count"])
+            self.assertEqual(0, receipt["counts"]["untracked_generated_artifact_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
             self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
@@ -217,6 +218,97 @@ class GapScannerTests(unittest.TestCase):
                     for entry in report["scan_receipt"]["scan_surface_digests"]
                 )
             )
+
+    def test_scan_reports_untracked_generated_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap",
+            )
+            artifact_path = repo_root / "artifacts" / "parallel-codex" / "worker.patch"
+            artifact_path.parent.mkdir(parents=True, exist_ok=True)
+            artifact_path.write_text("diff --git a/README.md b/README.md\n", encoding="utf-8")
+
+            report = GapScanner().scan(repo_root)
+            hit = report["untracked_generated_artifact_hits"][0]
+
+            self.assertEqual(1, report["untracked_generated_artifact_count"])
+            self.assertEqual(
+                "artifacts/parallel-codex/worker.patch",
+                hit["path"],
+            )
+            self.assertEqual("patch-or-artifact-output", hit["artifact_class"])
+            self.assertEqual(
+                "untracked-generated-artifact",
+                hit["untracked_artifact_status"],
+            )
+            self.assertFalse(hit["raw_artifact_payload_stored"])
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"]["untracked_generated_artifact_count"],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "untracked-generated-artifact"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:untracked-generated-artifacts"
+            )
+            self.assertEqual(
+                "git:untracked-generated-artifacts",
+                surface_digest["surface_pattern"],
+            )
+            self.assertEqual(
+                sha256_text("artifacts/parallel-codex/worker.patch\n"),
+                surface_digest["sha256"],
+            )
+
+    def test_scan_ignores_non_generated_untracked_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap",
+            )
+            note_path = repo_root / "docs" / "notes" / "draft.md"
+            note_path.parent.mkdir(parents=True, exist_ok=True)
+            note_path.write_text("# Draft\n", encoding="utf-8")
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["untracked_generated_artifact_count"])
+            self.assertEqual([], report["untracked_generated_artifact_hits"])
+            self.assertTrue(report["scan_receipt"]["all_zero"])
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:untracked-generated-artifacts"
+            )
+            self.assertEqual(sha256_text(""), surface_digest["sha256"])
 
     def test_scan_reports_empty_eval_surface(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
