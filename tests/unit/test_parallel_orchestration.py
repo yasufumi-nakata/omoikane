@@ -715,6 +715,11 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             batch["ordered_integration_receipt_digests"],
         )
         self.assertEqual([blocked_receipt["receipt_ref"]], batch["quarantined_receipt_refs"])
+        self.assertEqual(
+            "blocked-receipt-quarantine-manifest-v1",
+            batch["quarantine_profile"],
+        )
+        self.assertTrue(batch["quarantined_receipt_set_digest"])
         self.assertTrue(batch["blocked_receipts_quarantined"])
         self.assertEqual(0, batch["conflict_count"])
         self.assertTrue(validation["ok"])
@@ -722,6 +727,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["input_receipt_set_digest_bound"])
         self.assertTrue(validation["ordered_integration_digest_bound"])
         self.assertTrue(validation["changed_file_owner_manifest_digest_bound"])
+        self.assertTrue(validation["quarantined_receipt_set_digest_bound"])
         self.assertTrue(validation["conflict_free"])
         self.assertTrue(validation["blocked_receipts_quarantined"])
         self.assertFalse(batch["raw_worker_receipt_payload_stored"])
@@ -773,6 +779,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["conflict_blocked"])
         self.assertTrue(validation["conflict_digest_bound"])
         self.assertTrue(validation["changed_file_owner_manifest_digest_bound"])
+        self.assertTrue(validation["quarantined_receipt_set_digest_bound"])
 
 
 if __name__ == "__main__":

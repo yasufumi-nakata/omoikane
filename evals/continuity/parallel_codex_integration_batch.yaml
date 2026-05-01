@@ -14,6 +14,7 @@ expect:
   batch_input_receipt_set_digest_bound: true
   batch_ordered_integration_digest_bound: true
   batch_changed_file_owner_manifest_digest_bound: true
+  batch_quarantined_receipt_set_digest_bound: true
   batch_conflict_free: true
   batch_blocked_receipts_quarantined: true
   batch_required_verifications_passed: true
@@ -22,6 +23,7 @@ expect:
   conflict_batch_result_blocked: true
   conflict_batch_conflict_digest_bound: true
   conflict_batch_changed_file_owner_manifest_digest_bound: true
+  conflict_batch_quarantined_receipt_set_digest_bound: true
   conflict_batch_conflict_blocked: true
   conflict_batch_raw_conflict_payload_redacted: true
   raw_worker_receipt_payload_stored: false

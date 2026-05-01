@@ -207,6 +207,9 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["batch_changed_file_owner_manifest_digest_bound"]
         )
+        self.assertTrue(
+            result["validation"]["batch_quarantined_receipt_set_digest_bound"]
+        )
         self.assertTrue(result["validation"]["batch_conflict_free"])
         self.assertTrue(result["validation"]["batch_blocked_receipts_quarantined"])
         self.assertTrue(result["validation"]["batch_required_verifications_passed"])
@@ -221,6 +224,11 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"][
                 "conflict_batch_changed_file_owner_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "conflict_batch_quarantined_receipt_set_digest_bound"
             ]
         )
         self.assertTrue(result["validation"]["conflict_batch_conflict_blocked"])

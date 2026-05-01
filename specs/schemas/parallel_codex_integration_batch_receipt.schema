@@ -5,8 +5,9 @@ description: >
   Digest-only receipt for reducing multiple Parallel Codex worker-result
   receipts into one main-checkout integration batch. The batch deterministically
   orders accept-ready receipts, quarantines blocked receipts, detects changed
-  file overlap before integration, and keeps raw worker receipt, conflict, and
-  verification payloads out of the persisted artifact.
+  file overlap before integration, binds the quarantined receipt set to a
+  digest-only manifest, and keeps raw worker receipt, conflict, and verification
+  payloads out of the persisted artifact.
 type: object
 additionalProperties: false
 required:
@@ -30,6 +31,8 @@ required:
   - quarantined_receipt_digests
   - quarantined_receipt_count
   - blocked_receipts_quarantined
+  - quarantine_profile
+  - quarantined_receipt_set_digest
   - ordered_integration_receipt_refs
   - ordered_integration_receipt_digests
   - ordered_integration_digest
@@ -123,6 +126,11 @@ properties:
     minimum: 0
   blocked_receipts_quarantined:
     const: true
+  quarantine_profile:
+    const: blocked-receipt-quarantine-manifest-v1
+  quarantined_receipt_set_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
   ordered_integration_receipt_refs:
     type: array
     items:
@@ -321,6 +329,8 @@ examples:
     quarantined_receipt_digests: []
     quarantined_receipt_count: 0
     blocked_receipts_quarantined: true
+    quarantine_profile: blocked-receipt-quarantine-manifest-v1
+    quarantined_receipt_set_digest: "abababababababababababababababababababababababababababababababab"
     ordered_integration_receipt_refs:
       - receipt://parallel-codex/parallel-codex-result-0123456789ab
     ordered_integration_receipt_digests:

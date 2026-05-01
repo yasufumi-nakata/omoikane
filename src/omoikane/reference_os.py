@@ -1388,6 +1388,9 @@ class OmoikaneReferenceOS:
                 "batch_quarantined_receipt_digests": batch_receipt[
                     "quarantined_receipt_digests"
                 ],
+                "batch_quarantined_receipt_set_digest": batch_receipt[
+                    "quarantined_receipt_set_digest"
+                ],
                 "conflict_batch_receipt_ref": conflict_batch_receipt["receipt_ref"],
                 "conflict_batch_receipt_digest": conflict_batch_receipt[
                     "receipt_digest"
@@ -1770,6 +1773,9 @@ class OmoikaneReferenceOS:
                 "batch_changed_file_owner_manifest_digest_bound": (
                     batch_validation["changed_file_owner_manifest_digest_bound"]
                 ),
+                "batch_quarantined_receipt_set_digest_bound": (
+                    batch_validation["quarantined_receipt_set_digest_bound"]
+                ),
                 "batch_conflict_free": batch_validation["conflict_free"],
                 "batch_blocked_receipts_quarantined": batch_validation[
                     "blocked_receipts_quarantined"
@@ -1793,6 +1799,11 @@ class OmoikaneReferenceOS:
                 "conflict_batch_changed_file_owner_manifest_digest_bound": (
                     conflict_batch_validation[
                         "changed_file_owner_manifest_digest_bound"
+                    ]
+                ),
+                "conflict_batch_quarantined_receipt_set_digest_bound": (
+                    conflict_batch_validation[
+                        "quarantined_receipt_set_digest_bound"
                     ]
                 ),
                 "conflict_batch_conflict_blocked": conflict_batch_validation[

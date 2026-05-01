@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, workspace marker hygiene, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, and batch-level changed-file conflict arbitration before main checkout integration.
+summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, workspace marker hygiene, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, and quarantined blocked receipt set digests before main checkout integration.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
   parallel_codex_integration_batch_receipt: ../schemas/parallel_codex_integration_batch_receipt.schema
@@ -264,6 +264,7 @@ operations:
     guarantees:
       - only validated accept-ready worker receipts with matching main_checkout_head enter ordered integration
       - blocked, failed, stale, marker-only, stale-head, and otherwise invalid receipts are quarantined with receipt refs and digests only
+      - the quarantined blocked receipt set is reduced to blocked-receipt-quarantine-manifest-v1 and quarantined_receipt_set_digest so raw blocked worker receipts never need to be stored
       - accepted receipts are ordered deterministically by receipt digest and receipt ref before integration
       - changed file owners are reduced to a digest-bound owner manifest before any checkout mutation
       - any changed-file overlap between accepted receipts makes the batch schema-bound but blocked
@@ -291,7 +292,7 @@ operations:
             items:
               type: string
   validate_integration_batch_receipt:
-    summary: Recompute batch receipt set, ordered integration, changed-file owner, conflict, verification, and receipt digests.
+    summary: Recompute batch receipt set, ordered integration, quarantined receipt set, changed-file owner, conflict, verification, and receipt digests.
     input:
       schema_ref: parallel_codex_integration_batch_receipt
     output:

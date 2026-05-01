@@ -749,7 +749,7 @@ entries:
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize a deterministic Parallel Codex integration batch before main checkout mutation, including input receipt-set digest, accept-ready ordering digest, quarantined blocked receipt refs/digests, changed-file owner manifest digest, conflict digest, required verification manifest, integration-ready / blocked decision, and raw worker receipt / conflict / verification payload redaction.
+    rationale: Required to serialize a deterministic Parallel Codex integration batch before main checkout mutation, including input receipt-set digest, accept-ready ordering digest, quarantined blocked receipt refs/digests, quarantined receipt set digest, changed-file owner manifest digest, conflict digest, required verification manifest, integration-ready / blocked decision, and raw worker receipt / conflict / verification payload redaction.
   - priority: P1
     kind: idl
     file: specs/interfaces/selfctor.parallel_orchestration.v0.idl
@@ -760,7 +760,7 @@ entries:
       - docs/02-subsystems/self-construction/README.md
       - docs/04-ai-governance/codex-as-builder.md
       - docs/07-reference-implementation/README.md
-    rationale: Required to make parallel Codex worker result ingestion, signed worker identity evidence binding, workspace marker hygiene, remote branch / PR metadata binding, remote source revocation freshness, signed provider timestamp, timestamp replay guard checking, remote source content identity, remote source main-head ancestry, Yaoyorozu dispatch-to-ingestion bridging, deterministic integration batch ordering, changed-file conflict arbitration, blocked receipt quarantine, and fail-closed stale / marker-only / content-mismatch / unrelated-ancestry worker blocking machine-readable in the L5 self-construction pipeline.
+    rationale: Required to make parallel Codex worker result ingestion, signed worker identity evidence binding, workspace marker hygiene, remote branch / PR metadata binding, remote source revocation freshness, signed provider timestamp, timestamp replay guard checking, remote source content identity, remote source main-head ancestry, Yaoyorozu dispatch-to-ingestion bridging, deterministic integration batch ordering, changed-file conflict arbitration, blocked receipt quarantine manifest binding, and fail-closed stale / marker-only / content-mismatch / unrelated-ancestry worker blocking machine-readable in the L5 self-construction pipeline.
   - priority: P1
     kind: eval
     file: evals/continuity/design_reader_handoff.yaml
@@ -3302,7 +3302,7 @@ entries:
       - specs/schemas/parallel_codex_worker_result_receipt.schema
       - specs/schemas/parallel_codex_integration_batch_receipt.schema
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects Parallel Codex batch integration from nondeterministic worker receipt ordering, unquarantined blocked receipts, missing changed-file owner manifests, unresolved changed-file conflicts, missing verification manifests, and raw worker receipt / conflict / verification payload storage.
+    rationale: Protects Parallel Codex batch integration from nondeterministic worker receipt ordering, unquarantined blocked receipts, missing quarantined receipt set digests, missing changed-file owner manifests, unresolved changed-file conflicts, missing verification manifests, and raw worker receipt / conflict / verification payload storage.
   - priority: P1
     kind: schema
     file: specs/schemas/naming_policy.schema

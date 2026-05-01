@@ -58,10 +58,11 @@ workspace-enacted marker-only payload は別 digest に縮約され、marker だ
 result は blocked のまま保持される。
 複数の accept-ready receipt を main checkout に混ぜる前には
 `parallel_codex_integration_batch_receipt` で receipt set digest、digest/ref 順の
-ordered integration digest、changed-file owner manifest digest、conflict digest を
-作り、blocked receipt を quarantine したうえで、同じ file を複数 receipt が触る
-batch を blocked のまま保持する。raw worker receipt payload、raw conflict payload、
-raw verification output は batch 側にも保存しない。
+ordered integration digest、blocked-receipt quarantine manifest digest、
+changed-file owner manifest digest、conflict digest を作り、blocked receipt を
+quarantine したうえで、同じ file を複数 receipt が触る batch を blocked のまま
+保持する。raw worker receipt payload、raw conflict payload、raw verification output は
+batch 側にも保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

@@ -18,6 +18,9 @@ PARALLEL_CODEX_INTEGRATION_BATCH_ORDERING_PROFILE = (
 PARALLEL_CODEX_INTEGRATION_BATCH_CONFLICT_PROFILE = (
     "disjoint-changed-file-conflict-arbitration-v1"
 )
+PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE = (
+    "blocked-receipt-quarantine-manifest-v1"
+)
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -177,6 +180,9 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "integration_batch_conflict_arbitration_profile": (
                 PARALLEL_CODEX_INTEGRATION_BATCH_CONFLICT_PROFILE
+            ),
+            "integration_batch_quarantine_profile": (
+                PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE
             ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
@@ -703,6 +709,15 @@ class ParallelCodexOrchestrationService:
             "quarantined_receipt_digests": quarantined_digests,
             "quarantined_receipt_count": len(quarantined_receipts),
             "blocked_receipts_quarantined": True,
+            "quarantine_profile": (
+                PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE
+            ),
+            "quarantined_receipt_set_digest": (
+                self._integration_batch_quarantined_receipt_digest(
+                    quarantined_receipt_refs=quarantined_refs,
+                    quarantined_receipt_digests=quarantined_digests,
+                )
+            ),
             "ordered_integration_receipt_refs": ordered_refs,
             "ordered_integration_receipt_digests": ordered_digests,
             "ordered_integration_digest": (
@@ -795,6 +810,17 @@ class ParallelCodexOrchestrationService:
                 changed_file_owners=changed_file_owners,
             )
         )
+        quarantined_receipt_set_digest_bound = (
+            receipt.get("quarantined_receipt_set_digest")
+            == self._integration_batch_quarantined_receipt_digest(
+                quarantined_receipt_refs=list(
+                    receipt.get("quarantined_receipt_refs", []),
+                ),
+                quarantined_receipt_digests=list(
+                    receipt.get("quarantined_receipt_digests", []),
+                ),
+            )
+        )
         conflict_digest_bound = (
             receipt.get("conflict_digest")
             == self._integration_batch_conflict_digest(
@@ -827,6 +853,11 @@ class ParallelCodexOrchestrationService:
             != PARALLEL_CODEX_INTEGRATION_BATCH_CONFLICT_PROFILE
         ):
             errors.append("conflict_arbitration_profile mismatch")
+        if (
+            receipt.get("quarantine_profile")
+            != PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE
+        ):
+            errors.append("quarantine_profile mismatch")
         if receipt.get("source_receipt_count") != len(input_refs):
             errors.append("source_receipt_count mismatch")
         if len(input_refs) != len(input_digests):
@@ -835,6 +866,10 @@ class ParallelCodexOrchestrationService:
             receipt.get("quarantined_receipt_refs", []),
         ):
             errors.append("quarantined_receipt_count mismatch")
+        if len(receipt.get("quarantined_receipt_refs", [])) != len(
+            receipt.get("quarantined_receipt_digests", []),
+        ):
+            errors.append("quarantined receipt refs and digests must have equal length")
         if receipt.get("conflict_count") != len(changed_file_conflicts):
             errors.append("conflict_count mismatch")
         if receipt.get("verification_command_count") != len(verification_results):
@@ -845,6 +880,8 @@ class ParallelCodexOrchestrationService:
             errors.append("ordered_integration_digest mismatch")
         if not changed_file_owner_manifest_digest_bound:
             errors.append("changed_file_owner_manifest_digest mismatch")
+        if not quarantined_receipt_set_digest_bound:
+            errors.append("quarantined_receipt_set_digest mismatch")
         if not conflict_digest_bound:
             errors.append("conflict_digest mismatch")
         if not verification_manifest_digest_bound:
@@ -872,6 +909,9 @@ class ParallelCodexOrchestrationService:
             "ordered_integration_digest_bound": ordered_integration_digest_bound,
             "changed_file_owner_manifest_digest_bound": (
                 changed_file_owner_manifest_digest_bound
+            ),
+            "quarantined_receipt_set_digest_bound": (
+                quarantined_receipt_set_digest_bound
             ),
             "conflict_digest_bound": conflict_digest_bound,
             "verification_manifest_digest_bound": verification_manifest_digest_bound,
@@ -1789,6 +1829,33 @@ class ParallelCodexOrchestrationService:
         )
 
     @staticmethod
+    def _integration_batch_quarantined_receipt_digest(
+        *,
+        quarantined_receipt_refs: Sequence[str],
+        quarantined_receipt_digests: Sequence[str],
+    ) -> str:
+        receipt_pairs = sorted(
+            [
+                {"receipt_ref": ref, "receipt_digest": digest}
+                for ref, digest in zip(
+                    quarantined_receipt_refs,
+                    quarantined_receipt_digests,
+                )
+            ],
+            key=lambda item: (item["receipt_digest"], item["receipt_ref"]),
+        )
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE
+                    ),
+                    "quarantined_receipt_pairs": receipt_pairs,
+                }
+            )
+        )
+
+    @staticmethod
     def _integration_batch_conflict_digest(
         *,
         changed_file_conflicts: Sequence[Mapping[str, Any]],
@@ -1820,6 +1887,28 @@ class ParallelCodexOrchestrationService:
             reasons.append("batch required verification commands must pass")
         if receipt.get("blocked_receipts_quarantined") is not True:
             reasons.append("blocked receipts must be quarantined from integration order")
+        if (
+            receipt.get("quarantine_profile")
+            != PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE
+        ):
+            reasons.append("quarantine_profile mismatch")
+        if len(receipt.get("quarantined_receipt_refs", [])) != len(
+            receipt.get("quarantined_receipt_digests", []),
+        ):
+            reasons.append(
+                "quarantined receipt refs and digests must have equal length",
+            )
+        if receipt.get(
+            "quarantined_receipt_set_digest",
+        ) != self._integration_batch_quarantined_receipt_digest(
+            quarantined_receipt_refs=list(
+                receipt.get("quarantined_receipt_refs", []),
+            ),
+            quarantined_receipt_digests=list(
+                receipt.get("quarantined_receipt_digests", []),
+            ),
+        ):
+            reasons.append("quarantined_receipt_set_digest mismatch")
         if receipt.get("raw_worker_receipt_payload_stored") is not False:
             reasons.append("raw_worker_receipt_payload_stored must be false")
         if receipt.get("raw_conflict_payload_stored") is not False:

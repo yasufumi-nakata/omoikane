@@ -130,6 +130,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["batch_changed_file_owner_manifest_digest_bound"]
         )
+        self.assertTrue(
+            result["validation"]["batch_quarantined_receipt_set_digest_bound"]
+        )
         self.assertTrue(result["validation"]["conflict_batch_result_blocked"])
         self.assertTrue(result["validation"]["conflict_batch_conflict_blocked"])
         self.assertEqual(

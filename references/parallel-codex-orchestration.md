@@ -31,7 +31,8 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - 複数 worker result を同じ main checkout へ混ぜる場合は
   `parallel_codex_integration_batch_receipt.schema` で accept-ready receipt だけを
   digest/ref 順に決定的に並べ、blocked / stale / marker-only receipt を隔離し、
-  changed-file owner manifest と conflict digest を作ってから統合可否を決める
+  blocked-receipt quarantine manifest digest、changed-file owner manifest、
+  conflict digest を作ってから統合可否を決める
 - workspace-enacted marker-only 変更だけの worker result は schema-bound のまま
   blocked にし、marker payload raw text は保存しない
 - worker identity は ref / digest / integrity Guardian signature digest に縮約し、
@@ -65,6 +66,9 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - integration batch receipt は ready worker と Yaoyorozu bridge receipt を
   conflict-free batch として `integration-ready` にし、overlap する ready receipt
   セットは conflict digest を束縛したまま `blocked` にする
+- quarantined blocked receipt は refs / digests だけを
+  `blocked-receipt-quarantine-manifest-v1` の digest に束縛し、raw blocked receipt
+  payload は保存しない
 - batch receipt でも raw worker receipt payload、raw conflict payload、raw verification
   output は保存しない
 - conflict が残る場合は merge せず、blocked state と再開条件を報告する

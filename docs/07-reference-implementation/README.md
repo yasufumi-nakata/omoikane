@@ -945,8 +945,9 @@ raw dispatch payload、raw patch payload、raw worker identity payload は
 Parallel Codex 側へ保存しない。
 複数 receipt を同じ main checkout へ取り込む段階では
 `parallel_codex_integration_batch_receipt` が receipt set digest、
-digest/ref 順の ordered integration digest、changed-file owner manifest digest、
-conflict digest、quarantined blocked receipt refs/digests を固定する。
+digest/ref 順の ordered integration digest、blocked-receipt quarantine manifest
+digest、changed-file owner manifest digest、conflict digest、
+quarantined blocked receipt refs/digests を固定する。
 ready receipt と Yaoyorozu bridge receipt のように changed files が disjoint な batch は
 `integration-ready` になる一方、ready receipt 同士でも同じ file を触る batch は
 schema-bound のまま `blocked` になり、raw worker receipt payload、raw conflict
