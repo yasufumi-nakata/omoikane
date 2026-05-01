@@ -1115,22 +1115,20 @@ class OmoikaneReferenceOS:
             worker_base_commit=main_checkout_head,
             ownership_scope=["docs/"],
             changed_files=["docs/02-subsystems/agentic/README.md"],
-            workspace_marker_only_changed_files=[
-                "docs/02-subsystems/agentic/README.md",
-            ],
-            workspace_diff_by_file={
-                "docs/02-subsystems/agentic/README.md": (
-                    "diff --git a/docs/02-subsystems/agentic/README.md "
-                    "b/docs/02-subsystems/agentic/README.md\n"
-                    "@@\n"
-                    "+# workspace-enacted: patch-marker-only "
-                    "target=docs/02-subsystems/agentic/README.md\n"
-                )
+            workspace_patch_segments_by_file={
+                "docs/02-subsystems/agentic/README.md": [
+                    {
+                        "operation": "add",
+                        "line_count": 1,
+                        "contains_workspace_marker": True,
+                    }
+                ]
             },
             verification_results=verification_results[:2],
             result_summary=(
-                "Worker result that only appends workspace-enacted marker comments "
-                "is digest-bound but blocked as non-substantive."
+                "Worker result with structured patch segment evidence that only "
+                "adds workspace-enacted marker comments is digest-bound but "
+                "blocked as non-substantive."
             ),
         )
         yaoyorozu_patch_receipt_digest = sha256_text(
@@ -1824,6 +1822,25 @@ class OmoikaneReferenceOS:
                 "marker_only_classifier_digest_bound": marker_only_validation[
                     "workspace_marker_classifier_digest_bound"
                 ],
+                "marker_only_segment_manifest_digest_bound": (
+                    marker_only_receipt["workspace_marker_diff_summaries"][0][
+                        "segment_manifest_digest"
+                    ]
+                    == marker_only_receipt["workspace_marker_diff_summaries"][0][
+                        "diff_digest"
+                    ]
+                    and bool(
+                        marker_only_receipt["workspace_marker_diff_summaries"][0][
+                            "segment_manifest_digest"
+                        ]
+                    )
+                ),
+                "marker_only_structured_segment_classifier": (
+                    marker_only_receipt["workspace_marker_diff_summaries"][0][
+                        "classifier_evidence_profile"
+                    ]
+                    == "structured-patch-segment-manifest-v1"
+                ),
                 "marker_only_classifier_detected": marker_only_validation[
                     "workspace_marker_classifier_marker_only_detected"
                 ],
@@ -1832,6 +1849,12 @@ class OmoikaneReferenceOS:
                 ],
                 "marker_only_raw_workspace_marker_payload_redacted": (
                     marker_only_validation["raw_workspace_marker_payload_redacted"]
+                ),
+                "marker_only_raw_segment_payload_redacted": (
+                    marker_only_receipt["workspace_marker_diff_summaries"][0][
+                        "raw_segment_payload_stored"
+                    ]
+                    is False
                 ),
                 "yaoyorozu_bridge_ready_for_main_checkout": (
                     yaoyorozu_bridge_validation["ready_for_main_checkout"]

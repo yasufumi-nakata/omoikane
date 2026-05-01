@@ -137,11 +137,12 @@ high-priority task として検出できるか。
 ### Parallel Codex Result Ingestion
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、
 verification manifest、worker base commit freshness、signed worker identity、
-repo-local workspace marker diff classifier、remote branch / PR metadata、remote
-source revocation check、freshness window、signed provider timestamp、timestamp
-replay guard、remote source content identity、remote source main-head ancestry を
-main checkout integration 前の schema-bound receipt として固定し、stale worker
-result、marker-only result、unrelated ancestry result を fail-closed にできるか。
+repo-local workspace marker diff classifier または structured patch-segment
+manifest、remote branch / PR metadata、remote source revocation check、freshness
+window、signed provider timestamp、timestamp replay guard、remote source content
+identity、remote source main-head ancestry を main checkout integration 前の
+schema-bound receipt として固定し、stale worker result、marker-only result、
+unrelated ancestry result を fail-closed にできるか。
 
 ### Parallel Codex Integration Execution
 parallel-orchestration-demo が integration-ready batch receipt を source batch

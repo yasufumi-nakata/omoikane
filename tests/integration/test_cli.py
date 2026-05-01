@@ -105,6 +105,10 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["marker_only_result_blocked"])
         self.assertTrue(result["validation"]["marker_only_hygiene_digest_bound"])
         self.assertTrue(result["validation"]["marker_only_classifier_digest_bound"])
+        self.assertTrue(
+            result["validation"]["marker_only_segment_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["marker_only_structured_segment_classifier"])
         self.assertTrue(result["validation"]["marker_only_classifier_detected"])
         self.assertEqual(
             "parallel-codex-worker-result-ingestion-v1",

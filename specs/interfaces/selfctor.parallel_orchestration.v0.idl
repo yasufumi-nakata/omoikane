@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, pre-apply dry-run manifests, and post-apply verification manifests before main checkout integration.
+summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff or structured patch-segment classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, pre-apply dry-run manifests, and post-apply verification manifests before main checkout integration.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
   parallel_codex_integration_batch_receipt: ../schemas/parallel_codex_integration_batch_receipt.schema
@@ -76,6 +76,29 @@ operations:
             type: object
             additionalProperties:
               type: string
+          workspace_patch_segments_by_file:
+            type: object
+            additionalProperties:
+              type: array
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - operation
+                  - line_count
+                  - contains_workspace_marker
+                properties:
+                  operation:
+                    type: string
+                    enum: [add, remove, modify, context]
+                  line_count:
+                    type: integer
+                    minimum: 0
+                  contains_workspace_marker:
+                    type: boolean
+                  content_digest:
+                    type: string
+                    pattern: "^[a-f0-9]{64}$"
           verification_results:
             type: array
             minItems: 1
@@ -192,10 +215,10 @@ operations:
       - direct worker results carry source_system=direct-worker-result and no upstream dispatch refs
       - remote branch / PR worker results carry source_system=remote-branch-pr-worker-result plus branch ref, PR ref, review authority digest, accepted source policy digest, current-not-revoked source revocation digest, signed provider timestamp digest, replay-unique timestamp nonce evidence, remote source content identity digest, remote source main-head ancestry digest, and remote_metadata_digest
       - worker_identity_ref, worker_identity_digest, and integrity-guardian worker_identity_signature_digest are bound to patch digest and base/head commit evidence
-      - workspace-enacted marker-only changed files are classified from repo-local diff summaries, counted, and digest-bound, and receipts whose only payload is marker comments remain blocked
+      - workspace-enacted marker-only changed files are classified from repo-local diff summaries or structured patch-segment manifests, counted, and digest-bound, and receipts whose only payload is marker comments remain blocked
       - remote metadata, remote source revocation status, revocation freshness window, signed provider timestamp evidence, timestamp replay guard, remote source content identity, and remote source ancestry are digest-bound and redacted before remote results can become accept-ready
       - changed_files must remain inside both the repo-local allowed workspace prefixes and the worker ownership_scope
-      - patch payload, raw worker identity payload, raw workspace marker diff payload, raw remote metadata payload, raw remote revocation payload, raw remote content payload, raw remote ancestry payload, raw remote timestamp replay payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields and diff line counts remain
+      - patch payload, raw worker identity payload, raw workspace marker diff or segment payload, raw remote metadata payload, raw remote revocation payload, raw remote content payload, raw remote ancestry payload, raw remote timestamp replay payload, raw worker transcript, raw stdout, and raw stderr are never stored; only digest fields, line counts, segment counts, and classifier status remain
       - unittest discover and gap-report required verification commands must pass before main checkout integration is accepted
       - blocked, stale, or failed worker results remain schema-bound but cannot be integrated
   ingest_yaoyorozu_dispatch_receipt:

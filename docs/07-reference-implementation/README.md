@@ -909,9 +909,10 @@ unittest / gap-report verification digest を束縛し、
 raw patch payload、raw transcript、raw verification output は保存しない。
 worker identity は `worker_identity_ref`、`worker_identity_digest`、
 integrity Guardian 署名 digest だけに縮約し、raw worker identity payload は保存しない。
-workspace-enacted marker-only changed files は repo-local diff classifier が
-raw diff を保存せずに `diff_digest` / added・removed line counts /
-`classifier_status` へ縮約し、その classifier digest を
+workspace-enacted marker-only changed files は repo-local diff classifier または
+structured patch-segment manifest が raw diff / raw segment payload を保存せずに
+`diff_digest` / `segment_manifest_digest` / added・removed line counts /
+segment counts / `classifier_status` へ縮約し、その classifier digest を
 `workspace_marker_hygiene_digest` に束縛する。marker コメントだけの成果は
 schema-bound のまま `integration_decision=blocked` にする。
 remote receipt は `remote_branch_ref`、`remote_pr_ref`、

@@ -74,6 +74,12 @@ PARALLEL_CODEX_WORKSPACE_MARKER_HYGIENE_PROFILE = (
 PARALLEL_CODEX_WORKSPACE_MARKER_CLASSIFIER_PROFILE = (
     "repo-local-workspace-marker-diff-classifier-v1"
 )
+PARALLEL_CODEX_WORKSPACE_MARKER_DIFF_LINE_EVIDENCE_PROFILE = (
+    "repo-local-diff-line-classifier-v1"
+)
+PARALLEL_CODEX_WORKSPACE_MARKER_PATCH_SEGMENT_EVIDENCE_PROFILE = (
+    "structured-patch-segment-manifest-v1"
+)
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_OK_STATUS = "current-not-revoked"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS = "not-applicable"
 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_FRESH_STATUS = "fresh"
@@ -228,6 +234,12 @@ class ParallelCodexOrchestrationPolicy:
             "workspace_marker_classifier_profile": (
                 PARALLEL_CODEX_WORKSPACE_MARKER_CLASSIFIER_PROFILE
             ),
+            "workspace_marker_diff_line_evidence_profile": (
+                PARALLEL_CODEX_WORKSPACE_MARKER_DIFF_LINE_EVIDENCE_PROFILE
+            ),
+            "workspace_marker_patch_segment_evidence_profile": (
+                PARALLEL_CODEX_WORKSPACE_MARKER_PATCH_SEGMENT_EVIDENCE_PROFILE
+            ),
             "remote_metadata_profile": PARALLEL_CODEX_REMOTE_METADATA_PROFILE,
             "remote_source_revocation_profile": (
                 PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_PROFILE
@@ -322,6 +334,9 @@ class ParallelCodexOrchestrationService:
         result_summary: str,
         workspace_marker_only_changed_files: Sequence[str] = (),
         workspace_diff_by_file: Mapping[str, str] | None = None,
+        workspace_patch_segments_by_file: (
+            Mapping[str, Sequence[Mapping[str, Any]]] | None
+        ) = None,
         patch_digest: str = "",
         source_system: str = "direct-worker-result",
         upstream_receipt_ref: str = "",
@@ -370,6 +385,7 @@ class ParallelCodexOrchestrationService:
         workspace_marker_diff_summaries = self.classify_workspace_marker_diff_summaries(
             changed_files=normalized_files,
             workspace_diff_by_file=workspace_diff_by_file or {},
+            workspace_patch_segments_by_file=workspace_patch_segments_by_file or {},
         )
         classifier_marker_files = self._workspace_marker_classifier_marker_files(
             workspace_marker_diff_summaries,
@@ -3451,12 +3467,27 @@ class ParallelCodexOrchestrationService:
         *,
         changed_files: Sequence[str],
         workspace_diff_by_file: Mapping[str, str],
+        workspace_patch_segments_by_file: Mapping[
+            str,
+            Sequence[Mapping[str, Any]],
+        ]
+        | None = None,
     ) -> list[Dict[str, Any]]:
-        """Classify repo-local diffs without persisting raw diff payloads."""
+        """Classify marker-only diffs without persisting raw diff or segment payloads."""
 
         summaries: list[Dict[str, Any]] = []
         normalized_files = _dedupe_strings(changed_files)
+        patch_segments_by_file = workspace_patch_segments_by_file or {}
         for file_path in normalized_files:
+            patch_segments = list(patch_segments_by_file.get(file_path, []))
+            if patch_segments:
+                summaries.append(
+                    ParallelCodexOrchestrationService._classify_workspace_patch_segments(
+                        file_path=file_path,
+                        patch_segments=patch_segments,
+                    )
+                )
+                continue
             diff_text = str(workspace_diff_by_file.get(file_path, ""))
             if not diff_text:
                 continue
@@ -3490,16 +3521,128 @@ class ParallelCodexOrchestrationService:
             summaries.append(
                 {
                     "file_path": file_path,
+                    "classifier_evidence_profile": (
+                        PARALLEL_CODEX_WORKSPACE_MARKER_DIFF_LINE_EVIDENCE_PROFILE
+                    ),
                     "diff_digest": sha256_text(diff_text),
+                    "segment_manifest_digest": "",
+                    "segment_count": 0,
+                    "marker_segment_count": 0,
+                    "substantive_segment_count": 0,
                     "added_line_count": added_line_count,
                     "removed_line_count": removed_line_count,
                     "marker_added_line_count": marker_added_line_count,
                     "non_marker_added_line_count": non_marker_added_line_count,
                     "classifier_status": classifier_status,
                     "raw_diff_payload_stored": False,
+                    "raw_segment_payload_stored": False,
                 }
             )
         return sorted(summaries, key=lambda summary: summary["file_path"])
+
+    @staticmethod
+    def _classify_workspace_patch_segments(
+        *,
+        file_path: str,
+        patch_segments: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        normalized_segments: list[Dict[str, Any]] = []
+        added_line_count = 0
+        removed_line_count = 0
+        marker_added_line_count = 0
+        non_marker_added_line_count = 0
+        marker_segment_count = 0
+        substantive_segment_count = 0
+
+        for index, segment in enumerate(patch_segments, start=1):
+            operation = str(segment.get("operation", "")).strip().lower()
+            if operation not in {"add", "remove", "modify", "context"}:
+                operation = "modify"
+            line_count = _coerce_int(segment.get("line_count"), 1)
+            if line_count < 0:
+                line_count = 0
+            marker_segment = bool(segment.get("contains_workspace_marker", False))
+            content_digest = str(segment.get("content_digest", "")).strip()
+            if not _is_sha256(content_digest):
+                content_digest = sha256_text(
+                    canonical_json(
+                        {
+                            "file_path": file_path,
+                            "segment_index": index,
+                            "operation": operation,
+                            "line_count": line_count,
+                            "contains_workspace_marker": marker_segment,
+                        }
+                    )
+                )
+
+            if operation == "add":
+                added_line_count += line_count
+                if marker_segment:
+                    marker_added_line_count += line_count
+                    marker_segment_count += 1
+                else:
+                    non_marker_added_line_count += line_count
+                    substantive_segment_count += 1
+            elif operation in {"remove", "modify"}:
+                if operation == "remove":
+                    removed_line_count += line_count
+                else:
+                    added_line_count += line_count
+                    removed_line_count += line_count
+                substantive_segment_count += 1
+
+            normalized_segments.append(
+                {
+                    "segment_index": index,
+                    "operation": operation,
+                    "line_count": line_count,
+                    "contains_workspace_marker": marker_segment,
+                    "content_digest": content_digest,
+                }
+            )
+
+        classifier_status = (
+            "marker-only"
+            if (
+                added_line_count > 0
+                and removed_line_count == 0
+                and marker_added_line_count == added_line_count
+                and non_marker_added_line_count == 0
+                and marker_segment_count > 0
+                and substantive_segment_count == 0
+            )
+            else "substantive"
+        )
+        segment_manifest_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_WORKSPACE_MARKER_PATCH_SEGMENT_EVIDENCE_PROFILE
+                    ),
+                    "file_path": file_path,
+                    "segments": normalized_segments,
+                }
+            )
+        )
+        return {
+            "file_path": file_path,
+            "classifier_evidence_profile": (
+                PARALLEL_CODEX_WORKSPACE_MARKER_PATCH_SEGMENT_EVIDENCE_PROFILE
+            ),
+            "diff_digest": segment_manifest_digest,
+            "segment_manifest_digest": segment_manifest_digest,
+            "segment_count": len(normalized_segments),
+            "marker_segment_count": marker_segment_count,
+            "substantive_segment_count": substantive_segment_count,
+            "added_line_count": added_line_count,
+            "removed_line_count": removed_line_count,
+            "marker_added_line_count": marker_added_line_count,
+            "non_marker_added_line_count": non_marker_added_line_count,
+            "classifier_status": classifier_status,
+            "raw_diff_payload_stored": False,
+            "raw_segment_payload_stored": False,
+        }
 
     @staticmethod
     def _workspace_marker_classifier_marker_files(
@@ -3558,6 +3701,23 @@ class ParallelCodexOrchestrationService:
                 )
             if not _is_sha256(summary.get("diff_digest")):
                 reasons.append("workspace marker diff summary digest must be sha256")
+            classifier_evidence_profile = summary.get("classifier_evidence_profile")
+            if classifier_evidence_profile not in {
+                PARALLEL_CODEX_WORKSPACE_MARKER_DIFF_LINE_EVIDENCE_PROFILE,
+                PARALLEL_CODEX_WORKSPACE_MARKER_PATCH_SEGMENT_EVIDENCE_PROFILE,
+            }:
+                reasons.append(
+                    "workspace marker diff summary classifier_evidence_profile mismatch"
+                )
+            segment_count = _coerce_int(summary.get("segment_count"), -1)
+            marker_segment_count = _coerce_int(
+                summary.get("marker_segment_count"),
+                -1,
+            )
+            substantive_segment_count = _coerce_int(
+                summary.get("substantive_segment_count"),
+                -1,
+            )
             added_line_count = _coerce_int(summary.get("added_line_count"), -1)
             removed_line_count = _coerce_int(summary.get("removed_line_count"), -1)
             marker_added_line_count = _coerce_int(
@@ -3573,8 +3733,34 @@ class ParallelCodexOrchestrationService:
                 removed_line_count,
                 marker_added_line_count,
                 non_marker_added_line_count,
+                segment_count,
+                marker_segment_count,
+                substantive_segment_count,
             ) < 0:
                 reasons.append("workspace marker diff summary counts must be non-negative")
+            if marker_segment_count + substantive_segment_count > segment_count:
+                reasons.append(
+                    "workspace marker diff summary segment counts must not exceed segment_count"
+                )
+            segment_manifest_digest = str(
+                summary.get("segment_manifest_digest", ""),
+            ).strip()
+            if (
+                classifier_evidence_profile
+                == PARALLEL_CODEX_WORKSPACE_MARKER_PATCH_SEGMENT_EVIDENCE_PROFILE
+                and not _is_sha256(segment_manifest_digest)
+            ):
+                reasons.append(
+                    "workspace marker segment manifest digest must be sha256"
+                )
+            if (
+                classifier_evidence_profile
+                == PARALLEL_CODEX_WORKSPACE_MARKER_DIFF_LINE_EVIDENCE_PROFILE
+                and segment_manifest_digest
+            ):
+                reasons.append(
+                    "workspace marker diff-line summary must not carry segment_manifest_digest"
+                )
             if marker_added_line_count + non_marker_added_line_count != added_line_count:
                 reasons.append(
                     "workspace marker diff summary added counts must sum to added_line_count"
@@ -3594,6 +3780,10 @@ class ParallelCodexOrchestrationService:
             if summary.get("raw_diff_payload_stored") is not False:
                 reasons.append(
                     "workspace marker diff summary raw_diff_payload_stored must be false"
+                )
+            if summary.get("raw_segment_payload_stored") is not False:
+                reasons.append(
+                    "workspace marker diff summary raw_segment_payload_stored must be false"
                 )
         return reasons
 

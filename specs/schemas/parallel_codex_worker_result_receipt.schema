@@ -7,9 +7,9 @@ description: >
   identity evidence and remote branch / PR source metadata without storing raw
   worker identity, remote metadata, or remote revocation payloads.
   Workspace-enacted marker-only file changes are classified from repo-local diff
-  summaries, separately counted, and digest-bound so worker output that only
-  appends local enactment comments cannot be accepted as a substantive
-  integration payload.
+  summaries or structured patch-segment manifests, separately counted, and
+  digest-bound so worker output that only appends local enactment comments cannot
+  be accepted as a substantive integration payload.
   Remote source revocation evidence also carries a bounded freshness window so
   old current-not-revoked checks cannot be reused silently, and the freshness
   refs are bound to a signed provider timestamp digest before acceptance.
@@ -408,20 +408,43 @@ properties:
       additionalProperties: false
       required:
         - file_path
+        - classifier_evidence_profile
         - diff_digest
+        - segment_manifest_digest
+        - segment_count
+        - marker_segment_count
+        - substantive_segment_count
         - added_line_count
         - removed_line_count
         - marker_added_line_count
         - non_marker_added_line_count
         - classifier_status
         - raw_diff_payload_stored
+        - raw_segment_payload_stored
       properties:
         file_path:
           type: string
           minLength: 1
+        classifier_evidence_profile:
+          type: string
+          enum:
+            - repo-local-diff-line-classifier-v1
+            - structured-patch-segment-manifest-v1
         diff_digest:
           type: string
           pattern: "^[a-f0-9]{64}$"
+        segment_manifest_digest:
+          type: string
+          pattern: "^$|^[a-f0-9]{64}$"
+        segment_count:
+          type: integer
+          minimum: 0
+        marker_segment_count:
+          type: integer
+          minimum: 0
+        substantive_segment_count:
+          type: integer
+          minimum: 0
         added_line_count:
           type: integer
           minimum: 0
@@ -440,6 +463,8 @@ properties:
             - marker-only
             - substantive
         raw_diff_payload_stored:
+          const: false
+        raw_segment_payload_stored:
           const: false
   workspace_marker_diff_summary_count:
     type: integer

@@ -181,19 +181,41 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["marker_only_result_blocked"])
         self.assertTrue(result["validation"]["marker_only_hygiene_digest_bound"])
         self.assertTrue(result["validation"]["marker_only_classifier_digest_bound"])
+        self.assertTrue(
+            result["validation"]["marker_only_segment_manifest_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["marker_only_structured_segment_classifier"])
         self.assertTrue(result["validation"]["marker_only_classifier_detected"])
         self.assertTrue(result["validation"]["marker_only_change_blocked"])
         self.assertTrue(
             result["validation"]["marker_only_raw_workspace_marker_payload_redacted"]
         )
+        self.assertTrue(result["validation"]["marker_only_raw_segment_payload_redacted"])
         self.assertEqual(
             "repo-local-workspace-marker-diff-classifier-v1",
             result["marker_only_receipt"]["workspace_marker_classifier_profile"],
         )
         self.assertEqual(
+            "structured-patch-segment-manifest-v1",
+            result["marker_only_receipt"]["workspace_marker_diff_summaries"][0][
+                "classifier_evidence_profile"
+            ],
+        )
+        self.assertEqual(
             "marker-only",
             result["marker_only_receipt"]["workspace_marker_diff_summaries"][0][
                 "classifier_status"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["marker_only_receipt"]["workspace_marker_diff_summaries"][0][
+                "marker_segment_count"
+            ],
+        )
+        self.assertFalse(
+            result["marker_only_receipt"]["workspace_marker_diff_summaries"][0][
+                "raw_segment_payload_stored"
             ],
         )
         self.assertTrue(

@@ -165,11 +165,122 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             "marker-only",
             receipt["workspace_marker_diff_summaries"][0]["classifier_status"],
         )
+        self.assertEqual(
+            "repo-local-diff-line-classifier-v1",
+            receipt["workspace_marker_diff_summaries"][0][
+                "classifier_evidence_profile"
+            ],
+        )
         self.assertFalse(
             receipt["workspace_marker_diff_summaries"][0]["raw_diff_payload_stored"]
         )
+        self.assertFalse(
+            receipt["workspace_marker_diff_summaries"][0][
+                "raw_segment_payload_stored"
+            ]
+        )
         self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
         self.assertFalse(receipt["raw_workspace_marker_payload_stored"])
+
+    def test_structured_patch_segment_marker_only_result_blocks_integration(self) -> None:
+        marker_path = "docs/02-subsystems/agentic/README.md"
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-segment-marker-only-worker",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["docs/"],
+            changed_files=[marker_path],
+            workspace_patch_segments_by_file={
+                marker_path: [
+                    {
+                        "operation": "add",
+                        "line_count": 1,
+                        "contains_workspace_marker": True,
+                    }
+                ]
+            },
+            verification_results=_verification_results(),
+            result_summary=(
+                "Structured patch segment evidence shows only workspace markers."
+            ),
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+        summary = receipt["workspace_marker_diff_summaries"][0]
+
+        self.assertEqual("blocked", receipt["integration_decision"])
+        self.assertIn(marker_path, receipt["workspace_marker_only_changed_files"])
+        self.assertEqual(
+            "structured-patch-segment-manifest-v1",
+            summary["classifier_evidence_profile"],
+        )
+        self.assertEqual("marker-only", summary["classifier_status"])
+        self.assertEqual(summary["diff_digest"], summary["segment_manifest_digest"])
+        self.assertEqual(1, summary["segment_count"])
+        self.assertEqual(1, summary["marker_segment_count"])
+        self.assertEqual(0, summary["substantive_segment_count"])
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["workspace_marker_classifier_digest_bound"])
+        self.assertTrue(validation["workspace_marker_only_change_blocked"])
+        self.assertFalse(summary["raw_segment_payload_stored"])
+        self.assertFalse(receipt["raw_workspace_marker_payload_stored"])
+
+    def test_structured_patch_segment_substantive_payload_with_marker_is_ready(self) -> None:
+        marker_path = "docs/02-subsystems/agentic/README.md"
+        test_path = "tests/unit/test_parallel_orchestration.py"
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-segment-substantive-worker",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["docs/", "tests/unit/"],
+            changed_files=[marker_path, test_path],
+            workspace_patch_segments_by_file={
+                marker_path: [
+                    {
+                        "operation": "add",
+                        "line_count": 1,
+                        "contains_workspace_marker": True,
+                    }
+                ],
+                test_path: [
+                    {
+                        "operation": "add",
+                        "line_count": 4,
+                        "contains_workspace_marker": False,
+                    }
+                ],
+            },
+            verification_results=_verification_results(),
+            result_summary=(
+                "Structured patch segment evidence separates marker and "
+                "substantive payloads."
+            ),
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+        summaries = {
+            summary["file_path"]: summary
+            for summary in receipt["workspace_marker_diff_summaries"]
+        }
+
+        self.assertEqual("accept-ready", receipt["integration_decision"])
+        self.assertEqual(
+            "marker-only-reviewed",
+            receipt["workspace_marker_hygiene_status"],
+        )
+        self.assertEqual([marker_path], receipt["workspace_marker_only_changed_files"])
+        self.assertEqual(
+            "substantive",
+            summaries[test_path]["classifier_status"],
+        )
+        self.assertEqual(1, summaries[test_path]["substantive_segment_count"])
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["workspace_marker_hygiene_digest_bound"])
+        self.assertTrue(validation["workspace_marker_classifier_digest_bound"])
 
     def test_workspace_marker_diff_classifier_marks_substantive_diff_reviewed(self) -> None:
         marker_path = "docs/02-subsystems/agentic/README.md"
