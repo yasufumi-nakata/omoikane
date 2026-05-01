@@ -5,8 +5,9 @@ summary: >
   適用直前の execution receipt へ縮約し、source batch digest、current head、
   ordered apply plan digest、repo-local patch artifact manifest digest、
   `artifacts/parallel-codex/*.patch` path に束縛された command-bound
-  git apply dry-run manifest、post-apply verification manifest、raw batch /
-  apply / dry-run / worker / verification payload 非保存を固定すること
+  git apply dry-run manifest、post-apply verification manifest とその apply
+  context digest、raw batch / apply / dry-run / worker / verification payload
+  非保存を固定すること
 checks:
   - name: parallel Codex integration execution smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -24,6 +25,11 @@ expect:
   execution_pre_apply_command_receipt_digest_bound: true
   execution_pre_apply_dry_run_passed: true
   execution_post_apply_verification_manifest_digest_bound: true
+  execution_post_apply_verification_context_digest_bound: true
+  execution_post_apply_verification_context_bound: true
+  execution_post_apply_verification_apply_plan_digest_bound: true
+  execution_post_apply_verification_patch_artifact_manifest_digest_bound: true
+  execution_post_apply_verification_pre_apply_manifest_digest_bound: true
   execution_required_verifications_passed: true
   execution_raw_batch_payload_redacted: true
   execution_raw_apply_plan_payload_redacted: true

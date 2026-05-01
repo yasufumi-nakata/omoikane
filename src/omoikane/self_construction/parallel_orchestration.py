@@ -42,6 +42,9 @@ PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_SOURCE = (
 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE = (
     "post-apply-required-verification-v1"
 )
+PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE = (
+    "post-apply-verification-apply-context-binding-v1"
+)
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -234,6 +237,9 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "integration_execution_post_verify_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
+            ),
+            "integration_execution_post_verify_context_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE
             ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
@@ -1062,12 +1068,38 @@ class ParallelCodexOrchestrationService:
         normalized_verifications = self._normalize_verification_results(
             post_apply_verification_results,
         )
+        apply_plan_digest = self._integration_execution_apply_plan_digest(
+            apply_steps=apply_steps,
+        )
+        patch_artifact_manifest_digest = (
+            self._integration_execution_patch_artifact_manifest_digest(
+                apply_steps=apply_steps,
+            )
+        )
+        pre_apply_dry_run_manifest_digest = self._pre_apply_dry_run_manifest_digest(
+            normalized_dry_runs,
+        )
+        post_apply_verification_manifest_digest = self._verification_manifest_digest(
+            normalized_verifications,
+        )
         batch_receipt_digest = str(batch_receipt.get("receipt_digest", "")).strip()
         source_batch_digest_bound = (
             batch_receipt_digest == self._receipt_digest(batch_receipt)
         )
         main_checkout_head = str(batch_receipt.get("main_checkout_head", "")).strip()
         normalized_current_head = current_checkout_head.strip()
+        post_apply_verification_context_digest = (
+            self._post_apply_verification_context_digest(
+                source_batch_receipt_digest=batch_receipt_digest,
+                current_checkout_head=normalized_current_head,
+                apply_plan_digest=apply_plan_digest,
+                patch_artifact_manifest_digest=patch_artifact_manifest_digest,
+                pre_apply_dry_run_manifest_digest=pre_apply_dry_run_manifest_digest,
+                post_apply_verification_manifest_digest=(
+                    post_apply_verification_manifest_digest
+                ),
+            )
+        )
         receipt = {
             "kind": "parallel_codex_integration_execution_receipt",
             "schema_version": "1.0.0",
@@ -1107,17 +1139,11 @@ class ParallelCodexOrchestrationService:
             ),
             "apply_steps": apply_steps,
             "apply_step_count": len(apply_steps),
-            "apply_plan_digest": self._integration_execution_apply_plan_digest(
-                apply_steps=apply_steps,
-            ),
+            "apply_plan_digest": apply_plan_digest,
             "patch_artifact_binding_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_PROFILE
             ),
-            "patch_artifact_manifest_digest": (
-                self._integration_execution_patch_artifact_manifest_digest(
-                    apply_steps=apply_steps,
-                )
-            ),
+            "patch_artifact_manifest_digest": patch_artifact_manifest_digest,
             "repo_local_patch_artifact_count": (
                 self._integration_execution_repo_local_patch_artifact_count(
                     apply_steps=apply_steps,
@@ -1133,9 +1159,7 @@ class ParallelCodexOrchestrationService:
             ),
             "pre_apply_dry_run_results": normalized_dry_runs,
             "pre_apply_dry_run_result_count": len(normalized_dry_runs),
-            "pre_apply_dry_run_manifest_digest": (
-                self._pre_apply_dry_run_manifest_digest(normalized_dry_runs)
-            ),
+            "pre_apply_dry_run_manifest_digest": pre_apply_dry_run_manifest_digest,
             "pre_apply_dry_run_passed": self._pre_apply_dry_run_passed(
                 normalized_dry_runs,
                 apply_steps=apply_steps,
@@ -1143,10 +1167,28 @@ class ParallelCodexOrchestrationService:
             "post_apply_verification_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
             ),
+            "post_apply_verification_context_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE
+            ),
             "post_apply_verification_results": normalized_verifications,
             "post_apply_verification_command_count": len(normalized_verifications),
             "post_apply_verification_manifest_digest": (
-                self._verification_manifest_digest(normalized_verifications)
+                post_apply_verification_manifest_digest
+            ),
+            "post_apply_verification_apply_plan_digest_bound": (
+                _is_sha256(apply_plan_digest)
+            ),
+            "post_apply_verification_patch_artifact_manifest_digest_bound": (
+                _is_sha256(patch_artifact_manifest_digest)
+            ),
+            "post_apply_verification_pre_apply_manifest_digest_bound": (
+                _is_sha256(pre_apply_dry_run_manifest_digest)
+            ),
+            "post_apply_verification_context_digest": (
+                post_apply_verification_context_digest
+            ),
+            "post_apply_verification_context_bound": (
+                _is_sha256(post_apply_verification_context_digest)
             ),
             "required_verifications_passed": self._required_verifications_passed(
                 normalized_verifications,
@@ -1219,6 +1261,52 @@ class ParallelCodexOrchestrationService:
             receipt.get("pre_apply_dry_run_manifest_digest")
             == self._pre_apply_dry_run_manifest_digest(pre_apply_dry_run_results)
         )
+        post_apply_verification_apply_plan_digest_bound = (
+            receipt.get("post_apply_verification_apply_plan_digest_bound") is True
+            and apply_plan_digest_bound
+            and _is_sha256(receipt.get("apply_plan_digest"))
+        )
+        post_apply_verification_patch_artifact_manifest_digest_bound = (
+            receipt.get(
+                "post_apply_verification_patch_artifact_manifest_digest_bound",
+            )
+            is True
+            and patch_artifact_manifest_digest_bound
+            and _is_sha256(receipt.get("patch_artifact_manifest_digest"))
+        )
+        post_apply_verification_pre_apply_manifest_digest_bound = (
+            receipt.get("post_apply_verification_pre_apply_manifest_digest_bound")
+            is True
+            and pre_apply_dry_run_manifest_digest_bound
+            and _is_sha256(receipt.get("pre_apply_dry_run_manifest_digest"))
+        )
+        post_apply_verification_context_digest_bound = (
+            receipt.get("post_apply_verification_context_digest")
+            == self._post_apply_verification_context_digest(
+                source_batch_receipt_digest=str(
+                    receipt.get("source_batch_receipt_digest", ""),
+                ),
+                current_checkout_head=str(receipt.get("current_checkout_head", "")),
+                apply_plan_digest=str(receipt.get("apply_plan_digest", "")),
+                patch_artifact_manifest_digest=str(
+                    receipt.get("patch_artifact_manifest_digest", ""),
+                ),
+                pre_apply_dry_run_manifest_digest=str(
+                    receipt.get("pre_apply_dry_run_manifest_digest", ""),
+                ),
+                post_apply_verification_manifest_digest=str(
+                    receipt.get("post_apply_verification_manifest_digest", ""),
+                ),
+            )
+        )
+        post_apply_verification_context_bound = (
+            receipt.get("post_apply_verification_context_bound") is True
+            and post_apply_verification_context_digest_bound
+            and post_apply_verification_apply_plan_digest_bound
+            and post_apply_verification_patch_artifact_manifest_digest_bound
+            and post_apply_verification_pre_apply_manifest_digest_bound
+            and post_apply_verification_manifest_digest_bound
+        )
         apply_step_patch_artifact_digest_bound = all(
             step.get("patch_artifact_digest")
             == self._integration_execution_patch_artifact_digest(
@@ -1282,6 +1370,11 @@ class ParallelCodexOrchestrationService:
             != PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
         ):
             errors.append("post_apply_verification_profile mismatch")
+        if (
+            receipt.get("post_apply_verification_context_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE
+        ):
+            errors.append("post_apply_verification_context_profile mismatch")
         if len(receipt.get("ordered_integration_receipt_refs", [])) != len(
             receipt.get("ordered_integration_receipt_digests", []),
         ):
@@ -1314,6 +1407,18 @@ class ParallelCodexOrchestrationService:
             errors.append("pre_apply command_receipt_digest mismatch")
         if not post_apply_verification_manifest_digest_bound:
             errors.append("post_apply_verification_manifest_digest mismatch")
+        if not post_apply_verification_apply_plan_digest_bound:
+            errors.append("post_apply verification apply_plan_digest unbound")
+        if not post_apply_verification_patch_artifact_manifest_digest_bound:
+            errors.append(
+                "post_apply verification patch_artifact_manifest_digest unbound",
+            )
+        if not post_apply_verification_pre_apply_manifest_digest_bound:
+            errors.append("post_apply verification pre_apply manifest unbound")
+        if not post_apply_verification_context_digest_bound:
+            errors.append("post_apply_verification_context_digest mismatch")
+        if not post_apply_verification_context_bound:
+            errors.append("post_apply_verification_context_bound mismatch")
         if receipt.get("blocking_reasons") != expected_blocking_reasons:
             errors.append("blocking_reasons mismatch")
         if receipt.get("execution_decision") != expected_decision:
@@ -1368,6 +1473,21 @@ class ParallelCodexOrchestrationService:
             ),
             "post_apply_verification_manifest_digest_bound": (
                 post_apply_verification_manifest_digest_bound
+            ),
+            "post_apply_verification_apply_plan_digest_bound": (
+                post_apply_verification_apply_plan_digest_bound
+            ),
+            "post_apply_verification_patch_artifact_manifest_digest_bound": (
+                post_apply_verification_patch_artifact_manifest_digest_bound
+            ),
+            "post_apply_verification_pre_apply_manifest_digest_bound": (
+                post_apply_verification_pre_apply_manifest_digest_bound
+            ),
+            "post_apply_verification_context_digest_bound": (
+                post_apply_verification_context_digest_bound
+            ),
+            "post_apply_verification_context_bound": (
+                post_apply_verification_context_bound
             ),
             "required_verifications_passed": self._required_verifications_passed(
                 verification_results,
@@ -2858,6 +2978,42 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    def _post_apply_verification_context_digest(
+        self,
+        *,
+        source_batch_receipt_digest: str,
+        current_checkout_head: str,
+        apply_plan_digest: str,
+        patch_artifact_manifest_digest: str,
+        pre_apply_dry_run_manifest_digest: str,
+        post_apply_verification_manifest_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE
+                    ),
+                    "source_batch_receipt_digest": source_batch_receipt_digest,
+                    "current_checkout_head": current_checkout_head,
+                    "apply_plan_digest": apply_plan_digest,
+                    "patch_artifact_manifest_digest": (
+                        patch_artifact_manifest_digest
+                    ),
+                    "pre_apply_dry_run_manifest_digest": (
+                        pre_apply_dry_run_manifest_digest
+                    ),
+                    "post_apply_verification_manifest_digest": (
+                        post_apply_verification_manifest_digest
+                    ),
+                    "required_verifications": list(
+                        self._policy.required_verifications,
+                    ),
+                    "raw_verification_payload_stored": False,
+                }
+            )
+        )
+
     @staticmethod
     def _pre_apply_dry_run_passed(
         pre_apply_dry_run_results: Sequence[Mapping[str, Any]],
@@ -3012,6 +3168,59 @@ class ParallelCodexOrchestrationService:
             != self._verification_manifest_digest(verification_results)
         ):
             reasons.append("post_apply_verification_manifest_digest mismatch")
+        if (
+            receipt.get("post_apply_verification_context_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_CONTEXT_PROFILE
+        ):
+            reasons.append("post_apply_verification_context_profile mismatch")
+        if (
+            receipt.get("post_apply_verification_apply_plan_digest_bound") is not True
+            or receipt.get("apply_plan_digest")
+            != self._integration_execution_apply_plan_digest(apply_steps=apply_steps)
+        ):
+            reasons.append("post-apply verification must bind apply plan digest")
+        if (
+            receipt.get(
+                "post_apply_verification_patch_artifact_manifest_digest_bound",
+            )
+            is not True
+            or receipt.get("patch_artifact_manifest_digest")
+            != self._integration_execution_patch_artifact_manifest_digest(
+                apply_steps=apply_steps,
+            )
+        ):
+            reasons.append(
+                "post-apply verification must bind patch artifact manifest digest",
+            )
+        if (
+            receipt.get("post_apply_verification_pre_apply_manifest_digest_bound")
+            is not True
+            or receipt.get("pre_apply_dry_run_manifest_digest")
+            != self._pre_apply_dry_run_manifest_digest(pre_apply_dry_run_results)
+        ):
+            reasons.append("post-apply verification must bind pre-apply dry-run digest")
+        if (
+            receipt.get("post_apply_verification_context_digest")
+            != self._post_apply_verification_context_digest(
+                source_batch_receipt_digest=str(
+                    receipt.get("source_batch_receipt_digest", ""),
+                ),
+                current_checkout_head=str(receipt.get("current_checkout_head", "")),
+                apply_plan_digest=str(receipt.get("apply_plan_digest", "")),
+                patch_artifact_manifest_digest=str(
+                    receipt.get("patch_artifact_manifest_digest", ""),
+                ),
+                pre_apply_dry_run_manifest_digest=str(
+                    receipt.get("pre_apply_dry_run_manifest_digest", ""),
+                ),
+                post_apply_verification_manifest_digest=str(
+                    receipt.get("post_apply_verification_manifest_digest", ""),
+                ),
+            )
+        ):
+            reasons.append("post_apply_verification_context_digest mismatch")
+        if receipt.get("post_apply_verification_context_bound") is not True:
+            reasons.append("post_apply_verification_context_bound must be true")
         if not receipt.get("required_verifications_passed"):
             reasons.append("post-apply required verification commands must pass")
         if receipt.get("raw_batch_payload_stored") is not False:

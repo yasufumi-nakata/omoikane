@@ -990,6 +990,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-integration-batch-conflict-arbitration.md",
             "meta/decision-log/2026-05-01_parallel-codex-integration-execution-plan.md",
             "meta/decision-log/2026-05-01_parallel-codex-workspace-marker-diff-classifier.md",
+            "meta/decision-log/2026-05-02_parallel-codex-post-apply-verification-context.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1474,6 +1475,9 @@ class OmoikaneReferenceOS:
                 ],
                 "execution_post_apply_verification_manifest_digest": (
                     execution_receipt["post_apply_verification_manifest_digest"]
+                ),
+                "execution_post_apply_verification_context_digest": (
+                    execution_receipt["post_apply_verification_context_digest"]
                 ),
                 "conflict_execution_receipt_ref": conflict_execution_receipt[
                     "receipt_ref"
@@ -1987,6 +1991,29 @@ class OmoikaneReferenceOS:
                 "execution_post_apply_verification_manifest_digest_bound": (
                     execution_validation[
                         "post_apply_verification_manifest_digest_bound"
+                    ]
+                ),
+                "execution_post_apply_verification_context_digest_bound": (
+                    execution_validation[
+                        "post_apply_verification_context_digest_bound"
+                    ]
+                ),
+                "execution_post_apply_verification_context_bound": (
+                    execution_validation["post_apply_verification_context_bound"]
+                ),
+                "execution_post_apply_verification_apply_plan_digest_bound": (
+                    execution_validation[
+                        "post_apply_verification_apply_plan_digest_bound"
+                    ]
+                ),
+                "execution_post_apply_verification_patch_artifact_manifest_digest_bound": (
+                    execution_validation[
+                        "post_apply_verification_patch_artifact_manifest_digest_bound"
+                    ]
+                ),
+                "execution_post_apply_verification_pre_apply_manifest_digest_bound": (
+                    execution_validation[
+                        "post_apply_verification_pre_apply_manifest_digest_bound"
                     ]
                 ),
                 "execution_required_verifications_passed": (

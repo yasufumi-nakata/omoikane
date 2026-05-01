@@ -8,8 +8,10 @@ description: >
   head, ordered receipt set, per-step changed-file manifests, apply plan digest,
   repo-local patch artifact path / digest bindings,
   command-bound git-apply-check pre-apply dry-run receipts, required
-  verification manifest, and raw batch / worker / patch / dry-run /
-  verification payload redaction before a commit is made from the main checkout.
+  verification manifest, post-apply verification context binding to the apply
+  plan / patch artifact manifest / pre-apply dry-run manifest, and raw batch /
+  worker / patch / dry-run / verification payload redaction before a commit is
+  made from the main checkout.
 type: object
 additionalProperties: false
 required:
@@ -48,9 +50,15 @@ required:
   - pre_apply_dry_run_manifest_digest
   - pre_apply_dry_run_passed
   - post_apply_verification_profile
+  - post_apply_verification_context_profile
   - post_apply_verification_results
   - post_apply_verification_command_count
   - post_apply_verification_manifest_digest
+  - post_apply_verification_apply_plan_digest_bound
+  - post_apply_verification_patch_artifact_manifest_digest_bound
+  - post_apply_verification_pre_apply_manifest_digest_bound
+  - post_apply_verification_context_digest
+  - post_apply_verification_context_bound
   - required_verifications_passed
   - blocking_reasons
   - execution_decision
@@ -167,6 +175,8 @@ properties:
     type: boolean
   post_apply_verification_profile:
     const: post-apply-required-verification-v1
+  post_apply_verification_context_profile:
+    const: post-apply-verification-apply-context-binding-v1
   post_apply_verification_results:
     type: array
     minItems: 1
@@ -178,6 +188,17 @@ properties:
   post_apply_verification_manifest_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  post_apply_verification_apply_plan_digest_bound:
+    type: boolean
+  post_apply_verification_patch_artifact_manifest_digest_bound:
+    type: boolean
+  post_apply_verification_pre_apply_manifest_digest_bound:
+    type: boolean
+  post_apply_verification_context_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  post_apply_verification_context_bound:
+    type: boolean
   required_verifications_passed:
     type: boolean
   blocking_reasons:

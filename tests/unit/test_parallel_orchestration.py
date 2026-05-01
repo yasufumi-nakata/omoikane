@@ -1038,7 +1038,26 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["pre_apply_dry_run_manifest_digest_bound"])
         self.assertTrue(validation["pre_apply_dry_run_passed"])
         self.assertTrue(validation["post_apply_verification_manifest_digest_bound"])
+        self.assertTrue(validation["post_apply_verification_context_bound"])
+        self.assertTrue(validation["post_apply_verification_context_digest_bound"])
+        self.assertTrue(
+            validation["post_apply_verification_apply_plan_digest_bound"]
+        )
+        self.assertTrue(
+            validation[
+                "post_apply_verification_patch_artifact_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            validation["post_apply_verification_pre_apply_manifest_digest_bound"]
+        )
         self.assertTrue(validation["required_verifications_passed"])
+        self.assertEqual(
+            "post-apply-verification-apply-context-binding-v1",
+            execution["post_apply_verification_context_profile"],
+        )
+        self.assertTrue(execution["post_apply_verification_context_bound"])
+        self.assertTrue(execution["post_apply_verification_context_digest"])
         self.assertEqual(
             "pre-apply-dry-run-check-v1",
             execution["pre_apply_dry_run_profile"],
@@ -1184,6 +1203,52 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
                 "patch_artifact_digest_bound"
             ]
         )
+
+    def test_integration_execution_blocks_unbound_post_apply_context(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+            ],
+            verification_results=_verification_results(),
+            result_summary="Runtime orchestration patch is ready.",
+        )
+        batch = self.service.plan_integration_batch(
+            receipts=[receipt],
+            main_checkout_head=MAIN_HEAD,
+            verification_results=_verification_results(),
+            result_summary="Single ready receipt can be rehearsed.",
+        )
+        execution = self.service.plan_integration_execution(
+            batch_receipt=batch,
+            current_checkout_head=MAIN_HEAD,
+            post_apply_verification_results=_verification_results(),
+            result_summary="Post-apply context must bind the actual apply plan.",
+        )
+
+        tampered = dict(execution)
+        tampered["post_apply_verification_context_digest"] = "f" * 64
+        tampered["blocking_reasons"] = self.service._derive_execution_blocking_reasons(
+            tampered,
+        )
+        tampered["execution_decision"] = "blocked"
+        tampered["receipt_digest"] = self.service._receipt_digest(tampered)
+        validation = self.service.validate_integration_execution_receipt(tampered)
+
+        self.assertEqual("blocked", tampered["execution_decision"])
+        self.assertIn(
+            "post_apply_verification_context_digest mismatch",
+            tampered["blocking_reasons"],
+        )
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["ready_to_apply"])
+        self.assertFalse(validation["post_apply_verification_context_digest_bound"])
+        self.assertFalse(validation["post_apply_verification_context_bound"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
         changed_file = "src/omoikane/self_construction/parallel_orchestration.py"

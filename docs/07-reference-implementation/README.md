@@ -960,9 +960,12 @@ integration-ready batch はさらに
 current checkout head、ordered apply step digest、repo-local patch artifact manifest
 digest、`artifacts/parallel-codex/*.patch` path/ref/digest、
 `git apply --check artifacts/parallel-codex/*.patch` の command receipt digest を含む
-pre-apply dry-run manifest、post-apply verification manifest を commit 前に固定する。
+pre-apply dry-run manifest、post-apply verification manifest と、その verification が
+source batch digest、current checkout head、apply plan digest、patch artifact manifest
+digest、pre-apply dry-run manifest digest へ束縛された apply context digest を commit 前に固定する。
 conflict batch 由来の execution、dry-run failed execution、patch artifact に束縛されない
-dry-run command は schema-bound のまま `blocked` になり、
+dry-run command、または apply context に束縛されない post-apply verification は
+schema-bound のまま `blocked` になり、
 raw batch payload、raw apply plan payload、raw dry-run payload、raw worker receipt
 payload、raw verification output は保存しない。
 

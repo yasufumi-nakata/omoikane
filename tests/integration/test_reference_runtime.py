@@ -1095,6 +1095,29 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "execution_post_apply_verification_manifest_digest_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"]["execution_post_apply_verification_context_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "execution_post_apply_verification_context_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "execution_post_apply_verification_apply_plan_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "execution_post_apply_verification_patch_artifact_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "execution_post_apply_verification_pre_apply_manifest_digest_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["execution_required_verifications_passed"])
         self.assertTrue(result["validation"]["execution_raw_batch_payload_redacted"])
         self.assertTrue(

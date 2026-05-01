@@ -146,6 +146,7 @@ oversight_scope_refs:
   - evals/continuity/gap_scanner_required_reference_files.yaml
   - evals/continuity/parallel_codex_result_ingestion.yaml
   - evals/continuity/parallel_codex_integration_batch.yaml
+  - evals/continuity/parallel_codex_integration_execution.yaml
   - evals/agentic/yaoyorozu_agent_source_definition_contract.yaml
   - evals/agentic/yaoyorozu_source_manifest_ledger_binding.yaml
   - evals/agentic/yaoyorozu_source_manifest_public_verification.yaml
@@ -234,6 +235,7 @@ when_to_invoke: |
   - WMS shared reality の physics_rules change 前に participant approval が IMC transport receipt に束縛されていることを検証する時
   - WMS shared reality の physics_rules change / revert receipt が unanimous approval と rollback token に束縛されていることを検証する時
   - Sensory Loopback の session / receipt / artifact family / BioData arbitration binding が `sensory-loopback-public-schema-contract-v1` manifest 経由で public schema に直接束縛されていることを検証する時
+  - Parallel Codex integration execution の post-apply verification が apply plan digest、repo-local patch artifact manifest digest、pre-apply dry-run manifest digest に束縛されていることを検証する時
   - cognitive audit governance binding で Federation / Heritage returned result の signature binding を検証する時
   - cognitive audit governance binding で verifier transport profile の non-loopback / cross-host / OS observer trace digest を検証する時
 when_not_to_invoke: |
