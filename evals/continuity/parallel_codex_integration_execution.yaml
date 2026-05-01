@@ -6,8 +6,9 @@ summary: >
   ordered apply plan digest、repo-local patch artifact manifest digest、
   `artifacts/parallel-codex/*.patch` path に束縛された command-bound
   git apply dry-run manifest、post-apply verification manifest とその apply
-  context digest、checkout mutation attestation、raw batch / apply / dry-run /
-  worker / verification / checkout mutation / commit finalization payload 非保存を固定すること
+  context digest、checkout mutation attestation、patch artifact cleanup receipt、
+  raw batch / apply / dry-run / worker / verification / checkout mutation /
+  cleanup / commit finalization payload 非保存を固定すること
 checks:
   - name: parallel Codex integration execution smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -19,6 +20,14 @@ expect:
   execution_apply_plan_digest_bound: true
   execution_patch_artifact_manifest_digest_bound: true
   execution_repo_local_patch_artifacts_bound: true
+  execution_patch_artifact_cleanup_digest_bound: true
+  execution_patch_artifact_cleanup_artifact_paths_bound: true
+  execution_patch_artifact_cleanup_artifact_count_bound: true
+  execution_patch_artifact_cleanup_manifest_digest_bound: true
+  execution_patch_artifact_cleanup_pre_apply_digest_bound: true
+  execution_patch_artifact_cleanup_checkout_mutation_bound: true
+  execution_patch_artifact_cleanup_post_apply_head_bound: true
+  execution_patch_artifact_cleanup_verified: true
   execution_pre_apply_dry_run_manifest_digest_bound: true
   execution_pre_apply_dry_run_command_bound: true
   execution_pre_apply_patch_artifact_digest_bound: true
@@ -35,12 +44,14 @@ expect:
   execution_checkout_mutation_attested: true
   execution_commit_finalization_digest_bound: true
   execution_commit_finalization_context_bound: true
+  execution_commit_finalization_patch_artifact_cleanup_digest_bound: true
   execution_commit_finalization_ready: true
   execution_required_verifications_passed: true
   execution_raw_batch_payload_redacted: true
   execution_raw_apply_plan_payload_redacted: true
   execution_raw_pre_apply_dry_run_payload_redacted: true
   execution_raw_checkout_mutation_payload_redacted: true
+  execution_raw_patch_artifact_cleanup_payload_redacted: true
   execution_raw_commit_finalization_payload_redacted: true
   execution_raw_worker_receipt_payload_redacted: true
   execution_raw_verification_payload_redacted: true
@@ -51,6 +62,7 @@ expect:
   raw_apply_plan_payload_stored: false
   raw_pre_apply_dry_run_payload_stored: false
   raw_checkout_mutation_payload_stored: false
+  raw_patch_artifact_cleanup_payload_stored: false
   raw_commit_finalization_payload_stored: false
   raw_worker_receipt_payload_stored: false
   raw_verification_payload_stored: false

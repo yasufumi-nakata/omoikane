@@ -298,6 +298,22 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             result["validation"]["execution_repo_local_patch_artifacts_bound"]
         )
         self.assertTrue(
+            result["validation"]["execution_patch_artifact_cleanup_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "execution_patch_artifact_cleanup_artifact_paths_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "execution_patch_artifact_cleanup_artifact_count_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["execution_patch_artifact_cleanup_verified"]
+        )
+        self.assertTrue(
             result["validation"]["execution_pre_apply_dry_run_manifest_digest_bound"]
         )
         self.assertTrue(
@@ -353,6 +369,17 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             self.assertTrue(dry_run["patch_artifact_digest_bound"])
             self.assertTrue(dry_run["command_receipt_digest"])
             self.assertFalse(dry_run["raw_patch_payload_stored"])
+        self.assertEqual(
+            "repo-local-patch-artifact-cleanup-v1",
+            result["execution_receipt"]["patch_artifact_cleanup_profile"],
+        )
+        self.assertEqual(
+            "removed",
+            result["execution_receipt"]["patch_artifact_cleanup_status"],
+        )
+        self.assertTrue(
+            result["execution_receipt"]["patch_artifact_cleanup_verified"]
+        )
         self.assertTrue(
             result["validation"][
                 "execution_post_apply_verification_manifest_digest_bound"
@@ -394,6 +421,11 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_commit_finalization_context_bound"]
         )
+        self.assertTrue(
+            result["validation"][
+                "execution_commit_finalization_patch_artifact_cleanup_digest_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["execution_commit_finalization_ready"])
         self.assertEqual(
             "main-checkout-commit-finalization-gate-v1",
@@ -402,6 +434,11 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertEqual("ready", result["execution_receipt"]["commit_finalization_status"])
         self.assertFalse(
             result["execution_receipt"]["raw_checkout_mutation_payload_stored"]
+        )
+        self.assertFalse(
+            result["execution_receipt"][
+                "raw_patch_artifact_cleanup_payload_stored"
+            ]
         )
         self.assertFalse(
             result["execution_receipt"]["raw_commit_finalization_payload_stored"]

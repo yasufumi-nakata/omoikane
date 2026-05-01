@@ -1216,7 +1216,7 @@ class OmoikaneReferenceOS:
             result_summary=(
                 "Integration-ready batch is reduced into ordered apply steps "
                 "with pre-apply dry-run and post-apply verification evidence "
-                "before main checkout commit."
+                "plus patch artifact cleanup before main checkout commit."
             ),
         )
         conflict_execution_receipt = (
@@ -1475,6 +1475,18 @@ class OmoikaneReferenceOS:
                     result["patch_artifact_path"]
                     for result in execution_receipt["pre_apply_dry_run_results"]
                 ],
+                "execution_patch_artifact_cleanup_ref": execution_receipt[
+                    "patch_artifact_cleanup_ref"
+                ],
+                "execution_patch_artifact_cleanup_digest": execution_receipt[
+                    "patch_artifact_cleanup_digest"
+                ],
+                "execution_patch_artifact_cleanup_status": execution_receipt[
+                    "patch_artifact_cleanup_status"
+                ],
+                "execution_patch_artifact_cleanup_artifact_count": (
+                    execution_receipt["patch_artifact_cleanup_artifact_count"]
+                ),
                 "execution_post_apply_verification_manifest_digest": (
                     execution_receipt["post_apply_verification_manifest_digest"]
                 ),
@@ -1522,6 +1534,7 @@ class OmoikaneReferenceOS:
                 "raw_apply_plan_payload_stored": False,
                 "raw_pre_apply_dry_run_payload_stored": False,
                 "raw_checkout_mutation_payload_stored": False,
+                "raw_patch_artifact_cleanup_payload_stored": False,
                 "raw_commit_finalization_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
@@ -1994,6 +2007,42 @@ class OmoikaneReferenceOS:
                 "execution_repo_local_patch_artifacts_bound": (
                     execution_validation["repo_local_patch_artifacts_bound"]
                 ),
+                "execution_patch_artifact_cleanup_digest_bound": (
+                    execution_validation["patch_artifact_cleanup_digest_bound"]
+                ),
+                "execution_patch_artifact_cleanup_artifact_paths_bound": (
+                    execution_validation[
+                        "patch_artifact_cleanup_artifact_paths_bound"
+                    ]
+                ),
+                "execution_patch_artifact_cleanup_artifact_count_bound": (
+                    execution_validation[
+                        "patch_artifact_cleanup_artifact_count_bound"
+                    ]
+                ),
+                "execution_patch_artifact_cleanup_manifest_digest_bound": (
+                    execution_validation[
+                        "patch_artifact_cleanup_manifest_digest_bound"
+                    ]
+                ),
+                "execution_patch_artifact_cleanup_pre_apply_digest_bound": (
+                    execution_validation[
+                        "patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound"
+                    ]
+                ),
+                "execution_patch_artifact_cleanup_checkout_mutation_bound": (
+                    execution_validation[
+                        "patch_artifact_cleanup_checkout_mutation_event_digest_bound"
+                    ]
+                ),
+                "execution_patch_artifact_cleanup_post_apply_head_bound": (
+                    execution_validation[
+                        "patch_artifact_cleanup_post_apply_head_bound"
+                    ]
+                ),
+                "execution_patch_artifact_cleanup_verified": (
+                    execution_validation["patch_artifact_cleanup_verified"]
+                ),
                 "execution_pre_apply_dry_run_manifest_digest_bound": (
                     execution_validation["pre_apply_dry_run_manifest_digest_bound"]
                 ),
@@ -2059,6 +2108,11 @@ class OmoikaneReferenceOS:
                 "execution_commit_finalization_context_bound": (
                     execution_validation["commit_finalization_context_bound"]
                 ),
+                "execution_commit_finalization_patch_artifact_cleanup_digest_bound": (
+                    execution_validation[
+                        "commit_finalization_patch_artifact_cleanup_digest_bound"
+                    ]
+                ),
                 "execution_commit_finalization_ready": (
                     execution_validation["commit_finalization_ready"]
                 ),
@@ -2073,6 +2127,11 @@ class OmoikaneReferenceOS:
                 ),
                 "execution_raw_checkout_mutation_payload_redacted": (
                     execution_validation["raw_checkout_mutation_payload_redacted"]
+                ),
+                "execution_raw_patch_artifact_cleanup_payload_redacted": (
+                    execution_validation[
+                        "raw_patch_artifact_cleanup_payload_redacted"
+                    ]
                 ),
                 "execution_raw_commit_finalization_payload_redacted": (
                     execution_validation["raw_commit_finalization_payload_redacted"]

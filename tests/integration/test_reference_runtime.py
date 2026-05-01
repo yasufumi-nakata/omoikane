@@ -1078,6 +1078,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["execution_current_head_matches_batch"])
         self.assertTrue(result["validation"]["execution_apply_plan_digest_bound"])
         self.assertTrue(
+            result["validation"]["execution_patch_artifact_cleanup_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_patch_artifact_cleanup_verified"]
+        )
+        self.assertTrue(
             result["validation"]["execution_pre_apply_dry_run_manifest_digest_bound"]
         )
         self.assertTrue(
@@ -1131,6 +1137,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_commit_finalization_context_bound"]
         )
+        self.assertTrue(
+            result["validation"][
+                "execution_commit_finalization_patch_artifact_cleanup_digest_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["execution_commit_finalization_ready"])
         self.assertTrue(result["validation"]["execution_required_verifications_passed"])
         self.assertTrue(result["validation"]["execution_raw_batch_payload_redacted"])
@@ -1142,6 +1153,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"]["execution_raw_checkout_mutation_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "execution_raw_patch_artifact_cleanup_payload_redacted"
+            ]
         )
         self.assertTrue(
             result["validation"]["execution_raw_commit_finalization_payload_redacted"]

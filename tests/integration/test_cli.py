@@ -189,6 +189,14 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_commit_finalization_context_bound"]
         )
+        self.assertTrue(
+            result["validation"][
+                "execution_commit_finalization_patch_artifact_cleanup_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["execution_patch_artifact_cleanup_verified"]
+        )
         self.assertTrue(result["validation"]["execution_commit_finalization_ready"])
         self.assertTrue(result["validation"]["conflict_execution_blocked"])
         self.assertEqual(

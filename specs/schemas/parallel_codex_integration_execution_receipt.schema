@@ -11,8 +11,9 @@ description: >
   verification manifest, post-apply verification context binding to the apply
   plan / patch artifact manifest / pre-apply dry-run manifest, digest-only
   checkout mutation attestation, commit finalization gate digest, and raw batch /
-  worker / patch / dry-run / verification / checkout mutation / finalization
-  payload redaction before a commit is accepted from the main checkout.
+  worker / patch / dry-run / verification / checkout mutation / patch cleanup /
+  finalization payload redaction before a commit is accepted from the main
+  checkout.
 type: object
 additionalProperties: false
 required:
@@ -45,6 +46,19 @@ required:
   - patch_artifact_manifest_digest
   - repo_local_patch_artifact_count
   - repo_local_patch_artifacts_bound
+  - patch_artifact_cleanup_profile
+  - patch_artifact_cleanup_status
+  - patch_artifact_cleanup_ref
+  - patch_artifact_cleanup_digest
+  - patch_artifact_cleanup_artifact_paths
+  - patch_artifact_cleanup_artifact_count
+  - patch_artifact_cleanup_artifact_paths_bound
+  - patch_artifact_cleanup_artifact_count_bound
+  - patch_artifact_cleanup_manifest_digest_bound
+  - patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound
+  - patch_artifact_cleanup_checkout_mutation_event_digest_bound
+  - patch_artifact_cleanup_post_apply_head_bound
+  - patch_artifact_cleanup_verified
   - pre_apply_dry_run_profile
   - pre_apply_dry_run_results
   - pre_apply_dry_run_result_count
@@ -85,6 +99,7 @@ required:
   - commit_finalization_pre_apply_dry_run_manifest_digest_bound
   - commit_finalization_post_apply_verification_context_digest_bound
   - commit_finalization_checkout_mutation_event_digest_bound
+  - commit_finalization_patch_artifact_cleanup_digest_bound
   - commit_finalization_changed_file_owner_manifest_digest_bound
   - commit_finalization_required_verifications_bound
   - commit_finalization_ready
@@ -96,6 +111,7 @@ required:
   - raw_apply_plan_payload_stored
   - raw_pre_apply_dry_run_payload_stored
   - raw_checkout_mutation_payload_stored
+  - raw_patch_artifact_cleanup_payload_stored
   - raw_commit_finalization_payload_stored
   - raw_worker_receipt_payload_stored
   - raw_verification_payload_stored
@@ -188,6 +204,42 @@ properties:
     type: integer
     minimum: 1
   repo_local_patch_artifacts_bound:
+    type: boolean
+  patch_artifact_cleanup_profile:
+    const: repo-local-patch-artifact-cleanup-v1
+  patch_artifact_cleanup_status:
+    type: string
+    enum:
+      - removed
+      - retained
+  patch_artifact_cleanup_ref:
+    type: string
+    pattern: "^cleanup://parallel-codex/[a-f0-9]{12}$"
+  patch_artifact_cleanup_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  patch_artifact_cleanup_artifact_paths:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      pattern: "^artifacts/parallel-codex/[a-f0-9]{12}\\.patch$"
+  patch_artifact_cleanup_artifact_count:
+    type: integer
+    minimum: 1
+  patch_artifact_cleanup_artifact_paths_bound:
+    type: boolean
+  patch_artifact_cleanup_artifact_count_bound:
+    type: boolean
+  patch_artifact_cleanup_manifest_digest_bound:
+    type: boolean
+  patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound:
+    type: boolean
+  patch_artifact_cleanup_checkout_mutation_event_digest_bound:
+    type: boolean
+  patch_artifact_cleanup_post_apply_head_bound:
+    type: boolean
+  patch_artifact_cleanup_verified:
     type: boolean
   pre_apply_dry_run_profile:
     const: pre-apply-dry-run-check-v1
@@ -294,6 +346,8 @@ properties:
     type: boolean
   commit_finalization_checkout_mutation_event_digest_bound:
     type: boolean
+  commit_finalization_patch_artifact_cleanup_digest_bound:
+    type: boolean
   commit_finalization_changed_file_owner_manifest_digest_bound:
     type: boolean
   commit_finalization_required_verifications_bound:
@@ -322,6 +376,8 @@ properties:
   raw_pre_apply_dry_run_payload_stored:
     const: false
   raw_checkout_mutation_payload_stored:
+    const: false
+  raw_patch_artifact_cleanup_payload_stored:
     const: false
   raw_commit_finalization_payload_stored:
     const: false

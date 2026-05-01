@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff or structured patch-segment classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, repo-local patch artifact bindings, command-bound git apply dry-run manifests, context-bound post-apply verification manifests, checkout mutation attestations, and commit finalization gates before main checkout integration.
+summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff or structured patch-segment classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, repo-local patch artifact bindings, command-bound git apply dry-run manifests, context-bound post-apply verification manifests, checkout mutation attestations, patch artifact cleanup receipts, and commit finalization gates before main checkout integration.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
   parallel_codex_integration_batch_receipt: ../schemas/parallel_codex_integration_batch_receipt.schema
@@ -299,7 +299,7 @@ operations:
       - required unittest and gap-report verification commands must pass for the batch to become integration-ready
       - raw worker receipt payloads, raw conflict payloads, raw stdout, and raw stderr are never stored
   plan_integration_execution:
-    summary: Reduce one integration-ready batch receipt into an ordered main-checkout apply plan, repo-local patch artifact binding, command-bound git apply dry-run receipt set, post-apply verification receipt bound to the apply context, digest-only checkout mutation attestation, and a commit finalization gate.
+    summary: Reduce one integration-ready batch receipt into an ordered main-checkout apply plan, repo-local patch artifact binding, command-bound git apply dry-run receipt set, post-apply verification receipt bound to the apply context, digest-only checkout mutation attestation, patch artifact cleanup receipt, and a commit finalization gate.
     input:
       inline_schema:
         type: object
@@ -324,6 +324,9 @@ operations:
           checkout_mutation_attestation:
             type: object
             additionalProperties: true
+          patch_artifact_cleanup_receipt:
+            type: object
+            additionalProperties: true
           result_summary:
             type: string
             minLength: 1
@@ -339,8 +342,9 @@ operations:
       - post-apply unittest and gap-report verification commands must pass and are stored only as digests
       - post-apply verification must bind the apply plan digest, repo-local patch artifact manifest digest, pre-apply dry-run manifest digest, source batch digest, and current checkout head into post-apply-verification-apply-context-binding-v1 before ready-to-apply
       - checkout mutation attestation must bind pre-apply head, post-apply head, apply plan digest, patch artifact manifest digest, pre-apply dry-run manifest digest, post-apply verification context digest, and changed-file owner manifest digest before commit
-      - commit finalization gate must bind source batch digest, current checkout head, apply plan digest, patch artifact manifest digest, pre-apply dry-run manifest digest, post-apply verification context digest, checkout mutation event digest, post-apply head, changed-file owner manifest digest, and passing verification state before commit
-      - conflict, worker receipt, batch, patch, dry-run stdout/stderr, verification stdout/stderr, checkout mutation event payload, commit finalization payload, and other raw payloads are never stored
+      - patch artifact cleanup must bind the ordered `artifacts/parallel-codex/*.patch` paths, patch artifact manifest digest, pre-apply dry-run manifest digest, checkout mutation event digest, and post-apply head; retained artifacts keep execution_decision blocked before commit
+      - commit finalization gate must bind source batch digest, current checkout head, apply plan digest, patch artifact manifest digest, pre-apply dry-run manifest digest, post-apply verification context digest, checkout mutation event digest, post-apply head, patch artifact cleanup digest, changed-file owner manifest digest, and passing verification state before commit
+      - conflict, worker receipt, batch, patch, dry-run stdout/stderr, verification stdout/stderr, checkout mutation event payload, patch cleanup payload, commit finalization payload, and other raw payloads are never stored
   validate_worker_result_receipt:
     summary: Recompute the changed-file manifest digest, verification manifest digest, receipt digest, and blocking reasons for a worker result receipt.
     input:
@@ -384,7 +388,7 @@ operations:
             items:
               type: string
   validate_integration_execution_receipt:
-    summary: Recompute execution apply-plan digest, checkout mutation attestation digest, commit finalization digest, post-apply verification manifest digest, receipt digest, and blocking reasons.
+    summary: Recompute execution apply-plan digest, checkout mutation attestation digest, patch artifact cleanup digest, commit finalization digest, post-apply verification manifest digest, receipt digest, and blocking reasons.
     input:
       schema_ref: parallel_codex_integration_execution_receipt
     output:

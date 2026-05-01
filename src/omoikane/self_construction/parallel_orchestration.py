@@ -39,6 +39,9 @@ PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_PROFILE = (
 PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_SOURCE = (
     "repo-local-patch-file"
 )
+PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_CLEANUP_PROFILE = (
+    "repo-local-patch-artifact-cleanup-v1"
+)
 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE = (
     "post-apply-required-verification-v1"
 )
@@ -247,6 +250,9 @@ class ParallelCodexOrchestrationPolicy:
             "integration_execution_patch_artifact_source": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_SOURCE
             ),
+            "integration_execution_patch_artifact_cleanup_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_CLEANUP_PROFILE
+            ),
             "integration_execution_post_verify_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
             ),
@@ -348,6 +354,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_batch_payload_stored": False,
             "raw_apply_plan_payload_stored": False,
             "raw_pre_apply_dry_run_payload_stored": False,
+            "raw_patch_artifact_cleanup_payload_stored": False,
             "raw_checkout_mutation_payload_stored": False,
             "raw_commit_finalization_payload_stored": False,
             "raw_transcript_payload_stored": False,
@@ -1072,6 +1079,7 @@ class ParallelCodexOrchestrationService:
         pre_apply_dry_run_results: Sequence[Mapping[str, Any]] | None = None,
         post_apply_verification_results: Sequence[Mapping[str, Any]],
         checkout_mutation_attestation: Mapping[str, Any] | None = None,
+        patch_artifact_cleanup_receipt: Mapping[str, Any] | None = None,
         result_summary: str,
     ) -> Dict[str, Any]:
         batch_validation = self.validate_integration_batch_receipt(batch_receipt)
@@ -1157,6 +1165,21 @@ class ParallelCodexOrchestrationService:
             batch_validation["ready_for_integration"],
         )
         current_head_matches_batch = normalized_current_head == main_checkout_head
+        patch_artifact_cleanup = self._normalize_patch_artifact_cleanup_receipt(
+            patch_artifact_cleanup_receipt=patch_artifact_cleanup_receipt,
+            apply_steps=apply_steps,
+            patch_artifact_manifest_digest=patch_artifact_manifest_digest,
+            pre_apply_dry_run_manifest_digest=pre_apply_dry_run_manifest_digest,
+            checkout_mutation_event_digest=str(
+                checkout_mutation.get("checkout_mutation_event_digest", ""),
+            ),
+            checkout_mutation_post_apply_head=str(
+                checkout_mutation.get("checkout_mutation_post_apply_head", ""),
+            ),
+        )
+        patch_artifact_cleanup_verified = bool(
+            patch_artifact_cleanup.get("patch_artifact_cleanup_verified", False),
+        )
         commit_finalization = self._normalize_commit_finalization_gate(
             source_batch_receipt_digest=batch_receipt_digest,
             current_checkout_head=normalized_current_head,
@@ -1172,6 +1195,10 @@ class ParallelCodexOrchestrationService:
             checkout_mutation_post_apply_head=str(
                 checkout_mutation.get("checkout_mutation_post_apply_head", ""),
             ),
+            patch_artifact_cleanup_digest=str(
+                patch_artifact_cleanup.get("patch_artifact_cleanup_digest", ""),
+            ),
+            patch_artifact_cleanup_verified=patch_artifact_cleanup_verified,
             changed_file_owner_manifest_digest=str(
                 batch_receipt.get("changed_file_owner_manifest_digest", ""),
             ).strip(),
@@ -1269,6 +1296,7 @@ class ParallelCodexOrchestrationService:
                 post_apply_verification_context_bound
             ),
             **checkout_mutation,
+            **patch_artifact_cleanup,
             **commit_finalization,
             "required_verifications_passed": required_verifications_passed,
             "blocking_reasons": [],
@@ -1278,6 +1306,7 @@ class ParallelCodexOrchestrationService:
             "raw_apply_plan_payload_stored": False,
             "raw_pre_apply_dry_run_payload_stored": False,
             "raw_checkout_mutation_payload_stored": False,
+            "raw_patch_artifact_cleanup_payload_stored": False,
             "raw_commit_finalization_payload_stored": False,
             "raw_worker_receipt_payload_stored": False,
             "raw_verification_payload_stored": False,
@@ -1456,6 +1485,90 @@ class ParallelCodexOrchestrationService:
             and checkout_mutation_context_bound
             and receipt.get("raw_checkout_mutation_payload_stored") is False
         )
+        patch_artifact_cleanup_artifact_paths = list(
+            receipt.get("patch_artifact_cleanup_artifact_paths", []),
+        )
+        expected_patch_artifact_cleanup_paths = (
+            self._patch_artifact_cleanup_artifact_paths(apply_steps=apply_steps)
+        )
+        patch_artifact_cleanup_digest_bound = (
+            receipt.get("patch_artifact_cleanup_digest")
+            == self._patch_artifact_cleanup_digest(
+                patch_artifact_cleanup_ref=str(
+                    receipt.get("patch_artifact_cleanup_ref", ""),
+                ),
+                patch_artifact_cleanup_status=str(
+                    receipt.get("patch_artifact_cleanup_status", ""),
+                ),
+                patch_artifact_cleanup_artifact_paths=(
+                    patch_artifact_cleanup_artifact_paths
+                ),
+                patch_artifact_cleanup_artifact_count=_coerce_int(
+                    receipt.get("patch_artifact_cleanup_artifact_count"),
+                    0,
+                ),
+                patch_artifact_manifest_digest=str(
+                    receipt.get("patch_artifact_manifest_digest", ""),
+                ),
+                pre_apply_dry_run_manifest_digest=str(
+                    receipt.get("pre_apply_dry_run_manifest_digest", ""),
+                ),
+                checkout_mutation_event_digest=str(
+                    receipt.get("checkout_mutation_event_digest", ""),
+                ),
+                checkout_mutation_post_apply_head=str(
+                    receipt.get("checkout_mutation_post_apply_head", ""),
+                ),
+            )
+        )
+        patch_artifact_cleanup_artifact_paths_bound = (
+            receipt.get("patch_artifact_cleanup_artifact_paths_bound") is True
+            and patch_artifact_cleanup_artifact_paths
+            == expected_patch_artifact_cleanup_paths
+        )
+        patch_artifact_cleanup_artifact_count_bound = (
+            receipt.get("patch_artifact_cleanup_artifact_count_bound") is True
+            and receipt.get("patch_artifact_cleanup_artifact_count")
+            == len(expected_patch_artifact_cleanup_paths)
+        )
+        patch_artifact_cleanup_manifest_digest_bound = (
+            receipt.get("patch_artifact_cleanup_manifest_digest_bound") is True
+            and patch_artifact_manifest_digest_bound
+        )
+        patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound = (
+            receipt.get(
+                "patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound",
+            )
+            is True
+            and pre_apply_dry_run_manifest_digest_bound
+        )
+        patch_artifact_cleanup_checkout_mutation_event_digest_bound = (
+            receipt.get(
+                "patch_artifact_cleanup_checkout_mutation_event_digest_bound",
+            )
+            is True
+            and checkout_mutation_event_digest_bound
+        )
+        patch_artifact_cleanup_post_apply_head_bound = (
+            receipt.get("patch_artifact_cleanup_post_apply_head_bound") is True
+            and _is_commit(receipt.get("checkout_mutation_post_apply_head"))
+        )
+        expected_patch_artifact_cleanup_verified = (
+            receipt.get("patch_artifact_cleanup_status") == "removed"
+            and patch_artifact_cleanup_digest_bound
+            and bool(expected_patch_artifact_cleanup_paths)
+            and patch_artifact_cleanup_artifact_paths_bound
+            and patch_artifact_cleanup_artifact_count_bound
+            and patch_artifact_cleanup_manifest_digest_bound
+            and patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound
+            and patch_artifact_cleanup_checkout_mutation_event_digest_bound
+            and patch_artifact_cleanup_post_apply_head_bound
+            and receipt.get("raw_patch_artifact_cleanup_payload_stored") is False
+        )
+        patch_artifact_cleanup_verified = (
+            receipt.get("patch_artifact_cleanup_verified")
+            == expected_patch_artifact_cleanup_verified
+        )
         commit_finalization_digest_bound = (
             receipt.get("commit_finalization_digest")
             == self._commit_finalization_digest(
@@ -1478,6 +1591,12 @@ class ParallelCodexOrchestrationService:
                 ),
                 checkout_mutation_post_apply_head=str(
                     receipt.get("checkout_mutation_post_apply_head", ""),
+                ),
+                patch_artifact_cleanup_digest=str(
+                    receipt.get("patch_artifact_cleanup_digest", ""),
+                ),
+                patch_artifact_cleanup_verified=bool(
+                    receipt.get("patch_artifact_cleanup_verified", False),
                 ),
                 changed_file_owner_manifest_digest=str(
                     receipt.get("changed_file_owner_manifest_digest", ""),
@@ -1508,6 +1627,7 @@ class ParallelCodexOrchestrationService:
             )
             and post_apply_verification_context_bound
             and checkout_mutation_attested
+            and expected_patch_artifact_cleanup_verified
             and self._required_verifications_passed(verification_results)
             and repo_local_patch_artifacts_bound
         )
@@ -1536,6 +1656,11 @@ class ParallelCodexOrchestrationService:
             )
             is True
             and checkout_mutation_event_digest_bound
+            and receipt.get(
+                "commit_finalization_patch_artifact_cleanup_digest_bound",
+            )
+            is True
+            and patch_artifact_cleanup_digest_bound
             and receipt.get(
                 "commit_finalization_changed_file_owner_manifest_digest_bound",
             )
@@ -1632,6 +1757,11 @@ class ParallelCodexOrchestrationService:
         ):
             errors.append("checkout_mutation_event_profile mismatch")
         if (
+            receipt.get("patch_artifact_cleanup_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_CLEANUP_PROFILE
+        ):
+            errors.append("patch_artifact_cleanup_profile mismatch")
+        if (
             receipt.get("commit_finalization_profile")
             != PARALLEL_CODEX_INTEGRATION_EXECUTION_COMMIT_FINALIZATION_PROFILE
         ):
@@ -1686,6 +1816,22 @@ class ParallelCodexOrchestrationService:
             errors.append("checkout mutation heads must bind current and post-apply heads")
         if not checkout_mutation_context_bound:
             errors.append("checkout mutation context digest binding mismatch")
+        if not patch_artifact_cleanup_digest_bound:
+            errors.append("patch_artifact_cleanup_digest mismatch")
+        if not patch_artifact_cleanup_artifact_paths_bound:
+            errors.append("patch_artifact_cleanup_artifact_paths mismatch")
+        if not patch_artifact_cleanup_artifact_count_bound:
+            errors.append("patch_artifact_cleanup_artifact_count mismatch")
+        if not patch_artifact_cleanup_manifest_digest_bound:
+            errors.append("patch_artifact_cleanup manifest digest unbound")
+        if not patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound:
+            errors.append("patch_artifact_cleanup pre-apply digest unbound")
+        if not patch_artifact_cleanup_checkout_mutation_event_digest_bound:
+            errors.append("patch_artifact_cleanup checkout mutation digest unbound")
+        if not patch_artifact_cleanup_post_apply_head_bound:
+            errors.append("patch_artifact_cleanup post-apply head unbound")
+        if not patch_artifact_cleanup_verified:
+            errors.append("patch_artifact_cleanup_verified mismatch")
         if not commit_finalization_digest_bound:
             errors.append("commit_finalization_digest mismatch")
         if not commit_finalization_context_bound:
@@ -1706,6 +1852,8 @@ class ParallelCodexOrchestrationService:
             errors.append("raw_pre_apply_dry_run_payload_stored must be false")
         if receipt.get("raw_checkout_mutation_payload_stored") is not False:
             errors.append("raw_checkout_mutation_payload_stored must be false")
+        if receipt.get("raw_patch_artifact_cleanup_payload_stored") is not False:
+            errors.append("raw_patch_artifact_cleanup_payload_stored must be false")
         if receipt.get("raw_commit_finalization_payload_stored") is not False:
             errors.append("raw_commit_finalization_payload_stored must be false")
         if receipt.get("raw_worker_receipt_payload_stored") is not False:
@@ -1772,8 +1920,40 @@ class ParallelCodexOrchestrationService:
             "checkout_mutation_heads_bound": checkout_mutation_heads_bound,
             "checkout_mutation_context_bound": checkout_mutation_context_bound,
             "checkout_mutation_attested": checkout_mutation_attested,
+            "patch_artifact_cleanup_digest_bound": (
+                patch_artifact_cleanup_digest_bound
+            ),
+            "patch_artifact_cleanup_artifact_paths_bound": (
+                patch_artifact_cleanup_artifact_paths_bound
+            ),
+            "patch_artifact_cleanup_artifact_count_bound": (
+                patch_artifact_cleanup_artifact_count_bound
+            ),
+            "patch_artifact_cleanup_manifest_digest_bound": (
+                patch_artifact_cleanup_manifest_digest_bound
+            ),
+            "patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound": (
+                patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound
+            ),
+            "patch_artifact_cleanup_checkout_mutation_event_digest_bound": (
+                patch_artifact_cleanup_checkout_mutation_event_digest_bound
+            ),
+            "patch_artifact_cleanup_post_apply_head_bound": (
+                patch_artifact_cleanup_post_apply_head_bound
+            ),
+            "patch_artifact_cleanup_verified": (
+                expected_patch_artifact_cleanup_verified
+                and receipt.get("patch_artifact_cleanup_verified") is True
+            ),
             "commit_finalization_digest_bound": commit_finalization_digest_bound,
             "commit_finalization_context_bound": commit_finalization_context_bound,
+            "commit_finalization_patch_artifact_cleanup_digest_bound": (
+                receipt.get(
+                    "commit_finalization_patch_artifact_cleanup_digest_bound",
+                )
+                is True
+                and patch_artifact_cleanup_digest_bound
+            ),
             "commit_finalization_ready": (
                 expected_commit_finalization_ready
                 and receipt.get("commit_finalization_ready") is True
@@ -1803,6 +1983,9 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_checkout_mutation_payload_redacted": (
                 receipt.get("raw_checkout_mutation_payload_stored") is False
+            ),
+            "raw_patch_artifact_cleanup_payload_redacted": (
+                receipt.get("raw_patch_artifact_cleanup_payload_stored") is False
             ),
             "raw_commit_finalization_payload_redacted": (
                 receipt.get("raw_commit_finalization_payload_stored") is False
@@ -3043,6 +3226,156 @@ class ParallelCodexOrchestrationService:
                 return False
         return True
 
+    @staticmethod
+    def _patch_artifact_cleanup_artifact_paths(
+        *,
+        apply_steps: Sequence[Mapping[str, Any]],
+    ) -> list[str]:
+        return sorted(
+            _dedupe_strings(
+                [
+                    str(step.get("patch_artifact_path", "")).strip()
+                    for step in apply_steps
+                    if step.get("patch_artifact_source")
+                    == PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_SOURCE
+                ]
+            )
+        )
+
+    @staticmethod
+    def _patch_artifact_cleanup_digest(
+        *,
+        patch_artifact_cleanup_ref: str,
+        patch_artifact_cleanup_status: str,
+        patch_artifact_cleanup_artifact_paths: Sequence[str],
+        patch_artifact_cleanup_artifact_count: int,
+        patch_artifact_manifest_digest: str,
+        pre_apply_dry_run_manifest_digest: str,
+        checkout_mutation_event_digest: str,
+        checkout_mutation_post_apply_head: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_CLEANUP_PROFILE
+                    ),
+                    "patch_artifact_cleanup_ref": patch_artifact_cleanup_ref,
+                    "patch_artifact_cleanup_status": patch_artifact_cleanup_status,
+                    "patch_artifact_cleanup_artifact_paths": list(
+                        patch_artifact_cleanup_artifact_paths,
+                    ),
+                    "patch_artifact_cleanup_artifact_count": (
+                        patch_artifact_cleanup_artifact_count
+                    ),
+                    "patch_artifact_manifest_digest": patch_artifact_manifest_digest,
+                    "pre_apply_dry_run_manifest_digest": (
+                        pre_apply_dry_run_manifest_digest
+                    ),
+                    "checkout_mutation_event_digest": checkout_mutation_event_digest,
+                    "checkout_mutation_post_apply_head": (
+                        checkout_mutation_post_apply_head
+                    ),
+                    "raw_patch_artifact_cleanup_payload_stored": False,
+                }
+            )
+        )
+
+    def _normalize_patch_artifact_cleanup_receipt(
+        self,
+        *,
+        patch_artifact_cleanup_receipt: Mapping[str, Any] | None,
+        apply_steps: Sequence[Mapping[str, Any]],
+        patch_artifact_manifest_digest: str,
+        pre_apply_dry_run_manifest_digest: str,
+        checkout_mutation_event_digest: str,
+        checkout_mutation_post_apply_head: str,
+    ) -> Dict[str, Any]:
+        source = dict(patch_artifact_cleanup_receipt or {})
+        expected_artifact_paths = self._patch_artifact_cleanup_artifact_paths(
+            apply_steps=apply_steps,
+        )
+        artifact_paths = sorted(
+            _dedupe_strings(
+                [
+                    str(path).strip()
+                    for path in source.get(
+                        "patch_artifact_cleanup_artifact_paths",
+                        expected_artifact_paths,
+                    )
+                ]
+            )
+        )
+        artifact_count = _coerce_int(
+            source.get("patch_artifact_cleanup_artifact_count"),
+            len(artifact_paths),
+        )
+        status = str(
+            source.get("patch_artifact_cleanup_status", "removed"),
+        ).strip()
+        cleanup_ref = str(source.get("patch_artifact_cleanup_ref", "")).strip()
+        if not cleanup_ref:
+            cleanup_ref = (
+                "cleanup://parallel-codex/"
+                f"{sha256_text(patch_artifact_manifest_digest + checkout_mutation_event_digest)[:12]}"
+            )
+        expected_digest = self._patch_artifact_cleanup_digest(
+            patch_artifact_cleanup_ref=cleanup_ref,
+            patch_artifact_cleanup_status=status,
+            patch_artifact_cleanup_artifact_paths=artifact_paths,
+            patch_artifact_cleanup_artifact_count=artifact_count,
+            patch_artifact_manifest_digest=patch_artifact_manifest_digest,
+            pre_apply_dry_run_manifest_digest=pre_apply_dry_run_manifest_digest,
+            checkout_mutation_event_digest=checkout_mutation_event_digest,
+            checkout_mutation_post_apply_head=checkout_mutation_post_apply_head,
+        )
+        cleanup_digest = str(
+            source.get("patch_artifact_cleanup_digest", ""),
+        ).strip()
+        if not _is_sha256(cleanup_digest):
+            cleanup_digest = expected_digest
+        artifact_paths_bound = artifact_paths == expected_artifact_paths
+        artifact_count_bound = artifact_count == len(expected_artifact_paths)
+        manifest_digest_bound = _is_sha256(patch_artifact_manifest_digest)
+        pre_apply_digest_bound = _is_sha256(pre_apply_dry_run_manifest_digest)
+        checkout_mutation_event_bound = _is_sha256(checkout_mutation_event_digest)
+        post_apply_head_bound = _is_commit(checkout_mutation_post_apply_head)
+        cleanup_verified = (
+            status == "removed"
+            and bool(expected_artifact_paths)
+            and cleanup_digest == expected_digest
+            and artifact_paths_bound
+            and artifact_count_bound
+            and manifest_digest_bound
+            and pre_apply_digest_bound
+            and checkout_mutation_event_bound
+            and post_apply_head_bound
+            and source.get("raw_patch_artifact_cleanup_payload_stored", False)
+            is False
+        )
+        return {
+            "patch_artifact_cleanup_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_CLEANUP_PROFILE
+            ),
+            "patch_artifact_cleanup_status": status,
+            "patch_artifact_cleanup_ref": cleanup_ref,
+            "patch_artifact_cleanup_digest": cleanup_digest,
+            "patch_artifact_cleanup_artifact_paths": artifact_paths,
+            "patch_artifact_cleanup_artifact_count": artifact_count,
+            "patch_artifact_cleanup_artifact_paths_bound": artifact_paths_bound,
+            "patch_artifact_cleanup_artifact_count_bound": artifact_count_bound,
+            "patch_artifact_cleanup_manifest_digest_bound": manifest_digest_bound,
+            "patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound": (
+                pre_apply_digest_bound
+            ),
+            "patch_artifact_cleanup_checkout_mutation_event_digest_bound": (
+                checkout_mutation_event_bound
+            ),
+            "patch_artifact_cleanup_post_apply_head_bound": post_apply_head_bound,
+            "patch_artifact_cleanup_verified": cleanup_verified,
+            "raw_patch_artifact_cleanup_payload_stored": False,
+        }
+
     def _normalize_pre_apply_dry_run_results(
         self,
         pre_apply_dry_run_results: Sequence[Mapping[str, Any]] | None,
@@ -3511,6 +3844,8 @@ class ParallelCodexOrchestrationService:
         post_apply_verification_context_digest: str,
         checkout_mutation_event_digest: str,
         checkout_mutation_post_apply_head: str,
+        patch_artifact_cleanup_digest: str,
+        patch_artifact_cleanup_verified: bool,
         changed_file_owner_manifest_digest: str,
         required_verifications_passed: bool,
         source_batch_ready_for_execution: bool,
@@ -3542,6 +3877,10 @@ class ParallelCodexOrchestrationService:
                     "checkout_mutation_post_apply_head": (
                         checkout_mutation_post_apply_head
                     ),
+                    "patch_artifact_cleanup_digest": patch_artifact_cleanup_digest,
+                    "patch_artifact_cleanup_verified": (
+                        patch_artifact_cleanup_verified
+                    ),
                     "changed_file_owner_manifest_digest": (
                         changed_file_owner_manifest_digest
                     ),
@@ -3570,6 +3909,8 @@ class ParallelCodexOrchestrationService:
         post_apply_verification_context_digest: str,
         checkout_mutation_event_digest: str,
         checkout_mutation_post_apply_head: str,
+        patch_artifact_cleanup_digest: str,
+        patch_artifact_cleanup_verified: bool,
         changed_file_owner_manifest_digest: str,
         required_verifications_passed: bool,
         source_batch_ready_for_execution: bool,
@@ -3590,6 +3931,8 @@ class ParallelCodexOrchestrationService:
             ),
             checkout_mutation_event_digest=checkout_mutation_event_digest,
             checkout_mutation_post_apply_head=checkout_mutation_post_apply_head,
+            patch_artifact_cleanup_digest=patch_artifact_cleanup_digest,
+            patch_artifact_cleanup_verified=patch_artifact_cleanup_verified,
             changed_file_owner_manifest_digest=changed_file_owner_manifest_digest,
             required_verifications_passed=required_verifications_passed,
             source_batch_ready_for_execution=source_batch_ready_for_execution,
@@ -3605,6 +3948,7 @@ class ParallelCodexOrchestrationService:
             and pre_apply_dry_run_passed
             and post_apply_verification_context_bound
             and checkout_mutation_attested
+            and patch_artifact_cleanup_verified
             and required_verifications_passed
             and repo_local_patch_artifacts_bound
         )
@@ -3636,6 +3980,9 @@ class ParallelCodexOrchestrationService:
             ),
             "commit_finalization_checkout_mutation_event_digest_bound": (
                 _is_sha256(checkout_mutation_event_digest)
+            ),
+            "commit_finalization_patch_artifact_cleanup_digest_bound": (
+                _is_sha256(patch_artifact_cleanup_digest)
             ),
             "commit_finalization_changed_file_owner_manifest_digest_bound": (
                 _is_sha256(changed_file_owner_manifest_digest)
@@ -3925,6 +4272,77 @@ class ParallelCodexOrchestrationService:
         if receipt.get("checkout_mutation_attested") is not True:
             reasons.append("checkout mutation attestation must be bound before commit")
         if (
+            receipt.get("patch_artifact_cleanup_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_PATCH_ARTIFACT_CLEANUP_PROFILE
+        ):
+            reasons.append("patch_artifact_cleanup_profile mismatch")
+        expected_cleanup_paths = self._patch_artifact_cleanup_artifact_paths(
+            apply_steps=apply_steps,
+        )
+        cleanup_paths = list(
+            receipt.get("patch_artifact_cleanup_artifact_paths", []),
+        )
+        expected_cleanup_digest = self._patch_artifact_cleanup_digest(
+            patch_artifact_cleanup_ref=str(
+                receipt.get("patch_artifact_cleanup_ref", ""),
+            ),
+            patch_artifact_cleanup_status=str(
+                receipt.get("patch_artifact_cleanup_status", ""),
+            ),
+            patch_artifact_cleanup_artifact_paths=cleanup_paths,
+            patch_artifact_cleanup_artifact_count=_coerce_int(
+                receipt.get("patch_artifact_cleanup_artifact_count"),
+                0,
+            ),
+            patch_artifact_manifest_digest=str(
+                receipt.get("patch_artifact_manifest_digest", ""),
+            ),
+            pre_apply_dry_run_manifest_digest=str(
+                receipt.get("pre_apply_dry_run_manifest_digest", ""),
+            ),
+            checkout_mutation_event_digest=str(
+                receipt.get("checkout_mutation_event_digest", ""),
+            ),
+            checkout_mutation_post_apply_head=str(
+                receipt.get("checkout_mutation_post_apply_head", ""),
+            ),
+        )
+        if receipt.get("patch_artifact_cleanup_digest") != expected_cleanup_digest:
+            reasons.append("patch_artifact_cleanup_digest mismatch")
+        if cleanup_paths != expected_cleanup_paths:
+            reasons.append("patch artifact cleanup must bind apply-step artifacts")
+        if (
+            receipt.get("patch_artifact_cleanup_artifact_count")
+            != len(expected_cleanup_paths)
+        ):
+            reasons.append("patch_artifact_cleanup_artifact_count mismatch")
+        if receipt.get("patch_artifact_cleanup_artifact_paths_bound") is not True:
+            reasons.append("patch artifact cleanup must bind artifact paths")
+        if receipt.get("patch_artifact_cleanup_artifact_count_bound") is not True:
+            reasons.append("patch artifact cleanup must bind artifact count")
+        if receipt.get("patch_artifact_cleanup_manifest_digest_bound") is not True:
+            reasons.append("patch artifact cleanup must bind artifact manifest")
+        if (
+            receipt.get(
+                "patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound",
+            )
+            is not True
+        ):
+            reasons.append("patch artifact cleanup must bind pre-apply dry-run")
+        if (
+            receipt.get(
+                "patch_artifact_cleanup_checkout_mutation_event_digest_bound",
+            )
+            is not True
+        ):
+            reasons.append("patch artifact cleanup must bind checkout mutation event")
+        if receipt.get("patch_artifact_cleanup_post_apply_head_bound") is not True:
+            reasons.append("patch artifact cleanup must bind post-apply head")
+        if receipt.get("patch_artifact_cleanup_status") != "removed":
+            reasons.append("patch artifact cleanup must remove repo-local artifacts")
+        if receipt.get("patch_artifact_cleanup_verified") is not True:
+            reasons.append("patch artifact cleanup must be verified before commit")
+        if (
             receipt.get("commit_finalization_profile")
             != PARALLEL_CODEX_INTEGRATION_EXECUTION_COMMIT_FINALIZATION_PROFILE
         ):
@@ -3949,6 +4367,12 @@ class ParallelCodexOrchestrationService:
             ),
             checkout_mutation_post_apply_head=str(
                 receipt.get("checkout_mutation_post_apply_head", ""),
+            ),
+            patch_artifact_cleanup_digest=str(
+                receipt.get("patch_artifact_cleanup_digest", ""),
+            ),
+            patch_artifact_cleanup_verified=bool(
+                receipt.get("patch_artifact_cleanup_verified", False),
             ),
             changed_file_owner_manifest_digest=str(
                 receipt.get("changed_file_owner_manifest_digest", ""),
@@ -4000,6 +4424,11 @@ class ParallelCodexOrchestrationService:
         ):
             reasons.append("commit finalization must bind checkout mutation event")
         if (
+            receipt.get("commit_finalization_patch_artifact_cleanup_digest_bound")
+            is not True
+        ):
+            reasons.append("commit finalization must bind patch artifact cleanup")
+        if (
             receipt.get("commit_finalization_changed_file_owner_manifest_digest_bound")
             is not True
         ):
@@ -4021,6 +4450,8 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw_pre_apply_dry_run_payload_stored must be false")
         if receipt.get("raw_checkout_mutation_payload_stored") is not False:
             reasons.append("raw_checkout_mutation_payload_stored must be false")
+        if receipt.get("raw_patch_artifact_cleanup_payload_stored") is not False:
+            reasons.append("raw_patch_artifact_cleanup_payload_stored must be false")
         if receipt.get("raw_commit_finalization_payload_stored") is not False:
             reasons.append("raw_commit_finalization_payload_stored must be false")
         if receipt.get("raw_worker_receipt_payload_stored") is not False:

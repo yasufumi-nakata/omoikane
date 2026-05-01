@@ -89,8 +89,12 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - commit finalization gate は source batch digest、current checkout head、apply plan digest、
   patch artifact manifest digest、pre-apply dry-run manifest digest、
   post-apply verification context digest、checkout mutation event digest、
-  post-apply head、changed-file owner manifest digest、passing verification state を
-  束縛し、未 ready の execution を commit へ進めない
+  post-apply head、patch artifact cleanup digest、changed-file owner manifest digest、
+  passing verification state を束縛し、未 ready の execution を commit へ進めない
+- patch artifact cleanup receipt は ordered apply step の
+  `artifacts/parallel-codex/*.patch` path、patch artifact manifest digest、
+  pre-apply dry-run manifest digest、checkout mutation event digest、post-apply head を
+  束縛し、cleanup status が `removed` でない execution は commit 前に blocked とする
 - source batch が blocked、current head が batch head と不一致、または post-apply
   verification が未達の場合は `execution_decision=blocked` のまま commit へ進まない
 - post-apply verification context が apply plan digest、repo-local patch artifact
@@ -99,6 +103,9 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - apply 前 dry-run が step 単位で失敗した場合、または dry-run command が
   対象 repo-local patch artifact path/ref/digest に束縛されていない場合も
   `execution_decision=blocked` のまま checkout mutation や commit へ進まない
+- patch artifact cleanup が ordered apply step の repo-local patch artifact path を
+  `removed` として検証していない場合も `execution_decision=blocked` のまま
+  commit へ進まない
 - checkout mutation attestation が pre-apply head、post-apply head、apply plan
   digest、patch artifact manifest digest、pre-apply dry-run manifest digest、
   post-apply verification context digest、changed-file owner manifest digest に

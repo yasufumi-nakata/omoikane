@@ -1035,6 +1035,22 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["apply_plan_digest_bound"])
         self.assertTrue(validation["patch_artifact_manifest_digest_bound"])
         self.assertTrue(validation["repo_local_patch_artifacts_bound"])
+        self.assertTrue(validation["patch_artifact_cleanup_digest_bound"])
+        self.assertTrue(validation["patch_artifact_cleanup_artifact_paths_bound"])
+        self.assertTrue(validation["patch_artifact_cleanup_artifact_count_bound"])
+        self.assertTrue(validation["patch_artifact_cleanup_manifest_digest_bound"])
+        self.assertTrue(
+            validation[
+                "patch_artifact_cleanup_pre_apply_dry_run_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            validation[
+                "patch_artifact_cleanup_checkout_mutation_event_digest_bound"
+            ]
+        )
+        self.assertTrue(validation["patch_artifact_cleanup_post_apply_head_bound"])
+        self.assertTrue(validation["patch_artifact_cleanup_verified"])
         self.assertTrue(validation["pre_apply_dry_run_manifest_digest_bound"])
         self.assertTrue(validation["pre_apply_dry_run_passed"])
         self.assertTrue(validation["post_apply_verification_manifest_digest_bound"])
@@ -1077,6 +1093,24 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertEqual("ready", execution["commit_finalization_status"])
         self.assertTrue(execution["commit_finalization_ready"])
         self.assertTrue(execution["commit_finalization_digest"])
+        self.assertEqual(
+            "repo-local-patch-artifact-cleanup-v1",
+            execution["patch_artifact_cleanup_profile"],
+        )
+        self.assertEqual("removed", execution["patch_artifact_cleanup_status"])
+        self.assertEqual(
+            execution["repo_local_patch_artifact_count"],
+            execution["patch_artifact_cleanup_artifact_count"],
+        )
+        self.assertEqual(
+            sorted(step["patch_artifact_path"] for step in execution["apply_steps"]),
+            execution["patch_artifact_cleanup_artifact_paths"],
+        )
+        self.assertTrue(execution["patch_artifact_cleanup_verified"])
+        self.assertTrue(
+            execution["commit_finalization_patch_artifact_cleanup_digest_bound"]
+        )
+        self.assertFalse(execution["raw_patch_artifact_cleanup_payload_stored"])
         self.assertFalse(execution["raw_commit_finalization_payload_stored"])
         self.assertFalse(execution["raw_checkout_mutation_payload_stored"])
         self.assertTrue(execution["post_apply_verification_context_bound"])
@@ -1120,9 +1154,55 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(execution["raw_apply_plan_payload_stored"])
         self.assertFalse(execution["raw_pre_apply_dry_run_payload_stored"])
         self.assertFalse(execution["raw_checkout_mutation_payload_stored"])
+        self.assertFalse(execution["raw_patch_artifact_cleanup_payload_stored"])
         self.assertFalse(execution["raw_commit_finalization_payload_stored"])
         self.assertFalse(execution["raw_worker_receipt_payload_stored"])
         self.assertFalse(execution["raw_verification_payload_stored"])
+
+    def test_integration_execution_blocks_unremoved_patch_artifacts(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+            ],
+            verification_results=_verification_results(),
+            result_summary="Runtime orchestration patch is ready.",
+        )
+        batch = self.service.plan_integration_batch(
+            receipts=[receipt],
+            main_checkout_head=MAIN_HEAD,
+            verification_results=_verification_results(),
+            result_summary="Single ready receipt can be rehearsed.",
+        )
+
+        execution = self.service.plan_integration_execution(
+            batch_receipt=batch,
+            current_checkout_head=MAIN_HEAD,
+            post_apply_verification_results=_verification_results(),
+            patch_artifact_cleanup_receipt={
+                "patch_artifact_cleanup_status": "retained",
+            },
+            result_summary="Retained patch artifacts block commit finalization.",
+        )
+        validation = self.service.validate_integration_execution_receipt(execution)
+
+        self.assertEqual("blocked", execution["execution_decision"])
+        self.assertIn(
+            "patch artifact cleanup must remove repo-local artifacts",
+            execution["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_to_apply"])
+        self.assertTrue(validation["patch_artifact_cleanup_digest_bound"])
+        self.assertFalse(validation["patch_artifact_cleanup_verified"])
+        self.assertTrue(validation["commit_finalization_digest_bound"])
+        self.assertTrue(validation["commit_finalization_context_bound"])
+        self.assertFalse(validation["commit_finalization_ready"])
 
     def test_integration_execution_blocks_failed_pre_apply_dry_run(self) -> None:
         receipt = self.service.ingest_worker_result(
