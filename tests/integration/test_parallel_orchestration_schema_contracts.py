@@ -294,7 +294,32 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_pre_apply_dry_run_manifest_digest_bound"]
         )
+        self.assertTrue(
+            result["validation"]["execution_pre_apply_dry_run_command_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_pre_apply_patch_artifact_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_pre_apply_command_receipt_digest_bound"]
+        )
         self.assertTrue(result["validation"]["execution_pre_apply_dry_run_passed"])
+        for step in result["execution_receipt"]["apply_steps"]:
+            self.assertTrue(step["patch_artifact_ref"].startswith("patch://parallel-codex/"))
+            self.assertTrue(step["patch_artifact_digest"])
+            self.assertFalse(step["raw_patch_payload_stored"])
+        for dry_run in result["execution_receipt"]["pre_apply_dry_run_results"]:
+            self.assertEqual(
+                "command-bound-git-apply-check-v1",
+                dry_run["command_profile"],
+            )
+            self.assertEqual(
+                f"git apply --check {dry_run['patch_artifact_ref']}",
+                dry_run["command"],
+            )
+            self.assertTrue(dry_run["patch_artifact_digest_bound"])
+            self.assertTrue(dry_run["command_receipt_digest"])
+            self.assertFalse(dry_run["raw_patch_payload_stored"])
         self.assertTrue(
             result["validation"][
                 "execution_post_apply_verification_manifest_digest_bound"

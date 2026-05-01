@@ -1454,6 +1454,14 @@ class OmoikaneReferenceOS:
                 "execution_pre_apply_dry_run_manifest_digest": execution_receipt[
                     "pre_apply_dry_run_manifest_digest"
                 ],
+                "execution_pre_apply_command_receipt_digests": [
+                    result["command_receipt_digest"]
+                    for result in execution_receipt["pre_apply_dry_run_results"]
+                ],
+                "execution_pre_apply_patch_artifact_digests": [
+                    result["patch_artifact_digest"]
+                    for result in execution_receipt["pre_apply_dry_run_results"]
+                ],
                 "execution_post_apply_verification_manifest_digest": (
                     execution_receipt["post_apply_verification_manifest_digest"]
                 ),
@@ -1946,6 +1954,16 @@ class OmoikaneReferenceOS:
                 ),
                 "execution_pre_apply_dry_run_manifest_digest_bound": (
                     execution_validation["pre_apply_dry_run_manifest_digest_bound"]
+                ),
+                "execution_pre_apply_dry_run_command_bound": (
+                    execution_validation["pre_apply_command_bound"]
+                ),
+                "execution_pre_apply_patch_artifact_digest_bound": (
+                    execution_validation["pre_apply_patch_artifact_digest_bound"]
+                    and execution_validation["apply_step_patch_artifact_digest_bound"]
+                ),
+                "execution_pre_apply_command_receipt_digest_bound": (
+                    execution_validation["pre_apply_command_receipt_digest_bound"]
                 ),
                 "execution_pre_apply_dry_run_passed": (
                     execution_validation["pre_apply_dry_run_passed"]

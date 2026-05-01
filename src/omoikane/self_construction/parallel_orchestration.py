@@ -30,6 +30,9 @@ PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE = (
 PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE = (
     "pre-apply-dry-run-check-v1"
 )
+PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_COMMAND_PROFILE = (
+    "command-bound-git-apply-check-v1"
+)
 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE = (
     "post-apply-required-verification-v1"
 )
@@ -213,6 +216,9 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "integration_execution_dry_run_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_PROFILE
+            ),
+            "integration_execution_dry_run_command_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_COMMAND_PROFILE
             ),
             "integration_execution_post_verify_profile": (
                 PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
@@ -1167,6 +1173,33 @@ class ParallelCodexOrchestrationService:
             receipt.get("pre_apply_dry_run_manifest_digest")
             == self._pre_apply_dry_run_manifest_digest(pre_apply_dry_run_results)
         )
+        apply_step_patch_artifact_digest_bound = all(
+            step.get("patch_artifact_digest")
+            == self._integration_execution_patch_artifact_digest(
+                receipt_ref=str(step.get("receipt_ref", "")),
+                receipt_digest=str(step.get("receipt_digest", "")),
+                changed_file_manifest_digest=str(
+                    step.get("changed_file_manifest_digest", ""),
+                ),
+            )
+            for step in apply_steps
+        )
+        pre_apply_patch_artifact_digest_bound = all(
+            result.get("patch_artifact_digest_bound") is True
+            for result in pre_apply_dry_run_results
+        )
+        pre_apply_command_bound = all(
+            result.get("command_profile")
+            == PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_COMMAND_PROFILE
+            and result.get("command")
+            == f"git apply --check {result.get('patch_artifact_ref', '')}"
+            for result in pre_apply_dry_run_results
+        )
+        pre_apply_command_receipt_digest_bound = all(
+            result.get("command_receipt_digest")
+            == self._pre_apply_dry_run_command_receipt_digest(result)
+            for result in pre_apply_dry_run_results
+        )
         receipt_digest_bound = receipt.get("receipt_digest") == self._receipt_digest(
             receipt,
         )
@@ -1210,8 +1243,16 @@ class ParallelCodexOrchestrationService:
             errors.append("post_apply_verification_command_count mismatch")
         if not apply_plan_digest_bound:
             errors.append("apply_plan_digest mismatch")
+        if not apply_step_patch_artifact_digest_bound:
+            errors.append("apply step patch_artifact_digest mismatch")
         if not pre_apply_dry_run_manifest_digest_bound:
             errors.append("pre_apply_dry_run_manifest_digest mismatch")
+        if pre_apply_dry_run_results and not pre_apply_patch_artifact_digest_bound:
+            errors.append("pre_apply patch_artifact_digest unbound")
+        if pre_apply_dry_run_results and not pre_apply_command_bound:
+            errors.append("pre_apply command must be git apply --check patch artifact")
+        if pre_apply_dry_run_results and not pre_apply_command_receipt_digest_bound:
+            errors.append("pre_apply command_receipt_digest mismatch")
         if not post_apply_verification_manifest_digest_bound:
             errors.append("post_apply_verification_manifest_digest mismatch")
         if receipt.get("blocking_reasons") != expected_blocking_reasons:
@@ -1245,8 +1286,18 @@ class ParallelCodexOrchestrationService:
                 receipt.get("current_head_matches_batch") is True
             ),
             "apply_plan_digest_bound": apply_plan_digest_bound,
+            "apply_step_patch_artifact_digest_bound": (
+                apply_step_patch_artifact_digest_bound
+            ),
             "pre_apply_dry_run_manifest_digest_bound": (
                 pre_apply_dry_run_manifest_digest_bound
+            ),
+            "pre_apply_patch_artifact_digest_bound": (
+                pre_apply_patch_artifact_digest_bound
+            ),
+            "pre_apply_command_bound": pre_apply_command_bound,
+            "pre_apply_command_receipt_digest_bound": (
+                pre_apply_command_receipt_digest_bound
             ),
             "pre_apply_dry_run_passed": self._pre_apply_dry_run_passed(
                 pre_apply_dry_run_results,
@@ -2278,6 +2329,16 @@ class ParallelCodexOrchestrationService:
                 "changed_files": changed_files,
                 "changed_file_count": len(changed_files),
                 "changed_file_manifest_digest": changed_file_manifest_digest,
+                "patch_artifact_ref": self._integration_execution_patch_artifact_ref(
+                    receipt_ref,
+                ),
+                "patch_artifact_digest": (
+                    self._integration_execution_patch_artifact_digest(
+                        receipt_ref=receipt_ref,
+                        receipt_digest=receipt_digest,
+                        changed_file_manifest_digest=changed_file_manifest_digest,
+                    )
+                ),
                 "raw_patch_payload_stored": False,
             }
             step["apply_step_digest"] = self._integration_execution_apply_step_digest(
@@ -2304,6 +2365,34 @@ class ParallelCodexOrchestrationService:
                         "changed_file_manifest_digest",
                         "",
                     ),
+                    "patch_artifact_ref": step.get("patch_artifact_ref", ""),
+                    "patch_artifact_digest": step.get("patch_artifact_digest", ""),
+                }
+            )
+        )
+
+    @staticmethod
+    def _integration_execution_patch_artifact_ref(receipt_ref: str) -> str:
+        digest = sha256_text(receipt_ref)
+        return f"patch://parallel-codex/{digest[:12]}"
+
+    @staticmethod
+    def _integration_execution_patch_artifact_digest(
+        *,
+        receipt_ref: str,
+        receipt_digest: str,
+        changed_file_manifest_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE
+                    ),
+                    "receipt_ref": receipt_ref,
+                    "receipt_digest": receipt_digest,
+                    "changed_file_manifest_digest": changed_file_manifest_digest,
+                    "raw_patch_payload_stored": False,
                 }
             )
         )
@@ -2328,6 +2417,11 @@ class ParallelCodexOrchestrationService:
                                 "changed_file_manifest_digest",
                                 "",
                             ),
+                            "patch_artifact_ref": step.get("patch_artifact_ref", ""),
+                            "patch_artifact_digest": step.get(
+                                "patch_artifact_digest",
+                                "",
+                            ),
                             "apply_step_digest": step.get("apply_step_digest", ""),
                         }
                         for step in apply_steps
@@ -2350,7 +2444,12 @@ class ParallelCodexOrchestrationService:
                     "step_index": step.get("step_index", index),
                     "receipt_ref": step.get("receipt_ref", ""),
                     "receipt_digest": step.get("receipt_digest", ""),
-                    "command": f"git apply --check {step.get('receipt_ref', '')}",
+                    "patch_artifact_ref": step.get("patch_artifact_ref", ""),
+                    "patch_artifact_digest": step.get("patch_artifact_digest", ""),
+                    "command": (
+                        "git apply --check "
+                        f"{step.get('patch_artifact_ref', '')}"
+                    ),
                     "status": "pass",
                     "exit_code": 0,
                     "stdout_excerpt": "pre-apply dry run passed",
@@ -2369,29 +2468,89 @@ class ParallelCodexOrchestrationService:
             step = step_by_index.get(step_index, {})
             stdout_digest = str(result.get("stdout_digest", "")).strip()
             stderr_digest = str(result.get("stderr_digest", "")).strip()
+            patch_artifact_ref = str(
+                result.get("patch_artifact_ref", step.get("patch_artifact_ref", "")),
+            ).strip()
+            patch_artifact_digest = str(
+                result.get(
+                    "patch_artifact_digest",
+                    step.get("patch_artifact_digest", ""),
+                ),
+            ).strip()
             if not _is_sha256(stdout_digest):
                 stdout_digest = sha256_text(str(result.get("stdout_excerpt", "")))
             if not _is_sha256(stderr_digest):
                 stderr_digest = sha256_text(str(result.get("stderr_excerpt", "")))
-            normalized.append(
+            if not _is_sha256(patch_artifact_digest):
+                patch_artifact_digest = str(step.get("patch_artifact_digest", ""))
+            command = str(result.get("command", "")).strip()
+            if not command:
+                command = f"git apply --check {patch_artifact_ref}"
+            normalized_result = {
+                "step_index": step_index,
+                "receipt_ref": str(
+                    result.get("receipt_ref", step.get("receipt_ref", "")),
+                ).strip(),
+                "receipt_digest": str(
+                    result.get("receipt_digest", step.get("receipt_digest", "")),
+                ).strip(),
+                "command_profile": (
+                    PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_COMMAND_PROFILE
+                ),
+                "patch_artifact_ref": patch_artifact_ref,
+                "patch_artifact_digest": patch_artifact_digest,
+                "patch_artifact_digest_bound": (
+                    patch_artifact_ref == step.get("patch_artifact_ref", "")
+                    and patch_artifact_digest == step.get("patch_artifact_digest", "")
+                ),
+                "command": command,
+                "status": str(result.get("status", "")).strip(),
+                "exit_code": _coerce_int(result.get("exit_code"), 0),
+                "stdout_digest": stdout_digest,
+                "stderr_digest": stderr_digest,
+                "raw_patch_payload_stored": False,
+                "raw_stdout_stored": False,
+                "raw_stderr_stored": False,
+            }
+            command_receipt_digest = str(
+                result.get("command_receipt_digest", ""),
+            ).strip()
+            if not _is_sha256(command_receipt_digest):
+                command_receipt_digest = (
+                    self._pre_apply_dry_run_command_receipt_digest(
+                        normalized_result,
+                    )
+                )
+            normalized_result["command_receipt_digest"] = command_receipt_digest
+            normalized.append(normalized_result)
+        return normalized
+
+    @staticmethod
+    def _pre_apply_dry_run_command_receipt_digest(
+        result: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
                 {
-                    "step_index": step_index,
-                    "receipt_ref": str(
-                        result.get("receipt_ref", step.get("receipt_ref", "")),
-                    ).strip(),
-                    "receipt_digest": str(
-                        result.get("receipt_digest", step.get("receipt_digest", "")),
-                    ).strip(),
-                    "command": str(result.get("command", "")).strip(),
-                    "status": str(result.get("status", "")).strip(),
-                    "exit_code": _coerce_int(result.get("exit_code"), 0),
-                    "stdout_digest": stdout_digest,
-                    "stderr_digest": stderr_digest,
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_COMMAND_PROFILE
+                    ),
+                    "step_index": result.get("step_index", 0),
+                    "receipt_ref": result.get("receipt_ref", ""),
+                    "receipt_digest": result.get("receipt_digest", ""),
+                    "patch_artifact_ref": result.get("patch_artifact_ref", ""),
+                    "patch_artifact_digest": result.get("patch_artifact_digest", ""),
+                    "command": result.get("command", ""),
+                    "status": result.get("status", ""),
+                    "exit_code": result.get("exit_code", 0),
+                    "stdout_digest": result.get("stdout_digest", ""),
+                    "stderr_digest": result.get("stderr_digest", ""),
+                    "raw_patch_payload_stored": False,
                     "raw_stdout_stored": False,
                     "raw_stderr_stored": False,
                 }
             )
-        return normalized
+        )
 
     @staticmethod
     def _pre_apply_dry_run_manifest_digest(
@@ -2406,11 +2565,28 @@ class ParallelCodexOrchestrationService:
                             "step_index": result.get("step_index", 0),
                             "receipt_ref": result.get("receipt_ref", ""),
                             "receipt_digest": result.get("receipt_digest", ""),
+                            "command_profile": result.get("command_profile", ""),
+                            "patch_artifact_ref": result.get(
+                                "patch_artifact_ref",
+                                "",
+                            ),
+                            "patch_artifact_digest": result.get(
+                                "patch_artifact_digest",
+                                "",
+                            ),
+                            "patch_artifact_digest_bound": result.get(
+                                "patch_artifact_digest_bound",
+                                False,
+                            ),
                             "command": result.get("command", ""),
                             "status": result.get("status", ""),
                             "exit_code": result.get("exit_code", 0),
                             "stdout_digest": result.get("stdout_digest", ""),
                             "stderr_digest": result.get("stderr_digest", ""),
+                            "command_receipt_digest": result.get(
+                                "command_receipt_digest",
+                                "",
+                            ),
                         }
                         for result in pre_apply_dry_run_results
                     ],
@@ -2431,6 +2607,8 @@ class ParallelCodexOrchestrationService:
                 int(step.get("step_index", 0)),
                 step.get("receipt_ref", ""),
                 step.get("receipt_digest", ""),
+                step.get("patch_artifact_ref", ""),
+                step.get("patch_artifact_digest", ""),
             )
             for step in apply_steps
         }
@@ -2439,6 +2617,8 @@ class ParallelCodexOrchestrationService:
                 int(result.get("step_index", 0)),
                 result.get("receipt_ref", ""),
                 result.get("receipt_digest", ""),
+                result.get("patch_artifact_ref", ""),
+                result.get("patch_artifact_digest", ""),
             )
             for result in pre_apply_dry_run_results
         }
@@ -2447,6 +2627,16 @@ class ParallelCodexOrchestrationService:
             and observed_pairs == expected_pairs
             and all(
                 result.get("status") == "pass" and result.get("exit_code") == 0
+                and result.get("command_profile")
+                == PARALLEL_CODEX_INTEGRATION_EXECUTION_DRY_RUN_COMMAND_PROFILE
+                and result.get("command")
+                == f"git apply --check {result.get('patch_artifact_ref', '')}"
+                and result.get("patch_artifact_digest_bound") is True
+                and result.get("raw_patch_payload_stored") is False
+                and result.get("command_receipt_digest")
+                == ParallelCodexOrchestrationService._pre_apply_dry_run_command_receipt_digest(
+                    result,
+                )
                 for result in pre_apply_dry_run_results
             )
         )

@@ -1011,6 +1011,10 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             execution["profile_id"],
         )
         self.assertEqual(2, execution["apply_step_count"])
+        for step in execution["apply_steps"]:
+            self.assertTrue(step["patch_artifact_ref"].startswith("patch://parallel-codex/"))
+            self.assertTrue(step["patch_artifact_digest"])
+            self.assertFalse(step["raw_patch_payload_stored"])
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["ready_to_apply"])
         self.assertTrue(validation["source_batch_receipt_digest_bound"])
@@ -1028,6 +1032,18 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             execution["apply_step_count"],
             execution["pre_apply_dry_run_result_count"],
         )
+        for dry_run in execution["pre_apply_dry_run_results"]:
+            self.assertEqual(
+                "command-bound-git-apply-check-v1",
+                dry_run["command_profile"],
+            )
+            self.assertEqual(
+                f"git apply --check {dry_run['patch_artifact_ref']}",
+                dry_run["command"],
+            )
+            self.assertTrue(dry_run["patch_artifact_digest_bound"])
+            self.assertTrue(dry_run["command_receipt_digest"])
+            self.assertFalse(dry_run["raw_patch_payload_stored"])
         self.assertTrue(execution["pre_apply_dry_run_passed"])
         self.assertFalse(execution["raw_batch_payload_stored"])
         self.assertFalse(execution["raw_apply_plan_payload_stored"])
@@ -1061,7 +1077,6 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             current_checkout_head=MAIN_HEAD,
             pre_apply_dry_run_results=[
                 {
-                    "command": "git apply --check receipt://parallel-codex/unit",
                     "status": "fail",
                     "exit_code": 1,
                     "stdout_excerpt": "",
@@ -1083,6 +1098,63 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["pre_apply_dry_run_manifest_digest_bound"])
         self.assertFalse(validation["pre_apply_dry_run_passed"])
         self.assertTrue(validation["apply_plan_digest_bound"])
+
+    def test_integration_execution_blocks_unbound_pre_apply_command(self) -> None:
+        receipt = self.service.ingest_worker_result(
+            worker_id="codex-worker-runtime",
+            worker_role="worker",
+            worker_result_status="completed",
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            ownership_scope=["src/omoikane/self_construction/"],
+            changed_files=[
+                "src/omoikane/self_construction/parallel_orchestration.py",
+            ],
+            verification_results=_verification_results(),
+            result_summary="Runtime orchestration patch is ready.",
+        )
+        batch = self.service.plan_integration_batch(
+            receipts=[receipt],
+            main_checkout_head=MAIN_HEAD,
+            verification_results=_verification_results(),
+            result_summary="Single ready receipt can be rehearsed.",
+        )
+
+        execution = self.service.plan_integration_execution(
+            batch_receipt=batch,
+            current_checkout_head=MAIN_HEAD,
+            pre_apply_dry_run_results=[
+                {
+                    "command": "git apply --check receipt://parallel-codex/unit",
+                    "status": "pass",
+                    "exit_code": 0,
+                    "stdout_excerpt": "pre-apply dry run passed",
+                    "stderr_excerpt": "",
+                }
+            ],
+            post_apply_verification_results=_verification_results(),
+            result_summary="Unbound dry-run command blocks checkout mutation.",
+        )
+        validation = self.service.validate_integration_execution_receipt(execution)
+
+        self.assertEqual("blocked", execution["execution_decision"])
+        self.assertIn(
+            "pre-apply dry-run checks must pass",
+            execution["blocking_reasons"],
+        )
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "pre_apply command must be git apply --check patch artifact",
+            validation["errors"],
+        )
+        self.assertFalse(validation["ready_to_apply"])
+        self.assertTrue(validation["pre_apply_dry_run_manifest_digest_bound"])
+        self.assertFalse(validation["pre_apply_dry_run_passed"])
+        self.assertTrue(
+            execution["pre_apply_dry_run_results"][0][
+                "patch_artifact_digest_bound"
+            ]
+        )
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
         changed_file = "src/omoikane/self_construction/parallel_orchestration.py"

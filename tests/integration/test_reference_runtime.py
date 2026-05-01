@@ -1080,6 +1080,15 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["execution_pre_apply_dry_run_manifest_digest_bound"]
         )
+        self.assertTrue(
+            result["validation"]["execution_pre_apply_dry_run_command_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_pre_apply_patch_artifact_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_pre_apply_command_receipt_digest_bound"]
+        )
         self.assertTrue(result["validation"]["execution_pre_apply_dry_run_passed"])
         self.assertTrue(
             result["validation"][
