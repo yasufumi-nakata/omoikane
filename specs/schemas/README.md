@@ -113,6 +113,7 @@
 - `external_actuation_authorization.schema`
 - `gap_report.schema`
   - repo-local reference runbook の存在に加えて、必須 section-level policy 欠落を all-zero gate の外へ出す
+  - tracked worktree diff を digest-bound scan surface として扱い、workspace marker residue を all-zero gate の外へ出す
 - `governance_artifact_sync.schema`
 - `governance_verifier_connectivity_receipt.schema`
 - `governance_verifier_roster.schema`

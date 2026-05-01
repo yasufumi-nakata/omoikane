@@ -132,7 +132,9 @@ rollback-approved へ到達するか。
 ### Gap Scanner Required Reference Files
 gap-report が automation の pull-first / coverage / verification / parallel Codex
 orchestration runbook 欠落と必須 section-level policy 欠落を
-high-priority task として検出できるか。
+high-priority task として検出できるか。tracked worktree diff に残った
+workspace marker residue も `worktree_workspace_marker_hits` として
+all-zero gate の外へ出せるか。
 
 ### Parallel Codex Result Ingestion
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import subprocess
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -105,6 +106,8 @@ CATALOG_COVERAGE_SPECS = (
 EVAL_INVENTORY_GLOB = "evals/*/README.md"
 IMPLEMENTATION_STUB_GLOB = "src/omoikane/**/*.py"
 IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES = ("Backend",)
+WORKTREE_DIFF_SCAN_SURFACE = "git:tracked-worktree-diff"
+WORKTREE_WORKSPACE_MARKER_PREFIX = "# workspace-enacted:"
 SCAN_RECEIPT_SURFACES = (
     "meta/open-questions.md",
     "references/*.md",
@@ -118,6 +121,7 @@ SCAN_RECEIPT_SURFACES = (
     "specs/schemas/README.md",
     "src/omoikane/**/*.py",
     "meta/decision-log/*.md",
+    WORKTREE_DIFF_SCAN_SURFACE,
 )
 
 
@@ -139,6 +143,7 @@ class GapScanner:
         catalog_coverage_hits = self._catalog_coverage_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
         implementation_stub_hits = self._implementation_stub_hits(repo_root)
+        worktree_workspace_marker_hits = self._worktree_workspace_marker_hits(repo_root)
         decision_log_gap_hits = self._decision_log_gap_hits(repo_root)
         decision_log_residual_hits = [
             hit for hit in decision_log_gap_hits if hit["kind"] == "decision-log-residual"
@@ -220,6 +225,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in worktree_workspace_marker_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "worktree-workspace-marker",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in decision_log_frontier_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -267,6 +280,7 @@ class GapScanner:
             "catalog_coverage_gap_count": len(catalog_coverage_hits),
             "future_work_hit_count": len(future_work_hits),
             "implementation_stub_count": len(implementation_stub_hits),
+            "worktree_workspace_marker_count": len(worktree_workspace_marker_hits),
             "decision_log_residual_count": len(decision_log_residual_hits),
             "decision_log_frontier_count": len(decision_log_frontier_hits),
             "open_questions": open_questions,
@@ -283,6 +297,7 @@ class GapScanner:
             "catalog_coverage_gap_hits": catalog_coverage_hits,
             "future_work_hits": future_work_hits,
             "implementation_stub_hits": implementation_stub_hits,
+            "worktree_workspace_marker_hits": worktree_workspace_marker_hits,
             "decision_log_residual_hits": decision_log_residual_hits,
             "decision_log_frontier_hits": decision_log_frontier_hits,
             "prioritized_tasks": prioritized_tasks,
@@ -306,6 +321,9 @@ class GapScanner:
             "catalog_coverage_gap_count": int(report["catalog_coverage_gap_count"]),
             "future_work_hit_count": int(report["future_work_hit_count"]),
             "implementation_stub_count": int(report["implementation_stub_count"]),
+            "worktree_workspace_marker_count": int(
+                report["worktree_workspace_marker_count"]
+            ),
             "decision_log_residual_count": int(report["decision_log_residual_count"]),
             "decision_log_frontier_count": int(report["decision_log_frontier_count"]),
             "catalog_pending_count": int(report["catalog_pending_count"]),
@@ -480,6 +498,17 @@ class GapScanner:
         entries: List[Dict[str, Any]] = []
         seen_entries: set[tuple[str, str]] = set()
         for pattern in scanned_surfaces:
+            if pattern == WORKTREE_DIFF_SCAN_SURFACE:
+                diff_text = GapScanner._tracked_worktree_diff(repo_root)
+                entries.append(
+                    {
+                        "surface_pattern": pattern,
+                        "path": pattern,
+                        "sha256": sha256_text(diff_text),
+                        "byte_length": len(diff_text.encode("utf-8")),
+                    }
+                )
+                continue
             if any(marker in pattern for marker in ("*", "?", "[")):
                 candidates = sorted(path for path in repo_root.glob(pattern) if path.is_file())
             else:
@@ -505,6 +534,100 @@ class GapScanner:
                     }
                 )
         return entries
+
+    @staticmethod
+    def _tracked_worktree_diff(repo_root: Path) -> str:
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "diff",
+                    "--no-ext-diff",
+                    "--unified=0",
+                    "HEAD",
+                    "--",
+                ],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+        if result.returncode != 0:
+            return ""
+        return result.stdout
+
+    def _worktree_workspace_marker_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, Any]]:
+        diff_text = self._tracked_worktree_diff(repo_root)
+        if not diff_text:
+            return []
+
+        hits: List[Dict[str, Any]] = []
+        current_path = ""
+        marker_lines: List[str] = []
+        substantive_added_line_count = 0
+        removed_line_count = 0
+
+        def flush_current_file() -> None:
+            nonlocal current_path, marker_lines, substantive_added_line_count
+            nonlocal removed_line_count
+            if not current_path or not marker_lines:
+                current_path = ""
+                marker_lines = []
+                substantive_added_line_count = 0
+                removed_line_count = 0
+                return
+            status = (
+                "marker-only-dirty"
+                if substantive_added_line_count == 0 and removed_line_count == 0
+                else "mixed-marker-dirty"
+            )
+            hits.append(
+                {
+                    "kind": "worktree-workspace-marker",
+                    "path": current_path,
+                    "line": (
+                        f"{status}: {len(marker_lines)} workspace-enacted marker "
+                        "line(s) remain in tracked worktree diff"
+                    ),
+                    "marker_line_count": len(marker_lines),
+                    "substantive_added_line_count": substantive_added_line_count,
+                    "removed_line_count": removed_line_count,
+                    "worktree_marker_status": status,
+                    "raw_diff_payload_stored": False,
+                }
+            )
+            current_path = ""
+            marker_lines = []
+            substantive_added_line_count = 0
+            removed_line_count = 0
+
+        for line in diff_text.splitlines():
+            if line.startswith("diff --git "):
+                flush_current_file()
+                parts = line.split()
+                current_path = parts[3][2:] if len(parts) >= 4 and parts[3].startswith("b/") else ""
+                continue
+            if not current_path:
+                continue
+            if line.startswith("+++") or line.startswith("---"):
+                continue
+            if line.startswith("+"):
+                added_line = line[1:].strip()
+                if added_line.startswith(WORKTREE_WORKSPACE_MARKER_PREFIX):
+                    marker_lines.append(added_line)
+                elif added_line:
+                    substantive_added_line_count += 1
+                continue
+            if line.startswith("-"):
+                removed_line_count += 1
+        flush_current_file()
+        return hits
 
     @staticmethod
     def _catalog_pending_files(catalog_path: Path, repo_root: Path) -> List[str]:

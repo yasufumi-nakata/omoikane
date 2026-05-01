@@ -3,7 +3,8 @@ $id: "https://omoikane.dev/specs/schemas/gap_report.schema"
 title: GapReport
 description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
-  including a digest-bound scan receipt for automation gating.
+  including tracked worktree marker-residue checks and a digest-bound scan
+  receipt for automation gating.
 type: object
 additionalProperties: false
 required:
@@ -18,6 +19,7 @@ required:
   - catalog_coverage_gap_count
   - future_work_hit_count
   - implementation_stub_count
+  - worktree_workspace_marker_count
   - decision_log_residual_count
   - decision_log_frontier_count
   - open_questions
@@ -32,6 +34,7 @@ required:
   - catalog_coverage_gap_hits
   - future_work_hits
   - implementation_stub_hits
+  - worktree_workspace_marker_hits
   - decision_log_residual_hits
   - decision_log_frontier_hits
   - prioritized_tasks
@@ -68,6 +71,9 @@ properties:
     type: integer
     minimum: 0
   implementation_stub_count:
+    type: integer
+    minimum: 0
+  worktree_workspace_marker_count:
     type: integer
     minimum: 0
   decision_log_residual_count:
@@ -132,6 +138,10 @@ properties:
     items:
       $ref: "#/$defs/gap_hit"
   implementation_stub_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  worktree_workspace_marker_hits:
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -274,6 +284,7 @@ properties:
           - catalog_coverage_gap_count
           - future_work_hit_count
           - implementation_stub_count
+          - worktree_workspace_marker_count
           - decision_log_residual_count
           - decision_log_frontier_count
           - catalog_pending_count
@@ -307,6 +318,9 @@ properties:
             type: integer
             minimum: 0
           implementation_stub_count:
+            type: integer
+            minimum: 0
+          worktree_workspace_marker_count:
             type: integer
             minimum: 0
           decision_log_residual_count:
@@ -430,6 +444,22 @@ $defs:
       symbol:
         type: string
         minLength: 1
+      marker_line_count:
+        type: integer
+        minimum: 0
+      substantive_added_line_count:
+        type: integer
+        minimum: 0
+      removed_line_count:
+        type: integer
+        minimum: 0
+      worktree_marker_status:
+        type: string
+        enum:
+          - marker-only-dirty
+          - mixed-marker-dirty
+      raw_diff_payload_stored:
+        const: false
       required_section:
         type: string
         minLength: 1
@@ -445,6 +475,7 @@ examples:
     catalog_coverage_gap_count: 0
     future_work_hit_count: 0
     implementation_stub_count: 0
+    worktree_workspace_marker_count: 0
     decision_log_residual_count: 0
     decision_log_frontier_count: 0
     open_questions: []
@@ -459,6 +490,7 @@ examples:
     catalog_coverage_gap_hits: []
     future_work_hits: []
     implementation_stub_hits: []
+    worktree_workspace_marker_hits: []
     decision_log_residual_hits: []
     decision_log_frontier_hits: []
     prioritized_tasks: []
@@ -500,6 +532,7 @@ examples:
         catalog_coverage_gap_count: 0
         future_work_hit_count: 0
         implementation_stub_count: 0
+        worktree_workspace_marker_count: 0
         decision_log_residual_count: 0
         decision_log_frontier_count: 0
         catalog_pending_count: 0

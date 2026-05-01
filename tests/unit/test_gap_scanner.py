@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import subprocess
 from pathlib import Path
 
 from omoikane.common import canonical_json, sha256_text
@@ -108,6 +109,7 @@ class GapScannerTests(unittest.TestCase):
                 0,
                 receipt["counts"]["missing_required_reference_policy_section_count"],
             )
+            self.assertEqual(0, receipt["counts"]["worktree_workspace_marker_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
             self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
@@ -160,6 +162,61 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(1, receipt["counts"]["prioritized_task_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
+
+    def test_scan_reports_tracked_worktree_workspace_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            docs_path = repo_root / "docs" / "02-subsystems" / "agentic" / "README.md"
+            docs_path.parent.mkdir(parents=True, exist_ok=True)
+            docs_path.write_text("# Agentic\n", encoding="utf-8")
+            self._run_git(repo_root, "init")
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap",
+            )
+            docs_path.write_text(
+                "# Agentic\n"
+                "# workspace-enacted: patch-test "
+                "target=docs/02-subsystems/agentic/README.md\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+            hit = report["worktree_workspace_marker_hits"][0]
+
+            self.assertEqual(1, report["worktree_workspace_marker_count"])
+            self.assertEqual(
+                "docs/02-subsystems/agentic/README.md",
+                hit["path"],
+            )
+            self.assertEqual("marker-only-dirty", hit["worktree_marker_status"])
+            self.assertEqual(1, hit["marker_line_count"])
+            self.assertFalse(hit["raw_diff_payload_stored"])
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"]["worktree_workspace_marker_count"],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "worktree-workspace-marker"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+            self.assertTrue(
+                any(
+                    entry["path"] == "git:tracked-worktree-diff"
+                    for entry in report["scan_receipt"]["scan_surface_digests"]
+                )
+            )
 
     def test_scan_reports_empty_eval_surface(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -670,6 +727,15 @@ class GapScannerTests(unittest.TestCase):
                 "meta/decision-log/2026-04-22_recent-gap.md",
                 report["decision_log_residual_hits"][0]["path"],
             )
+
+    @staticmethod
+    def _run_git(repo_root: Path, *args: str) -> None:
+        subprocess.run(
+            ["git", "-C", str(repo_root), *args],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
 
     @staticmethod
     def _bootstrap_repo(repo_root: Path) -> None:

@@ -83,6 +83,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             counts["implementation_stub_count"],
         )
         self.assertEqual(
+            report["worktree_workspace_marker_count"],
+            counts["worktree_workspace_marker_count"],
+        )
+        self.assertEqual(
             report["decision_log_residual_count"],
             counts["decision_log_residual_count"],
         )
@@ -119,6 +123,13 @@ class GapReportSchemaContractTests(unittest.TestCase):
             any(
                 entry["path"] == "references/parallel-codex-orchestration.md"
                 and entry["surface_pattern"] == "references/*.md"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+        self.assertTrue(
+            any(
+                entry["path"] == "git:tracked-worktree-diff"
+                and entry["surface_pattern"] == "git:tracked-worktree-diff"
                 for entry in receipt["scan_surface_digests"]
             )
         )

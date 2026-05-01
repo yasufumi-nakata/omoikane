@@ -1211,6 +1211,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual([], report["catalog_coverage_gap_hits"])
         self.assertEqual(0, report["implementation_stub_count"])
         self.assertEqual([], report["implementation_stub_hits"])
+        self.assertEqual(0, report["worktree_workspace_marker_count"])
+        self.assertEqual([], report["worktree_workspace_marker_hits"])
         self.assertIn("decision_log_residual_count", report)
         self.assertEqual(
             report["decision_log_residual_count"],

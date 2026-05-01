@@ -116,6 +116,9 @@ residual `future work` に加え、
 `src/omoikane/**/*.py` の非抽象 runtime path に残る
 `raise NotImplementedError` も `implementation_stub_hits` として拾う。
 `*Backend._*` の抽象 backend hook は concrete backend subclass が実装するため除外する。
+さらに tracked worktree diff を `git:tracked-worktree-diff` の digest-bound
+scan surface として扱い、dirty diff に残った workspace marker residue を
+`worktree_workspace_marker_hits` として all-zero gate の外へ出す。
 最新 decision log 日付に残る `residual gap` / `unresolved gap` の bullet も
 `decision_log_residual_hits` として JSON で列挙する。
 同じ最新日付の後続 decision log が `closes_next_gaps` で閉じた item は除外され、

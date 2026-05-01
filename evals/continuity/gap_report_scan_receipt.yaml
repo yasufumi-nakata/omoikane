@@ -14,6 +14,7 @@ expected:
   scan_receipt_profile: self-construction-gap-report-scan-receipt-v1
   all_zero: true
   missing_required_reference_policy_section_count: 0
+  worktree_workspace_marker_count: 0
   validation_ok: true
   counts_match_report: true
   report_digest_bound: true
@@ -31,6 +32,7 @@ expected:
   prioritized_tasks_empty_when_all_zero: true
   raw_report_payload_stored: false
   raw_surface_payload_stored: false
+  tracked_worktree_diff_surface_bound: true
   raw_continuity_event_payload_stored: false
 metric: boolean
 threshold: 1.0

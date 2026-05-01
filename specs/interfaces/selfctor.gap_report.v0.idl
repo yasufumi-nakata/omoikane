@@ -2,12 +2,12 @@ idl_version: 1
 kind: service
 namespace: selfctor.gap_report.v0
 service: GapReportService
-summary: Emit a schema-bound self-construction gap report with a digest-bound scan receipt for automation gates.
+summary: Emit a schema-bound self-construction gap report with tracked worktree marker-residue checks and a digest-bound scan receipt for automation gates.
 imports:
   gap_report: ../schemas/gap_report.schema
 operations:
   scan_repo:
-    summary: Scan one repository root for open questions, required automation references, inventory drift, catalog coverage gaps, residual future work, runtime stubs, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
+    summary: Scan one repository root for open questions, required automation references, inventory drift, catalog coverage gaps, residual future work, runtime stubs, tracked worktree workspace marker residue, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
     input:
       inline_schema:
         type: object
@@ -30,6 +30,7 @@ operations:
       - operating-playbook, parallel-codex-orchestration, repo-coverage-checklist, and verification-checklist must be required repo-local references
       - present repo-local references must retain their required section-level policies so empty or truncated runbooks cannot pass the all-zero gate
       - abstract Backend extension hooks are excluded from implementation_stub_hits, while concrete NotImplementedError paths remain reportable
+      - tracked worktree diff is digest-bound as git:tracked-worktree-diff and any added workspace-enacted marker residue is reported as worktree_workspace_marker_hits before all-zero completion
       - latest decision-log residual and frontier chains must respect closes_next_gaps frontmatter
 events:
   selfctor.gap_report.scanned:
