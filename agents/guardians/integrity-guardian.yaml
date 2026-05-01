@@ -69,6 +69,7 @@ capabilities:
   - parallel-codex.remote-source-revocation-freshness.attest
   - parallel-codex.integration-batch-conflict.attest
   - parallel-codex.integration-batch-quarantine.attest
+  - parallel-codex.integration-execution.attest
   - parallel-codex.yaoyorozu-dispatch-bridge.attest
   - ethics.consent-authenticity-redaction.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest
@@ -129,6 +130,7 @@ oversight_scope_refs:
   - specs/schemas/gap_report.schema
   - specs/schemas/parallel_codex_worker_result_receipt.schema
   - specs/schemas/parallel_codex_integration_batch_receipt.schema
+  - specs/schemas/parallel_codex_integration_execution_receipt.schema
   - specs/schemas/yaoyorozu_source_manifest_public_verification_bundle.schema
   - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
   - specs/schemas/yaoyorozu_worker_dispatch_plan.schema

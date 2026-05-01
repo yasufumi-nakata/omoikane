@@ -1059,6 +1059,34 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["conflict_batch_raw_conflict_payload_redacted"]
         )
+        self.assertTrue(result["validation"]["execution_receipt_ok"])
+        self.assertTrue(result["validation"]["execution_ready_to_apply"])
+        self.assertTrue(
+            result["validation"]["execution_source_batch_receipt_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_current_head_matches_batch"])
+        self.assertTrue(result["validation"]["execution_apply_plan_digest_bound"])
+        self.assertTrue(
+            result["validation"][
+                "execution_post_apply_verification_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(result["validation"]["execution_required_verifications_passed"])
+        self.assertTrue(result["validation"]["execution_raw_batch_payload_redacted"])
+        self.assertTrue(
+            result["validation"]["execution_raw_apply_plan_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_raw_worker_receipt_payload_redacted"]
+        )
+        self.assertTrue(
+            result["validation"]["execution_raw_verification_payload_redacted"]
+        )
+        self.assertTrue(result["validation"]["conflict_execution_receipt_ok"])
+        self.assertTrue(result["validation"]["conflict_execution_blocked"])
+        self.assertTrue(
+            result["validation"]["conflict_execution_blocked_on_source_batch"]
+        )
         self.assertTrue(result["validation"]["ledger_bound"])
         self.assertEqual("accept-ready", result["ready_receipt"]["integration_decision"])
         self.assertEqual("accept-ready", result["remote_receipt"]["integration_decision"])
@@ -1085,6 +1113,14 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertEqual("integration-ready", result["batch_receipt"]["batch_decision"])
         self.assertEqual("blocked", result["conflict_batch_receipt"]["batch_decision"])
+        self.assertEqual(
+            "ready-to-apply",
+            result["execution_receipt"]["execution_decision"],
+        )
+        self.assertEqual(
+            "blocked",
+            result["conflict_execution_receipt"]["execution_decision"],
+        )
         self.assertEqual(0, result["batch_receipt"]["conflict_count"])
         self.assertGreater(result["conflict_batch_receipt"]["conflict_count"], 0)
 

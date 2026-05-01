@@ -21,6 +21,15 @@ PARALLEL_CODEX_INTEGRATION_BATCH_CONFLICT_PROFILE = (
 PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE = (
     "blocked-receipt-quarantine-manifest-v1"
 )
+PARALLEL_CODEX_INTEGRATION_EXECUTION_PROFILE = (
+    "parallel-codex-integration-execution-plan-v1"
+)
+PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE = (
+    "ordered-receipt-apply-plan-digest-v1"
+)
+PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE = (
+    "post-apply-required-verification-v1"
+)
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -187,6 +196,15 @@ class ParallelCodexOrchestrationPolicy:
             "integration_batch_quarantine_profile": (
                 PARALLEL_CODEX_INTEGRATION_BATCH_QUARANTINE_PROFILE
             ),
+            "integration_execution_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_PROFILE
+            ),
+            "integration_execution_apply_plan_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE
+            ),
+            "integration_execution_post_verify_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
+            ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
             "allowed_workspace_prefixes": list(self.allowed_workspace_prefixes),
@@ -264,6 +282,8 @@ class ParallelCodexOrchestrationPolicy:
             "raw_remote_source_ancestry_payload_stored": False,
             "raw_worker_receipt_payload_stored": False,
             "raw_conflict_payload_stored": False,
+            "raw_batch_payload_stored": False,
+            "raw_apply_plan_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -968,6 +988,224 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_conflict_payload_redacted": (
                 receipt.get("raw_conflict_payload_stored") is False
+            ),
+            "raw_verification_payload_redacted": (
+                receipt.get("raw_verification_payload_stored") is False
+            ),
+        }
+
+    def plan_integration_execution(
+        self,
+        *,
+        batch_receipt: Mapping[str, Any],
+        current_checkout_head: str,
+        post_apply_verification_results: Sequence[Mapping[str, Any]],
+        result_summary: str,
+    ) -> Dict[str, Any]:
+        batch_validation = self.validate_integration_batch_receipt(batch_receipt)
+        ordered_refs = list(batch_receipt.get("ordered_integration_receipt_refs", []))
+        ordered_digests = list(
+            batch_receipt.get("ordered_integration_receipt_digests", []),
+        )
+        changed_file_owners = list(batch_receipt.get("changed_file_owners", []))
+        apply_steps = self._integration_execution_apply_steps(
+            ordered_receipt_refs=ordered_refs,
+            ordered_receipt_digests=ordered_digests,
+            changed_file_owners=changed_file_owners,
+        )
+        normalized_verifications = self._normalize_verification_results(
+            post_apply_verification_results,
+        )
+        batch_receipt_digest = str(batch_receipt.get("receipt_digest", "")).strip()
+        source_batch_digest_bound = (
+            batch_receipt_digest == self._receipt_digest(batch_receipt)
+        )
+        main_checkout_head = str(batch_receipt.get("main_checkout_head", "")).strip()
+        normalized_current_head = current_checkout_head.strip()
+        receipt = {
+            "kind": "parallel_codex_integration_execution_receipt",
+            "schema_version": "1.0.0",
+            "receipt_id": new_id("parallel-codex-execution"),
+            "generated_at": utc_now_iso(),
+            "profile_id": PARALLEL_CODEX_INTEGRATION_EXECUTION_PROFILE,
+            "integration_policy_profile": self._policy.profile_id,
+            "reference_runbook_ref": self._policy.reference_runbook_ref,
+            "source_batch_receipt_ref": str(
+                batch_receipt.get("receipt_ref", ""),
+            ).strip(),
+            "source_batch_receipt_digest": batch_receipt_digest,
+            "source_batch_receipt_digest_bound": source_batch_digest_bound,
+            "source_batch_decision": str(
+                batch_receipt.get("batch_decision", ""),
+            ).strip(),
+            "source_batch_ready_for_execution": bool(
+                batch_validation["ready_for_integration"],
+            ),
+            "main_checkout_head": main_checkout_head,
+            "current_checkout_head": normalized_current_head,
+            "current_head_matches_batch": normalized_current_head == main_checkout_head,
+            "ordered_integration_receipt_refs": ordered_refs,
+            "ordered_integration_receipt_digests": ordered_digests,
+            "ordered_integration_digest": str(
+                batch_receipt.get("ordered_integration_digest", ""),
+            ).strip(),
+            "changed_file_owner_manifest_digest": str(
+                batch_receipt.get("changed_file_owner_manifest_digest", ""),
+            ).strip(),
+            "quarantined_receipt_set_digest": str(
+                batch_receipt.get("quarantined_receipt_set_digest", ""),
+            ).strip(),
+            "conflict_digest": str(batch_receipt.get("conflict_digest", "")).strip(),
+            "apply_plan_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE
+            ),
+            "apply_steps": apply_steps,
+            "apply_step_count": len(apply_steps),
+            "apply_plan_digest": self._integration_execution_apply_plan_digest(
+                apply_steps=apply_steps,
+            ),
+            "post_apply_verification_profile": (
+                PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
+            ),
+            "post_apply_verification_results": normalized_verifications,
+            "post_apply_verification_command_count": len(normalized_verifications),
+            "post_apply_verification_manifest_digest": (
+                self._verification_manifest_digest(normalized_verifications)
+            ),
+            "required_verifications_passed": self._required_verifications_passed(
+                normalized_verifications,
+            ),
+            "blocking_reasons": [],
+            "execution_decision": "blocked",
+            "result_summary": result_summary,
+            "raw_batch_payload_stored": False,
+            "raw_apply_plan_payload_stored": False,
+            "raw_worker_receipt_payload_stored": False,
+            "raw_verification_payload_stored": False,
+            "receipt_digest": "",
+        }
+        receipt["receipt_ref"] = (
+            f"receipt://parallel-codex/{receipt['receipt_id']}"
+        )
+        receipt["blocking_reasons"] = self._derive_execution_blocking_reasons(
+            receipt,
+        )
+        receipt["execution_decision"] = (
+            "blocked" if receipt["blocking_reasons"] else "ready-to-apply"
+        )
+        receipt["receipt_digest"] = self._receipt_digest(receipt)
+        return receipt
+
+    def validate_integration_execution_receipt(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> Dict[str, Any]:
+        errors: list[str] = []
+        apply_steps = list(receipt.get("apply_steps", []))
+        verification_results = list(
+            receipt.get("post_apply_verification_results", []),
+        )
+        expected_blocking_reasons = self._derive_execution_blocking_reasons(receipt)
+        expected_decision = (
+            "blocked" if expected_blocking_reasons else "ready-to-apply"
+        )
+        apply_plan_digest_bound = (
+            receipt.get("apply_plan_digest")
+            == self._integration_execution_apply_plan_digest(
+                apply_steps=apply_steps,
+            )
+        )
+        post_apply_verification_manifest_digest_bound = (
+            receipt.get("post_apply_verification_manifest_digest")
+            == self._verification_manifest_digest(verification_results)
+        )
+        receipt_digest_bound = receipt.get("receipt_digest") == self._receipt_digest(
+            receipt,
+        )
+
+        if receipt.get("kind") != "parallel_codex_integration_execution_receipt":
+            errors.append("kind must be parallel_codex_integration_execution_receipt")
+        if receipt.get("profile_id") != PARALLEL_CODEX_INTEGRATION_EXECUTION_PROFILE:
+            errors.append("profile_id mismatch")
+        if receipt.get("integration_policy_profile") != self._policy.profile_id:
+            errors.append("integration_policy_profile mismatch")
+        if receipt.get("reference_runbook_ref") != self._policy.reference_runbook_ref:
+            errors.append("reference_runbook_ref mismatch")
+        if (
+            receipt.get("apply_plan_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE
+        ):
+            errors.append("apply_plan_profile mismatch")
+        if (
+            receipt.get("post_apply_verification_profile")
+            != PARALLEL_CODEX_INTEGRATION_EXECUTION_POST_VERIFY_PROFILE
+        ):
+            errors.append("post_apply_verification_profile mismatch")
+        if len(receipt.get("ordered_integration_receipt_refs", [])) != len(
+            receipt.get("ordered_integration_receipt_digests", []),
+        ):
+            errors.append("ordered receipt refs and digests must have equal length")
+        if receipt.get("apply_step_count") != len(apply_steps):
+            errors.append("apply_step_count mismatch")
+        if receipt.get("post_apply_verification_command_count") != len(
+            verification_results,
+        ):
+            errors.append("post_apply_verification_command_count mismatch")
+        if not apply_plan_digest_bound:
+            errors.append("apply_plan_digest mismatch")
+        if not post_apply_verification_manifest_digest_bound:
+            errors.append("post_apply_verification_manifest_digest mismatch")
+        if receipt.get("blocking_reasons") != expected_blocking_reasons:
+            errors.append("blocking_reasons mismatch")
+        if receipt.get("execution_decision") != expected_decision:
+            errors.append("execution_decision mismatch")
+        if not receipt_digest_bound:
+            errors.append("receipt_digest mismatch")
+        if receipt.get("raw_batch_payload_stored") is not False:
+            errors.append("raw_batch_payload_stored must be false")
+        if receipt.get("raw_apply_plan_payload_stored") is not False:
+            errors.append("raw_apply_plan_payload_stored must be false")
+        if receipt.get("raw_worker_receipt_payload_stored") is not False:
+            errors.append("raw_worker_receipt_payload_stored must be false")
+        if receipt.get("raw_verification_payload_stored") is not False:
+            errors.append("raw_verification_payload_stored must be false")
+
+        return {
+            "ok": not errors,
+            "ready_to_apply": (
+                receipt.get("execution_decision") == "ready-to-apply"
+                and not expected_blocking_reasons
+            ),
+            "errors": errors,
+            "source_batch_receipt_digest_bound": (
+                receipt.get("source_batch_receipt_digest_bound") is True
+            ),
+            "current_head_matches_batch": (
+                receipt.get("current_head_matches_batch") is True
+            ),
+            "apply_plan_digest_bound": apply_plan_digest_bound,
+            "post_apply_verification_manifest_digest_bound": (
+                post_apply_verification_manifest_digest_bound
+            ),
+            "required_verifications_passed": self._required_verifications_passed(
+                verification_results,
+            ),
+            "source_batch_ready_for_execution": (
+                receipt.get("source_batch_ready_for_execution") is True
+            ),
+            "blocked_on_source_batch": (
+                receipt.get("source_batch_decision") != "integration-ready"
+                and receipt.get("execution_decision") == "blocked"
+            ),
+            "receipt_digest_bound": receipt_digest_bound,
+            "raw_batch_payload_redacted": (
+                receipt.get("raw_batch_payload_stored") is False
+            ),
+            "raw_apply_plan_payload_redacted": (
+                receipt.get("raw_apply_plan_payload_stored") is False
+            ),
+            "raw_worker_receipt_payload_redacted": (
+                receipt.get("raw_worker_receipt_payload_stored") is False
             ),
             "raw_verification_payload_redacted": (
                 receipt.get("raw_verification_payload_stored") is False
@@ -1938,6 +2176,164 @@ class ParallelCodexOrchestrationService:
                 }
             )
         )
+
+    def _integration_execution_apply_steps(
+        self,
+        *,
+        ordered_receipt_refs: Sequence[str],
+        ordered_receipt_digests: Sequence[str],
+        changed_file_owners: Sequence[Mapping[str, Any]],
+    ) -> list[Dict[str, Any]]:
+        files_by_receipt: Dict[str, list[str]] = {}
+        for owner in changed_file_owners:
+            receipt_ref = str(owner.get("receipt_ref", "")).strip()
+            file_path = str(owner.get("file_path", "")).strip()
+            if receipt_ref and file_path:
+                files_by_receipt.setdefault(receipt_ref, []).append(file_path)
+
+        steps: list[Dict[str, Any]] = []
+        for index, (receipt_ref, receipt_digest) in enumerate(
+            zip(ordered_receipt_refs, ordered_receipt_digests),
+            start=1,
+        ):
+            changed_files = sorted(_dedupe_strings(files_by_receipt.get(receipt_ref, [])))
+            changed_file_manifest_digest = self._changed_file_manifest_digest(
+                changed_files,
+            )
+            step = {
+                "step_index": index,
+                "receipt_ref": receipt_ref,
+                "receipt_digest": receipt_digest,
+                "changed_files": changed_files,
+                "changed_file_count": len(changed_files),
+                "changed_file_manifest_digest": changed_file_manifest_digest,
+                "raw_patch_payload_stored": False,
+            }
+            step["apply_step_digest"] = self._integration_execution_apply_step_digest(
+                step,
+            )
+            steps.append(step)
+        return steps
+
+    @staticmethod
+    def _integration_execution_apply_step_digest(
+        step: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE
+                    ),
+                    "step_index": step.get("step_index", 0),
+                    "receipt_ref": step.get("receipt_ref", ""),
+                    "receipt_digest": step.get("receipt_digest", ""),
+                    "changed_files": list(step.get("changed_files", [])),
+                    "changed_file_manifest_digest": step.get(
+                        "changed_file_manifest_digest",
+                        "",
+                    ),
+                }
+            )
+        )
+
+    @staticmethod
+    def _integration_execution_apply_plan_digest(
+        *,
+        apply_steps: Sequence[Mapping[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_INTEGRATION_EXECUTION_APPLY_PLAN_PROFILE
+                    ),
+                    "apply_steps": [
+                        {
+                            "step_index": step.get("step_index", 0),
+                            "receipt_ref": step.get("receipt_ref", ""),
+                            "receipt_digest": step.get("receipt_digest", ""),
+                            "changed_file_manifest_digest": step.get(
+                                "changed_file_manifest_digest",
+                                "",
+                            ),
+                            "apply_step_digest": step.get("apply_step_digest", ""),
+                        }
+                        for step in apply_steps
+                    ],
+                }
+            )
+        )
+
+    def _derive_execution_blocking_reasons(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> list[str]:
+        reasons: list[str] = []
+        apply_steps = list(receipt.get("apply_steps", []))
+        verification_results = list(
+            receipt.get("post_apply_verification_results", []),
+        )
+        ordered_refs = list(receipt.get("ordered_integration_receipt_refs", []))
+        ordered_digests = list(receipt.get("ordered_integration_receipt_digests", []))
+
+        if receipt.get("profile_id") != PARALLEL_CODEX_INTEGRATION_EXECUTION_PROFILE:
+            reasons.append("profile_id mismatch")
+        if (
+            receipt.get("source_batch_decision") != "integration-ready"
+            or receipt.get("source_batch_ready_for_execution") is not True
+        ):
+            reasons.append(
+                "source integration batch must be integration-ready before apply"
+            )
+        if receipt.get("source_batch_receipt_digest_bound") is not True:
+            reasons.append("source_batch_receipt_digest must bind source batch")
+        if receipt.get("current_head_matches_batch") is not True:
+            reasons.append("current checkout head must match batch main checkout head")
+        if not ordered_refs:
+            reasons.append("execution plan must include ordered integration receipts")
+        if len(ordered_refs) != len(ordered_digests):
+            reasons.append("ordered receipt refs and digests must have equal length")
+        if receipt.get("apply_step_count") != len(apply_steps):
+            reasons.append("apply_step_count mismatch")
+        if len(apply_steps) != len(ordered_refs):
+            reasons.append("apply step count must match ordered receipt count")
+        for step in apply_steps:
+            if step.get("raw_patch_payload_stored") is not False:
+                reasons.append("raw_patch_payload_stored must be false")
+                break
+            expected_digest = self._integration_execution_apply_step_digest(step)
+            if step.get("apply_step_digest") != expected_digest:
+                reasons.append("apply_step_digest mismatch")
+                break
+            if step.get("changed_file_count") != len(step.get("changed_files", [])):
+                reasons.append("changed_file_count mismatch")
+                break
+            if step.get("changed_file_manifest_digest") != self._changed_file_manifest_digest(
+                list(step.get("changed_files", [])),
+            ):
+                reasons.append("changed_file_manifest_digest mismatch")
+                break
+        if receipt.get("apply_plan_digest") != self._integration_execution_apply_plan_digest(
+            apply_steps=apply_steps,
+        ):
+            reasons.append("apply_plan_digest mismatch")
+        if (
+            receipt.get("post_apply_verification_manifest_digest")
+            != self._verification_manifest_digest(verification_results)
+        ):
+            reasons.append("post_apply_verification_manifest_digest mismatch")
+        if not receipt.get("required_verifications_passed"):
+            reasons.append("post-apply required verification commands must pass")
+        if receipt.get("raw_batch_payload_stored") is not False:
+            reasons.append("raw_batch_payload_stored must be false")
+        if receipt.get("raw_apply_plan_payload_stored") is not False:
+            reasons.append("raw_apply_plan_payload_stored must be false")
+        if receipt.get("raw_worker_receipt_payload_stored") is not False:
+            reasons.append("raw_worker_receipt_payload_stored must be false")
+        if receipt.get("raw_verification_payload_stored") is not False:
+            reasons.append("raw_verification_payload_stored must be false")
+        return reasons
 
     def _derive_batch_blocking_reasons(self, receipt: Mapping[str, Any]) -> list[str]:
         reasons: list[str] = []

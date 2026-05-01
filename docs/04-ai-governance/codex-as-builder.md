@@ -65,6 +65,11 @@ changed-file owner manifest digest、conflict digest を作り、blocked receipt
 quarantine したうえで、同じ file を複数 receipt が触る batch を blocked のまま
 保持する。raw worker receipt payload、raw conflict payload、raw verification output は
 batch 側にも保存しない。
+integration-ready batch はさらに
+`parallel_codex_integration_execution_receipt` へ縮約され、source batch digest、
+current checkout head、ordered apply step digest、post-apply verification manifest を
+commit 前に固定する。blocked batch や stale checkout head からの execution は
+blocked のまま保持し、raw batch / apply plan / worker receipt / verification payload は保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

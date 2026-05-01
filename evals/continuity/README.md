@@ -143,6 +143,11 @@ replay guard、remote source content identity、remote source main-head ancestry
 main checkout integration 前の schema-bound receipt として固定し、stale worker
 result、marker-only result、unrelated ancestry result を fail-closed にできるか。
 
+### Parallel Codex Integration Execution
+parallel-orchestration-demo が integration-ready batch receipt を source batch
+digest、current checkout head、ordered apply step digest、post-apply verification
+manifest に束縛し、conflict batch 由来の execution を fail-closed にできるか。
+
 ### Subjective Continuity Self-Report
 本人による「途切れていない」感覚の自己報告。
 
@@ -174,6 +179,7 @@ result、marker-only result、unrelated ancestry result を fail-closed にで�
 - `memory_edit_recall_buffer.yaml`
 - `memory_replication_quorum.yaml`
 - `parallel_codex_integration_batch.yaml`
+- `parallel_codex_integration_execution.yaml`
 - `parallel_codex_result_ingestion.yaml`
 - `patch_generator_direct_contract.yaml`
 - `procedural_actuation_bridge.yaml`

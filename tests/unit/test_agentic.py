@@ -4,6 +4,7 @@ from contextlib import contextmanager
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+import shutil
 import socket
 import ssl
 import subprocess
@@ -11,6 +12,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from unittest import mock
 
 from omoikane.agentic.cognitive_audit import CognitiveAuditService
 from omoikane.agentic.cognitive_audit_governance import CognitiveAuditGovernanceService
@@ -2886,6 +2888,52 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
         target_path = workspace_root / relative_path
         target_path.parent.mkdir(parents=True, exist_ok=True)
         target_path.write_text(contents, encoding="utf-8")
+
+    def test_external_workspace_seed_retries_transient_missing_source_entries(self) -> None:
+        service = YaoyorozuRegistryService()
+
+        with tempfile.TemporaryDirectory() as workspace:
+            source_root = Path(workspace) / "source"
+            execution_root = Path(workspace) / "execution"
+            decision_log = source_root / "meta" / "decision-log"
+            decision_log.mkdir(parents=True)
+            (decision_log / "kept.md").write_text("# kept\n", encoding="utf-8")
+
+            copytree_calls = 0
+            real_copytree = shutil.copytree
+
+            def flaky_copytree(src: Path, dst: Path, *args: object, **kwargs: object) -> str:
+                nonlocal copytree_calls
+                copytree_calls += 1
+                if copytree_calls == 1:
+                    raise shutil.Error(
+                        [
+                            (
+                                str(Path(src) / "vanished.md"),
+                                str(Path(dst) / "vanished.md"),
+                                "[Errno 2] No such file or directory",
+                            )
+                        ]
+                    )
+                return real_copytree(src, dst, *args, **kwargs)
+
+            with mock.patch(
+                "omoikane.agentic.yaoyorozu.shutil.copytree",
+                side_effect=flaky_copytree,
+            ):
+                service._copy_target_path_into_workspace(
+                    source_root=source_root,
+                    execution_root=execution_root,
+                    target_path="meta/decision-log/",
+                )
+
+            self.assertEqual(2, copytree_calls)
+            self.assertEqual(
+                "# kept\n",
+                (execution_root / "meta" / "decision-log" / "kept.md").read_text(
+                    encoding="utf-8"
+                ),
+            )
 
     def test_sync_repo_agents_materializes_registry_snapshot(self) -> None:
         repo_root = Path(__file__).resolve().parents[2]

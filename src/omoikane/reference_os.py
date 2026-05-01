@@ -966,10 +966,12 @@ class OmoikaneReferenceOS:
             "specs/interfaces/selfctor.parallel_orchestration.v0.idl",
             "specs/schemas/parallel_codex_worker_result_receipt.schema",
             "specs/schemas/parallel_codex_integration_batch_receipt.schema",
+            "specs/schemas/parallel_codex_integration_execution_receipt.schema",
             "specs/schemas/README.md",
             "specs/catalog.yaml",
             "evals/continuity/parallel_codex_result_ingestion.yaml",
             "evals/continuity/parallel_codex_integration_batch.yaml",
+            "evals/continuity/parallel_codex_integration_execution.yaml",
             "evals/continuity/README.md",
             "docs/02-subsystems/self-construction/README.md",
             "docs/04-ai-governance/codex-as-builder.md",
@@ -986,6 +988,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-content-identity.md",
             "meta/decision-log/2026-05-01_parallel-codex-remote-source-ancestry-binding.md",
             "meta/decision-log/2026-05-01_parallel-codex-integration-batch-conflict-arbitration.md",
+            "meta/decision-log/2026-05-01_parallel-codex-integration-execution-plan.md",
             "meta/decision-log/2026-05-01_parallel-codex-workspace-marker-diff-classifier.md",
             "references/parallel-codex-orchestration.md",
         ]
@@ -1205,6 +1208,26 @@ class OmoikaneReferenceOS:
                 "but blocked until the changed-file conflict is resolved."
             ),
         )
+        execution_receipt = self.parallel_orchestration.plan_integration_execution(
+            batch_receipt=batch_receipt,
+            current_checkout_head=main_checkout_head,
+            post_apply_verification_results=verification_results,
+            result_summary=(
+                "Integration-ready batch is reduced into ordered apply steps "
+                "and post-apply verification evidence before main checkout commit."
+            ),
+        )
+        conflict_execution_receipt = (
+            self.parallel_orchestration.plan_integration_execution(
+                batch_receipt=conflict_batch_receipt,
+                current_checkout_head=main_checkout_head,
+                post_apply_verification_results=verification_results,
+                result_summary=(
+                    "Conflict batch cannot produce a ready-to-apply execution "
+                    "receipt until changed-file overlap is resolved."
+                ),
+            )
+        )
         ready_validation = self.parallel_orchestration.validate_worker_result_receipt(
             ready_receipt,
         )
@@ -1244,9 +1267,21 @@ class OmoikaneReferenceOS:
                 conflict_batch_receipt,
             )
         )
+        execution_validation = (
+            self.parallel_orchestration.validate_integration_execution_receipt(
+                execution_receipt,
+            )
+        )
+        conflict_execution_validation = (
+            self.parallel_orchestration.validate_integration_execution_receipt(
+                conflict_execution_receipt,
+            )
+        )
         ledger_entry = self.ledger.append(
             identity_id="omoikane-reference-runtime",
-            event_type="selfctor.parallel_orchestration.worker_result_ingested",
+            event_type=(
+                "selfctor.parallel_orchestration.integration_execution_planned"
+            ),
             payload={
                 "ready_receipt_ref": ready_receipt["receipt_ref"],
                 "ready_receipt_digest": ready_receipt["receipt_digest"],
@@ -1412,6 +1447,20 @@ class OmoikaneReferenceOS:
                 "conflict_batch_conflict_digest": conflict_batch_receipt[
                     "conflict_digest"
                 ],
+                "execution_receipt_ref": execution_receipt["receipt_ref"],
+                "execution_receipt_digest": execution_receipt["receipt_digest"],
+                "execution_apply_plan_digest": execution_receipt[
+                    "apply_plan_digest"
+                ],
+                "execution_post_apply_verification_manifest_digest": (
+                    execution_receipt["post_apply_verification_manifest_digest"]
+                ),
+                "conflict_execution_receipt_ref": conflict_execution_receipt[
+                    "receipt_ref"
+                ],
+                "conflict_execution_receipt_digest": conflict_execution_receipt[
+                    "receipt_digest"
+                ],
                 "raw_patch_payload_stored": False,
                 "raw_upstream_payload_stored": False,
                 "raw_worker_identity_payload_stored": False,
@@ -1425,6 +1474,8 @@ class OmoikaneReferenceOS:
                 "raw_remote_source_ancestry_payload_stored": False,
                 "raw_worker_receipt_payload_stored": False,
                 "raw_conflict_payload_stored": False,
+                "raw_batch_payload_stored": False,
+                "raw_apply_plan_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -1509,6 +1560,22 @@ class OmoikaneReferenceOS:
                 ),
                 "contract_role": "parallel-codex-integration-batch-conflict",
             },
+            {
+                "payload_path": "execution_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_integration_execution_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-integration-execution-ready",
+            },
+            {
+                "payload_path": "conflict_execution_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_integration_execution_receipt.schema"
+                ),
+                "contract_role": "parallel-codex-integration-execution-blocked",
+            },
         ]
         return {
             "policy": self.parallel_orchestration.policy(),
@@ -1522,6 +1589,8 @@ class OmoikaneReferenceOS:
             "yaoyorozu_bridge_receipt": yaoyorozu_bridge_receipt,
             "batch_receipt": batch_receipt,
             "conflict_batch_receipt": conflict_batch_receipt,
+            "execution_receipt": execution_receipt,
+            "conflict_execution_receipt": conflict_execution_receipt,
             "ledger_entry_ref": f"ledger://continuity-ledger/{ledger_entry.entry_hash}",
             "ledger_entry_hash": ledger_entry.entry_hash,
             "ledger_payload_ref": ledger_entry.payload_ref,
@@ -1536,6 +1605,8 @@ class OmoikaneReferenceOS:
                     and yaoyorozu_bridge_validation["ok"]
                     and batch_validation["ok"]
                     and conflict_batch_validation["ok"]
+                    and execution_validation["ok"]
+                    and conflict_execution_validation["ok"]
                     and ready_validation["ready_for_main_checkout"]
                     and remote_validation["ready_for_main_checkout"]
                     and yaoyorozu_bridge_validation["ready_for_main_checkout"]
@@ -1545,6 +1616,8 @@ class OmoikaneReferenceOS:
                     and not marker_only_validation["ready_for_main_checkout"]
                     and batch_validation["ready_for_integration"]
                     and not conflict_batch_validation["ready_for_integration"]
+                    and execution_validation["ready_to_apply"]
+                    and not conflict_execution_validation["ready_to_apply"]
                 ),
                 "ready_receipt_ok": ready_validation["ok"],
                 "ready_for_main_checkout": ready_validation[
@@ -1831,6 +1904,47 @@ class OmoikaneReferenceOS:
                 ],
                 "conflict_batch_raw_conflict_payload_redacted": (
                     conflict_batch_validation["raw_conflict_payload_redacted"]
+                ),
+                "execution_receipt_ok": execution_validation["ok"],
+                "execution_ready_to_apply": execution_validation["ready_to_apply"],
+                "execution_source_batch_receipt_digest_bound": (
+                    execution_validation["source_batch_receipt_digest_bound"]
+                ),
+                "execution_current_head_matches_batch": (
+                    execution_validation["current_head_matches_batch"]
+                ),
+                "execution_apply_plan_digest_bound": (
+                    execution_validation["apply_plan_digest_bound"]
+                ),
+                "execution_post_apply_verification_manifest_digest_bound": (
+                    execution_validation[
+                        "post_apply_verification_manifest_digest_bound"
+                    ]
+                ),
+                "execution_required_verifications_passed": (
+                    execution_validation["required_verifications_passed"]
+                ),
+                "execution_raw_batch_payload_redacted": (
+                    execution_validation["raw_batch_payload_redacted"]
+                ),
+                "execution_raw_apply_plan_payload_redacted": (
+                    execution_validation["raw_apply_plan_payload_redacted"]
+                ),
+                "execution_raw_worker_receipt_payload_redacted": (
+                    execution_validation["raw_worker_receipt_payload_redacted"]
+                ),
+                "execution_raw_verification_payload_redacted": (
+                    execution_validation["raw_verification_payload_redacted"]
+                ),
+                "conflict_execution_receipt_ok": conflict_execution_validation["ok"],
+                "conflict_execution_blocked": (
+                    not conflict_execution_validation["ready_to_apply"]
+                ),
+                "conflict_execution_blocked_on_source_batch": (
+                    conflict_execution_validation["blocked_on_source_batch"]
+                ),
+                "conflict_execution_apply_plan_digest_bound": (
+                    conflict_execution_validation["apply_plan_digest_bound"]
                 ),
                 "ledger_bound": bool(ledger_entry.entry_hash)
                 and ledger_entry.payload_ref.startswith("cas://sha256/"),

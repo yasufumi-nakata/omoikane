@@ -143,6 +143,22 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertEqual("integration-ready", result["batch_receipt"]["batch_decision"])
         self.assertEqual("blocked", result["conflict_batch_receipt"]["batch_decision"])
+        self.assertTrue(result["validation"]["execution_ready_to_apply"])
+        self.assertTrue(result["validation"]["execution_apply_plan_digest_bound"])
+        self.assertTrue(
+            result["validation"][
+                "execution_post_apply_verification_manifest_digest_bound"
+            ]
+        )
+        self.assertTrue(result["validation"]["conflict_execution_blocked"])
+        self.assertEqual(
+            "parallel-codex-integration-execution-plan-v1",
+            result["execution_receipt"]["profile_id"],
+        )
+        self.assertEqual(
+            "ready-to-apply",
+            result["execution_receipt"]["execution_decision"],
+        )
 
     def test_version_demo_emits_release_manifest(self) -> None:
         stdout = io.StringIO()

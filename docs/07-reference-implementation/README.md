@@ -954,6 +954,12 @@ ready receipt と Yaoyorozu bridge receipt のように changed files が disjoi
 `integration-ready` になる一方、ready receipt 同士でも同じ file を触る batch は
 schema-bound のまま `blocked` になり、raw worker receipt payload、raw conflict
 payload、raw verification output は保存しない。
+integration-ready batch はさらに
+`parallel_codex_integration_execution_receipt` へ縮約され、source batch receipt digest、
+current checkout head、ordered apply step digest、post-apply verification manifest を
+commit 前に固定する。conflict batch 由来の execution は schema-bound のまま
+`blocked` になり、raw batch payload、raw apply plan payload、raw worker receipt payload、
+raw verification output は保存しない。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

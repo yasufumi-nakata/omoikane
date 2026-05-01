@@ -162,6 +162,8 @@
   - parallel Codex worker / subagent / codex exec / remote branch / PR / Yaoyorozu dispatch result を main checkout 統合前に patch digest、changed file manifest digest、repo-local workspace marker diff classifier digest、workspace marker hygiene digest、verification manifest digest、worker base commit freshness、signed worker identity evidence、remote metadata digest、remote source revocation digest、remote source revocation freshness digest、signed provider timestamp digest、timestamp replay guard digest、remote source content identity digest、remote source ancestry digest、upstream dispatch / patch candidate digest、raw payload 非保存 flag へ縮約し、workspace-enacted marker-only result、content identity mismatch result、unrelated ancestry result を blocked にする
 - `parallel_codex_integration_batch_receipt.schema`
   - 複数の Parallel Codex worker receipt を main checkout 統合前に決定的順序へ並べ、blocked receipt を quarantine manifest digest へ隔離し、changed-file owner manifest と conflict digest で overlap を blocked にする batch receipt を固定する
+- `parallel_codex_integration_execution_receipt.schema`
+  - integration-ready batch receipt を main checkout 適用直前の ordered apply plan と post-apply verification manifest に縮約し、source batch digest、current head、apply step digest、raw batch / apply / worker / verification payload 非保存を固定する
 - `patch_descriptor.schema`
 - `perception_frame.schema`
 - `perception_shift.schema`

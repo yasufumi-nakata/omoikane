@@ -84,7 +84,15 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             "specs/schemas/parallel_codex_integration_batch_receipt.schema",
             result["conflict_batch_receipt"],
         )
-        self.assertEqual(9, len(result["schema_contracts"]))
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_integration_execution_receipt.schema",
+            result["execution_receipt"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/parallel_codex_integration_execution_receipt.schema",
+            result["conflict_execution_receipt"],
+        )
+        self.assertEqual(11, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
         self.assertTrue(result["validation"]["ready_workspace_marker_hygiene_clean"])
@@ -246,6 +254,34 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["conflict_batch_conflict_blocked"])
         self.assertTrue(
             result["validation"]["conflict_batch_raw_conflict_payload_redacted"]
+        )
+        self.assertEqual(
+            "parallel-codex-integration-execution-plan-v1",
+            result["execution_receipt"]["profile_id"],
+        )
+        self.assertEqual(
+            "ready-to-apply",
+            result["execution_receipt"]["execution_decision"],
+        )
+        self.assertTrue(result["validation"]["execution_receipt_ok"])
+        self.assertTrue(result["validation"]["execution_ready_to_apply"])
+        self.assertTrue(
+            result["validation"]["execution_source_batch_receipt_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["execution_apply_plan_digest_bound"])
+        self.assertTrue(
+            result["validation"][
+                "execution_post_apply_verification_manifest_digest_bound"
+            ]
+        )
+        self.assertEqual(
+            "blocked",
+            result["conflict_execution_receipt"]["execution_decision"],
+        )
+        self.assertTrue(result["validation"]["conflict_execution_receipt_ok"])
+        self.assertTrue(result["validation"]["conflict_execution_blocked"])
+        self.assertTrue(
+            result["validation"]["conflict_execution_blocked_on_source_batch"]
         )
         self.assertTrue(result["validation"]["ledger_bound"])
 

@@ -2791,6 +2791,19 @@ class YaoyorozuRegistryService:
         }
 
     @staticmethod
+    def _copytree_error_is_transient_missing_source(error: shutil.Error) -> bool:
+        errors = error.args[0] if error.args else []
+        if not isinstance(errors, list) or not errors:
+            return False
+        for entry in errors:
+            if not isinstance(entry, tuple) or len(entry) < 3:
+                return False
+            message = str(entry[2])
+            if "[Errno 2]" not in message and "No such file or directory" not in message:
+                return False
+        return True
+
+    @staticmethod
     def _external_execution_workspace_root(
         selected_workspace_root: str,
         dispatch_id: str,
@@ -2815,19 +2828,34 @@ class YaoyorozuRegistryService:
         if not source_path.exists():
             raise ValueError(f"source target path does not exist for external execution: {target_path}")
         if source_path.is_dir():
-            shutil.copytree(
-                source_path,
-                destination_path,
-                dirs_exist_ok=True,
-                ignore=shutil.ignore_patterns(
-                    "__pycache__",
-                    "*.pyc",
-                    "*.pyo",
-                    ".mypy_cache",
-                    ".pytest_cache",
-                    ".ruff_cache",
-                ),
+            ignore = shutil.ignore_patterns(
+                "__pycache__",
+                "*.pyc",
+                "*.pyo",
+                ".mypy_cache",
+                ".pytest_cache",
+                ".ruff_cache",
             )
+            try:
+                shutil.copytree(
+                    source_path,
+                    destination_path,
+                    dirs_exist_ok=True,
+                    ignore=ignore,
+                )
+            except shutil.Error as error:
+                if not YaoyorozuRegistryService._copytree_error_is_transient_missing_source(
+                    error
+                ):
+                    raise
+                if destination_path.exists():
+                    shutil.rmtree(destination_path)
+                shutil.copytree(
+                    source_path,
+                    destination_path,
+                    dirs_exist_ok=True,
+                    ignore=ignore,
+                )
             return
         destination_path.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(source_path, destination_path)
