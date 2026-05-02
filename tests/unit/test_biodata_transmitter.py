@@ -1,11 +1,52 @@
 from __future__ import annotations
 
+from copy import deepcopy
 import unittest
 
 from omoikane.interface.biodata_transmitter import BioDataTransmitter
 
 
 class BioDataTransmitterTests(unittest.TestCase):
+    def test_human_biosignal_catalog_is_digest_bound(self) -> None:
+        transmitter = BioDataTransmitter()
+
+        catalog = transmitter.human_biosignal_catalog()
+        validation = transmitter.validate_human_biosignal_catalog(catalog)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["catalog_digest_bound"])
+        self.assertTrue(validation["family_coverage_bound"])
+        self.assertTrue(validation["alias_targets_bound"])
+        self.assertTrue(validation["uncatalogued_modality_policy_bound"])
+        self.assertGreaterEqual(catalog["family_count"], 20)
+        self.assertGreaterEqual(catalog["modality_count"], 90)
+        for family in (
+            "neural_electrical",
+            "cardiac_electrical",
+            "respiratory_gas_exchange",
+            "muscle_peripheral",
+            "ocular",
+            "vascular_flow_perfusion",
+            "pressure_fluid",
+            "molecular_omics",
+        ):
+            self.assertIn(family, catalog["modality_families"])
+        for modality in (
+            "eeg",
+            "ecg",
+            "spo2",
+            "blood_pressure",
+            "intracranial_pressure",
+            "urine_output",
+            "dna_variant_profile",
+            "metabolomics",
+        ):
+            self.assertIn(modality, catalog["known_modalities"])
+
+        tampered = deepcopy(catalog)
+        tampered["alias_map"]["glucose"] = "interstitial_glucose"
+        self.assertFalse(transmitter.validate_human_biosignal_catalog(tampered)["ok"])
+
     def test_encodes_body_state_and_generates_target_modalities(self) -> None:
         transmitter = BioDataTransmitter()
         session = transmitter.open_session(
@@ -31,6 +72,8 @@ class BioDataTransmitterTests(unittest.TestCase):
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["literature_backed_intermediate"])
         self.assertTrue(validation["mind_upload_conflict_sink_bound"])
+        self.assertTrue(validation["source_modality_projections_bound"])
+        self.assertTrue(validation["human_biosignal_catalog_bound"])
         self.assertTrue(validation["target_modalities_generated"])
         self.assertFalse(validation["semantic_thought_content_generated"])
         self.assertFalse(validation["subjective_equivalence_claimed"])
@@ -39,9 +82,134 @@ class BioDataTransmitterTests(unittest.TestCase):
             validation["intermediate_representation"],
         )
         self.assertEqual(1.0, latent["interoceptive_confidence"])
+        self.assertIn("ecg", latent["source_modality_projections"])
         self.assertIn("thought", bundle["signals"])
         self.assertFalse(bundle["signals"]["thought"]["semantic_content_generated"])
         self.assertEqual("not-generated://thought-content", bundle["signals"]["thought"]["content_ref"])
+
+    def test_open_biosignal_modalities_roundtrip_through_generic_projection(self) -> None:
+        transmitter = BioDataTransmitter()
+        session = transmitter.open_session(
+            "identity-bdt-open-modalities",
+            source_modalities=[
+                "eeg",
+                "ecg",
+                "ppg",
+                "eda",
+                "respiration",
+                "emg",
+                "skin_temperature",
+                "3-lead ECG",
+                "SpO2",
+                "fMRI BOLD",
+                "pupil diameter",
+                "voice acoustics",
+                "blood glucose",
+                "novel human biosensor",
+            ],
+            target_modalities=[
+                "ecg",
+                "eda",
+                "emg",
+                "skin_temperature",
+                "blood_pressure",
+                "3-lead ECG",
+                "SpO2",
+                "fMRI BOLD",
+                "pupil diameter",
+                "voice acoustics",
+                "blood glucose",
+                "novel human biosensor",
+                "thought",
+            ],
+        )
+        latent = transmitter.encode_body_state(
+            session["session_id"],
+            biosignal_features={
+                "eeg": {"alpha_power": 0.4, "theta_power": 0.3, "beta_power": 0.35},
+                "ecg": {"heart_rate_bpm": 74.0, "hrv_rmssd_ms": 48.0},
+                "ppg": {"pulse_rate_bpm": 73.8, "pulse_amplitude": 0.7},
+                "eda": {"skin_conductance_microsiemens": 4.8},
+                "respiration": {"rate_bpm": 15.5, "phase": "exhale"},
+                "emg": {"rms_microvolt": 21.0, "median_frequency_hz": 88.0},
+                "skin_temperature": {"temperature_c": 36.3, "distal_gradient_c": 0.5},
+                "3-lead ECG": {"lead_i_quality": 0.92, "lead_ii_quality": 0.89},
+                "SpO2": {"oxygen_saturation_percent": 98.0, "signal_quality": 0.95},
+                "fMRI BOLD": {"bold_percent_change": 0.8, "roi_count": 4.0},
+                "pupil diameter": {"left_pupil_mm": 3.1, "right_pupil_mm": 3.0},
+                "voice acoustics": {
+                    "fundamental_frequency_hz": 146.0,
+                    "jitter_percent": 0.8,
+                    "speaking_state": "quiet",
+                },
+                "blood glucose": {"glucose_mg_dl": 94.0, "trend": "stable"},
+                "novel human biosensor": {"vendor_feature_a": 0.44},
+            },
+            context_label="unit-test-open-biosignal-roundtrip",
+        )
+        bundle = transmitter.generate_biosignal_bundle(session["session_id"], latent)
+        validation = transmitter.validate_transmission(session, latent, bundle)
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["source_modality_projections_bound"])
+        self.assertTrue(validation["human_biosignal_catalog_bound"])
+        self.assertEqual(1.0, latent["interoceptive_confidence"])
+        self.assertEqual(set(session["source_modalities"]), set(latent["source_modalities"]))
+        self.assertEqual(
+            "human-biosignal-open-modality-catalog-v1",
+            session["modality_policy_id"],
+        )
+        self.assertEqual(
+            "cardiac_electrical",
+            session["source_modality_families"]["3lead_ecg"],
+        )
+        self.assertEqual(
+            "respiratory_gas_exchange",
+            session["source_modality_families"]["spo2"],
+        )
+        self.assertEqual(
+            "neurovascular_optical_mri",
+            session["source_modality_families"]["fmri_bold"],
+        )
+        self.assertEqual(
+            "uncatalogued_human_biosignal",
+            session["source_modality_families"]["novel-human-biosensor"],
+        )
+        self.assertIn("emg", latent["source_modality_projections"])
+        self.assertIn("skin_temperature", latent["source_modality_projections"])
+        self.assertIn("3lead_ecg", latent["source_modality_projections"])
+        self.assertIn("spo2", latent["source_modality_projections"])
+        self.assertIn("fmri_bold", latent["source_modality_projections"])
+        self.assertIn("novel-human-biosensor", latent["source_modality_projections"])
+        self.assertEqual(
+            "catalogued",
+            latent["source_modality_projections"]["fmri_bold"]["catalog_status"],
+        )
+        self.assertEqual(
+            "uncatalogued",
+            latent["source_modality_projections"]["novel-human-biosensor"][
+                "catalog_status"
+            ],
+        )
+        self.assertIn("blood_pressure", bundle["signals"])
+        self.assertEqual(
+            "generic-feature-summary-to-biosignal-proxy-v1",
+            bundle["signals"]["blood_pressure"]["generator_policy"],
+        )
+        self.assertEqual(
+            "cardiac_mechanical_hemodynamic",
+            bundle["signals"]["blood_pressure"]["target_modality_family"],
+        )
+        self.assertFalse(bundle["signals"]["blood_pressure"]["semantic_content_generated"])
+        self.assertIn("emg", bundle["signals"])
+        self.assertIn("skin_temperature", bundle["signals"])
+        self.assertIn("spo2", bundle["signals"])
+        self.assertIn("fmri_bold", bundle["signals"])
+        self.assertEqual(
+            "uncatalogued",
+            bundle["signals"]["novel-human-biosensor"]["catalog_status"],
+        )
+        self.assertTrue(validation["target_modalities_generated"])
 
     def test_adapts_dataset_feature_window_without_raw_payloads(self) -> None:
         transmitter = BioDataTransmitter()
@@ -622,12 +790,130 @@ class BioDataTransmitterTests(unittest.TestCase):
                 {"identity-confirmation": "identity-confirmation://unit/ascending"},
             )
 
-    def test_rejects_unknown_modality_and_mismatched_latent(self) -> None:
+    def test_binds_biodata_latent_to_mind_state_bridge_without_consciousness_claim(self) -> None:
+        transmitter = BioDataTransmitter()
+        session = transmitter.open_session("identity-bdt-mind-state-bridge")
+        latent_day_one = transmitter.encode_body_state(
+            session["session_id"],
+            biosignal_features={
+                "eeg": {"alpha_power": 0.38, "theta_power": 0.29, "beta_power": 0.34},
+                "ecg": {"heart_rate_bpm": 76.0, "hrv_rmssd_ms": 44.0},
+                "ppg": {"pulse_rate_bpm": 75.6, "pulse_amplitude": 0.71},
+                "eda": {"skin_conductance_microsiemens": 5.2},
+                "respiration": {"rate_bpm": 16.2, "phase": "exhale"},
+            },
+            context_label="mind-state-bridge-day-one",
+        )
+        latent_day_two = transmitter.encode_body_state(
+            session["session_id"],
+            biosignal_features={
+                "eeg": {"alpha_power": 0.43, "theta_power": 0.25, "beta_power": 0.32},
+                "ecg": {"heart_rate_bpm": 72.4, "hrv_rmssd_ms": 49.0},
+                "ppg": {"pulse_rate_bpm": 72.0, "pulse_amplitude": 0.76},
+                "eda": {"skin_conductance_microsiemens": 4.6},
+                "respiration": {"rate_bpm": 14.8, "phase": "inhale"},
+            },
+            context_label="mind-state-bridge-day-two",
+        )
+        generated_bundle = transmitter.generate_biosignal_bundle(
+            session["session_id"],
+            latent_day_one,
+        )
+        calibration = transmitter.build_calibration_profile(
+            session["session_id"],
+            [latent_day_one, latent_day_two],
+            [
+                "calibration-day://unit/bridge-day-1",
+                "calibration-day://unit/bridge-day-2",
+            ],
+        )
+        gate = transmitter.bind_calibration_confidence_gate(
+            session,
+            calibration,
+            {
+                "identity-confirmation": "identity-confirmation://unit/bridge",
+                "sensory-loopback": "sensory-loopback://unit/bridge",
+            },
+        )
+
+        bridge = transmitter.bind_mind_state_bridge(
+            session,
+            latent_day_one,
+            generated_bundle,
+            calibration,
+            gate,
+        )
+        validation = transmitter.validate_mind_state_bridge(
+            session,
+            latent_day_one,
+            generated_bundle,
+            calibration,
+            gate,
+            bridge,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("bound", bridge["mind_state_handoff_status"])
+        self.assertEqual("body-state-surrogate-input-only", bridge["claim_ceiling"])
+        self.assertTrue(validation["body_state_latent_bound"])
+        self.assertTrue(validation["generated_bundle_bound"])
+        self.assertTrue(validation["calibration_confidence_gate_bound"])
+        self.assertTrue(validation["qualia_surrogate_bound"])
+        self.assertTrue(validation["self_model_advisory_bound"])
+        self.assertTrue(validation["l2_l3_handoffs_bound"])
+        self.assertTrue(validation["claim_ceiling_bound"])
+        self.assertTrue(validation["bridge_digest_bound"])
+        self.assertEqual(4, len(bridge["qualia_surrogate_axis_refs"]))
+        self.assertEqual(6, len(bridge["l2_l3_handoff_bindings"]))
+        self.assertFalse(bridge["raw_biodata_payload_stored"])
+        self.assertFalse(bridge["semantic_thought_content_generated"])
+        self.assertFalse(bridge["subjective_equivalence_claimed"])
+        self.assertFalse(bridge["consciousness_reproduction_claimed"])
+        self.assertFalse(bridge["identity_replacement_claimed"])
+
+        tampered = deepcopy(bridge)
+        tampered["consciousness_reproduction_claimed"] = True
+        self.assertFalse(
+            transmitter.validate_mind_state_bridge(
+                session,
+                latent_day_one,
+                generated_bundle,
+                calibration,
+                gate,
+                tampered,
+            )["ok"]
+        )
+        tampered_digest = deepcopy(bridge)
+        tampered_digest["l2_l3_handoff_digest_set"] = "0" * 64
+        self.assertFalse(
+            transmitter.validate_mind_state_bridge(
+                session,
+                latent_day_one,
+                generated_bundle,
+                calibration,
+                gate,
+                tampered_digest,
+            )["ok"]
+        )
+
+    def test_normalizes_open_modality_and_rejects_mismatched_latent(self) -> None:
         transmitter = BioDataTransmitter()
         session = transmitter.open_session("identity-bdt-2")
 
-        with self.assertRaisesRegex(ValueError, "unsupported modality"):
-            transmitter.open_session("identity-bdt-3", source_modalities=["fMRI"])
+        custom_session = transmitter.open_session(
+            "identity-bdt-3",
+            source_modalities=["fMRI"],
+            target_modalities=["fMRI", "blood_pressure"],
+        )
+        self.assertEqual(["fmri_bold"], custom_session["source_modalities"])
+        self.assertEqual(
+            ["fmri_bold", "blood_pressure"],
+            custom_session["target_modalities"],
+        )
+        self.assertEqual(
+            "neurovascular_optical_mri",
+            custom_session["source_modality_families"]["fmri_bold"],
+        )
 
         other_session = transmitter.open_session("identity-bdt-4")
         latent = transmitter.encode_body_state(

@@ -22,7 +22,7 @@
 - `biodata_calibration_refresh_receipt.schema`
   - current drift gate、self consent、Guardian review、1-90 日 freshness window を calibration 再利用前に digest-only で束縛し、raw calibration / drift / threshold / refresh / gate payload を保存しない
 - `biodata_dataset_adapter_receipt.schema`
-  - external EEG/ECG/PPG/EDA/respiration dataset window を manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset / signal sample / feature-window payload を保存しない
+  - session-declared arbitrary BioData dataset window を manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset / signal sample / feature-window payload を保存しない
 - `biodata_circadian_phase_verifier_receipt.schema`
   - feature-window series の circadian phase refs を external clock / sleep diary / wearable evidence digest へ束縛し、raw phase verifier payload を保存しない
 - `biodata_feature_window_series_profile.schema`
@@ -31,9 +31,16 @@
   - feature-window series の axis drift summary を calibration confidence gate へ渡す前に bounded threshold で検査し、series/calibration digest と raw drift payload 非保存を保持する
 - `biodata_drift_threshold_policy_authority_receipt.schema`
   - feature-window drift threshold を clinical reviewer / jurisdiction policy / Guardian authority refs と signer/signature digest set に束縛し、raw threshold policy / signature payload を保存しない
+- `biodata_human_biosignal_catalog.schema`
+  - 人間由来 biosignal の family catalog、alias map、known modality list、未カタログ fallback policy を public artifact として束縛し、raw catalog / biosignal payload を保存しない
 - `biodata_body_state_latent.schema`
+  - 任意 source modality の feature summary を human biosignal catalog family / catalog status と source_modality_projections に digest-bound し、raw signal payload なしで known axes と generic projection を併存させる
+- `biodata_mind_state_bridge.schema`
+  - BioData Transmitter の body-state latent、generated bundle、calibration confidence gate を L2/L3 の qualia surrogate / self-model advisory / perception・affect・attention handoff へ digest-only で束縛し、semantic thought・subjective equivalence・consciousness reproduction・identity replacement は主張しない
 - `biodata_signal_bundle.schema`
+  - 既知 target は専用 proxy、未知 target は generic biosignal proxy として arbitrary modality key を許可し、各 signal に target family / catalog status / catalog digest を保持する
 - `biodata_transmitter_session.schema`
+  - session-declared source / target modality を human biosignal catalog digest、family map、未カタログ modality policy に束縛する
 - `build_artifact.yaml`
 - `build_request.yaml`
 - `builder_live_enactment_session.schema`

@@ -4,7 +4,8 @@
 > 出典: [古事記学センター 神名データベース 思兼神](https://kojiki.kokugakuin.ac.jp/shinmei/omoikanenokami/)
 
 OmoikaneOS は、いずれ到来する **マインドアップロード（Mind Uploading）** のための基盤 OS の設計プロジェクトである。
-現在の中心像は、脳波・心電・脈波・皮膚電気活動・呼吸などの **生体データ** から
+現在の中心像は、脳波・心電・脈波・皮膚電気活動・呼吸に限らない
+**あらゆる宣言済みの生体データ** から
 その人に束縛された **体内状態の中間表現** を作り、そこから別モダリティの
 生体データ、感情 proxy、思考圧 proxy を生成する **BioData Transmitter** を核に置く。
 つまり `生体データ → internal body-state latent → 生体データ` を OmoikaneOS の
@@ -61,7 +62,7 @@ meta/                 ── 用語集・決定履歴
 - これは **夢物語の設計図** であり、同時にその設計を壊さず試す **参考実装の実験場** である。
 - 今日の技術で実装できない部分は多いが、L1/L4/L5 の統率や append-only ledger のような骨格は今から prototype 化できる。
 - L6 では BDB（Biological-Digital Bridge）の bounded viability を proxy 実装し、ms 級 latency budget・fail-safe fallback・可逆な置換比率調整までは reference runtime で検証できる。
-- L6 では BioData Transmitter も reference runtime 化し、生体データから体内状態 latent を経由して別モダリティの生体データ proxy を生成し、複数日の latent digest から個人内 calibration profile と identity / loopback confidence gate を作る境界を検証できる。
+- L6 では BioData Transmitter も reference runtime 化し、人間から取られる神経・心血管・呼吸・皮膚・筋・眼・体温・運動・音声・生化学系などの宣言済み生体信号を catalog / family map に束縛し、体内状態 latent を経由して別モダリティの生体データ proxy を生成し、未知 target は汎用 biosignal proxy として digest-bound に扱い、複数日の latent digest から個人内 calibration profile と identity / loopback confidence gate を作る境界を検証できる。
 - このリポジトリは「設計が成熟するほど、必要な研究が明確になり、reference runtime も厚くなる」ことを目指す。
 
 ## すぐ動かせるもの

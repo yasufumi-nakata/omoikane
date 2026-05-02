@@ -74,7 +74,30 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["literature_backed_intermediate"])
         self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
+        self.assertTrue(result["validation"]["source_modality_projections_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_ok"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_digest_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_family_coverage_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_alias_targets_bound"])
+        self.assertGreaterEqual(result["human_biosignal_catalog"]["family_count"], 20)
+        self.assertGreaterEqual(result["human_biosignal_catalog"]["modality_count"], 90)
+        self.assertIn("molecular_omics", result["human_biosignal_catalog"]["modality_families"])
+        self.assertIn("pressure_fluid", result["human_biosignal_catalog"]["modality_families"])
+        self.assertIn("structural_functional_imaging", result["human_biosignal_catalog"]["modality_families"])
         self.assertTrue(result["validation"]["target_modalities_generated"])
+        self.assertEqual(
+            "human-biosignal-open-modality-catalog-v1",
+            result["session"]["modality_policy_id"],
+        )
+        self.assertEqual(
+            "respiratory_gas_exchange",
+            result["session"]["source_modality_families"]["spo2"],
+        )
+        self.assertEqual(
+            "neurovascular_optical_mri",
+            result["session"]["source_modality_families"]["fnirs"],
+        )
         self.assertTrue(result["validation"]["dataset_adapter_ok"])
         self.assertTrue(result["validation"]["dataset_manifest_digest_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_source_feature_digest_bound"])
@@ -136,6 +159,69 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["identity_confirmation_confidence_gate_bound"])
         self.assertTrue(result["validation"]["sensory_loopback_confidence_gate_bound"])
         self.assertFalse(result["validation"]["raw_gate_payload_stored"])
+        self.assertTrue(result["validation"]["biodata_mind_state_bridge_ok"])
+        self.assertEqual(
+            "bound",
+            result["validation"]["biodata_mind_state_bridge_status"],
+        )
+        self.assertTrue(result["validation"]["biodata_mind_state_bridge_latent_bound"])
+        self.assertTrue(
+            result["validation"]["biodata_mind_state_bridge_generated_bundle_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["biodata_mind_state_bridge_confidence_gate_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["biodata_mind_state_bridge_feature_window_series_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["biodata_mind_state_bridge_qualia_surrogate_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["biodata_mind_state_bridge_self_model_advisory_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["biodata_mind_state_bridge_l2_l3_handoffs_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["biodata_mind_state_bridge_claim_ceiling_bound"]
+        )
+        self.assertTrue(result["validation"]["biodata_mind_state_bridge_digest_bound"])
+        self.assertEqual(
+            "body-state-surrogate-input-only",
+            result["mind_state_bridge"]["claim_ceiling"],
+        )
+        self.assertFalse(result["validation"]["raw_biodata_bridge_payload_stored"])
+        self.assertFalse(result["validation"]["raw_biodata_bridge_latent_payload_stored"])
+        self.assertFalse(
+            result["validation"]["raw_biodata_bridge_generated_payload_stored"]
+        )
+        self.assertFalse(result["validation"]["raw_biodata_bridge_gate_payload_stored"])
+        self.assertFalse(result["validation"]["raw_biodata_bridge_qualia_payload_stored"])
+        self.assertFalse(
+            result["validation"]["raw_biodata_bridge_self_model_payload_stored"]
+        )
+        self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
+        self.assertFalse(result["validation"]["identity_replacement_claimed"])
+        self.assertIn("emg", result["generated_bundle"]["signals"])
+        self.assertIn("skin_temperature", result["generated_bundle"]["signals"])
+        self.assertIn("blood_pressure", result["generated_bundle"]["signals"])
+        self.assertIn("spo2", result["generated_bundle"]["signals"])
+        self.assertIn("pupil_diameter", result["generated_bundle"]["signals"])
+        self.assertIn("speech_acoustics", result["generated_bundle"]["signals"])
+        self.assertIn("blood_glucose", result["generated_bundle"]["signals"])
+        self.assertIn("fmri_bold", result["generated_bundle"]["signals"])
+        self.assertIn("novel-human-biosensor", result["generated_bundle"]["signals"])
+        self.assertEqual(
+            "generic-feature-summary-to-biosignal-proxy-v1",
+            result["generated_bundle"]["signals"]["blood_pressure"]["generator_policy"],
+        )
+        self.assertEqual(
+            "uncatalogued",
+            result["generated_bundle"]["signals"]["novel-human-biosensor"][
+                "catalog_status"
+            ],
+        )
         self.assertIn("thought", result["generated_bundle"]["signals"])
         self.assertFalse(
             result["generated_bundle"]["signals"]["thought"]["semantic_content_generated"]
@@ -181,6 +267,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-biodata-transmitter-confidence-gate"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-mind-state-bridge"
             ],
         )
 

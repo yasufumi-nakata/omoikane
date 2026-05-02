@@ -3,10 +3,12 @@ kind: service
 namespace: interface.biodata_transmitter.v0
 service: BioDataTransmitterService
 summary: >
-  Canonical L6 contract for a person-bound transmitter that maps EEG, ECG, PPG,
-  EDA, and respiration through an internal body-state latent before generating
-  bounded target biosignal, affect, and thought-pressure proxies.
+  Canonical L6 contract for a person-bound transmitter that maps declared
+  human biosignal features through a catalog-bound internal body-state latent
+  before generating bounded target biosignal, affect, and thought-pressure
+  proxies.
 imports:
+  biodata_human_biosignal_catalog: ../schemas/biodata_human_biosignal_catalog.schema
   biodata_transmitter_session: ../schemas/biodata_transmitter_session.schema
   biodata_body_state_latent: ../schemas/biodata_body_state_latent.schema
   biodata_signal_bundle: ../schemas/biodata_signal_bundle.schema
@@ -18,9 +20,23 @@ imports:
   biodata_feature_window_series_profile: ../schemas/biodata_feature_window_series_profile.schema
   biodata_feature_window_series_drift_gate: ../schemas/biodata_feature_window_series_drift_gate.schema
   biodata_drift_threshold_policy_authority_receipt: ../schemas/biodata_drift_threshold_policy_authority_receipt.schema
+  biodata_mind_state_bridge: ../schemas/biodata_mind_state_bridge.schema
 operations:
+  get_human_biosignal_catalog:
+    summary: Return the public human biosignal modality family catalog and uncatalogued-modality policy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+    output:
+      schema_ref: biodata_human_biosignal_catalog
+    guarantees:
+      - catalog_digest must bind the modality families and alias map
+      - alias targets must resolve to known catalog modalities
+      - uncatalogued human biosensors must remain accepted through the generic proxy policy
+      - raw catalog and raw biosignal payload storage must remain false
   open_session:
-    summary: Open one transmitter session for a single identity and explicit modality set.
+    summary: Open one transmitter session for a single identity and explicit, catalog-bound human biosignal modality set.
     input:
       inline_schema:
         type: object
@@ -38,18 +54,19 @@ operations:
             uniqueItems: true
             items:
               type: string
-              enum: [eeg, ecg, ppg, eda, respiration]
+              pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
           target_modalities:
             type: array
             minItems: 1
             uniqueItems: true
             items:
               type: string
-              enum: [ecg, ppg, respiration, eeg, affect, thought]
+              pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
     output:
       schema_ref: biodata_transmitter_session
     guarantees:
       - session must remain person-bound to one identity_id
+      - modality_policy_id, human_biosignal_catalog_digest, source_modality_families, target_modality_families, and uncatalogued_modality_policy must be bound
       - unresolved equivalence and thought-content claims must point to mind-upload.com conflict refs
       - raw source payload and raw generated waveform storage must be false
   adapt_dataset_feature_window:
@@ -110,7 +127,7 @@ operations:
     guarantees:
       - dataset_manifest_digest must bind the dataset ref, participant ref, license ref, window ref, and modality file refs
       - source_feature_digest and latent_digest must match the generated body-state latent
-      - full confidence-gate readiness requires eeg, ecg, ppg, eda, and respiration feature-window coverage
+      - full confidence-gate readiness requires all session-declared source modality feature-window coverage
       - raw dataset payload, raw signal samples, and raw feature-window payload storage must remain false
   bind_circadian_phase_verifier:
     summary: Bind circadian phase refs to external clock, sleep diary, and wearable evidence before series use.
@@ -310,6 +327,7 @@ operations:
       schema_ref: biodata_body_state_latent
     guarantees:
       - source_feature_digest must bind the input feature summary
+      - source_modality_projections must bind every observed modality by feature digest, family, catalog status, and generic projection summary
       - physiological axes must include cardiac, autonomic, respiratory, neural, affect, and thought proxies
       - thought axis must not contain generated semantic thought content
   generate_biosignal_bundle:
@@ -332,11 +350,13 @@ operations:
             uniqueItems: true
             items:
               type: string
-              enum: [ecg, ppg, respiration, eeg, affect, thought]
+              pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
     output:
       schema_ref: biodata_signal_bundle
     guarantees:
       - source_latent_digest must match the latent input digest
+      - target signals must bind target_modality_family, catalog_status, and human_biosignal_catalog_digest
+      - unknown target modalities must be emitted only as generic feature-summary biosignal proxies
       - semantic_thought_content_generated must remain false
       - subjective_equivalence_claimed must remain false
   build_calibration_profile:
@@ -486,7 +506,7 @@ operations:
       - calibration_digest_bound must prove the receipt is bound to the exact calibration profile
       - feature-window series drift gate digest must be directly bound when a drift gate receipt is supplied
       - calibration refresh receipt digest must be directly bound when current freshness is supplied
-      - source_modalities_covered must cover eeg, ecg, ppg, eda, and respiration before any target gate can pass
+      - source_modalities_covered must cover every session-declared source modality before any target gate can pass
       - identity-confirmation gates require confidence_score >= 0.8
       - sensory-loopback gates require confidence_score >= 0.7
       - raw calibration and gate payload storage must remain false
@@ -604,6 +624,105 @@ operations:
           sensory_loopback_gate_bound:
             type: boolean
           raw_gate_payload_stored:
+            const: false
+  bind_mind_state_bridge:
+    summary: Bind a BioData body-state latent to bounded downstream mind-state consumers without raw payload or consciousness claims.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - latent_state
+          - generated_bundle
+          - calibration_profile
+          - calibration_confidence_gate
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          latent_state:
+            schema_ref: biodata_body_state_latent
+          generated_bundle:
+            schema_ref: biodata_signal_bundle
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          calibration_confidence_gate:
+            schema_ref: biodata_calibration_confidence_gate
+          feature_window_series_profile:
+            schema_ref: biodata_feature_window_series_profile
+    output:
+      schema_ref: biodata_mind_state_bridge
+    guarantees:
+      - body_state_latent_digest, generated_bundle_digest, and calibration_confidence_gate_digest must all be bound
+      - QualiaBuffer and SelfModel consumers receive only digest-bound surrogate/advisory refs
+      - L3 perception, affect, and attention consumers receive handoff receipts under the same claim ceiling
+      - semantic_thought_content_generated, subjective_equivalence_claimed, consciousness_reproduction_claimed, and identity_replacement_claimed must remain false
+      - raw biodata, latent, generated, gate, qualia, and self-model payload storage must remain false
+  validate_mind_state_bridge:
+    summary: Verify BioData mind-state bridge digest binding, allowed consumers, and no-consciousness claim ceiling.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - latent_state
+          - generated_bundle
+          - calibration_profile
+          - calibration_confidence_gate
+          - bridge_receipt
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          latent_state:
+            schema_ref: biodata_body_state_latent
+          generated_bundle:
+            schema_ref: biodata_signal_bundle
+          calibration_profile:
+            schema_ref: biodata_calibration_profile
+          calibration_confidence_gate:
+            schema_ref: biodata_calibration_confidence_gate
+          bridge_receipt:
+            schema_ref: biodata_mind_state_bridge
+          feature_window_series_profile:
+            schema_ref: biodata_feature_window_series_profile
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - body_state_latent_bound
+          - generated_bundle_bound
+          - calibration_confidence_gate_bound
+          - qualia_surrogate_bound
+          - self_model_advisory_bound
+          - l2_l3_handoffs_bound
+          - claim_ceiling_bound
+          - bridge_digest_bound
+          - consciousness_reproduction_claimed
+          - identity_replacement_claimed
+        properties:
+          ok:
+            type: boolean
+          body_state_latent_bound:
+            type: boolean
+          generated_bundle_bound:
+            type: boolean
+          calibration_confidence_gate_bound:
+            type: boolean
+          feature_window_series_bound:
+            type: boolean
+          qualia_surrogate_bound:
+            type: boolean
+          self_model_advisory_bound:
+            type: boolean
+          l2_l3_handoffs_bound:
+            type: boolean
+          claim_ceiling_bound:
+            type: boolean
+          bridge_digest_bound:
+            type: boolean
+          consciousness_reproduction_claimed:
+            const: false
+          identity_replacement_claimed:
             const: false
   validate_feature_window_series_drift_gate:
     summary: Verify BioData feature-window series drift threshold binding and raw-payload redaction.
@@ -863,6 +982,9 @@ events:
   biodata_transmitter.calibration_confidence_gate_bound:
     payload:
       schema_ref: biodata_calibration_confidence_gate
+  biodata_transmitter.mind_state_bridge_bound:
+    payload:
+      schema_ref: biodata_mind_state_bridge
   biodata_transmitter.feature_window_series_drift_gate_bound:
     payload:
       schema_ref: biodata_feature_window_series_drift_gate
@@ -874,8 +996,9 @@ compatibility:
     - Conflicting or under-evidenced claims are routed to mind-upload.com refs rather than treated as settled runtime facts.
     - Multi-day calibration profiles improve person-specific baselines but still do not claim subjective equivalence or semantic thought recovery.
     - Calibration confidence gates may raise confidence for identity confirmation and sensory loopback only through digest-bound calibration receipts; they do not expose raw biosignal or gate payloads.
-    - Dataset feature-window adapters make external EEG/ECG/PPG/EDA/respiration corpora ingestible only as manifest digests, feature-window digests, and latent refs; raw samples are out of scope.
+    - Dataset feature-window adapters make session-declared external BioData corpora ingestible only as manifest digests, feature-window digests, and latent refs; raw samples are out of scope.
     - Circadian phase verifiers bind phase refs to external clock, sleep diary, and wearable evidence digests without storing raw phase evidence.
     - Feature-window series drift gates let calibration confidence gates consume current longitudinal evidence only through bounded, digest-only drift-threshold receipts.
     - Drift threshold policy authority receipts bind clinical, jurisdiction, and Guardian threshold policy refs without storing raw policy or signature payloads.
     - Calibration refresh receipts force current drift-gate, self-consent, Guardian review, and freshness-window evidence to be digest-bound before a calibration gate is reused.
+    - Mind-state bridge receipts may feed L2/L3 surrogate/advisory consumers, but they remain body-state surrogate inputs and do not claim consciousness reproduction or identity replacement.

@@ -1,0 +1,104 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_human_biosignal_catalog.schema"
+title: BioDataHumanBiosignalCatalog
+description: >
+  Public catalog artifact for human-derived biosignal modality families, aliases,
+  and the fallback policy for uncatalogued human biosensors.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - catalog_ref
+  - profile_id
+  - policy_id
+  - human_biosignal_scope
+  - catalog_digest
+  - modality_families
+  - known_modalities
+  - modality_to_family
+  - alias_map
+  - family_count
+  - modality_count
+  - alias_count
+  - accepted_uncatalogued_family
+  - uncatalogued_modality_policy
+  - raw_catalog_payload_stored
+  - raw_biosignal_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+properties:
+  schema_version:
+    const: "1.0"
+  catalog_ref:
+    const: catalog://biodata/human-biosignal-open-modality-catalog-v1
+  profile_id:
+    const: human-biosignal-modality-catalog-v1
+  policy_id:
+    const: human-biosignal-open-modality-catalog-v1
+  human_biosignal_scope:
+    const: human-derived-sensor-feature-summary-only
+  catalog_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  modality_families:
+    type: object
+    minProperties: 20
+    propertyNames:
+      $ref: "#/$defs/modality_family"
+    additionalProperties:
+      type: array
+      minItems: 1
+      uniqueItems: true
+      items:
+        $ref: "#/$defs/modality_name"
+  known_modalities:
+    type: array
+    minItems: 90
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/modality_name"
+  modality_to_family:
+    type: object
+    minProperties: 90
+    propertyNames:
+      $ref: "#/$defs/modality_name"
+    additionalProperties:
+      $ref: "#/$defs/modality_family"
+  alias_map:
+    type: object
+    minProperties: 40
+    propertyNames:
+      $ref: "#/$defs/alias_name"
+    additionalProperties:
+      $ref: "#/$defs/modality_name"
+  family_count:
+    type: integer
+    minimum: 20
+  modality_count:
+    type: integer
+    minimum: 90
+  alias_count:
+    type: integer
+    minimum: 40
+  accepted_uncatalogued_family:
+    const: uncatalogued_human_biosignal
+  uncatalogued_modality_policy:
+    const: accept-as-human-biosignal-feature-summary-with-generic-proxy
+  raw_catalog_payload_stored:
+    const: false
+  raw_biosignal_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+$defs:
+  modality_name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  modality_family:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  alias_name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"

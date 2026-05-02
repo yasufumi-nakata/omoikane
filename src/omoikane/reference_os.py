@@ -9775,10 +9775,43 @@ json.dump(response, sys.stdout)
             human_consent_proof="consent://biodata-transmitter-demo/v1",
             metadata={"display_name": "BioData Transmitter Sandbox"},
         )
+        human_biosignal_catalog = self.biodata_transmitter.human_biosignal_catalog()
         session = self.biodata_transmitter.open_session(
             identity.identity_id,
-            source_modalities=["eeg", "ecg", "ppg", "eda", "respiration"],
-            target_modalities=["ecg", "ppg", "respiration", "eeg", "affect", "thought"],
+            source_modalities=[
+                "eeg",
+                "ecg",
+                "ppg",
+                "eda",
+                "respiration",
+                "emg",
+                "skin_temperature",
+                "blood_pressure",
+                "SpO2",
+                "pupil diameter",
+                "voice acoustics",
+                "accelerometer",
+                "blood glucose",
+                "fNIRS",
+            ],
+            target_modalities=[
+                "ecg",
+                "ppg",
+                "respiration",
+                "eeg",
+                "eda",
+                "emg",
+                "skin_temperature",
+                "blood_pressure",
+                "SpO2",
+                "pupil diameter",
+                "voice acoustics",
+                "blood glucose",
+                "fMRI BOLD",
+                "novel human biosensor",
+                "affect",
+                "thought",
+            ],
         )
         dataset_manifest = {
             "dataset_ref": "dataset://physionet-compatible/demo-biodata-window",
@@ -9791,6 +9824,15 @@ json.dump(response, sys.stdout)
                 "ppg": "dataset-file://demo-biodata/ppg-window-summary",
                 "eda": "dataset-file://demo-biodata/eda-window-summary",
                 "respiration": "dataset-file://demo-biodata/resp-window-summary",
+                "emg": "dataset-file://demo-biodata/emg-window-summary",
+                "skin_temperature": "dataset-file://demo-biodata/skin-temp-window-summary",
+                "blood pressure": "dataset-file://demo-biodata/blood-pressure-window-summary",
+                "SpO2": "dataset-file://demo-biodata/spo2-window-summary",
+                "pupil diameter": "dataset-file://demo-biodata/pupil-window-summary",
+                "voice acoustics": "dataset-file://demo-biodata/voice-window-summary",
+                "accelerometer": "dataset-file://demo-biodata/accel-window-summary",
+                "blood glucose": "dataset-file://demo-biodata/glucose-window-summary",
+                "fNIRS": "dataset-file://demo-biodata/fnirs-window-summary",
             },
         }
         adapted_window = self.biodata_transmitter.adapt_dataset_feature_window(
@@ -9817,6 +9859,44 @@ json.dump(response, sys.stdout)
                     "rate_bpm": 16.2,
                     "phase": "exhale",
                 },
+                "emg": {
+                    "rms_microvolt": 18.4,
+                    "median_frequency_hz": 82.0,
+                },
+                "skin_temperature": {
+                    "temperature_c": 36.4,
+                    "distal_gradient_c": 0.6,
+                },
+                "blood pressure": {
+                    "systolic_mmhg": 118.0,
+                    "diastolic_mmhg": 74.0,
+                    "mean_arterial_pressure_mmhg": 89.0,
+                },
+                "SpO2": {
+                    "oxygen_saturation_percent": 98.0,
+                    "signal_quality": 0.93,
+                },
+                "pupil diameter": {
+                    "left_pupil_mm": 3.1,
+                    "right_pupil_mm": 3.0,
+                },
+                "voice acoustics": {
+                    "fundamental_frequency_hz": 142.0,
+                    "jitter_percent": 0.7,
+                    "speaking_state": "silent-review",
+                },
+                "accelerometer": {
+                    "activity_count": 12.0,
+                    "posture_stability": 0.91,
+                },
+                "blood glucose": {
+                    "glucose_mg_dl": 92.0,
+                    "trend": "stable",
+                },
+                "fNIRS": {
+                    "oxyhemoglobin_delta": 0.18,
+                    "deoxyhemoglobin_delta": -0.05,
+                },
             },
             context_label="quiet-review-with-attention-shift",
         )
@@ -9833,6 +9913,15 @@ json.dump(response, sys.stdout)
                 "ppg": "dataset-file://demo-biodata/day-2/ppg-window-summary",
                 "eda": "dataset-file://demo-biodata/day-2/eda-window-summary",
                 "respiration": "dataset-file://demo-biodata/day-2/resp-window-summary",
+                "emg": "dataset-file://demo-biodata/day-2/emg-window-summary",
+                "skin_temperature": "dataset-file://demo-biodata/day-2/skin-temp-window-summary",
+                "blood pressure": "dataset-file://demo-biodata/day-2/blood-pressure-window-summary",
+                "SpO2": "dataset-file://demo-biodata/day-2/spo2-window-summary",
+                "pupil diameter": "dataset-file://demo-biodata/day-2/pupil-window-summary",
+                "voice acoustics": "dataset-file://demo-biodata/day-2/voice-window-summary",
+                "accelerometer": "dataset-file://demo-biodata/day-2/accel-window-summary",
+                "blood glucose": "dataset-file://demo-biodata/day-2/glucose-window-summary",
+                "fNIRS": "dataset-file://demo-biodata/day-2/fnirs-window-summary",
             },
         }
         day_two_adapted_window = self.biodata_transmitter.adapt_dataset_feature_window(
@@ -9858,6 +9947,44 @@ json.dump(response, sys.stdout)
                 "respiration": {
                     "rate_bpm": 14.8,
                     "phase": "inhale",
+                },
+                "emg": {
+                    "rms_microvolt": 15.2,
+                    "median_frequency_hz": 76.0,
+                },
+                "skin_temperature": {
+                    "temperature_c": 36.2,
+                    "distal_gradient_c": 0.4,
+                },
+                "blood pressure": {
+                    "systolic_mmhg": 114.0,
+                    "diastolic_mmhg": 72.0,
+                    "mean_arterial_pressure_mmhg": 86.0,
+                },
+                "SpO2": {
+                    "oxygen_saturation_percent": 98.5,
+                    "signal_quality": 0.94,
+                },
+                "pupil diameter": {
+                    "left_pupil_mm": 2.8,
+                    "right_pupil_mm": 2.9,
+                },
+                "voice acoustics": {
+                    "fundamental_frequency_hz": 138.0,
+                    "jitter_percent": 0.6,
+                    "speaking_state": "resting",
+                },
+                "accelerometer": {
+                    "activity_count": 8.0,
+                    "posture_stability": 0.95,
+                },
+                "blood glucose": {
+                    "glucose_mg_dl": 88.0,
+                    "trend": "stable",
+                },
+                "fNIRS": {
+                    "oxyhemoglobin_delta": 0.11,
+                    "deoxyhemoglobin_delta": -0.03,
                 },
             },
             context_label="next-day-resting-calibration",
@@ -9994,6 +10121,14 @@ json.dump(response, sys.stdout)
             feature_window_series_drift_gate_receipt=feature_window_series_drift_gate,
             calibration_refresh_receipt=calibration_refresh_receipt,
         )
+        mind_state_bridge = self.biodata_transmitter.bind_mind_state_bridge(
+            session,
+            latent_state,
+            generated_bundle,
+            calibration_profile,
+            calibration_confidence_gate,
+            feature_window_series_profile,
+        )
         transmission_validation = self.biodata_transmitter.validate_transmission(
             session,
             latent_state,
@@ -10010,6 +10145,15 @@ json.dump(response, sys.stdout)
                 calibration_profile,
                 calibration_confidence_gate,
             )
+        )
+        mind_state_bridge_validation = self.biodata_transmitter.validate_mind_state_bridge(
+            session,
+            latent_state,
+            generated_bundle,
+            calibration_profile,
+            calibration_confidence_gate,
+            mind_state_bridge,
+            feature_window_series_profile,
         )
         dataset_adapter_validation = self.biodata_transmitter.validate_dataset_adapter_receipt(
             session,
@@ -10057,6 +10201,11 @@ json.dump(response, sys.stdout)
                 calibration_refresh_receipt,
             )
         )
+        human_biosignal_catalog_validation = (
+            self.biodata_transmitter.validate_human_biosignal_catalog(
+                human_biosignal_catalog
+            )
+        )
         validation = dict(transmission_validation)
         validation["ok"] = (
             transmission_validation["ok"]
@@ -10068,6 +10217,21 @@ json.dump(response, sys.stdout)
             and feature_window_series_drift_gate_validation["ok"]
             and drift_threshold_policy_authority_validation["ok"]
             and calibration_refresh_validation["ok"]
+            and human_biosignal_catalog_validation["ok"]
+            and mind_state_bridge_validation["ok"]
+        )
+        validation["human_biosignal_catalog_ok"] = human_biosignal_catalog_validation["ok"]
+        validation["human_biosignal_catalog_digest_bound"] = (
+            human_biosignal_catalog_validation["catalog_digest_bound"]
+        )
+        validation["human_biosignal_catalog_family_coverage_bound"] = (
+            human_biosignal_catalog_validation["family_coverage_bound"]
+        )
+        validation["human_biosignal_catalog_alias_targets_bound"] = (
+            human_biosignal_catalog_validation["alias_targets_bound"]
+        )
+        validation["human_biosignal_catalog_uncatalogued_policy_bound"] = (
+            human_biosignal_catalog_validation["uncatalogued_modality_policy_bound"]
         )
         validation["dataset_adapter_ok"] = dataset_adapter_validation["ok"]
         validation["dataset_manifest_digest_bound"] = dataset_adapter_validation[
@@ -10306,6 +10470,61 @@ json.dump(response, sys.stdout)
         ]
         validation["raw_refresh_payload_stored"] = (
             calibration_refresh_validation["raw_refresh_payload_stored"]
+        )
+        validation["biodata_mind_state_bridge_ok"] = mind_state_bridge_validation["ok"]
+        validation["biodata_mind_state_bridge_status"] = (
+            mind_state_bridge_validation["mind_state_handoff_status"]
+        )
+        validation["biodata_mind_state_bridge_latent_bound"] = (
+            mind_state_bridge_validation["body_state_latent_bound"]
+        )
+        validation["biodata_mind_state_bridge_generated_bundle_bound"] = (
+            mind_state_bridge_validation["generated_bundle_bound"]
+        )
+        validation["biodata_mind_state_bridge_confidence_gate_bound"] = (
+            mind_state_bridge_validation["calibration_confidence_gate_bound"]
+        )
+        validation["biodata_mind_state_bridge_feature_window_series_bound"] = (
+            mind_state_bridge_validation["feature_window_series_bound"]
+        )
+        validation["biodata_mind_state_bridge_qualia_surrogate_bound"] = (
+            mind_state_bridge_validation["qualia_surrogate_bound"]
+        )
+        validation["biodata_mind_state_bridge_self_model_advisory_bound"] = (
+            mind_state_bridge_validation["self_model_advisory_bound"]
+        )
+        validation["biodata_mind_state_bridge_l2_l3_handoffs_bound"] = (
+            mind_state_bridge_validation["l2_l3_handoffs_bound"]
+        )
+        validation["biodata_mind_state_bridge_claim_ceiling_bound"] = (
+            mind_state_bridge_validation["claim_ceiling_bound"]
+        )
+        validation["biodata_mind_state_bridge_digest_bound"] = (
+            mind_state_bridge_validation["bridge_digest_bound"]
+        )
+        validation["raw_biodata_bridge_payload_stored"] = (
+            mind_state_bridge_validation["raw_biodata_payload_stored"]
+        )
+        validation["raw_biodata_bridge_latent_payload_stored"] = (
+            mind_state_bridge_validation["raw_latent_payload_stored"]
+        )
+        validation["raw_biodata_bridge_generated_payload_stored"] = (
+            mind_state_bridge_validation["raw_generated_payload_stored"]
+        )
+        validation["raw_biodata_bridge_gate_payload_stored"] = (
+            mind_state_bridge_validation["raw_gate_payload_stored"]
+        )
+        validation["raw_biodata_bridge_qualia_payload_stored"] = (
+            mind_state_bridge_validation["raw_qualia_payload_stored"]
+        )
+        validation["raw_biodata_bridge_self_model_payload_stored"] = (
+            mind_state_bridge_validation["raw_self_model_payload_stored"]
+        )
+        validation["consciousness_reproduction_claimed"] = (
+            mind_state_bridge_validation["consciousness_reproduction_claimed"]
+        )
+        validation["identity_replacement_claimed"] = (
+            mind_state_bridge_validation["identity_replacement_claimed"]
         )
 
         self.ledger.append(
@@ -10655,6 +10874,44 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.mind_state_bridge_bound",
+            payload={
+                "bridge_ref": mind_state_bridge["bridge_ref"],
+                "bridge_digest": mind_state_bridge["bridge_digest"],
+                "body_state_latent_digest": mind_state_bridge[
+                    "body_state_latent_digest"
+                ],
+                "generated_bundle_digest": mind_state_bridge[
+                    "generated_bundle_digest"
+                ],
+                "calibration_confidence_gate_digest": mind_state_bridge[
+                    "calibration_confidence_gate_digest"
+                ],
+                "qualia_surrogate_axis_digest_set": mind_state_bridge[
+                    "qualia_surrogate_axis_digest_set"
+                ],
+                "l2_l3_handoff_digest_set": mind_state_bridge[
+                    "l2_l3_handoff_digest_set"
+                ],
+                "mind_state_handoff_status": mind_state_bridge[
+                    "mind_state_handoff_status"
+                ],
+                "claim_ceiling": mind_state_bridge["claim_ceiling"],
+                "consciousness_reproduction_claimed": mind_state_bridge[
+                    "consciousness_reproduction_claimed"
+                ],
+                "identity_replacement_claimed": mind_state_bridge[
+                    "identity_replacement_claimed"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-mind-state-bridge",
+            layer="L6-to-L2/L3",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
 
         return {
             "identity": {
@@ -10662,6 +10919,7 @@ json.dump(response, sys.stdout)
                 "lineage_id": identity.lineage_id,
             },
             "profile": self.biodata_transmitter.reference_profile(),
+            "human_biosignal_catalog": human_biosignal_catalog,
             "session": session,
             "dataset_manifest": dataset_manifest,
             "dataset_manifests": [dataset_manifest, day_two_dataset_manifest],
@@ -10679,6 +10937,7 @@ json.dump(response, sys.stdout)
             "calibration_latent_states": [latent_state, day_two_latent_state],
             "calibration_profile": calibration_profile,
             "calibration_confidence_gate": calibration_confidence_gate,
+            "mind_state_bridge": mind_state_bridge,
             "generated_bundle": generated_bundle,
             "validation": validation,
             "ledger_profile": self.ledger.profile(),

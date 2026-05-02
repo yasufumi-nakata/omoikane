@@ -37,14 +37,21 @@
             └──────────────────────────┘
 ```
 
-BioData Transmitter は L6 の入口で、脳波・心電・脈波・皮膚電気活動・呼吸などを
+BioData Transmitter は L6 の入口で、脳波・心電・脈波・皮膚電気活動・呼吸に限らず、
+人間から取られる神経・心血管・呼吸・皮膚・筋・眼・体温・運動・音声・生化学系など
+session で宣言された任意の生体信号 feature summary を
 `internal body-state latent` に束ね、別モダリティの生体データ proxy へ再投影する。
+source / target は human biosignal catalog digest と modality family map に束縛される。
+既知 modality は専用 proxy、未知 modality は raw payload を保存しない汎用 biosignal proxy
+として feature digest / feature-name digest / intensity proxy に束縛する。
 複数日の latent は raw payload を保存せずに個人内 calibration profile へ束ねる。
 この calibration profile は digest-only confidence gate として identity confirmation と
 Sensory Loopback へ渡せるが、各 subsystem の既存承認・witness・body-map contract を
 置き換えない。
-この latent は L2/L3 へ渡せるが、主観同一性や semantic thought content は
-runtime fact として扱わず、mind-upload.com の conflict sink ref に分離する。
+この latent は `biodata-mind-state-bridge-v1` で L2 QualiaBuffer surrogate / SelfModel
+advisory と L3 perception / affect / attention handoff へ渡せるが、主観同一性、
+semantic thought content、consciousness reproduction、identity replacement は runtime fact
+として扱わず、mind-upload.com の conflict sink ref と研究課題に分離する。
 
 ## 2. 連続性ログの粒度
 

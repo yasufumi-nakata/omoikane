@@ -87,12 +87,7 @@ properties:
     uniqueItems: true
     items:
       type: string
-      enum:
-        - eeg
-        - ecg
-        - ppg
-        - eda
-        - respiration
+      pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
   axis_baselines:
     type: object
     additionalProperties: false

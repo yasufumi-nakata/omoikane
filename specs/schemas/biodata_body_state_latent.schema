@@ -2,7 +2,8 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/biodata_body_state_latent.schema"
 title: BioDataBodyStateLatent
 description: >
-  Digest-bound internal body-state latent derived from source biosignal features.
+  Digest-bound internal body-state latent derived from source biosignal features,
+  including per-modality human biosignal catalog family and catalog-status binding.
 type: object
 additionalProperties: false
 required:
@@ -15,6 +16,7 @@ required:
   - context_label
   - source_modalities
   - source_feature_digest
+  - source_modality_projections
   - physiological_axes
   - interoceptive_confidence
   - literature_refs
@@ -48,16 +50,17 @@ properties:
     minItems: 1
     uniqueItems: true
     items:
-      type: string
-      enum:
-        - eeg
-        - ecg
-        - ppg
-        - eda
-        - respiration
+      $ref: "#/$defs/modality_name"
   source_feature_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  source_modality_projections:
+    type: object
+    minProperties: 1
+    propertyNames:
+      $ref: "#/$defs/modality_name"
+    additionalProperties:
+      $ref: "#/$defs/modality_projection"
   physiological_axes:
     type: object
     additionalProperties: false
@@ -196,3 +199,63 @@ properties:
   latent_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+$defs:
+  modality_name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  modality_projection:
+    type: object
+    additionalProperties: false
+    required:
+      - modality
+      - modality_family
+      - catalog_status
+      - human_biosignal_catalog_digest
+      - projection_policy
+      - feature_digest
+      - feature_name_digest
+      - numeric_feature_count
+      - string_feature_count
+      - intensity_proxy
+      - variability_proxy
+      - projection_confidence
+    properties:
+      modality:
+        $ref: "#/$defs/modality_name"
+      modality_family:
+        type: string
+        pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+      catalog_status:
+        type: string
+        enum:
+          - catalogued
+          - uncatalogued
+      human_biosignal_catalog_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      projection_policy:
+        const: feature-summary-digest-to-open-biosignal-projection-v1
+      feature_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      feature_name_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      numeric_feature_count:
+        type: integer
+        minimum: 0
+      string_feature_count:
+        type: integer
+        minimum: 0
+      intensity_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      variability_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      projection_confidence:
+        type: number
+        minimum: 0
+        maximum: 1

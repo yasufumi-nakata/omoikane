@@ -1236,21 +1236,31 @@ coarse neuromodulator proxy、置換比率の増減、`bio-autonomous-fallback`
 
 `biodata-transmitter-demo` は L6 BioData Transmitter の reference contract
 (`interface.biodata_transmitter.v0`) を JSON で可視化し、
-EEG/ECG/PPG/EDA/respiration features を `physiology-latent-body-state-v0` に束ね、
-ECG/PPG/respiration/EEG/affect/thought proxy を生成する。
+EEG/ECG/PPG/EDA/respiration に加えて EMG、体温、血圧、SpO2、瞳孔、音声、
+加速度、血糖、fNIRS など session で宣言された人間由来の生体信号 feature summary を
+`human-biosignal-open-modality-catalog-v1` の family map と
+`physiology-latent-body-state-v0` に束ね、ECG/PPG/respiration/EEG/EDA/affect/thought proxy と
+血圧、SpO2、瞳孔、音声、血糖、fMRI BOLD、未カタログ human biosensor などの
+generic biosignal proxy を生成する。
+同じ demo は `biodata_human_biosignal_catalog.schema` に従う public catalog artifact も返し、
+神経、心血管、呼吸、皮膚、筋、眼、体温、運動、音声、消化管、泌尿/腎、圧/体液、
+血流、生化学、画像、omics などの family coverage と alias target を検証する。
 同じ demo は literature refs、source feature digest、latent digest、generated bundle digest、
 `mind-upload.com` conflict sink binding、raw source payload / raw generated waveform 非保持、
 semantic thought content 非生成、subjective equivalence 非主張をまとめて検証する。
+latent は各 source modality の `source_modality_projections` を持ち、
+modality family、catalog status、catalog digest、feature digest、feature-name digest、
+intensity proxy、variability proxy だけを保持する。
 feature input は `biodata-dataset-feature-window-adapter-v1` により、dataset ref、
 participant ref、license ref、window ref、modality file refs の manifest digest と
 feature-window digest、body-state latent ref / digest へ先に束縛される。
-adapter receipt は full EEG/ECG/PPG/EDA/respiration coverage を検証し、
+adapter receipt は full session-declared source modality coverage を検証し、
 raw dataset payload、raw signal samples、raw feature-window payload は保存しない。
 さらに複数日の adapter receipt と body-state latent は
 `biodata-feature-window-series-profile-v1` により ordered longitudinal / circadian
 series へ束縛される。series profile は adapter receipt digest set、latent digest set、
 circadian phase refs、circadian phase verifier digest、axis drift summary、
-required modality coverage を返し、raw dataset / sample / feature-window / latent /
+session-declared required modality coverage を返し、raw dataset / sample / feature-window / latent /
 phase verifier / series payload は保存しない。
 circadian phase refs は `biodata-circadian-phase-verifier-v1` により external clock、
 sleep diary、wearable evidence refs の source digest set へ束縛され、raw clock /
@@ -1270,7 +1280,7 @@ clinical reviewer、jurisdiction policy、Guardian の authority refs、signer k
 signature refs の digest set へ束縛される。drift gate は authority receipt digest と
 source digest set を保持するが、raw threshold policy / raw signature / raw reviewer
 payload は保存しない。
-gate receipt は full modality coverage、target 別 confidence threshold、calibration digest、
+gate receipt は session-declared full modality coverage、target 別 confidence threshold、calibration digest、
 feature-window drift gate digest、threshold policy authority digest、gate receipt digest を検証し、
 raw drift / threshold policy / gate payload は保存しない。
 さらに `biodata-calibration-refresh-window-v1` が current drift gate、self consent、
@@ -1278,6 +1288,12 @@ Guardian review、1-90 日 freshness window を calibration 再利用前に dige
 束縛し、confidence gate は refresh receipt ref/digest/source digest set と
 `refresh_status=fresh` を同じ target gate binding に持つ。raw calibration / drift /
 threshold policy / refresh / gate payload は保存しない。
+そのうえで `biodata-mind-state-bridge-v1` は body-state latent digest、generated bundle
+digest、calibration confidence gate digest、feature-window series digest を 1 つの
+bridge receipt に束縛し、QualiaBuffer surrogate、SelfModel advisory、L3 perception /
+affect / attention handoff refs へ渡す。claim ceiling は
+`body-state-surrogate-input-only` に固定され、semantic thought content、subjective
+equivalence、consciousness reproduction、identity replacement はすべて false のまま検証される。
 sensory loopback 側では、この gate を
 `biodata-calibration-gated-drift-threshold-v1` として受け取り、
 `confidence_score >= 0.7` の時だけ body-map drift threshold を最大 `0.04`

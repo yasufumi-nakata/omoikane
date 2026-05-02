@@ -4,6 +4,9 @@ title: BioDataTransmitterSession
 description: >
   Person-bound L6 transmitter session that maps biological data through an
   internal body-state latent before generating bounded target biosignal proxies.
+  Modality names are intentionally open but bound to a human biosignal catalog,
+  family map, and uncatalogued-modality policy so newly measured human signals
+  can be declared without changing the session contract.
 type: object
 additionalProperties: false
 required:
@@ -16,6 +19,12 @@ required:
   - generator_profile_id
   - source_modalities
   - target_modalities
+  - modality_policy_id
+  - human_biosignal_scope
+  - human_biosignal_catalog_digest
+  - source_modality_families
+  - target_modality_families
+  - uncatalogued_modality_policy
   - literature_refs
   - conflict_refs
   - mind_upload_conflict_sink_url
@@ -47,6 +56,19 @@ properties:
     $ref: "#/$defs/modalities"
   target_modalities:
     $ref: "#/$defs/modalities"
+  modality_policy_id:
+    const: human-biosignal-open-modality-catalog-v1
+  human_biosignal_scope:
+    const: human-derived-sensor-feature-summary-only
+  human_biosignal_catalog_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_modality_families:
+    $ref: "#/$defs/modality_family_map"
+  target_modality_families:
+    $ref: "#/$defs/modality_family_map"
+  uncatalogued_modality_policy:
+    const: accept-as-human-biosignal-feature-summary-with-generic-proxy
   literature_refs:
     type: array
     minItems: 5
@@ -77,15 +99,20 @@ $defs:
     minItems: 1
     uniqueItems: true
     items:
-      type: string
-      enum:
-        - eeg
-        - ecg
-        - ppg
-        - eda
-        - respiration
-        - affect
-        - thought
+      $ref: "#/$defs/modality_name"
+  modality_name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  modality_family:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  modality_family_map:
+    type: object
+    minProperties: 1
+    propertyNames:
+      $ref: "#/$defs/modality_name"
+    additionalProperties:
+      $ref: "#/$defs/modality_family"
   literature_ref:
     type: object
     additionalProperties: false

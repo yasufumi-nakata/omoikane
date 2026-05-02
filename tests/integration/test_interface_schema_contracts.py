@@ -55,6 +55,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         result = self.runtime.run_biodata_transmitter_demo()
 
         self._assert_schema_valid(
+            "specs/schemas/biodata_human_biosignal_catalog.schema",
+            result["human_biosignal_catalog"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/biodata_transmitter_session.schema",
             result["session"],
         )
@@ -103,6 +107,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/biodata_calibration_confidence_gate.schema",
             result["calibration_confidence_gate"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/biodata_mind_state_bridge.schema",
+            result["mind_state_bridge"],
+        )
         for latent in result["calibration_latent_states"]:
             self._assert_schema_valid(
                 "specs/schemas/biodata_body_state_latent.schema",
@@ -110,6 +118,12 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["mind_upload_conflict_sink_bound"])
         self.assertTrue(result["validation"]["literature_backed_intermediate"])
+        self.assertTrue(result["validation"]["source_modality_projections_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_ok"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_digest_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_family_coverage_bound"])
+        self.assertTrue(result["validation"]["human_biosignal_catalog_alias_targets_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_ok"])
         self.assertTrue(result["validation"]["dataset_manifest_digest_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])

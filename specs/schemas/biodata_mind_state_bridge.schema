@@ -1,0 +1,289 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_mind_state_bridge.schema"
+title: BioDataMindStateBridge
+description: >
+  Digest-only handoff receipt that binds a BioData Transmitter body-state latent,
+  generated biosignal bundle, and calibration confidence gate to bounded downstream
+  mind-state consumers without claiming semantic thought, subjective equivalence,
+  consciousness reproduction, or identity replacement.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - bridge_id
+  - bridge_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - latent_profile_id
+  - generator_profile_id
+  - confidence_gate_profile_id
+  - body_state_latent_ref
+  - body_state_latent_digest
+  - body_state_latent_digest_bound
+  - generated_bundle_ref
+  - generated_bundle_digest
+  - generated_bundle_digest_bound
+  - calibration_ref
+  - calibration_digest
+  - source_latent_digest_set_digest
+  - calibration_confidence_gate_ref
+  - calibration_confidence_gate_digest
+  - calibration_confidence_score
+  - calibration_confidence_gate_status
+  - feature_window_series_ref
+  - feature_window_series_profile_digest
+  - feature_window_series_digest_set_digest
+  - feature_window_series_bound
+  - qualia_binding_ref
+  - qualia_surrogate_profile_id
+  - qualia_surrogate_axis_refs
+  - qualia_surrogate_axis_digest_set
+  - self_model_advisory_ref
+  - self_model_advisory_digest
+  - self_model_advisory_only
+  - l2_l3_handoff_bindings
+  - l2_l3_handoff_digest_set
+  - allowed_consumers
+  - mind_state_handoff_status
+  - claim_ceiling
+  - storage_policy
+  - raw_biodata_payload_stored
+  - raw_latent_payload_stored
+  - raw_generated_payload_stored
+  - raw_gate_payload_stored
+  - raw_qualia_payload_stored
+  - raw_self_model_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - bridge_digest
+properties:
+  schema_version:
+    const: "1.0"
+  bridge_id:
+    type: string
+    pattern: "^bdt-mind-bridge-[a-f0-9]{12}$"
+  bridge_ref:
+    type: string
+    pattern: "^mind-bridge://biodata/bdt-mind-bridge-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-mind-state-bridge-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  latent_profile_id:
+    const: physiology-latent-body-state-v0
+  generator_profile_id:
+    const: bounded-cross-modal-biosignal-generator-v0
+  confidence_gate_profile_id:
+    const: biodata-calibration-confidence-gate-v1
+  body_state_latent_ref:
+    type: string
+    pattern: "^latent://body-state/body-latent-[a-f0-9]{12}$"
+  body_state_latent_digest:
+    $ref: "#/$defs/digest"
+  body_state_latent_digest_bound:
+    const: true
+  generated_bundle_ref:
+    type: string
+    pattern: "^synthetic://biosignal-bundle/bdt-bundle-[a-f0-9]{12}$"
+  generated_bundle_digest:
+    $ref: "#/$defs/digest"
+  generated_bundle_digest_bound:
+    const: true
+  calibration_ref:
+    type: string
+    pattern: "^calibration://biodata/bdt-calibration-[a-f0-9]{12}$"
+  calibration_digest:
+    $ref: "#/$defs/digest"
+  source_latent_digest_set_digest:
+    $ref: "#/$defs/digest"
+  calibration_confidence_gate_ref:
+    type: string
+    pattern: "^confidence-gate://biodata/bdt-confidence-gate-[a-f0-9]{12}$"
+  calibration_confidence_gate_digest:
+    $ref: "#/$defs/digest"
+  calibration_confidence_score:
+    type: number
+    minimum: 0
+    maximum: 1
+  calibration_confidence_gate_status:
+    type: string
+    enum:
+      - bound
+      - blocked
+  feature_window_series_ref:
+    anyOf:
+      - type: string
+        pattern: "^feature-window-series://biodata/bdt-window-series-[a-f0-9]{12}$"
+      - const: ""
+  feature_window_series_profile_digest:
+    anyOf:
+      - $ref: "#/$defs/digest"
+      - const: ""
+  feature_window_series_digest_set_digest:
+    anyOf:
+      - $ref: "#/$defs/digest"
+      - const: ""
+  feature_window_series_bound:
+    type: boolean
+  qualia_binding_ref:
+    type: string
+    pattern: "^qualia://tick/bdt-mind-bridge-[a-f0-9]{12}$"
+  qualia_surrogate_profile_id:
+    const: biodata-to-qualia-surrogate-bridge-v1
+  qualia_surrogate_axis_refs:
+    type: array
+    minItems: 4
+    maxItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - axis
+        - surrogate_ref
+        - source_latent_ref
+        - source_latent_digest
+        - source_axes
+        - source_axis_digest
+        - status
+        - claim_ceiling
+        - axis_digest
+      properties:
+        axis:
+          type: string
+          enum:
+            - interoceptive
+            - affective
+            - cognitive
+            - somatic
+        surrogate_ref:
+          type: string
+          pattern: "^qualia-surrogate://biodata/bdt-mind-bridge-[a-f0-9]{12}/[a-z]+$"
+        source_latent_ref:
+          type: string
+          pattern: "^latent://body-state/body-latent-[a-f0-9]{12}$"
+        source_latent_digest:
+          $ref: "#/$defs/digest"
+        source_axes:
+          type: array
+          minItems: 2
+          uniqueItems: true
+          items:
+            type: string
+            enum:
+              - cardiac
+              - autonomic
+              - respiratory
+              - affect
+              - neural
+              - thought
+        source_axis_digest:
+          $ref: "#/$defs/digest"
+        status:
+          const: bound
+        claim_ceiling:
+          const: body-state-surrogate-input-only
+        axis_digest:
+          $ref: "#/$defs/digest"
+  qualia_surrogate_axis_digest_set:
+    $ref: "#/$defs/digest"
+  self_model_advisory_ref:
+    type: string
+    pattern: "^self-model-advisory://biodata/bdt-mind-bridge-[a-f0-9]{12}$"
+  self_model_advisory_digest:
+    $ref: "#/$defs/digest"
+  self_model_advisory_only:
+    const: true
+  l2_l3_handoff_bindings:
+    type: array
+    minItems: 6
+    maxItems: 6
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - consumer
+        - handoff_ref
+        - handoff_digest
+        - status
+        - claim_ceiling
+      properties:
+        consumer:
+          type: string
+          enum:
+            - l2-qualia-buffer
+            - l2-self-model-advisory
+            - l3-perception
+            - l3-affect
+            - l3-attention
+            - l1-identity-confirmation-confidence-input
+        handoff_ref:
+          type: string
+          pattern: "^handoff://biodata/bdt-mind-bridge-[a-f0-9]{12}/[a-z0-9-]+$"
+        handoff_digest:
+          $ref: "#/$defs/digest"
+        status:
+          const: bound
+        claim_ceiling:
+          const: body-state-surrogate-input-only
+  l2_l3_handoff_digest_set:
+    $ref: "#/$defs/digest"
+  allowed_consumers:
+    type: array
+    minItems: 6
+    maxItems: 6
+    uniqueItems: true
+    items:
+      type: string
+      enum:
+        - l2-qualia-buffer
+        - l2-self-model-advisory
+        - l3-perception
+        - l3-affect
+        - l3-attention
+        - l1-identity-confirmation-confidence-input
+  mind_state_handoff_status:
+    type: string
+    enum:
+      - bound
+      - blocked
+  claim_ceiling:
+    const: body-state-surrogate-input-only
+  storage_policy:
+    const: digest-only-biodata-to-mind-state-handoff-v1
+  raw_biodata_payload_stored:
+    const: false
+  raw_latent_payload_stored:
+    const: false
+  raw_generated_payload_stored:
+    const: false
+  raw_gate_payload_stored:
+    const: false
+  raw_qualia_payload_stored:
+    const: false
+  raw_self_model_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  bridge_digest:
+    $ref: "#/$defs/digest"
+$defs:
+  digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

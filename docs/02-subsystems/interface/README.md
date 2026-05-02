@@ -5,8 +5,9 @@
 ## 主要境界
 
 ### BioData Transmitter (BDT)
-- 脳波・心電・脈波・皮膚電気活動・呼吸などの生体データ
-- 生体データを `internal body-state latent` に束ね、別モダリティの生体データ proxy を生成
+- 脳波・心電・脈波・皮膚電気活動・呼吸に限らず、人間から取られる神経・心血管・筋・眼・体温・運動・音声・生化学系などの session-declared 任意生体データ
+- source / target modality は `human-biosignal-open-modality-catalog-v1` の catalog digest と family map に束縛
+- 生体データを `internal body-state latent` に束ね、別モダリティの生体データ proxy と未知 target の generic biosignal proxy を生成
 - affect は valence/arousal proxy、thought は attention-pressure proxy までに制限
 - 主観同一性や thought content の飛躍は `mind-upload.com` conflict sink ref に分離
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json`

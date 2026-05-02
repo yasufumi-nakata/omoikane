@@ -2,8 +2,8 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/biodata_dataset_adapter_receipt.schema"
 title: BioDataDatasetAdapterReceipt
 description: >
-  Digest-only receipt that binds one external EEG/ECG/PPG/EDA/respiration
-  dataset feature window to a BioData body-state latent without storing raw
+  Digest-only receipt that binds one external BioData dataset feature window
+  to a BioData body-state latent without storing raw
   dataset payloads, signal samples, or feature-window payloads.
 type: object
 additionalProperties: false
@@ -76,14 +76,12 @@ properties:
   source_modalities_observed:
     type: array
     minItems: 1
-    maxItems: 5
     uniqueItems: true
     items:
       $ref: "#/$defs/source_modality"
   source_modalities_required:
     type: array
-    minItems: 5
-    maxItems: 5
+    minItems: 1
     uniqueItems: true
     items:
       $ref: "#/$defs/source_modality"
@@ -131,9 +129,4 @@ properties:
 $defs:
   source_modality:
     type: string
-    enum:
-      - eeg
-      - ecg
-      - ppg
-      - eda
-      - respiration
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"

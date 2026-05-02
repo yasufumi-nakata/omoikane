@@ -2316,7 +2316,16 @@ entries:
       - specs/interfaces/interface.biodata_transmitter.v0.idl
       - docs/02-subsystems/interface/biodata-transmitter.md
       - reference-runtime
-    rationale: Required to open a person-bound biosignal transmitter session with literature refs and mind-upload.com conflict sinks.
+    rationale: Required to open a person-bound biosignal transmitter session with open source/target modality sets, human biosignal catalog digest, modality family maps, literature refs, and mind-upload.com conflict sinks.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/biodata_human_biosignal_catalog.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+    rationale: Required to publish the BioData human biosignal family catalog, alias map, known modality set, and uncatalogued-modality fallback as a machine-checkable artifact.
   - priority: P1
     kind: schema
     file: specs/schemas/biodata_body_state_latent.schema
@@ -2324,7 +2333,7 @@ entries:
       - specs/interfaces/interface.biodata_transmitter.v0.idl
       - docs/02-subsystems/interface/biodata-transmitter.md
       - reference-runtime
-    rationale: Required to serialize the internal body-state intermediate representation between source and target biosignals.
+    rationale: Required to serialize the internal body-state intermediate representation and per-modality feature projections with human biosignal family and catalog-status binding between source and target biosignals.
   - priority: P1
     kind: schema
     file: specs/schemas/biodata_dataset_adapter_receipt.schema
@@ -2334,7 +2343,7 @@ entries:
       - reference-runtime
       - evals/interface/biodata_transmitter_roundtrip.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to bind external EEG/ECG/PPG/EDA/respiration dataset feature windows to BioData body-state latents with manifest digest, feature-window digest, latent digest, full modality coverage, and raw sample redaction.
+    rationale: Required to bind session-declared external BioData dataset feature windows to BioData body-state latents with manifest digest, feature-window digest, latent digest, full modality coverage, and raw sample redaction.
   - priority: P1
     kind: schema
     file: specs/schemas/biodata_circadian_phase_verifier_receipt.schema
@@ -2382,7 +2391,7 @@ entries:
       - specs/interfaces/interface.biodata_transmitter.v0.idl
       - docs/02-subsystems/interface/biodata-transmitter.md
       - reference-runtime
-    rationale: Required to serialize generated target biosignal, affect, and thought-pressure proxies without raw waveform storage.
+    rationale: Required to serialize generated known target biosignal, affect, thought-pressure, and generic arbitrary-modality proxies with target family/catalog binding and without raw waveform storage.
   - priority: P1
     kind: schema
     file: specs/schemas/biodata_calibration_profile.schema
@@ -2415,20 +2424,32 @@ entries:
       - agents/guardians/integrity-guardian.yaml
     rationale: Required to bind complete BioData calibration profiles, feature-window series drift gate receipts, and calibration refresh receipts to identity-confirmation and sensory-loopback confidence gates without raw calibration, drift, refresh, or gate payload storage.
   - priority: P1
+    kind: schema
+    file: specs/schemas/biodata_mind_state_bridge.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - docs/02-subsystems/mind-substrate/qualia-buffer.md
+      - docs/02-subsystems/cognitive/README.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind BioData body-state latents, generated bundles, and calibration confidence gates into digest-only L2/L3 mind-state handoffs while preserving the no-consciousness/no-identity-replacement claim ceiling.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.biodata_transmitter.v0.idl
     consumers:
       - docs/02-subsystems/interface/biodata-transmitter.md
       - docs/05-research-frontiers/biosignal-transmitter.md
       - reference-runtime
-    rationale: Required to make the dataset feature-window to body-state latent to biosignal transmitter machine-readable.
+    rationale: Required to make the dataset feature-window to body-state latent to biosignal transmitter and digest-only mind-state handoff machine-readable.
   - priority: P1
     kind: eval
     file: evals/interface/biodata_transmitter_roundtrip.yaml
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects dataset adapter digest binding, calibration refresh freshness binding, literature-backed intermediate, target signal generation, mind-upload.com conflict sink binding, and raw payload redaction.
+    rationale: Protects human biosignal catalog binding, dataset adapter digest binding, calibration refresh freshness binding, literature-backed intermediate, target signal generation, BioData mind-state bridge claim ceiling, mind-upload.com conflict sink binding, and raw payload redaction.
   - priority: P1
     kind: schema
     file: specs/schemas/bdb_session.schema

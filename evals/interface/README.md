@@ -9,12 +9,13 @@ L6 interface 境界の reference runtime 評価。
 生体自律復帰をまとめて確認する。
 
 ### BioData Transmitter Roundtrip
-EEG/ECG/PPG/EDA/respiration features を internal body-state latent に束ね、
-ECG/PPG/respiration/EEG/affect/thought proxy を生成し、literature refs、
+session-declared arbitrary biosignal features を public human biosignal catalog / family map と
+internal body-state latent に束ね、既知 target proxy と未知 target の generic biosignal proxy を生成し、catalog digest、family coverage、alias target、literature refs、
 mind-upload.com conflict sink、external dataset feature-window adapter receipt、
 external clock / sleep diary / wearable circadian phase verifier、
 longitudinal / circadian feature-window series profile、multi-day calibration digest、
 calibration refresh receipt の freshness window、
+BioData mind-state bridge の L2/L3 digest-only handoff と no-consciousness claim ceiling、
 raw payload redaction、semantic thought content 非生成を確認する。
 
 ### IMC Disclosure Floor

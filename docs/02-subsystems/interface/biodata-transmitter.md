@@ -1,8 +1,10 @@
 # BioData Transmitter (BDT)
 
-L6 Interface のサブシステム。脳波、心電、脈波、皮膚電気活動、呼吸などの
-生体データから、その人に束縛された **体内状態の中間表現** を作り、そこから
-別モダリティの生体データ proxy を生成する。
+L6 Interface のサブシステム。脳波、心電、脈波、皮膚電気活動、呼吸に限らず、
+人間から取られる神経、心血管、呼吸、皮膚、筋、眼、体温、運動、音声、消化管、
+血液・間質液・汗・唾液・呼気、睡眠/概日などの生体信号 feature summary から、
+その人に束縛された **体内状態の中間表現** を作り、そこから別モダリティの
+生体データ proxy を生成する。
 
 OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 「マインドアップロード基盤 OS」から一段具体化し、アップロード対象者の
@@ -11,38 +13,48 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 
 ## 役割
 
-- `eeg / ecg / ppg / eda / respiration` の特徴量を同一 identity の
+- session で宣言された任意 modality の特徴量を同一 identity の
   digest-bound feature summary として受け取る
+- `human-biosignal-open-modality-catalog-v1` で表記ゆれを正規化し、既知の
+  human biosignal は family に束縛し、catalog 外の新規 human biosignal は
+  `uncatalogued_human_biosignal` として generic proxy に通す
 - 心拍、HRV、呼吸、交感/副交感 proxy、EEG band proxy、valence/arousal proxy、
   thought-pressure proxy を `internal-body-state-latent` に束ねる
-- `ecg / ppg / respiration / eeg / affect / thought` の target modality へ
-  bounded synthetic signal summary を生成する
+- 既知 target は専用 bounded synthetic signal summary として生成し、未知 target は
+  generic biosignal proxy として feature digest / feature-name digest / intensity proxy に束縛する
 - thought は **semantic content** を生成せず、注意圧・認知負荷の proxy だけを返す
 - affect は discrete emotion 断定ではなく valence/arousal proxy に留める
 - 体内状態の中間表現は literature refs を持ち、主観同一性や thought content への
   飛躍は `mind-upload.com` の conflict sink ref へ送る
+- complete な latent / generated bundle / calibration confidence gate は
+  `biodata-mind-state-bridge-v1` で L2/L3 の surrogate / advisory handoff に束縛できるが、
+  consciousness reproduction や identity replacement へ昇格させない
 
 ## Reference Runtime v0
 
 `PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json` は、
 1 人の identity について次を 1 シナリオで実行する。
 
-1. source modalities と target modalities を固定した BDT session を開く
+1. source modalities と target modalities を明示し、human biosignal catalog digest と
+   modality family map を束縛した BDT session を開く
 2. external dataset manifest と feature-window summary を digest-only adapter receipt に束縛する
 3. external clock / sleep diary / wearable evidence で circadian phase refs を digest-only verifier receipt に束縛する
 4. 複数日の adapter receipt と body-state latent を longitudinal / circadian feature-window series profile に束縛する
-5. EEG/ECG/PPG/EDA/respiration features から body-state latent を作る
-6. latent digest に束縛した ECG/PPG/respiration/EEG/affect/thought proxy を生成する
+5. EEG/ECG/PPG/EDA/respiration に加え、EMG、体温、血圧、SpO2、瞳孔、音声、加速度、血糖、fNIRS などの features から body-state latent を作る
+6. latent digest に束縛した ECG/PPG/respiration/EEG/EDA/affect/thought proxy と、血圧、SpO2、瞳孔、音声、血糖、fMRI BOLD、未カタログ human biosensor などの generic biosignal proxy を生成する
 7. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
    semantic thought content 非生成を検証する
 8. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
 9. drift threshold policy を clinical reviewer / jurisdiction policy / Guardian authority refs へ digest-only に束縛する
 10. feature-window series の axis drift を authority-bound threshold receipt に束縛し、calibration confidence gate へ渡す
 11. current drift gate、self consent、Guardian review、freshness window を calibration refresh receipt へ digest-only に束縛する
-12. ContinuityLedger に session / dataset adapter / circadian phase verifier / feature-window series / threshold policy authority / drift gate / calibration refresh / latent / generated bundle / conflict sink / calibration binding を残す
-13. calibration profile、feature-window drift gate、calibration refresh receipt を identity confirmation / sensory loopback の confidence gate へ
+12. calibration profile、feature-window drift gate、calibration refresh receipt を identity confirmation / sensory loopback の confidence gate へ
     digest-only receipt として束縛する
-14. shared sensory loopback へ渡す場合は participant ごとの confidence gate と drift gate digest を
+13. body-state latent、generated bundle、calibration confidence gate を
+    `biodata-mind-state-bridge-v1` へ束縛し、QualiaBuffer surrogate、SelfModel advisory、
+    L3 perception / affect / attention handoff refs へ digest-only に渡す
+14. ContinuityLedger に session / dataset adapter / circadian phase verifier / feature-window series / threshold policy authority / drift gate / calibration refresh / latent / generated bundle / conflict sink / calibration gate / mind-state bridge を残す
+15. shared sensory loopback へ渡す場合は participant ごとの confidence gate と drift gate digest を
     Sensory Loopback 側の arbitration binding へ配布し、raw BioData / drift / gate payload は渡さない
 
 ## 中間表現
@@ -58,9 +70,29 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 | affect | `valence_proxy`, `arousal_proxy`, `circumplex-proxy` |
 | thought | `attention_pressure_proxy`, `semantic_content_generated=false` |
 
+各 source modality は `source_modality_projections` にも束縛される。
+projection は modality family、catalog status、human biosignal catalog digest、
+feature digest、feature-name digest、numeric / string feature count、intensity proxy、
+variability proxy、projection confidence だけを保持し、raw sample や raw feature-window
+payload は保持しない。専用 generator がまだ無い modality でも、この projection から
+generic biosignal proxy を生成できる。
+
 この latent は本人の完全な心ではなく、別の生体データを生成するための
 body-state carrier である。主観経験の同一性、思考内容の復元、qualia の正規表現は
 OmoikaneOS runtime 内で断定しない。
+
+## Human biosignal catalog
+
+`biodata_human_biosignal_catalog.schema` は、BDT が「人間から取られる生体信号」として
+受ける代表 family と alias を public artifact にしたものである。catalog は
+`human-biosignal-open-modality-catalog-v1`、`catalog_digest`、family count、modality count、
+alias count、`modality_to_family`、`uncatalogued_human_biosignal` fallback を持つ。
+
+v0 catalog は神経電気、神経磁気、神経血管/光学/MRI、誘発電位、心電、心機械/血行動態、
+血流/灌流、呼吸/ガス交換、皮膚電気、筋、眼、体温、圧/体液、運動/姿勢、音声/音響、
+消化管、泌尿生殖、腎/尿、生化学、間質液/汗、唾液/呼気、睡眠/概日、構造/機能画像、
+omics までを含む。これは「全てを固定 enum に閉じる」ためではなく、代表範囲を監査可能にしつつ、
+未知の人間由来 biosensor を generic proxy として受け続けるための contract である。
 
 ## 文献境界
 
@@ -93,15 +125,17 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 4. **thought ceiling** ── thought target は attention pressure proxy までで、semantic content は生成しない
 5. **conflict sink** ── qualia equivalence と thought content の飛躍は mind-upload.com ref に束縛する
 6. **literature refs** ── 中間表現は少なくとも 5 件の文献 ref に束縛する
-7. **multi-day calibration** ── 個人内 calibration は 2 日以上の latent digest set と day refs だけを束ね、raw latent / raw calibration payload は保存しない
-8. **confidence gate** ── identity confirmation / sensory loopback へ渡す時は calibration digest、source modality coverage、target 別 confidence threshold を receipt で束縛し、raw gate payload は保存しない
-9. **dataset adapter** ── 実 dataset は manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset payload、raw signal samples、raw feature-window payload は保存しない
-10. **circadian phase verifier** ── phase refs は external clock / sleep diary / wearable evidence digest に束縛し、raw clock / diary / wearable / phase verifier payload は保存しない
-11. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、circadian verifier digest、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
-12. **threshold policy authority** ── drift threshold は clinical reviewer / jurisdiction policy / Guardian authority refs、signer key refs、signature refs の digest set に束縛し、raw policy / raw signature payload は保存しない
-13. **series drift gate** ── calibration confidence gate が current series を参照する時は、series profile digest、calibration digest、axis drift threshold digest、threshold policy authority digest を直接束縛し、raw drift payload は保存しない
-14. **calibration refresh** ── calibration を再利用する時は current drift gate、self consent、Guardian review、1-90 日 freshness window を refresh receipt に束縛し、raw refresh payload は保存しない
-15. **shared loopback arbitration** ── shared sensory loopback へ分配する時は participant ごとの confidence gate digest、drift gate digest、threshold digest だけを渡し、raw BioData payload を arbitration に渡さない
+7. **human biosignal catalog** ── session は catalog digest、source / target family map、未カタログ modality policy を束縛する
+8. **multi-day calibration** ── 個人内 calibration は 2 日以上の latent digest set と day refs だけを束ね、raw latent / raw calibration payload は保存しない
+9. **confidence gate** ── identity confirmation / sensory loopback へ渡す時は calibration digest、session-declared source modality coverage、target 別 confidence threshold を receipt で束縛し、raw gate payload は保存しない
+10. **dataset adapter** ── 実 dataset は manifest digest、feature-window digest、latent ref だけに束縛し、raw dataset payload、raw signal samples、raw feature-window payload は保存しない
+11. **circadian phase verifier** ── phase refs は external clock / sleep diary / wearable evidence digest に束縛し、raw clock / diary / wearable / phase verifier payload は保存しない
+12. **feature-window series** ── 複数 window の adapter receipt digest、latent digest、circadian phase ref、circadian verifier digest、axis drift summary だけを保持し、raw dataset / feature-window / latent / series payload は保存しない
+13. **threshold policy authority** ── drift threshold は clinical reviewer / jurisdiction policy / Guardian authority refs、signer key refs、signature refs の digest set に束縛し、raw policy / raw signature payload は保存しない
+14. **series drift gate** ── calibration confidence gate が current series を参照する時は、series profile digest、calibration digest、axis drift threshold digest、threshold policy authority digest を直接束縛し、raw drift payload は保存しない
+15. **calibration refresh** ── calibration を再利用する時は current drift gate、self consent、Guardian review、1-90 日 freshness window を refresh receipt に束縛し、raw refresh payload は保存しない
+16. **shared loopback arbitration** ── shared sensory loopback へ分配する時は participant ごとの confidence gate digest、drift gate digest、threshold digest だけを渡し、raw BioData payload を arbitration に渡さない
+17. **mind-state bridge ceiling** ── L2/L3 へ渡す時は body-state latent、generated bundle、confidence gate の digest と claim ceiling だけを渡し、semantic thought、subjective equivalence、consciousness reproduction、identity replacement は主張しない
 
 ## 個人内 calibration
 
@@ -118,8 +152,8 @@ raw calibration payload は保持しない。
 
 `biodata-calibration-confidence-gate-v1` は、complete な calibration profile を
 identity confirmation と sensory loopback の入口へ渡すための digest-only bridge である。
-gate receipt は calibration ref / digest、source latent digest set、`eeg / ecg / ppg / eda /
-respiration` の coverage、target gate refs、target 別 threshold を束縛する。
+gate receipt は calibration ref / digest、source latent digest set、session-declared source
+modality coverage、target gate refs、target 別 threshold を束縛する。
 current series を再利用する場合は `biodata-calibration-refresh-window-v1` の
 refresh receipt も同じ gate に束縛し、current drift gate、self consent、
 Guardian review、1-90 日 freshness window が揃う場合だけ `fresh` として扱う。
@@ -131,10 +165,29 @@ contract の confidence input としてのみ扱う。raw calibration payload �
 保存しない。refresh receipt も raw calibration、drift、threshold policy、refresh、gate
 payload を保存せず、digest refs だけを渡す。
 
+## Mind-state bridge
+
+`biodata-mind-state-bridge-v1` は、BDT の現在実装できる最終出口である。
+receipt は `physiology-latent-body-state-v0`、generated biosignal bundle、
+`biodata-calibration-confidence-gate-v1`、任意で feature-window series profile の digest を
+1 つの bridge digest に束縛する。
+
+bridge は `l2-qualia-buffer` へは qualia surrogate axis refs、
+`l2-self-model-advisory` へは self-model advisory digest、
+`l3-perception` / `l3-affect` / `l3-attention` へは handoff digest を渡す。
+ただし claim ceiling は `body-state-surrogate-input-only` で固定し、QualiaBuffer や
+SelfModel に入る値も「身体状態から見た surrogate / advisory input」であって、
+本人の主観経験、意味内容、意識再現、同一性置換を表す runtime fact ではない。
+
+この bridge は raw BioData、raw latent、raw generated waveform、raw gate、
+raw qualia、raw self-model payload を保存しない。semantic thought content、
+subjective equivalence、consciousness reproduction、identity replacement の各 flag は
+false のまま維持し、未解決部分は mind-upload 側の研究課題に残す。
+
 ## Dataset adapter
 
-`biodata-dataset-feature-window-adapter-v1` は、外部 dataset の EEG/ECG/PPG/EDA/
-respiration window を `dataset_ref`、`participant_ref`、`license_ref`、`window_ref`、
+`biodata-dataset-feature-window-adapter-v1` は、外部 dataset の session-declared
+BioData window を `dataset_ref`、`participant_ref`、`license_ref`、`window_ref`、
 modality file refs の manifest digest と、normalized feature-window digest に束縛する。
 adapter receipt は body-state latent ref / digest と source feature digest を同時に保持し、
 full source modality coverage が揃う時だけ confidence gate ready として扱う。

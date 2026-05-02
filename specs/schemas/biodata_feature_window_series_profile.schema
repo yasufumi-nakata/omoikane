@@ -115,8 +115,7 @@ properties:
     minimum: 1
   source_modalities_covered:
     type: array
-    minItems: 5
-    maxItems: 5
+    minItems: 1
     uniqueItems: true
     items:
       $ref: "#/$defs/source_modality"
@@ -251,12 +250,7 @@ $defs:
     pattern: "^[a-f0-9]{64}$"
   source_modality:
     type: string
-    enum:
-      - eeg
-      - ecg
-      - ppg
-      - eda
-      - respiration
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
   axis_drift:
     type: object
     additionalProperties: false

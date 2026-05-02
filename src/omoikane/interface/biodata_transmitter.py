@@ -22,9 +22,325 @@ BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID = (
     "biodata-drift-threshold-policy-authority-v1"
 )
 BDT_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/biosignal-transmitter"
+BDT_HUMAN_BIOSIGNAL_CATALOG_PROFILE_ID = "human-biosignal-modality-catalog-v1"
+BDT_MODALITY_POLICY_ID = "human-biosignal-open-modality-catalog-v1"
+BDT_HUMAN_BIOSIGNAL_SCOPE = "human-derived-sensor-feature-summary-only"
+BDT_MIND_STATE_BRIDGE_PROFILE_ID = "biodata-mind-state-bridge-v1"
+BDT_MIND_STATE_BRIDGE_CLAIM_CEILING = "body-state-surrogate-input-only"
+BDT_MIND_STATE_QUALIA_SURROGATE_PROFILE_ID = "biodata-to-qualia-surrogate-bridge-v1"
+BDT_MIND_STATE_BRIDGE_ALLOWED_CONSUMERS = (
+    "l2-qualia-buffer",
+    "l2-self-model-advisory",
+    "l3-perception",
+    "l3-affect",
+    "l3-attention",
+    "l1-identity-confirmation-confidence-input",
+)
+BDT_MIND_STATE_SURROGATE_AXES = (
+    "interoceptive",
+    "affective",
+    "cognitive",
+    "somatic",
+)
+BDT_GENERIC_MODALITY_PROJECTION_POLICY_ID = (
+    "feature-summary-digest-to-open-biosignal-projection-v1"
+)
+BDT_GENERIC_TARGET_GENERATOR_POLICY_ID = "generic-feature-summary-to-biosignal-proxy-v1"
+BDT_UNCATALOGUED_MODALITY_POLICY = (
+    "accept-as-human-biosignal-feature-summary-with-generic-proxy"
+)
 DEFAULT_SOURCE_MODALITIES = ("eeg", "ecg", "ppg", "eda", "respiration")
-DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "affect", "thought")
-SUPPORTED_MODALITIES = set(DEFAULT_SOURCE_MODALITIES + DEFAULT_TARGET_MODALITIES)
+DEFAULT_TARGET_MODALITIES = ("ecg", "ppg", "respiration", "eeg", "eda", "affect", "thought")
+HUMAN_BIOSIGNAL_MODALITY_FAMILIES = {
+    "neural_electrical": (
+        "eeg",
+        "intracranial_eeg",
+        "ecog",
+        "local_field_potential",
+        "single_unit_activity",
+        "multi_unit_activity",
+    ),
+    "neural_magnetic": (
+        "meg",
+    ),
+    "neurovascular_optical_mri": (
+        "fnirs",
+        "nirs",
+        "fmri_bold",
+        "cerebral_blood_flow",
+        "diffuse_correlation_spectroscopy",
+    ),
+    "neural_evoked_response": (
+        "visual_evoked_potential",
+        "auditory_evoked_potential",
+        "somatosensory_evoked_potential",
+        "event_related_potential",
+        "nerve_conduction",
+    ),
+    "cardiac_electrical": (
+        "ecg",
+        "1lead_ecg",
+        "3lead_ecg",
+        "6lead_ecg",
+        "12lead_ecg",
+        "vectorcardiogram",
+    ),
+    "cardiac_mechanical_hemodynamic": (
+        "ppg",
+        "pulse_wave",
+        "blood_pressure",
+        "arterial_pressure",
+        "central_venous_pressure",
+        "pulse_transit_time",
+        "pulse_arrival_time",
+        "ballistocardiogram",
+        "seismocardiogram",
+        "impedance_cardiography",
+    ),
+    "vascular_flow_perfusion": (
+        "vascular_doppler",
+        "laser_doppler_flowmetry",
+        "tissue_perfusion",
+        "microvascular_flow",
+        "capillary_refill_time",
+    ),
+    "respiratory_gas_exchange": (
+        "respiration",
+        "airflow",
+        "respiratory_belt",
+        "capnography",
+        "end_tidal_co2",
+        "oxygen_saturation",
+        "spo2",
+        "transcutaneous_co2",
+    ),
+    "electrodermal": (
+        "eda",
+        "gsr",
+        "skin_conductance",
+        "skin_potential",
+        "skin_resistance",
+    ),
+    "muscle_peripheral": (
+        "emg",
+        "surface_emg",
+        "intramuscular_emg",
+        "mechanomyogram",
+        "force_myography",
+    ),
+    "ocular": (
+        "eog",
+        "eye_tracking",
+        "pupil_diameter",
+        "blink_rate",
+        "gaze_position",
+        "microsaccade",
+        "retinal_signal",
+    ),
+    "thermal": (
+        "skin_temperature",
+        "core_temperature",
+        "distal_temperature_gradient",
+        "body_temperature",
+        "thermal_imaging",
+    ),
+    "pressure_fluid": (
+        "intracranial_pressure",
+        "intraocular_pressure",
+        "cerebrospinal_fluid_pressure",
+        "cerebrospinal_fluid_flow",
+    ),
+    "motion_posture": (
+        "accelerometry",
+        "gyroscope",
+        "actigraphy",
+        "gait",
+        "posture",
+        "tremor",
+        "joint_angle",
+        "pressure_foot",
+    ),
+    "acoustic_vocal": (
+        "voice",
+        "speech_acoustics",
+        "cough",
+        "breathing_sound",
+        "heart_sound",
+        "phonocardiogram",
+        "snore",
+    ),
+    "gastrointestinal": (
+        "egg",
+        "electrogastrogram",
+        "bowel_sound",
+        "gastric_motility",
+        "swallow_sound",
+    ),
+    "urogenital": (
+        "bladder_pressure",
+        "uroflow",
+        "pelvic_floor_emg",
+    ),
+    "renal_urinary": (
+        "urine_output",
+        "urine_specific_gravity",
+        "urinary_ph",
+        "urinary_glucose",
+        "urinary_ketones",
+    ),
+    "biochemical_blood": (
+        "blood_glucose",
+        "lactate",
+        "cortisol",
+        "melatonin",
+        "adrenaline",
+        "noradrenaline",
+        "insulin",
+        "cytokines",
+        "blood_oxygen",
+        "blood_co2",
+        "electrolyte_panel",
+        "ph",
+    ),
+    "biochemical_interstitial_sweat": (
+        "interstitial_glucose",
+        "interstitial_lactate",
+        "sweat_lactate",
+        "sweat_sodium",
+        "sweat_chloride",
+        "sweat_potassium",
+        "sweat_rate",
+    ),
+    "biochemical_saliva_breath": (
+        "salivary_cortisol",
+        "salivary_melatonin",
+        "salivary_alpha_amylase",
+        "breath_acetone",
+        "breath_alcohol",
+        "volatile_organic_compounds",
+    ),
+    "sleep_circadian_context": (
+        "sleep_stage",
+        "circadian_phase",
+        "body_position",
+        "energy_expenditure",
+        "metabolic_rate",
+    ),
+    "structural_functional_imaging": (
+        "mri",
+        "ct",
+        "ultrasound",
+        "xray",
+        "pet",
+        "spect",
+        "thermography",
+    ),
+    "molecular_omics": (
+        "dna_variant_profile",
+        "rna_expression",
+        "protein_panel",
+        "metabolomics",
+        "microbiome_profile",
+        "epigenetic_profile",
+    ),
+}
+HUMAN_BIOSIGNAL_ALIASES = {
+    "1-lead-ecg": "1lead_ecg",
+    "3-lead-ecg": "3lead_ecg",
+    "6-lead-ecg": "6lead_ecg",
+    "12-lead-ecg": "12lead_ecg",
+    "accelerometer": "accelerometry",
+    "blood-glucose": "blood_glucose",
+    "blood-pressure": "blood_pressure",
+    "body-temp": "body_temperature",
+    "body-temperature": "body_temperature",
+    "bp": "blood_pressure",
+    "capillary-refill": "capillary_refill_time",
+    "cbf": "cerebral_blood_flow",
+    "cerebrospinal-fluid-flow": "cerebrospinal_fluid_flow",
+    "cerebrospinal-fluid-pressure": "cerebrospinal_fluid_pressure",
+    "cgm": "interstitial_glucose",
+    "computed-tomography": "ct",
+    "csf-flow": "cerebrospinal_fluid_flow",
+    "csf-pressure": "cerebrospinal_fluid_pressure",
+    "dcs": "diffuse_correlation_spectroscopy",
+    "dna": "dna_variant_profile",
+    "ecog": "ecog",
+    "egg": "egg",
+    "electrocardiogram": "ecg",
+    "electrodermal-activity": "eda",
+    "electroencephalogram": "eeg",
+    "electrogastrogram": "electrogastrogram",
+    "electromyogram": "emg",
+    "electrooculogram": "eog",
+    "end-tidal-carbon-dioxide": "end_tidal_co2",
+    "end-tidal-co2": "end_tidal_co2",
+    "etco2": "end_tidal_co2",
+    "fmri": "fmri_bold",
+    "fmri-bold": "fmri_bold",
+    "fnirs": "fnirs",
+    "functional-near-infrared-spectroscopy": "fnirs",
+    "glucose": "blood_glucose",
+    "gsr": "eda",
+    "heart-sound": "heart_sound",
+    "ieeg": "intracranial_eeg",
+    "intracranial-eeg": "intracranial_eeg",
+    "intracranial-pressure": "intracranial_pressure",
+    "intraocular-pressure": "intraocular_pressure",
+    "laser-doppler": "laser_doppler_flowmetry",
+    "lfp": "local_field_potential",
+    "metabolome": "metabolomics",
+    "microbiome": "microbiome_profile",
+    "mechanical-cardiogram": "seismocardiogram",
+    "meg": "meg",
+    "mmg": "mechanomyogram",
+    "mua": "multi_unit_activity",
+    "near-infrared-spectroscopy": "nirs",
+    "nerve-conduction-study": "nerve_conduction",
+    "nibp": "blood_pressure",
+    "oxygen-saturation": "spo2",
+    "pcg": "phonocardiogram",
+    "photoplethysmogram": "ppg",
+    "pulse-ox": "spo2",
+    "pulse-oximetry": "spo2",
+    "pupil": "pupil_diameter",
+    "pupil-diameter": "pupil_diameter",
+    "pupillometry": "pupil_diameter",
+    "resp": "respiration",
+    "respiratory-rate": "respiration",
+    "rna": "rna_expression",
+    "scl": "skin_conductance",
+    "skin-conductance": "eda",
+    "skin-potential": "skin_potential",
+    "skin-temp": "skin_temperature",
+    "skin-temperature": "skin_temperature",
+    "spo2": "spo2",
+    "sua": "single_unit_activity",
+    "surface-emg": "surface_emg",
+    "temperature": "body_temperature",
+    "urine-ph": "urinary_ph",
+    "urine-output": "urine_output",
+    "vcg": "vectorcardiogram",
+    "vascular-ultrasound": "vascular_doppler",
+    "voice-acoustics": "speech_acoustics",
+    "visual-evoked-potential": "visual_evoked_potential",
+}
+HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY = {
+    modality: family
+    for family, modalities in HUMAN_BIOSIGNAL_MODALITY_FAMILIES.items()
+    for modality in modalities
+}
+KNOWN_HUMAN_BIOSIGNAL_MODALITIES = tuple(sorted(HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY))
+HUMAN_BIOSIGNAL_CATALOG_DIGEST = sha256_text(
+    canonical_json(
+        {
+            "policy_id": BDT_MODALITY_POLICY_ID,
+            "scope": BDT_HUMAN_BIOSIGNAL_SCOPE,
+            "families": HUMAN_BIOSIGNAL_MODALITY_FAMILIES,
+            "aliases": HUMAN_BIOSIGNAL_ALIASES,
+        }
+    )
+)
 CONFIDENCE_GATE_TARGET_THRESHOLDS = {
     "identity-confirmation": 0.8,
     "sensory-loopback": 0.7,
@@ -107,6 +423,35 @@ class BioDataTransmitter:
     def __init__(self) -> None:
         self.sessions: Dict[str, Dict[str, Any]] = {}
 
+    def human_biosignal_catalog(self) -> Dict[str, Any]:
+        families = {
+            family: list(modalities)
+            for family, modalities in HUMAN_BIOSIGNAL_MODALITY_FAMILIES.items()
+        }
+        modality_to_family = dict(sorted(HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY.items()))
+        catalog = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "catalog_ref": f"catalog://biodata/{BDT_MODALITY_POLICY_ID}",
+            "profile_id": BDT_HUMAN_BIOSIGNAL_CATALOG_PROFILE_ID,
+            "policy_id": BDT_MODALITY_POLICY_ID,
+            "human_biosignal_scope": BDT_HUMAN_BIOSIGNAL_SCOPE,
+            "catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+            "modality_families": families,
+            "known_modalities": list(KNOWN_HUMAN_BIOSIGNAL_MODALITIES),
+            "modality_to_family": modality_to_family,
+            "alias_map": dict(sorted(HUMAN_BIOSIGNAL_ALIASES.items())),
+            "family_count": len(families),
+            "modality_count": len(KNOWN_HUMAN_BIOSIGNAL_MODALITIES),
+            "alias_count": len(HUMAN_BIOSIGNAL_ALIASES),
+            "accepted_uncatalogued_family": "uncatalogued_human_biosignal",
+            "uncatalogued_modality_policy": BDT_UNCATALOGUED_MODALITY_POLICY,
+            "raw_catalog_payload_stored": False,
+            "raw_biosignal_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+        }
+        return deepcopy(catalog)
+
     def reference_profile(self) -> Dict[str, Any]:
         return {
             "schema_version": BDT_SCHEMA_VERSION,
@@ -125,8 +470,32 @@ class BioDataTransmitter:
             "drift_threshold_policy_authority_profile_id": (
                 BDT_DRIFT_THRESHOLD_POLICY_AUTHORITY_PROFILE_ID
             ),
+            "mind_state_bridge_profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+            "mind_state_bridge_claim_ceiling": BDT_MIND_STATE_BRIDGE_CLAIM_CEILING,
+            "mind_state_bridge_allowed_consumers": list(
+                BDT_MIND_STATE_BRIDGE_ALLOWED_CONSUMERS
+            ),
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
+            "modality_policy": BDT_MODALITY_POLICY_ID,
+            "human_biosignal_catalog_profile_id": BDT_HUMAN_BIOSIGNAL_CATALOG_PROFILE_ID,
+            "human_biosignal_catalog_ref": f"catalog://biodata/{BDT_MODALITY_POLICY_ID}",
+            "human_biosignal_scope": BDT_HUMAN_BIOSIGNAL_SCOPE,
+            "known_source_modalities": list(DEFAULT_SOURCE_MODALITIES),
+            "known_target_modalities": list(DEFAULT_TARGET_MODALITIES),
+            "known_human_biosignal_modalities": list(KNOWN_HUMAN_BIOSIGNAL_MODALITIES),
+            "human_biosignal_modality_families": deepcopy(
+                HUMAN_BIOSIGNAL_MODALITY_FAMILIES
+            ),
+            "human_biosignal_aliases": dict(HUMAN_BIOSIGNAL_ALIASES),
+            "human_biosignal_catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+            "human_biosignal_family_count": len(HUMAN_BIOSIGNAL_MODALITY_FAMILIES),
+            "human_biosignal_modality_count": len(KNOWN_HUMAN_BIOSIGNAL_MODALITIES),
+            "human_biosignal_alias_count": len(HUMAN_BIOSIGNAL_ALIASES),
+            "uncatalogued_modality_policy": BDT_UNCATALOGUED_MODALITY_POLICY,
+            "generic_modality_projection_policy": (
+                BDT_GENERIC_MODALITY_PROJECTION_POLICY_ID
+            ),
             "confidence_gate_target_thresholds": dict(CONFIDENCE_GATE_TARGET_THRESHOLDS),
             "feature_window_series_drift_thresholds": dict(FEATURE_WINDOW_SERIES_DRIFT_THRESHOLDS),
             "intermediate_representation": "internal-body-state-latent",
@@ -160,6 +529,12 @@ class BioDataTransmitter:
             "generator_profile_id": BDT_GENERATOR_PROFILE_ID,
             "source_modalities": sources,
             "target_modalities": targets,
+            "modality_policy_id": BDT_MODALITY_POLICY_ID,
+            "human_biosignal_scope": BDT_HUMAN_BIOSIGNAL_SCOPE,
+            "human_biosignal_catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+            "source_modality_families": self._modality_family_map(sources),
+            "target_modality_families": self._modality_family_map(targets),
+            "uncatalogued_modality_policy": BDT_UNCATALOGUED_MODALITY_POLICY,
             "literature_refs": deepcopy(list(REQUIRED_LITERATURE_REFS)),
             "conflict_refs": deepcopy(list(DEFAULT_CONFLICT_REFS)),
             "mind_upload_conflict_sink_url": BDT_CONFLICT_SINK_URL,
@@ -201,7 +576,7 @@ class BioDataTransmitter:
             biosignal_features=features,
             context_label=context_label,
         )
-        required_modalities_bound = sorted(observed_modalities) == sorted(DEFAULT_SOURCE_MODALITIES)
+        required_modalities_bound = sorted(observed_modalities) == sorted(session["source_modalities"])
         adapter_receipt = {
             "schema_version": BDT_SCHEMA_VERSION,
             "adapter_ref": f"dataset-adapter://biodata/{new_id('bdt-dataset-adapter')}",
@@ -216,7 +591,7 @@ class BioDataTransmitter:
             "dataset_manifest_digest": sha256_text(canonical_json(manifest)),
             "source_feature_digest": latent_state["source_feature_digest"],
             "source_modalities_observed": observed_modalities,
-            "source_modalities_required": list(DEFAULT_SOURCE_MODALITIES),
+            "source_modalities_required": list(session["source_modalities"]),
             "required_modalities_bound": required_modalities_bound,
             "latent_ref": latent_state["latent_ref"],
             "latent_digest": latent_state["latent_digest"],
@@ -284,9 +659,9 @@ class BioDataTransmitter:
             errors.append("adapter_receipt.dataset_manifest_digest mismatch")
 
         required_modalities_bound = (
-            adapter_receipt.get("source_modalities_required") == list(DEFAULT_SOURCE_MODALITIES)
+            adapter_receipt.get("source_modalities_required") == list(session.get("source_modalities", []))
             and sorted(adapter_receipt.get("source_modalities_observed", []))
-            == sorted(DEFAULT_SOURCE_MODALITIES)
+            == sorted(session.get("source_modalities", []))
             and adapter_receipt.get("required_modalities_bound") is True
         )
         if not required_modalities_bound:
@@ -463,7 +838,7 @@ class BioDataTransmitter:
             "window_count": len(adapter_receipts),
             "dataset_count": len(set(dataset_refs)),
             "source_modalities_covered": sorted(source_modalities),
-            "required_modalities_bound": sorted(source_modalities) == sorted(DEFAULT_SOURCE_MODALITIES),
+            "required_modalities_bound": sorted(source_modalities) == sorted(session["source_modalities"]),
             "circadian_phase_refs": normalized_phase_refs,
             "circadian_phase_summary": phase_summaries,
             "circadian_profile_bound": len(set(normalized_phase_refs)) >= 2,
@@ -543,7 +918,7 @@ class BioDataTransmitter:
             errors.append("series_profile.series_profile_digest mismatch")
 
         required_modalities_bound = (
-            sorted(series_profile.get("source_modalities_covered", [])) == sorted(DEFAULT_SOURCE_MODALITIES)
+            sorted(series_profile.get("source_modalities_covered", [])) == sorted(session.get("source_modalities", []))
             and series_profile.get("required_modalities_bound") is True
         )
         if not required_modalities_bound:
@@ -1370,6 +1745,12 @@ class BioDataTransmitter:
         observed_modalities = [modality for modality in session["source_modalities"] if modality in features]
         if not observed_modalities:
             raise ValueError("at least one source modality must be present in biosignal_features")
+        extra_modalities = [modality for modality in features if modality not in session["source_modalities"]]
+        if extra_modalities:
+            raise ValueError(
+                "biosignal_features must be declared in session.source_modalities: "
+                f"{sorted(extra_modalities)}"
+            )
 
         eeg = features.get("eeg", {})
         ecg = features.get("ecg", {})
@@ -1412,6 +1793,10 @@ class BioDataTransmitter:
             0.58 * cortical_load_proxy + 0.42 * autonomic_arousal
         )
         interoceptive_confidence = round(len(observed_modalities) / len(session["source_modalities"]), 3)
+        source_modality_projections = self._build_source_modality_projections(
+            features,
+            observed_modalities,
+        )
 
         feature_digest = sha256_text(canonical_json(features))
         latent_id = new_id("body-latent")
@@ -1425,6 +1810,7 @@ class BioDataTransmitter:
             "context_label": context_label,
             "source_modalities": observed_modalities,
             "source_feature_digest": feature_digest,
+            "source_modality_projections": source_modality_projections,
             "physiological_axes": {
                 "cardiac": {
                     "heart_rate_bpm": round(heart_rate_bpm, 3),
@@ -1497,6 +1883,7 @@ class BioDataTransmitter:
         if "ecg" in targets:
             signal_summaries["ecg"] = {
                 "synthetic_ref": f"synthetic://biosignal/ecg/{bundle_id}",
+                **self._target_modality_metadata("ecg"),
                 "heart_rate_bpm": cardiac["heart_rate_bpm"],
                 "hrv_rmssd_ms": cardiac["hrv_rmssd_ms"],
                 "confidence": self._clamp(latent_state["interoceptive_confidence"] * 0.92),
@@ -1504,6 +1891,7 @@ class BioDataTransmitter:
         if "ppg" in targets:
             signal_summaries["ppg"] = {
                 "synthetic_ref": f"synthetic://biosignal/ppg/{bundle_id}",
+                **self._target_modality_metadata("ppg"),
                 "pulse_rate_bpm": cardiac["heart_rate_bpm"],
                 "pulse_amplitude_proxy": round(self._clamp(1.0 - autonomic["sympathetic_tone"] * 0.4), 3),
                 "confidence": self._clamp(latent_state["interoceptive_confidence"] * 0.88),
@@ -1511,6 +1899,7 @@ class BioDataTransmitter:
         if "respiration" in targets:
             signal_summaries["respiration"] = {
                 "synthetic_ref": f"synthetic://biosignal/respiration/{bundle_id}",
+                **self._target_modality_metadata("respiration"),
                 "rate_bpm": respiratory["rate_bpm"],
                 "phase": respiratory["phase"],
                 "confidence": self._clamp(latent_state["interoceptive_confidence"] * 0.9),
@@ -1518,14 +1907,27 @@ class BioDataTransmitter:
         if "eeg" in targets:
             signal_summaries["eeg"] = {
                 "synthetic_ref": f"synthetic://biosignal/eeg/{bundle_id}",
+                **self._target_modality_metadata("eeg"),
                 "alpha_power_proxy": round(self._clamp(1.0 - neural["alpha_suppression"]), 3),
                 "theta_beta_ratio": neural["theta_beta_ratio"],
                 "cortical_load_proxy": neural["cortical_load_proxy"],
                 "confidence": self._clamp(latent_state["interoceptive_confidence"] * 0.72),
             }
+        if "eda" in targets:
+            signal_summaries["eda"] = {
+                "synthetic_ref": f"synthetic://biosignal/eda/{bundle_id}",
+                **self._target_modality_metadata("eda"),
+                "skin_conductance_microsiemens_proxy": round(
+                    self._clamp(autonomic["sympathetic_tone"]) * 12.0,
+                    3,
+                ),
+                "autonomic_arousal_proxy": autonomic["arousal"],
+                "confidence": self._clamp(latent_state["interoceptive_confidence"] * 0.82),
+            }
         if "affect" in targets:
             signal_summaries["affect"] = {
                 "synthetic_ref": f"synthetic://biosignal/affect/{bundle_id}",
+                **self._target_modality_metadata("affect"),
                 "valence_proxy": affect["valence_proxy"],
                 "arousal_proxy": affect["arousal_proxy"],
                 "label_policy": "valence-arousal-only-no-discrete-emotion-assertion",
@@ -1534,11 +1936,19 @@ class BioDataTransmitter:
         if "thought" in targets:
             signal_summaries["thought"] = {
                 "synthetic_ref": f"synthetic://biosignal/thought-pressure/{bundle_id}",
+                **self._target_modality_metadata("thought"),
                 "attention_pressure_proxy": thought["attention_pressure_proxy"],
                 "semantic_content_generated": False,
                 "content_ref": "not-generated://thought-content",
                 "confidence": self._clamp(latent_state["interoceptive_confidence"] * 0.34),
             }
+        for target in targets:
+            if target not in signal_summaries:
+                signal_summaries[target] = self._build_generic_target_signal(
+                    target,
+                    bundle_id,
+                    latent_state,
+                )
 
         bundle = {
             "schema_version": BDT_SCHEMA_VERSION,
@@ -2065,7 +2475,7 @@ class BioDataTransmitter:
             calibration_profile.get("calibration_digest") == expected_calibration_digest
         )
         required_modalities_bound = sorted(calibration_profile.get("source_modalities_covered", [])) == sorted(
-            DEFAULT_SOURCE_MODALITIES
+            session["source_modalities"]
         )
         drift_gate_ref = ""
         drift_gate_digest = ""
@@ -2212,7 +2622,7 @@ class BioDataTransmitter:
             "source_latent_digest_set_digest": calibration_profile[
                 "source_latent_digest_set_digest"
             ],
-            "source_modalities_required": list(DEFAULT_SOURCE_MODALITIES),
+            "source_modalities_required": list(session["source_modalities"]),
             "source_modalities_covered": sorted(calibration_profile["source_modalities_covered"]),
             "required_modalities_bound": required_modalities_bound,
             "confidence_score": confidence_score,
@@ -2301,9 +2711,9 @@ class BioDataTransmitter:
         if not calibration_digest_bound:
             errors.append("gate_receipt must bind the calibration profile digest")
         required_modalities_bound = (
-            gate_receipt.get("source_modalities_required") == list(DEFAULT_SOURCE_MODALITIES)
+            gate_receipt.get("source_modalities_required") == list(session.get("source_modalities", []))
             and sorted(gate_receipt.get("source_modalities_covered", []))
-            == sorted(DEFAULT_SOURCE_MODALITIES)
+            == sorted(session.get("source_modalities", []))
             and gate_receipt.get("required_modalities_bound") is True
         )
         if not required_modalities_bound:
@@ -2530,6 +2940,461 @@ class BioDataTransmitter:
             "semantic_thought_content_generated": False,
         }
 
+    def bind_mind_state_bridge(
+        self,
+        session: Dict[str, Any],
+        latent_state: Dict[str, Any],
+        generated_bundle: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        calibration_confidence_gate: Dict[str, Any],
+        feature_window_series_profile: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        self._validate_latent_for_session(session, latent_state)
+        transmission_validation = self.validate_transmission(
+            session,
+            latent_state,
+            generated_bundle,
+        )
+        if not transmission_validation["ok"]:
+            raise ValueError(
+                "generated_bundle is invalid: "
+                + "; ".join(transmission_validation["errors"])
+            )
+        gate_validation = self.validate_calibration_confidence_gate(
+            session,
+            calibration_profile,
+            calibration_confidence_gate,
+        )
+        if not gate_validation["ok"]:
+            raise ValueError(
+                "calibration_confidence_gate is invalid: "
+                + "; ".join(gate_validation["errors"])
+            )
+
+        feature_window_series_ref = ""
+        feature_window_series_digest = ""
+        feature_window_series_digest_set = ""
+        feature_window_series_bound = False
+        if feature_window_series_profile is not None:
+            self._validate_feature_window_series_for_bridge(
+                session,
+                calibration_profile,
+                feature_window_series_profile,
+            )
+            feature_window_series_ref = str(feature_window_series_profile["series_ref"])
+            feature_window_series_digest = str(
+                feature_window_series_profile["series_profile_digest"]
+            )
+            feature_window_series_digest_set = str(
+                feature_window_series_profile["series_digest_set_digest"]
+            )
+            feature_window_series_bound = True
+
+        bridge_id = new_id("bdt-mind-bridge")
+        qualia_axis_refs = self._build_mind_state_axis_refs(bridge_id, latent_state)
+        qualia_axis_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                    "axis_digests": [
+                        item["axis_digest"] for item in qualia_axis_refs
+                    ],
+                }
+            )
+        )
+        self_model_advisory_digest = self._mind_state_self_model_advisory_digest(
+            bridge_id,
+            latent_state,
+            calibration_confidence_gate,
+            qualia_axis_digest_set,
+        )
+        handoff_bindings = self._build_mind_state_handoff_bindings(
+            bridge_id,
+            latent_state,
+            generated_bundle,
+            calibration_confidence_gate,
+            qualia_axis_digest_set,
+            self_model_advisory_digest,
+        )
+        handoff_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                    "handoff_digests": [
+                        item["handoff_digest"] for item in handoff_bindings
+                    ],
+                }
+            )
+        )
+        raw_flags_clear = all(
+            item is False
+            for item in (
+                session.get("raw_source_payload_stored"),
+                latent_state.get("raw_source_payload_stored"),
+                generated_bundle.get("raw_source_payload_stored"),
+                generated_bundle.get("raw_generated_waveform_stored"),
+                calibration_profile.get("raw_latent_payload_stored"),
+                calibration_profile.get("raw_calibration_payload_stored"),
+                calibration_confidence_gate.get("raw_gate_payload_stored"),
+            )
+        )
+        claim_flags_clear = all(
+            item is False
+            for item in (
+                latent_state.get("subjective_equivalence_claimed"),
+                generated_bundle.get("subjective_equivalence_claimed"),
+                generated_bundle.get("semantic_thought_content_generated"),
+                calibration_profile.get("subjective_equivalence_claimed"),
+                calibration_profile.get("semantic_thought_content_generated"),
+                calibration_confidence_gate.get("subjective_equivalence_claimed"),
+                calibration_confidence_gate.get("semantic_thought_content_generated"),
+            )
+        )
+        handoff_status = (
+            "bound"
+            if (
+                gate_validation["confidence_gate_status"] == "bound"
+                and raw_flags_clear
+                and claim_flags_clear
+            )
+            else "blocked"
+        )
+        receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "bridge_id": bridge_id,
+            "bridge_ref": f"mind-bridge://biodata/{bridge_id}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "latent_profile_id": BDT_LATENT_PROFILE_ID,
+            "generator_profile_id": BDT_GENERATOR_PROFILE_ID,
+            "confidence_gate_profile_id": BDT_CONFIDENCE_GATE_PROFILE_ID,
+            "body_state_latent_ref": latent_state["latent_ref"],
+            "body_state_latent_digest": latent_state["latent_digest"],
+            "body_state_latent_digest_bound": True,
+            "generated_bundle_ref": generated_bundle["bundle_ref"],
+            "generated_bundle_digest": generated_bundle["bundle_digest"],
+            "generated_bundle_digest_bound": True,
+            "calibration_ref": calibration_profile["calibration_ref"],
+            "calibration_digest": calibration_profile["calibration_digest"],
+            "source_latent_digest_set_digest": calibration_profile[
+                "source_latent_digest_set_digest"
+            ],
+            "calibration_confidence_gate_ref": calibration_confidence_gate["gate_ref"],
+            "calibration_confidence_gate_digest": calibration_confidence_gate[
+                "gate_receipt_digest"
+            ],
+            "calibration_confidence_score": calibration_confidence_gate[
+                "confidence_score"
+            ],
+            "calibration_confidence_gate_status": calibration_confidence_gate[
+                "confidence_gate_status"
+            ],
+            "feature_window_series_ref": feature_window_series_ref,
+            "feature_window_series_profile_digest": feature_window_series_digest,
+            "feature_window_series_digest_set_digest": feature_window_series_digest_set,
+            "feature_window_series_bound": feature_window_series_bound,
+            "qualia_binding_ref": f"qualia://tick/{bridge_id}",
+            "qualia_surrogate_profile_id": BDT_MIND_STATE_QUALIA_SURROGATE_PROFILE_ID,
+            "qualia_surrogate_axis_refs": qualia_axis_refs,
+            "qualia_surrogate_axis_digest_set": qualia_axis_digest_set,
+            "self_model_advisory_ref": f"self-model-advisory://biodata/{bridge_id}",
+            "self_model_advisory_digest": self_model_advisory_digest,
+            "self_model_advisory_only": True,
+            "l2_l3_handoff_bindings": handoff_bindings,
+            "l2_l3_handoff_digest_set": handoff_digest_set,
+            "allowed_consumers": list(BDT_MIND_STATE_BRIDGE_ALLOWED_CONSUMERS),
+            "mind_state_handoff_status": handoff_status,
+            "claim_ceiling": BDT_MIND_STATE_BRIDGE_CLAIM_CEILING,
+            "storage_policy": "digest-only-biodata-to-mind-state-handoff-v1",
+            "raw_biodata_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_generated_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "raw_qualia_payload_stored": False,
+            "raw_self_model_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        receipt["bridge_digest"] = sha256_text(
+            canonical_json(self._mind_state_bridge_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_mind_state_bridge(
+        self,
+        session: Dict[str, Any],
+        latent_state: Dict[str, Any],
+        generated_bundle: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        calibration_confidence_gate: Dict[str, Any],
+        bridge_receipt: Dict[str, Any],
+        feature_window_series_profile: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        if not isinstance(bridge_receipt, dict):
+            errors.append("bridge_receipt must be a mapping")
+            bridge_receipt = {}
+        self._check_non_empty_string(
+            bridge_receipt.get("bridge_id"),
+            "bridge_receipt.bridge_id",
+            errors,
+        )
+        self._check_non_empty_string(
+            bridge_receipt.get("bridge_ref"),
+            "bridge_receipt.bridge_ref",
+            errors,
+        )
+        if bridge_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("bridge_receipt.schema_version mismatch")
+        if bridge_receipt.get("profile_id") != BDT_MIND_STATE_BRIDGE_PROFILE_ID:
+            errors.append("bridge_receipt.profile_id mismatch")
+        if bridge_receipt.get("session_id") != session.get("session_id"):
+            errors.append("bridge_receipt.session_id must match session.session_id")
+        if bridge_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("bridge_receipt.identity_id must match session.identity_id")
+        if bridge_receipt.get("bridge_ref") != f"mind-bridge://biodata/{bridge_receipt.get('bridge_id')}":
+            errors.append("bridge_receipt.bridge_ref must bind bridge_id")
+
+        transmission_validation = self.validate_transmission(
+            session,
+            latent_state,
+            generated_bundle,
+        )
+        if not transmission_validation["ok"]:
+            errors.extend(
+                f"transmission.{error}" for error in transmission_validation["errors"]
+            )
+        gate_validation = self.validate_calibration_confidence_gate(
+            session,
+            calibration_profile,
+            calibration_confidence_gate,
+        )
+        if not gate_validation["ok"]:
+            errors.extend(f"confidence_gate.{error}" for error in gate_validation["errors"])
+
+        expected_latent_digest = sha256_text(
+            canonical_json(self._latent_digest_payload(latent_state))
+        )
+        body_state_latent_bound = (
+            bridge_receipt.get("body_state_latent_ref") == latent_state.get("latent_ref")
+            and bridge_receipt.get("body_state_latent_digest")
+            == latent_state.get("latent_digest")
+            and latent_state.get("latent_digest") == expected_latent_digest
+            and bridge_receipt.get("body_state_latent_digest_bound") is True
+        )
+        if not body_state_latent_bound:
+            errors.append("bridge_receipt must bind body_state_latent digest")
+
+        expected_bundle_digest = sha256_text(
+            canonical_json(self._signal_bundle_digest_payload(generated_bundle))
+        )
+        generated_bundle_bound = (
+            bridge_receipt.get("generated_bundle_ref") == generated_bundle.get("bundle_ref")
+            and bridge_receipt.get("generated_bundle_digest")
+            == generated_bundle.get("bundle_digest")
+            and generated_bundle.get("bundle_digest") == expected_bundle_digest
+            and bridge_receipt.get("generated_bundle_digest_bound") is True
+        )
+        if not generated_bundle_bound:
+            errors.append("bridge_receipt must bind generated_bundle digest")
+
+        calibration_confidence_gate_bound = (
+            bridge_receipt.get("calibration_ref") == calibration_profile.get("calibration_ref")
+            and bridge_receipt.get("calibration_digest")
+            == calibration_profile.get("calibration_digest")
+            and bridge_receipt.get("source_latent_digest_set_digest")
+            == calibration_profile.get("source_latent_digest_set_digest")
+            and bridge_receipt.get("calibration_confidence_gate_ref")
+            == calibration_confidence_gate.get("gate_ref")
+            and bridge_receipt.get("calibration_confidence_gate_digest")
+            == calibration_confidence_gate.get("gate_receipt_digest")
+            and bridge_receipt.get("calibration_confidence_score")
+            == calibration_confidence_gate.get("confidence_score")
+            and bridge_receipt.get("calibration_confidence_gate_status")
+            == calibration_confidence_gate.get("confidence_gate_status")
+        )
+        if not calibration_confidence_gate_bound:
+            errors.append("bridge_receipt must bind calibration confidence gate")
+
+        feature_window_series_bound = False
+        if feature_window_series_profile is not None:
+            try:
+                self._validate_feature_window_series_for_bridge(
+                    session,
+                    calibration_profile,
+                    feature_window_series_profile,
+                )
+            except ValueError as exc:
+                errors.append(str(exc))
+            feature_window_series_bound = (
+                bridge_receipt.get("feature_window_series_ref")
+                == feature_window_series_profile.get("series_ref")
+                and bridge_receipt.get("feature_window_series_profile_digest")
+                == feature_window_series_profile.get("series_profile_digest")
+                and bridge_receipt.get("feature_window_series_digest_set_digest")
+                == feature_window_series_profile.get("series_digest_set_digest")
+                and bridge_receipt.get("feature_window_series_bound") is True
+            )
+        else:
+            feature_window_series_bound = (
+                bridge_receipt.get("feature_window_series_ref", "") == ""
+                and bridge_receipt.get("feature_window_series_profile_digest", "") == ""
+                and bridge_receipt.get("feature_window_series_digest_set_digest", "") == ""
+                and bridge_receipt.get("feature_window_series_bound") is False
+            )
+        if not feature_window_series_bound:
+            errors.append("bridge_receipt feature_window_series binding mismatch")
+
+        bridge_id = str(bridge_receipt.get("bridge_id", ""))
+        expected_axis_refs = self._build_mind_state_axis_refs(bridge_id, latent_state)
+        expected_axis_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                    "axis_digests": [
+                        item["axis_digest"] for item in expected_axis_refs
+                    ],
+                }
+            )
+        )
+        qualia_surrogate_bound = (
+            bridge_receipt.get("qualia_binding_ref") == f"qualia://tick/{bridge_id}"
+            and bridge_receipt.get("qualia_surrogate_profile_id")
+            == BDT_MIND_STATE_QUALIA_SURROGATE_PROFILE_ID
+            and bridge_receipt.get("qualia_surrogate_axis_refs") == expected_axis_refs
+            and bridge_receipt.get("qualia_surrogate_axis_digest_set")
+            == expected_axis_digest_set
+        )
+        if not qualia_surrogate_bound:
+            errors.append("bridge_receipt qualia surrogate binding mismatch")
+
+        expected_self_model_digest = self._mind_state_self_model_advisory_digest(
+            bridge_id,
+            latent_state,
+            calibration_confidence_gate,
+            expected_axis_digest_set,
+        )
+        self_model_advisory_bound = (
+            bridge_receipt.get("self_model_advisory_ref")
+            == f"self-model-advisory://biodata/{bridge_id}"
+            and bridge_receipt.get("self_model_advisory_digest")
+            == expected_self_model_digest
+            and bridge_receipt.get("self_model_advisory_only") is True
+        )
+        if not self_model_advisory_bound:
+            errors.append("bridge_receipt self-model advisory binding mismatch")
+
+        expected_handoff_bindings = self._build_mind_state_handoff_bindings(
+            bridge_id,
+            latent_state,
+            generated_bundle,
+            calibration_confidence_gate,
+            expected_axis_digest_set,
+            expected_self_model_digest,
+        )
+        expected_handoff_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                    "handoff_digests": [
+                        item["handoff_digest"] for item in expected_handoff_bindings
+                    ],
+                }
+            )
+        )
+        l2_l3_handoffs_bound = (
+            bridge_receipt.get("l2_l3_handoff_bindings") == expected_handoff_bindings
+            and bridge_receipt.get("l2_l3_handoff_digest_set")
+            == expected_handoff_digest_set
+            and bridge_receipt.get("allowed_consumers")
+            == list(BDT_MIND_STATE_BRIDGE_ALLOWED_CONSUMERS)
+        )
+        if not l2_l3_handoffs_bound:
+            errors.append("bridge_receipt L2/L3 handoff binding mismatch")
+
+        claim_ceiling_bound = (
+            bridge_receipt.get("claim_ceiling") == BDT_MIND_STATE_BRIDGE_CLAIM_CEILING
+            and bridge_receipt.get("storage_policy")
+            == "digest-only-biodata-to-mind-state-handoff-v1"
+        )
+        if not claim_ceiling_bound:
+            errors.append("bridge_receipt claim ceiling mismatch")
+        for field_name in (
+            "raw_biodata_payload_stored",
+            "raw_latent_payload_stored",
+            "raw_generated_payload_stored",
+            "raw_gate_payload_stored",
+            "raw_qualia_payload_stored",
+            "raw_self_model_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if bridge_receipt.get(field_name) is not False:
+                errors.append(f"bridge_receipt.{field_name} must be false")
+
+        expected_handoff_status = (
+            "bound"
+            if (
+                transmission_validation["ok"]
+                and gate_validation["ok"]
+                and gate_validation["confidence_gate_status"] == "bound"
+                and body_state_latent_bound
+                and generated_bundle_bound
+                and calibration_confidence_gate_bound
+                and qualia_surrogate_bound
+                and self_model_advisory_bound
+                and l2_l3_handoffs_bound
+                and claim_ceiling_bound
+                and bridge_receipt.get("subjective_equivalence_claimed") is False
+                and bridge_receipt.get("semantic_thought_content_generated") is False
+                and bridge_receipt.get("consciousness_reproduction_claimed") is False
+                and bridge_receipt.get("identity_replacement_claimed") is False
+            )
+            else "blocked"
+        )
+        if bridge_receipt.get("mind_state_handoff_status") != expected_handoff_status:
+            errors.append("bridge_receipt.mind_state_handoff_status mismatch")
+        expected_bridge_digest = sha256_text(
+            canonical_json(self._mind_state_bridge_digest_payload(bridge_receipt))
+        )
+        bridge_digest_bound = bridge_receipt.get("bridge_digest") == expected_bridge_digest
+        if not bridge_digest_bound:
+            errors.append("bridge_receipt.bridge_digest mismatch")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": bridge_receipt.get("profile_id"),
+            "mind_state_handoff_status": bridge_receipt.get("mind_state_handoff_status"),
+            "body_state_latent_bound": body_state_latent_bound,
+            "generated_bundle_bound": generated_bundle_bound,
+            "calibration_confidence_gate_bound": calibration_confidence_gate_bound,
+            "feature_window_series_bound": feature_window_series_bound,
+            "qualia_surrogate_bound": qualia_surrogate_bound,
+            "self_model_advisory_bound": self_model_advisory_bound,
+            "l2_l3_handoffs_bound": l2_l3_handoffs_bound,
+            "claim_ceiling_bound": claim_ceiling_bound,
+            "bridge_digest_bound": bridge_digest_bound,
+            "raw_biodata_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_generated_payload_stored": False,
+            "raw_gate_payload_stored": False,
+            "raw_qualia_payload_stored": False,
+            "raw_self_model_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+
     def validate_transmission(
         self,
         session: Dict[str, Any],
@@ -2571,6 +3436,66 @@ class BioDataTransmitter:
         signals = generated_bundle.get("signals", {})
         all_targets_generated = isinstance(signals, dict) and set(generated_bundle.get("target_modalities", [])) == set(signals.keys())
         confidence = latent_state.get("interoceptive_confidence")
+        projections = latent_state.get("source_modality_projections", {})
+        source_modality_projections_bound = (
+            isinstance(projections, dict)
+            and set(projections.keys()) == set(latent_state.get("source_modalities", []))
+            and all(
+                isinstance(projection, dict)
+                and bool(projection.get("feature_digest"))
+                and bool(projection.get("feature_name_digest"))
+                and projection.get("human_biosignal_catalog_digest")
+                == HUMAN_BIOSIGNAL_CATALOG_DIGEST
+                and projection.get("modality_family")
+                == self._modality_family(str(projection.get("modality", "")))
+                and projection.get("catalog_status")
+                == self._modality_catalog_status(str(projection.get("modality", "")))
+                for projection in projections.values()
+            )
+        )
+        if not source_modality_projections_bound:
+            errors.append("latent_state.source_modality_projections must bind every source modality")
+        session_source_modalities = session.get("source_modalities", [])
+        if not isinstance(session_source_modalities, list):
+            session_source_modalities = []
+        session_target_modalities = session.get("target_modalities", [])
+        if not isinstance(session_target_modalities, list):
+            session_target_modalities = []
+        session_catalog_bound = (
+            session.get("modality_policy_id") == BDT_MODALITY_POLICY_ID
+            and session.get("human_biosignal_scope") == BDT_HUMAN_BIOSIGNAL_SCOPE
+            and session.get("human_biosignal_catalog_digest")
+            == HUMAN_BIOSIGNAL_CATALOG_DIGEST
+            and session.get("uncatalogued_modality_policy")
+            == BDT_UNCATALOGUED_MODALITY_POLICY
+            and session.get("source_modality_families")
+            == self._modality_family_map(session_source_modalities)
+            and session.get("target_modality_families")
+            == self._modality_family_map(session_target_modalities)
+        )
+        signal_catalog_bound = (
+            isinstance(signals, dict)
+            and all(
+                not isinstance(signal, dict)
+                or "target_modality" not in signal
+                or (
+                    signal.get("human_biosignal_catalog_digest")
+                    == HUMAN_BIOSIGNAL_CATALOG_DIGEST
+                    and signal.get("target_modality_family")
+                    == self._modality_family(str(signal.get("target_modality", "")))
+                    and signal.get("catalog_status")
+                    == self._modality_catalog_status(
+                        str(signal.get("target_modality", ""))
+                    )
+                )
+                for signal in signals.values()
+            )
+        )
+        human_biosignal_catalog_bound = (
+            session_catalog_bound and source_modality_projections_bound and signal_catalog_bound
+        )
+        if not human_biosignal_catalog_bound:
+            errors.append("human biosignal modality catalog must be bound")
 
         return {
             "ok": not errors,
@@ -2584,6 +3509,8 @@ class BioDataTransmitter:
             "literature_ref_count": literature_count,
             "mind_upload_conflict_sink_bound": conflict_sink_bound,
             "source_feature_digest_bound": bool(latent_state.get("source_feature_digest")),
+            "source_modality_projections_bound": source_modality_projections_bound,
+            "human_biosignal_catalog_bound": human_biosignal_catalog_bound,
             "latent_digest_bound": bool(latent_state.get("latent_digest")),
             "generated_bundle_digest_bound": bool(generated_bundle.get("bundle_digest")),
             "target_modalities_generated": all_targets_generated,
@@ -2592,6 +3519,85 @@ class BioDataTransmitter:
             "semantic_thought_content_generated": False,
             "subjective_equivalence_claimed": False,
             "interoceptive_confidence": confidence,
+        }
+
+    def validate_human_biosignal_catalog(
+        self,
+        catalog: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        if not isinstance(catalog, dict):
+            errors.append("catalog must be a mapping")
+            catalog = {}
+        expected_families = {
+            family: list(modalities)
+            for family, modalities in HUMAN_BIOSIGNAL_MODALITY_FAMILIES.items()
+        }
+        expected_modality_to_family = dict(sorted(HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY.items()))
+        expected_known_modalities = list(KNOWN_HUMAN_BIOSIGNAL_MODALITIES)
+        expected_alias_map = dict(sorted(HUMAN_BIOSIGNAL_ALIASES.items()))
+        if catalog.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("catalog.schema_version mismatch")
+        if catalog.get("profile_id") != BDT_HUMAN_BIOSIGNAL_CATALOG_PROFILE_ID:
+            errors.append("catalog.profile_id mismatch")
+        if catalog.get("policy_id") != BDT_MODALITY_POLICY_ID:
+            errors.append("catalog.policy_id mismatch")
+        if catalog.get("human_biosignal_scope") != BDT_HUMAN_BIOSIGNAL_SCOPE:
+            errors.append("catalog.human_biosignal_scope mismatch")
+        catalog_digest_bound = catalog.get("catalog_digest") == HUMAN_BIOSIGNAL_CATALOG_DIGEST
+        if not catalog_digest_bound:
+            errors.append("catalog.catalog_digest mismatch")
+        family_coverage_bound = (
+            catalog.get("modality_families") == expected_families
+            and catalog.get("known_modalities") == expected_known_modalities
+            and catalog.get("modality_to_family") == expected_modality_to_family
+            and catalog.get("family_count") == len(expected_families)
+            and catalog.get("modality_count") == len(expected_known_modalities)
+        )
+        if not family_coverage_bound:
+            errors.append("catalog modality family coverage mismatch")
+        alias_targets_bound = (
+            catalog.get("alias_map") == expected_alias_map
+            and catalog.get("alias_count") == len(expected_alias_map)
+            and all(
+                target in HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY
+                for target in expected_alias_map.values()
+            )
+        )
+        if not alias_targets_bound:
+            errors.append("catalog alias map must target known modalities")
+        uncatalogued_policy_bound = (
+            catalog.get("accepted_uncatalogued_family") == "uncatalogued_human_biosignal"
+            and catalog.get("uncatalogued_modality_policy")
+            == BDT_UNCATALOGUED_MODALITY_POLICY
+        )
+        if not uncatalogued_policy_bound:
+            errors.append("catalog uncatalogued modality policy mismatch")
+        for field_name in (
+            "raw_catalog_payload_stored",
+            "raw_biosignal_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if catalog.get(field_name) is not False:
+                errors.append(f"catalog.{field_name} must be false")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": catalog.get("profile_id"),
+            "policy_id": catalog.get("policy_id"),
+            "catalog_digest_bound": catalog_digest_bound,
+            "family_coverage_bound": family_coverage_bound,
+            "alias_targets_bound": alias_targets_bound,
+            "uncatalogued_modality_policy_bound": uncatalogued_policy_bound,
+            "family_count": catalog.get("family_count"),
+            "modality_count": catalog.get("modality_count"),
+            "alias_count": catalog.get("alias_count"),
+            "raw_catalog_payload_stored": False,
+            "raw_biosignal_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
         }
 
     def _require_session(self, session_id: str) -> Dict[str, Any]:
@@ -2773,20 +3779,94 @@ class BioDataTransmitter:
             if drift_gate_receipt.get(field_name) is not False:
                 raise ValueError(f"drift_gate_receipt.{field_name} must be false")
 
+    def _validate_feature_window_series_for_bridge(
+        self,
+        session: Dict[str, Any],
+        calibration_profile: Dict[str, Any],
+        series_profile: Dict[str, Any],
+    ) -> None:
+        if not isinstance(series_profile, dict):
+            raise ValueError("feature_window_series_profile must be a mapping")
+        if series_profile.get("schema_version") != BDT_SCHEMA_VERSION:
+            raise ValueError("feature_window_series_profile.schema_version mismatch")
+        if series_profile.get("profile_id") != BDT_FEATURE_WINDOW_SERIES_PROFILE_ID:
+            raise ValueError("feature_window_series_profile.profile_id mismatch")
+        if series_profile.get("session_id") != session["session_id"]:
+            raise ValueError("feature_window_series_profile.session_id must match session")
+        if series_profile.get("identity_id") != session["identity_id"]:
+            raise ValueError("feature_window_series_profile.identity_id must match session")
+        expected_series_digest = sha256_text(
+            canonical_json(self._feature_window_series_digest_payload(series_profile))
+        )
+        if series_profile.get("series_profile_digest") != expected_series_digest:
+            raise ValueError("feature_window_series_profile.series_profile_digest mismatch")
+        if series_profile.get("latent_digests") != calibration_profile.get("source_latent_digests"):
+            raise ValueError(
+                "feature_window_series_profile latent digests must match calibration source latents"
+            )
+        if series_profile.get("required_modalities_bound") is not True:
+            raise ValueError("feature_window_series_profile.required_modalities_bound must be true")
+        for field_name in (
+            "raw_dataset_payload_stored",
+            "raw_signal_samples_stored",
+            "raw_feature_window_payload_stored",
+            "raw_latent_payload_stored",
+            "raw_series_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if series_profile.get(field_name) is not False:
+                raise ValueError(f"feature_window_series_profile.{field_name} must be false")
+
     def _normalize_modalities(self, values: Sequence[str] | None, field_name: str) -> List[str]:
         if not isinstance(values, (list, tuple)) or not values:
             raise ValueError(f"{field_name} must be a non-empty sequence")
         normalized: List[str] = []
         seen = set()
         for value in values:
-            self._require_non_empty_string(value, field_name)
-            text = str(value).strip().lower()
-            if text not in SUPPORTED_MODALITIES:
-                raise ValueError(f"unsupported modality for {field_name}: {text}")
+            text = self._normalize_modality_name(value, field_name)
             if text not in seen:
                 normalized.append(text)
                 seen.add(text)
         return normalized
+
+    def _normalize_modality_name(self, value: Any, field_name: str) -> str:
+        self._require_non_empty_string(value, field_name)
+        text = str(value).strip().lower()
+        for separator in (
+            " ",
+            "\t",
+            "\n",
+            "\r",
+            "/",
+            "\\",
+            ".",
+            ":",
+            "+",
+            "%",
+            "(",
+            ")",
+            "[",
+            "]",
+            "{",
+            "}",
+            ",",
+        ):
+            text = text.replace(separator, "-")
+        while "--" in text:
+            text = text.replace("--", "-")
+        text = text.strip("-_")
+        text = HUMAN_BIOSIGNAL_ALIASES.get(text, text)
+        if not text:
+            raise ValueError(f"unsupported modality name for {field_name}: {value}")
+        if len(text) > 64:
+            raise ValueError(f"unsupported modality name for {field_name}: {text}")
+        if not text[0].isalnum():
+            raise ValueError(f"unsupported modality name for {field_name}: {text}")
+        allowed = set("abcdefghijklmnopqrstuvwxyz0123456789_-")
+        if any(char not in allowed for char in text):
+            raise ValueError(f"unsupported modality name for {field_name}: {text}")
+        return text
 
     def _normalize_biosignal_features(
         self,
@@ -2796,9 +3876,9 @@ class BioDataTransmitter:
             raise ValueError("biosignal_features must be a non-empty mapping")
         normalized: Dict[str, Dict[str, Any]] = {}
         for modality, features in biosignal_features.items():
-            modality_key = str(modality).strip().lower()
-            if modality_key not in SUPPORTED_MODALITIES:
-                raise ValueError(f"unsupported biosignal modality: {modality_key}")
+            modality_key = self._normalize_modality_name(modality, "biosignal modality")
+            if modality_key in normalized:
+                raise ValueError(f"duplicate normalized biosignal modality: {modality_key}")
             if not isinstance(features, dict) or not features:
                 raise ValueError(f"features for {modality_key} must be a non-empty mapping")
             normalized_features: Dict[str, Any] = {}
@@ -2814,6 +3894,147 @@ class BioDataTransmitter:
             normalized[modality_key] = normalized_features
         return normalized
 
+    def _build_source_modality_projections(
+        self,
+        features: Dict[str, Dict[str, Any]],
+        observed_modalities: Sequence[str],
+    ) -> Dict[str, Dict[str, Any]]:
+        projections: Dict[str, Dict[str, Any]] = {}
+        for modality in observed_modalities:
+            modality_features = features[modality]
+            numeric_values = [
+                float(value)
+                for value in modality_features.values()
+                if isinstance(value, (int, float))
+            ]
+            string_feature_count = sum(
+                1 for value in modality_features.values() if isinstance(value, str)
+            )
+            if numeric_values:
+                bounded_values = [
+                    self._clamp(abs(value) / (abs(value) + 100.0))
+                    for value in numeric_values
+                ]
+                intensity_proxy = round(sum(bounded_values) / len(bounded_values), 3)
+                numeric_min = min(numeric_values)
+                numeric_max = max(numeric_values)
+                variability_proxy = round(
+                    self._clamp(
+                        abs(numeric_max - numeric_min)
+                        / (max(abs(numeric_max), abs(numeric_min), 1.0) + 100.0)
+                    ),
+                    3,
+                )
+            else:
+                intensity_proxy = 0.0
+                variability_proxy = 0.0
+            projections[modality] = {
+                "modality": modality,
+                "modality_family": self._modality_family(modality),
+                "catalog_status": self._modality_catalog_status(modality),
+                "human_biosignal_catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+                "projection_policy": BDT_GENERIC_MODALITY_PROJECTION_POLICY_ID,
+                "feature_digest": sha256_text(canonical_json(modality_features)),
+                "feature_name_digest": sha256_text(
+                    canonical_json(sorted(modality_features.keys()))
+                ),
+                "numeric_feature_count": len(numeric_values),
+                "string_feature_count": string_feature_count,
+                "intensity_proxy": intensity_proxy,
+                "variability_proxy": variability_proxy,
+                "projection_confidence": self._source_projection_confidence(modality),
+            }
+        return projections
+
+    def _build_generic_target_signal(
+        self,
+        target: str,
+        bundle_id: str,
+        latent_state: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        projections = latent_state.get("source_modality_projections", {})
+        if not isinstance(projections, dict):
+            projections = {}
+        projection = projections.get(target)
+        if not isinstance(projection, dict):
+            projection = self._aggregate_generic_projection(target, projections)
+        base_confidence = self._bounded_score(
+            latent_state.get("interoceptive_confidence", 0.0),
+            "latent_state.interoceptive_confidence",
+        )
+        projection_confidence = self._bounded_score(
+            projection.get("projection_confidence", 0.45),
+            f"source_modality_projections.{target}.projection_confidence",
+        )
+        return {
+            "synthetic_ref": f"synthetic://biosignal/{target}/{bundle_id}",
+            "target_modality": target,
+            "target_modality_family": self._modality_family(target),
+            "catalog_status": self._modality_catalog_status(target),
+            "human_biosignal_catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+            "generator_policy": BDT_GENERIC_TARGET_GENERATOR_POLICY_ID,
+            "source_projection_digest": projection["feature_digest"],
+            "source_feature_name_digest": projection["feature_name_digest"],
+            "intensity_proxy": projection["intensity_proxy"],
+            "variability_proxy": projection["variability_proxy"],
+            "semantic_content_generated": False,
+            "confidence": self._clamp(base_confidence * projection_confidence),
+        }
+
+    def _aggregate_generic_projection(
+        self,
+        target: str,
+        projections: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        usable = [
+            projection
+            for projection in projections.values()
+            if isinstance(projection, dict)
+        ]
+        if not usable:
+            return {
+                "feature_digest": sha256_text(canonical_json({"target": target})),
+                "feature_name_digest": sha256_text(canonical_json([])),
+                "modality_family": self._modality_family(target),
+                "catalog_status": self._modality_catalog_status(target),
+                "human_biosignal_catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+                "intensity_proxy": 0.0,
+                "variability_proxy": 0.0,
+                "projection_confidence": 0.0,
+            }
+        intensity = round(
+            sum(float(item.get("intensity_proxy", 0.0)) for item in usable) / len(usable),
+            3,
+        )
+        variability = round(
+            sum(float(item.get("variability_proxy", 0.0)) for item in usable) / len(usable),
+            3,
+        )
+        digest_payload = {
+            "target": target,
+            "source_projection_digests": [
+                str(item.get("feature_digest", "")) for item in usable
+            ],
+        }
+        name_payload = {
+            "target": target,
+            "source_feature_name_digests": [
+                str(item.get("feature_name_digest", "")) for item in usable
+            ],
+        }
+        return {
+            "feature_digest": sha256_text(canonical_json(digest_payload)),
+            "feature_name_digest": sha256_text(canonical_json(name_payload)),
+            "modality_family": self._modality_family(target),
+            "catalog_status": self._modality_catalog_status(target),
+            "human_biosignal_catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+            "intensity_proxy": intensity,
+            "variability_proxy": variability,
+            "projection_confidence": 0.5
+            if target in HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY
+            else 0.38,
+        }
+
     def _normalize_dataset_manifest(self, dataset_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(dataset_manifest, dict):
             raise ValueError("dataset_manifest must be a mapping")
@@ -2827,13 +4048,41 @@ class BioDataTransmitter:
             raise ValueError("dataset_manifest.modality_file_refs must be a non-empty mapping")
         normalized_refs: Dict[str, str] = {}
         for modality, file_ref in modality_file_refs.items():
-            modality_key = str(modality).strip().lower()
-            if modality_key not in DEFAULT_SOURCE_MODALITIES:
-                raise ValueError(f"unsupported dataset modality: {modality_key}")
+            modality_key = self._normalize_modality_name(modality, "dataset modality")
             self._require_non_empty_string(file_ref, f"dataset_manifest.modality_file_refs.{modality_key}")
             normalized_refs[modality_key] = str(file_ref).strip()
         normalized["modality_file_refs"] = normalized_refs
         return normalized
+
+    def _modality_family_map(self, modalities: Sequence[str]) -> Dict[str, str]:
+        return {modality: self._modality_family(modality) for modality in modalities}
+
+    def _target_modality_metadata(self, modality: str) -> Dict[str, str]:
+        return {
+            "target_modality": modality,
+            "target_modality_family": self._modality_family(modality),
+            "catalog_status": self._modality_catalog_status(modality),
+            "human_biosignal_catalog_digest": HUMAN_BIOSIGNAL_CATALOG_DIGEST,
+        }
+
+    @staticmethod
+    def _modality_family(modality: str) -> str:
+        return HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY.get(
+            modality,
+            "uncatalogued_human_biosignal",
+        )
+
+    @staticmethod
+    def _modality_catalog_status(modality: str) -> str:
+        return "catalogued" if modality in HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY else "uncatalogued"
+
+    @staticmethod
+    def _source_projection_confidence(modality: str) -> float:
+        if modality in DEFAULT_SOURCE_MODALITIES:
+            return 1.0
+        if modality in HUMAN_BIOSIGNAL_MODALITY_TO_FAMILY:
+            return 0.78
+        return 0.55
 
     def _normalize_circadian_phase_refs(
         self,
@@ -3091,6 +4340,140 @@ class BioDataTransmitter:
         payload = dict(gate_receipt)
         payload.pop("gate_receipt_digest", None)
         return payload
+
+    @staticmethod
+    def _latent_digest_payload(latent_state: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(latent_state)
+        payload.pop("latent_digest", None)
+        return payload
+
+    @staticmethod
+    def _signal_bundle_digest_payload(generated_bundle: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(generated_bundle)
+        payload.pop("bundle_digest", None)
+        return payload
+
+    @staticmethod
+    def _mind_state_bridge_digest_payload(bridge_receipt: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(bridge_receipt)
+        payload.pop("bridge_digest", None)
+        return payload
+
+    def _build_mind_state_axis_refs(
+        self,
+        bridge_id: str,
+        latent_state: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        axes = latent_state.get("physiological_axes", {})
+        source_axis_map = {
+            "interoceptive": ("cardiac", "autonomic", "respiratory"),
+            "affective": ("affect", "autonomic"),
+            "cognitive": ("neural", "thought"),
+            "somatic": ("cardiac", "respiratory", "autonomic"),
+        }
+        axis_refs: List[Dict[str, Any]] = []
+        for axis in BDT_MIND_STATE_SURROGATE_AXES:
+            source_axes = list(source_axis_map[axis])
+            source_axis_digest = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                        "source_latent_digest": latent_state.get("latent_digest"),
+                        "axis": axis,
+                        "source_axes": {
+                            source_axis: axes.get(source_axis, {})
+                            for source_axis in source_axes
+                        },
+                    }
+                )
+            )
+            axis_ref = {
+                "axis": axis,
+                "surrogate_ref": f"qualia-surrogate://biodata/{bridge_id}/{axis}",
+                "source_latent_ref": latent_state.get("latent_ref", ""),
+                "source_latent_digest": latent_state.get("latent_digest", ""),
+                "source_axes": source_axes,
+                "source_axis_digest": source_axis_digest,
+                "status": "bound",
+                "claim_ceiling": BDT_MIND_STATE_BRIDGE_CLAIM_CEILING,
+            }
+            axis_ref["axis_digest"] = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                        "axis": axis,
+                        "surrogate_ref": axis_ref["surrogate_ref"],
+                        "source_latent_digest": axis_ref["source_latent_digest"],
+                        "source_axis_digest": source_axis_digest,
+                        "claim_ceiling": axis_ref["claim_ceiling"],
+                    }
+                )
+            )
+            axis_refs.append(axis_ref)
+        return axis_refs
+
+    @staticmethod
+    def _mind_state_self_model_advisory_digest(
+        bridge_id: str,
+        latent_state: Dict[str, Any],
+        calibration_confidence_gate: Dict[str, Any],
+        qualia_axis_digest_set: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                    "bridge_id": bridge_id,
+                    "source_latent_digest": latent_state.get("latent_digest"),
+                    "confidence_gate_digest": calibration_confidence_gate.get(
+                        "gate_receipt_digest"
+                    ),
+                    "qualia_axis_digest_set": qualia_axis_digest_set,
+                    "advisory_only": True,
+                    "claim_ceiling": BDT_MIND_STATE_BRIDGE_CLAIM_CEILING,
+                }
+            )
+        )
+
+    @staticmethod
+    def _build_mind_state_handoff_bindings(
+        bridge_id: str,
+        latent_state: Dict[str, Any],
+        generated_bundle: Dict[str, Any],
+        calibration_confidence_gate: Dict[str, Any],
+        qualia_axis_digest_set: str,
+        self_model_advisory_digest: str,
+    ) -> List[Dict[str, Any]]:
+        handoff_bindings: List[Dict[str, Any]] = []
+        for consumer in BDT_MIND_STATE_BRIDGE_ALLOWED_CONSUMERS:
+            handoff_ref = f"handoff://biodata/{bridge_id}/{consumer}"
+            handoff_digest = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": BDT_MIND_STATE_BRIDGE_PROFILE_ID,
+                        "consumer": consumer,
+                        "handoff_ref": handoff_ref,
+                        "source_latent_digest": latent_state.get("latent_digest"),
+                        "generated_bundle_digest": generated_bundle.get("bundle_digest"),
+                        "confidence_gate_digest": calibration_confidence_gate.get(
+                            "gate_receipt_digest"
+                        ),
+                        "qualia_axis_digest_set": qualia_axis_digest_set,
+                        "self_model_advisory_digest": self_model_advisory_digest,
+                        "claim_ceiling": BDT_MIND_STATE_BRIDGE_CLAIM_CEILING,
+                    }
+                )
+            )
+            handoff_bindings.append(
+                {
+                    "consumer": consumer,
+                    "handoff_ref": handoff_ref,
+                    "handoff_digest": handoff_digest,
+                    "status": "bound",
+                    "claim_ceiling": BDT_MIND_STATE_BRIDGE_CLAIM_CEILING,
+                }
+            )
+        return handoff_bindings
 
     @staticmethod
     def _series_drift_gate_digest_payload(drift_gate_receipt: Dict[str, Any]) -> Dict[str, Any]:

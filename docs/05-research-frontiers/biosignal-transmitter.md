@@ -1,7 +1,7 @@
 ---
 status: in-progress
 priority: T0
-last_revisit: 2026-04-29
+last_revisit: 2026-05-03
 researcher: yasufumi
 ---
 
@@ -9,8 +9,10 @@ researcher: yasufumi
 
 ## 問題定義
 
-脳波、心電、脈波、皮膚電気活動、呼吸などの生体データから、その人の
-別モダリティの生体データを生成できるか。OmoikaneOS ではこの問題を
+脳波、心電、脈波、皮膚電気活動、呼吸に限らず、人間から取られる神経、心血管、
+呼吸、皮膚、筋、眼、体温、運動、音声、消化管、血液・間質液・汗・唾液・呼気、
+睡眠/概日などの生体データから、その人の別モダリティの生体データを生成できるか。
+OmoikaneOS ではこの問題を
 **生体データ → 実体に近い体内状態 latent → 生体データ** と分解する。
 
 ここでいう体内状態 latent は、単なる任意の embedding ではなく、心拍、HRV、
@@ -30,6 +32,13 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   接続する中間理論として使える。
 - CEBRA のような joint neural / behavioural latent embedding は、神経活動と行動を
   仮説駆動または自己教師ありで低次元 latent に束ねる参照点になる。
+- reference runtime は 2026-05-03 時点で
+  `human-biosignal-open-modality-catalog-v1` を採用し、既知の human biosignal を
+  family に束縛しつつ、catalog 外の新規 human biosignal も generic proxy として保持できる。
+- catalog は `biodata_human_biosignal_catalog.schema` として公開され、family coverage、
+  alias target、uncatalogued fallback policy、raw payload 非保持を machine-checkable にした。
+- demo は EEG/ECG/PPG/EDA/呼吸に加えて EMG、体温、血圧、SpO2、瞳孔、音声、
+  加速度、血糖、fNIRS、fMRI BOLD、未カタログ human biosensor の roundtrip を検証する。
 
 ## ブロッキング要因
 
@@ -48,7 +57,10 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 
 - source biosignal は feature summary digest だけを保持し、raw payload を保存しない
 - intermediate は `physiology-latent-body-state-v0` として person-bound にする
-- generated target は ECG/PPG/respiration/EEG/affect/thought の bounded proxy に留める
+- generated target は既知 modality では専用 bounded proxy、未知 modality では
+  `generic-feature-summary-to-biosignal-proxy-v1` による bounded generic biosignal proxy に留める
+- session は human biosignal catalog digest、source / target modality family map、
+  未カタログ modality policy を束縛する
 - circadian phase refs は external clock / sleep diary / wearable evidence digest に束縛し、
   raw phase verifier payload を保存しない
 - 個人内 calibration は複数日の body-state latent digest set と day refs を

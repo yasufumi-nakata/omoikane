@@ -71,7 +71,7 @@ health check に基づく `primary -> fallback` の単純切替を行う。
 
 **責務**: 外界・他自我・生体側との接続。
 **境界**:
-- **BioData Transmitter** ── 生体データ → 体内状態 latent → 別モダリティ生体データ
+- **BioData Transmitter** ── human biosignal catalog に束縛された任意生体データ → 体内状態 latent → 別モダリティ生体データ proxy
 - **Biological-Digital Bridge** ── BCI、神経インタフェース、生体センサ
 - **Inter-Mind Channel** ── 他のアップロード自我との通信プロトコル
 - **World Model Sync** ── 外界状態の同期（共有現実 / 個別現実の選択）

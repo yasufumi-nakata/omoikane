@@ -82,30 +82,16 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   source_modalities_required:
     type: array
-    minItems: 5
-    maxItems: 5
+    minItems: 1
     uniqueItems: true
     items:
-      type: string
-      enum:
-        - eeg
-        - ecg
-        - ppg
-        - eda
-        - respiration
+      $ref: "#/$defs/source_modality"
   source_modalities_covered:
     type: array
-    minItems: 5
-    maxItems: 5
+    minItems: 1
     uniqueItems: true
     items:
-      type: string
-      enum:
-        - eeg
-        - ecg
-        - ppg
-        - eda
-        - respiration
+      $ref: "#/$defs/source_modality"
   required_modalities_bound:
     const: true
   confidence_score:
@@ -299,3 +285,7 @@ properties:
   gate_receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+$defs:
+  source_modality:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"

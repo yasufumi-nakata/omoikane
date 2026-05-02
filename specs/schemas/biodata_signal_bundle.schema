@@ -2,7 +2,8 @@ $schema: "https://json-schema.org/draft/2020-12/schema"
 $id: "https://omoikane.dev/specs/schemas/biodata_signal_bundle.schema"
 title: BioDataSignalBundle
 description: >
-  Generated bounded target biosignal bundle derived from one internal body-state latent.
+  Generated bounded target biosignal bundle derived from one internal body-state latent,
+  with per-signal target modality family and human biosignal catalog status.
 type: object
 additionalProperties: false
 required:
@@ -52,17 +53,15 @@ properties:
     minItems: 1
     uniqueItems: true
     items:
-      type: string
-      enum:
-        - eeg
-        - ecg
-        - ppg
-        - respiration
-        - affect
-        - thought
+      $ref: "#/$defs/modality_name"
   signals:
     type: object
     minProperties: 1
+    propertyNames:
+      $ref: "#/$defs/modality_name"
+    patternProperties:
+      "^[a-z0-9][a-z0-9_-]{0,63}$":
+        $ref: "#/$defs/confidence_signal"
     additionalProperties: false
     properties:
       ecg:
@@ -101,10 +100,17 @@ properties:
     type: string
     pattern: "^[a-f0-9]{64}$"
 $defs:
+  modality_name:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
   confidence_signal:
     type: object
     required:
       - synthetic_ref
+      - target_modality
+      - target_modality_family
+      - catalog_status
+      - human_biosignal_catalog_digest
       - confidence
     properties:
       synthetic_ref:
