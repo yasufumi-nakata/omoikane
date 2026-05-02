@@ -69,6 +69,10 @@ PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE = (
 PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE = (
     "command-bound-git-ls-remote-origin-main-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE = (
+    "protected-branch-provider-policy-receipt-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS = "protected"
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -156,6 +160,10 @@ PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_REVOCATION_TIMESTAMP_NONCE_REF = (
 )
 PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_CONTENT_REF = (
     "content://parallel-codex/remote-branch-pr/content-identity/v1"
+)
+PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER = "github"
+PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_REF = (
+    "provider://github/protected-branch/origin-main/v1"
 )
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
@@ -286,6 +294,18 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_remote_verify_profile": (
                 PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
             ),
+            "post_commit_publication_protected_branch_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
+            ),
+            "post_commit_publication_protected_branch_required_status": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
+            ),
+            "default_protected_branch_provider": (
+                PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
+            ),
+            "default_protected_branch_policy_ref": (
+                PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_REF
+            ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
             "allowed_workspace_prefixes": list(self.allowed_workspace_prefixes),
@@ -380,6 +400,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_push_stderr_stored": False,
             "raw_remote_verification_stdout_stored": False,
             "raw_remote_verification_stderr_stored": False,
+            "raw_protected_branch_provider_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -2032,6 +2053,18 @@ class ParallelCodexOrchestrationService:
         remote_ref: str = "refs/heads/main",
         push_result: Mapping[str, Any] | None = None,
         remote_verification_result: Mapping[str, Any] | None = None,
+        protected_branch_provider: str = (
+            PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
+        ),
+        protected_branch_policy_ref: str = (
+            PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_REF
+        ),
+        protected_branch_policy_digest: str = "",
+        protected_branch_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
+        ),
+        protected_branch_required_checks: Sequence[str] | None = None,
+        protected_branch_receipt_digest: str = "",
     ) -> Dict[str, Any]:
         execution_validation = self.validate_integration_execution_receipt(
             execution_receipt,
@@ -2080,6 +2113,44 @@ class ParallelCodexOrchestrationService:
         source_commit_finalization_digest = str(
             execution_receipt.get("commit_finalization_digest", ""),
         ).strip()
+        normalized_protected_branch_provider = (
+            protected_branch_provider.strip()
+            or PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
+        )
+        normalized_protected_branch_policy_ref = (
+            protected_branch_policy_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_REF
+        )
+        normalized_protected_branch_checks = _dedupe_strings(
+            list(
+                protected_branch_required_checks
+                if protected_branch_required_checks is not None
+                else self._policy.required_verifications
+            )
+        )
+        normalized_protected_branch_status = (
+            protected_branch_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
+        )
+        normalized_protected_branch_policy_digest = (
+            protected_branch_policy_digest.strip()
+        )
+        expected_protected_branch_policy_digest = (
+            self._post_commit_protected_branch_policy_digest(
+                provider=normalized_protected_branch_provider,
+                branch_ref=normalized_remote_ref,
+                policy_ref=normalized_protected_branch_policy_ref,
+                required_checks=normalized_protected_branch_checks,
+            )
+        )
+        if not _is_sha256(normalized_protected_branch_policy_digest):
+            normalized_protected_branch_policy_digest = (
+                expected_protected_branch_policy_digest
+            )
+        protected_branch_policy_bound = (
+            normalized_protected_branch_policy_digest
+            == expected_protected_branch_policy_digest
+        )
         receipt = {
             "kind": "parallel_codex_post_commit_publication_receipt",
             "schema_version": "1.0.0",
@@ -2138,6 +2209,23 @@ class ParallelCodexOrchestrationService:
             "remote_verification_command_receipt_digest": (
                 normalized_remote_verification_result["command_receipt_digest"]
             ),
+            "protected_branch_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
+            ),
+            "protected_branch_provider": normalized_protected_branch_provider,
+            "protected_branch_ref": normalized_remote_ref,
+            "protected_branch_policy_ref": normalized_protected_branch_policy_ref,
+            "protected_branch_policy_digest": (
+                normalized_protected_branch_policy_digest
+            ),
+            "protected_branch_policy_bound": protected_branch_policy_bound,
+            "protected_branch_status": normalized_protected_branch_status,
+            "protected_branch_required_checks": normalized_protected_branch_checks,
+            "protected_branch_required_check_count": len(
+                normalized_protected_branch_checks,
+            ),
+            "protected_branch_receipt_digest": "",
+            "protected_branch_receipt_digest_bound": False,
             "publication_digest": "",
             "publication_status": "blocked",
             "ready_for_github_handoff": False,
@@ -2149,8 +2237,23 @@ class ParallelCodexOrchestrationService:
             "raw_push_stderr_stored": False,
             "raw_remote_verification_stdout_stored": False,
             "raw_remote_verification_stderr_stored": False,
+            "raw_protected_branch_provider_payload_stored": False,
             "receipt_digest": "",
         }
+        normalized_protected_branch_receipt_digest = (
+            protected_branch_receipt_digest.strip()
+        )
+        if not _is_sha256(normalized_protected_branch_receipt_digest):
+            normalized_protected_branch_receipt_digest = (
+                self._post_commit_protected_branch_receipt_digest(receipt)
+            )
+        receipt["protected_branch_receipt_digest"] = (
+            normalized_protected_branch_receipt_digest
+        )
+        receipt["protected_branch_receipt_digest_bound"] = (
+            normalized_protected_branch_receipt_digest
+            == self._post_commit_protected_branch_receipt_digest(receipt)
+        )
         receipt["publication_digest"] = self._post_commit_publication_digest(
             receipt,
         )
@@ -2208,6 +2311,21 @@ class ParallelCodexOrchestrationService:
             receipt.get("publication_digest")
             == self._post_commit_publication_digest(receipt)
         )
+        protected_branch_policy_digest_bound = (
+            receipt.get("protected_branch_policy_digest")
+            == self._post_commit_protected_branch_policy_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                policy_ref=str(receipt.get("protected_branch_policy_ref", "")),
+                required_checks=receipt.get("protected_branch_required_checks", []),
+            )
+            and receipt.get("protected_branch_policy_bound") is True
+        )
+        protected_branch_receipt_digest_bound = (
+            receipt.get("protected_branch_receipt_digest")
+            == self._post_commit_protected_branch_receipt_digest(receipt)
+            and receipt.get("protected_branch_receipt_digest_bound") is True
+        )
         receipt_digest_bound = (
             receipt.get("receipt_digest") == self._receipt_digest(receipt)
         )
@@ -2230,6 +2348,21 @@ class ParallelCodexOrchestrationService:
             != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
         ):
             errors.append("remote_verification_profile mismatch")
+        if (
+            receipt.get("protected_branch_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
+        ):
+            errors.append("protected_branch_profile mismatch")
+        if receipt.get("protected_branch_provider") != (
+            PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
+        ):
+            errors.append("protected_branch_provider must be github")
+        if receipt.get("protected_branch_ref") != "refs/heads/main":
+            errors.append("protected_branch_ref must be refs/heads/main")
+        if not protected_branch_policy_digest_bound:
+            errors.append("protected_branch_policy_digest mismatch")
+        if not protected_branch_receipt_digest_bound:
+            errors.append("protected_branch_receipt_digest mismatch")
         if push_result.get("command") != push_command:
             errors.append("push command must target origin main")
         if remote_verification_result.get("command") != remote_verification_command:
@@ -2262,6 +2395,8 @@ class ParallelCodexOrchestrationService:
             errors.append("raw_remote_verification_stdout_stored must be false")
         if receipt.get("raw_remote_verification_stderr_stored") is not False:
             errors.append("raw_remote_verification_stderr_stored must be false")
+        if receipt.get("raw_protected_branch_provider_payload_stored") is not False:
+            errors.append("raw_protected_branch_provider_payload_stored must be false")
 
         return {
             "ok": not errors,
@@ -2302,6 +2437,21 @@ class ParallelCodexOrchestrationService:
                 remote_verification_result.get("status") == "pass"
                 and remote_verification_result.get("exit_code") == 0
             ),
+            "protected_branch_policy_digest_bound": (
+                protected_branch_policy_digest_bound
+            ),
+            "protected_branch_receipt_digest_bound": (
+                protected_branch_receipt_digest_bound
+            ),
+            "protected_branch_status_protected": (
+                receipt.get("protected_branch_status")
+                == PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
+            ),
+            "protected_branch_required_checks_bound": (
+                self._protected_branch_required_checks_bound(
+                    receipt.get("protected_branch_required_checks", []),
+                )
+            ),
             "publication_digest_bound": publication_digest_bound,
             "receipt_digest_bound": receipt_digest_bound,
             "raw_publication_payload_redacted": (
@@ -2319,6 +2469,10 @@ class ParallelCodexOrchestrationService:
                 and receipt.get("raw_remote_verification_stderr_stored") is False
                 and remote_verification_result.get("raw_stdout_stored") is False
                 and remote_verification_result.get("raw_stderr_stored") is False
+            ),
+            "raw_protected_branch_provider_payload_redacted": (
+                receipt.get("raw_protected_branch_provider_payload_stored")
+                is False
             ),
         }
 
@@ -4373,6 +4527,69 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    def _post_commit_protected_branch_policy_digest(
+        self,
+        *,
+        provider: str,
+        branch_ref: str,
+        policy_ref: str,
+        required_checks: Sequence[str],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
+                    ),
+                    "provider": provider,
+                    "branch_ref": branch_ref,
+                    "policy_ref": policy_ref,
+                    "required_checks": _dedupe_strings(required_checks),
+                    "raw_provider_payload_stored": False,
+                }
+            )
+        )
+
+    def _post_commit_protected_branch_receipt_digest(
+        self,
+        receipt: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
+                    ),
+                    "provider": receipt.get("protected_branch_provider", ""),
+                    "branch_ref": receipt.get("protected_branch_ref", ""),
+                    "policy_ref": receipt.get("protected_branch_policy_ref", ""),
+                    "policy_digest": receipt.get(
+                        "protected_branch_policy_digest",
+                        "",
+                    ),
+                    "policy_bound": receipt.get(
+                        "protected_branch_policy_bound",
+                        False,
+                    ),
+                    "status": receipt.get("protected_branch_status", ""),
+                    "required_checks": _dedupe_strings(
+                        receipt.get("protected_branch_required_checks", []),
+                    ),
+                    "raw_provider_payload_stored": False,
+                }
+            )
+        )
+
+    def _protected_branch_required_checks_bound(
+        self,
+        required_checks: Sequence[str],
+    ) -> bool:
+        normalized_required_checks = set(_dedupe_strings(required_checks))
+        return all(
+            command in normalized_required_checks
+            for command in self._policy.required_verifications
+        )
+
     def _post_commit_publication_digest(
         self,
         receipt: Mapping[str, Any],
@@ -4430,12 +4647,52 @@ class ParallelCodexOrchestrationService:
                         "remote_verification_command_receipt_digest",
                         "",
                     ),
+                    "protected_branch_profile": receipt.get(
+                        "protected_branch_profile",
+                        "",
+                    ),
+                    "protected_branch_provider": receipt.get(
+                        "protected_branch_provider",
+                        "",
+                    ),
+                    "protected_branch_ref": receipt.get(
+                        "protected_branch_ref",
+                        "",
+                    ),
+                    "protected_branch_policy_ref": receipt.get(
+                        "protected_branch_policy_ref",
+                        "",
+                    ),
+                    "protected_branch_policy_digest": receipt.get(
+                        "protected_branch_policy_digest",
+                        "",
+                    ),
+                    "protected_branch_policy_bound": receipt.get(
+                        "protected_branch_policy_bound",
+                        False,
+                    ),
+                    "protected_branch_status": receipt.get(
+                        "protected_branch_status",
+                        "",
+                    ),
+                    "protected_branch_required_checks": _dedupe_strings(
+                        receipt.get("protected_branch_required_checks", []),
+                    ),
+                    "protected_branch_receipt_digest": receipt.get(
+                        "protected_branch_receipt_digest",
+                        "",
+                    ),
+                    "protected_branch_receipt_digest_bound": receipt.get(
+                        "protected_branch_receipt_digest_bound",
+                        False,
+                    ),
                     "raw_execution_payload_stored": False,
                     "raw_post_commit_publication_payload_stored": False,
                     "raw_push_stdout_stored": False,
                     "raw_push_stderr_stored": False,
                     "raw_remote_verification_stdout_stored": False,
                     "raw_remote_verification_stderr_stored": False,
+                    "raw_protected_branch_provider_payload_stored": False,
                 }
             )
         )
@@ -5005,6 +5262,50 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw remote verification stdout must not be stored")
         if remote_verification_result.get("raw_stderr_stored") is not False:
             reasons.append("raw remote verification stderr must not be stored")
+        if (
+            receipt.get("protected_branch_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
+        ):
+            reasons.append("protected_branch_profile mismatch")
+        if receipt.get("protected_branch_provider") != (
+            PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
+        ):
+            reasons.append("protected_branch_provider must be github")
+        if receipt.get("protected_branch_ref") != "refs/heads/main":
+            reasons.append("protected_branch_ref must be refs/heads/main")
+        if (
+            receipt.get("protected_branch_policy_digest")
+            != self._post_commit_protected_branch_policy_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                policy_ref=str(receipt.get("protected_branch_policy_ref", "")),
+                required_checks=receipt.get("protected_branch_required_checks", []),
+            )
+            or receipt.get("protected_branch_policy_bound") is not True
+        ):
+            reasons.append("protected_branch_policy_digest mismatch")
+        if (
+            receipt.get("protected_branch_status")
+            != PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
+        ):
+            reasons.append("protected branch must be protected before GitHub handoff")
+        if not self._protected_branch_required_checks_bound(
+            receipt.get("protected_branch_required_checks", []),
+        ):
+            reasons.append("protected branch must require reference verification checks")
+        if (
+            receipt.get("protected_branch_required_check_count")
+            != len(_dedupe_strings(receipt.get("protected_branch_required_checks", [])))
+        ):
+            reasons.append("protected_branch_required_check_count mismatch")
+        if (
+            receipt.get("protected_branch_receipt_digest")
+            != self._post_commit_protected_branch_receipt_digest(receipt)
+            or receipt.get("protected_branch_receipt_digest_bound") is not True
+        ):
+            reasons.append("protected_branch_receipt_digest mismatch")
+        if receipt.get("raw_protected_branch_provider_payload_stored") is not False:
+            reasons.append("raw_protected_branch_provider_payload_stored must be false")
         if receipt.get("publication_digest") != self._post_commit_publication_digest(
             receipt,
         ):

@@ -1193,6 +1193,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_protected_branch_policy_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_receipt_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_status_protected"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_publication_digest_bound"
             ]
         )

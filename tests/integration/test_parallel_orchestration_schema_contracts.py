@@ -487,6 +487,21 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_protected_branch_policy_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_receipt_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_status_protected"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_publication_digest_bound"
             ]
         )
@@ -503,9 +518,18 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
                 "command"
             ],
         )
+        self.assertEqual(
+            "protected",
+            result["post_commit_publication_receipt"]["protected_branch_status"],
+        )
         self.assertFalse(
             result["post_commit_publication_receipt"][
                 "raw_post_commit_publication_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["post_commit_publication_receipt"][
+                "raw_protected_branch_provider_payload_stored"
             ]
         )
         self.assertEqual(

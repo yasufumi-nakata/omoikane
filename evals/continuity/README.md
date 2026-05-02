@@ -196,6 +196,7 @@ commit finalization gate 未 ready execution を fail-closed にできるか。
 - `parallel_codex_integration_batch.yaml`
 - `parallel_codex_integration_execution.yaml`
 - `parallel_codex_post_commit_publication.yaml`
+  - commit-finalized Parallel Codex handoff が push / remote-head verification だけでなく GitHub protected branch provider policy receipt、required verification checks、raw provider payload 非保存まで束縛すること
 - `parallel_codex_result_ingestion.yaml`
 - `patch_generator_direct_contract.yaml`
 - `procedural_actuation_bridge.yaml`

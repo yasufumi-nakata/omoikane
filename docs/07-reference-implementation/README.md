@@ -997,14 +997,17 @@ commit-finalized execution はさらに
 digest、commit finalization readiness、local commit head、origin/main remote head、
 `git push origin HEAD:refs/heads/main` の command receipt digest、
 `git ls-remote origin refs/heads/main` の remote verification command receipt digest、
-publication digest を固定する。remote head が local commit と一致しない場合、
-push / remote verification が失敗した場合、または source execution が
-`ready-to-apply` でない場合は schema-bound のまま
+GitHub protected branch provider policy receipt、publication digest を固定する。
+protected branch receipt は `refs/heads/main` の provider policy ref、
+required verification checks、policy digest、receipt digest、protected status を
+raw provider payload なしで束縛する。remote head が local commit と一致しない場合、
+push / remote verification が失敗した場合、protected branch status が `protected`
+でない場合、または source execution が `ready-to-apply` でない場合は schema-bound のまま
 `ready_for_github_handoff=false` に留まる。
 raw batch payload、raw apply plan payload、raw dry-run payload、raw worker receipt
 payload、raw verification output、raw checkout mutation payload、raw patch cleanup
-payload、raw commit finalization payload、raw publication / push / remote verification
-payload は保存しない。
+payload、raw commit finalization payload、raw publication / push / remote verification /
+protected branch provider payload は保存しない。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

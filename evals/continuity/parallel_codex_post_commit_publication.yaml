@@ -4,8 +4,9 @@ summary: >
   parallel-orchestration-demo が commit-finalized execution receipt を
   origin/main 公開レシートへ縮約し、source execution digest、local commit head、
   remote head、command-bound git push receipt、command-bound git ls-remote
-  verification receipt、publication digest、raw execution / push / remote
-  verification payload 非保存を固定すること
+  verification receipt、protected branch provider policy receipt、
+  publication digest、raw execution / push / remote verification /
+  protected branch provider payload 非保存を固定すること
 checks:
   - name: parallel Codex post-commit publication smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -17,6 +18,10 @@ expect:
   post_commit_publication_remote_head_matches: true
   post_commit_publication_push_command_digest_bound: true
   post_commit_publication_remote_verification_digest_bound: true
+  post_commit_publication_protected_branch_policy_bound: true
+  post_commit_publication_protected_branch_receipt_bound: true
+  post_commit_publication_protected_branch_status_protected: true
+  post_commit_publication_protected_branch_checks_bound: true
   post_commit_publication_publication_digest_bound: true
   post_commit_publication_raw_payload_redacted: true
   blocked_post_commit_publication_result_blocked: true

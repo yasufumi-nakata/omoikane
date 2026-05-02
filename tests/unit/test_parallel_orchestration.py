@@ -1501,6 +1501,10 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["remote_head_matches_local_commit"])
         self.assertTrue(validation["push_command_digest_bound"])
         self.assertTrue(validation["remote_verification_digest_bound"])
+        self.assertTrue(validation["protected_branch_policy_digest_bound"])
+        self.assertTrue(validation["protected_branch_receipt_digest_bound"])
+        self.assertTrue(validation["protected_branch_status_protected"])
+        self.assertTrue(validation["protected_branch_required_checks_bound"])
         self.assertTrue(validation["publication_digest_bound"])
         self.assertEqual(
             "git push origin HEAD:refs/heads/main",
@@ -1510,11 +1514,19 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             "git ls-remote origin refs/heads/main",
             publication["remote_verification_result"]["command"],
         )
+        self.assertEqual("github", publication["protected_branch_provider"])
+        self.assertEqual("refs/heads/main", publication["protected_branch_ref"])
+        self.assertEqual("protected", publication["protected_branch_status"])
+        self.assertTrue(publication["protected_branch_policy_bound"])
+        self.assertTrue(publication["protected_branch_receipt_digest_bound"])
         self.assertFalse(publication["raw_post_commit_publication_payload_stored"])
         self.assertFalse(publication["raw_push_stdout_stored"])
         self.assertFalse(publication["raw_push_stderr_stored"])
         self.assertFalse(publication["raw_remote_verification_stdout_stored"])
         self.assertFalse(publication["raw_remote_verification_stderr_stored"])
+        self.assertFalse(
+            publication["raw_protected_branch_provider_payload_stored"]
+        )
 
     def test_post_commit_publication_blocks_remote_head_mismatch(self) -> None:
         execution = self._ready_execution_receipt()
@@ -1540,6 +1552,36 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(validation["ready_for_github_handoff"])
         self.assertTrue(validation["publication_digest_bound"])
         self.assertFalse(validation["remote_head_matches_local_commit"])
+
+    def test_post_commit_publication_blocks_unprotected_branch_policy(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            protected_branch_status="unprotected",
+            result_summary=(
+                "Publication blocks when provider branch protection evidence "
+                "does not show refs/heads/main as protected."
+            ),
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "protected branch must be protected before GitHub handoff",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["protected_branch_policy_digest_bound"])
+        self.assertTrue(validation["protected_branch_receipt_digest_bound"])
+        self.assertFalse(validation["protected_branch_status_protected"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
         changed_file = "src/omoikane/self_construction/parallel_orchestration.py"

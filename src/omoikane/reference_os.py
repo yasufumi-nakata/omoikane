@@ -1243,7 +1243,8 @@ class OmoikaneReferenceOS:
                 result_summary=(
                     "Commit-finalized Parallel Codex execution is bound to a "
                     "command-level origin/main push receipt and a remote-head "
-                    "verification receipt before GitHub handoff."
+                    "verification receipt plus protected-branch provider "
+                    "policy receipt before GitHub handoff."
                 ),
             )
         )
@@ -1579,6 +1580,14 @@ class OmoikaneReferenceOS:
                         "remote_verification_command_receipt_digest"
                     ]
                 ),
+                "post_commit_publication_protected_branch_digest": (
+                    post_commit_publication_receipt[
+                        "protected_branch_receipt_digest"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_status": (
+                    post_commit_publication_receipt["protected_branch_status"]
+                ),
                 "blocked_post_commit_publication_receipt_ref": (
                     blocked_post_commit_publication_receipt["receipt_ref"]
                 ),
@@ -1615,6 +1624,7 @@ class OmoikaneReferenceOS:
                 "raw_push_stderr_stored": False,
                 "raw_remote_verification_stdout_stored": False,
                 "raw_remote_verification_stderr_stored": False,
+                "raw_protected_branch_provider_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -2287,6 +2297,26 @@ class OmoikaneReferenceOS:
                         "remote_verification_digest_bound"
                     ]
                 ),
+                "post_commit_publication_protected_branch_policy_bound": (
+                    post_commit_publication_validation[
+                        "protected_branch_policy_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_receipt_bound": (
+                    post_commit_publication_validation[
+                        "protected_branch_receipt_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_status_protected": (
+                    post_commit_publication_validation[
+                        "protected_branch_status_protected"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_checks_bound": (
+                    post_commit_publication_validation[
+                        "protected_branch_required_checks_bound"
+                    ]
+                ),
                 "post_commit_publication_publication_digest_bound": (
                     post_commit_publication_validation[
                         "publication_digest_bound"
@@ -2301,6 +2331,9 @@ class OmoikaneReferenceOS:
                     ]
                     and post_commit_publication_validation[
                         "raw_remote_verification_output_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_protected_branch_provider_payload_redacted"
                     ]
                 ),
                 "blocked_post_commit_publication_receipt_ok": (

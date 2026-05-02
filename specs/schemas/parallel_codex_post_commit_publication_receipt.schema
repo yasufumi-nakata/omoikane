@@ -3,9 +3,10 @@ $id: "https://omoikane.dev/specs/schemas/parallel_codex_post_commit_publication_
 title: ParallelCodexPostCommitPublicationReceipt
 description: >
   Digest-only receipt for binding a commit-finalized Parallel Codex integration
-  execution to a command-level origin/main push and remote-head verification
-  before GitHub handoff. The receipt keeps raw execution, push, and remote
-  verification payloads redacted while preserving command and publication
+  execution to a command-level origin/main push, remote-head verification, and
+  protected-branch provider policy receipt before GitHub handoff. The receipt
+  keeps raw execution, push, remote verification, and branch-provider payloads
+  redacted while preserving command, policy, provider receipt, and publication
   digests.
 type: object
 additionalProperties: false
@@ -39,6 +40,17 @@ required:
   - remote_verification_profile
   - remote_verification_result
   - remote_verification_command_receipt_digest
+  - protected_branch_profile
+  - protected_branch_provider
+  - protected_branch_ref
+  - protected_branch_policy_ref
+  - protected_branch_policy_digest
+  - protected_branch_policy_bound
+  - protected_branch_status
+  - protected_branch_required_checks
+  - protected_branch_required_check_count
+  - protected_branch_receipt_digest
+  - protected_branch_receipt_digest_bound
   - publication_digest
   - publication_status
   - ready_for_github_handoff
@@ -50,6 +62,7 @@ required:
   - raw_push_stderr_stored
   - raw_remote_verification_stdout_stored
   - raw_remote_verification_stderr_stored
+  - raw_protected_branch_provider_payload_stored
   - receipt_digest
   - receipt_ref
 properties:
@@ -125,6 +138,39 @@ properties:
   remote_verification_command_receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  protected_branch_profile:
+    const: protected-branch-provider-policy-receipt-v1
+  protected_branch_provider:
+    const: github
+  protected_branch_ref:
+    const: refs/heads/main
+  protected_branch_policy_ref:
+    type: string
+    minLength: 1
+  protected_branch_policy_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  protected_branch_policy_bound:
+    type: boolean
+  protected_branch_status:
+    enum:
+      - protected
+      - unprotected
+      - unknown
+  protected_branch_required_checks:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  protected_branch_required_check_count:
+    type: integer
+    minimum: 1
+  protected_branch_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  protected_branch_receipt_digest_bound:
+    type: boolean
   publication_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -152,6 +198,8 @@ properties:
   raw_remote_verification_stdout_stored:
     const: false
   raw_remote_verification_stderr_stored:
+    const: false
+  raw_protected_branch_provider_payload_stored:
     const: false
   receipt_digest:
     type: string

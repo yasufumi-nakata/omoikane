@@ -85,11 +85,12 @@ context digest、checkout mutation event digest、post-apply head、patch artifa
 digest、changed-file owner manifest digest、passing verification state を束縛し、未 ready
 の execution を commit へ進めない。commit-finalized execution はさらに
 `parallel_codex_post_commit_publication_receipt` で local commit head、origin/main
-remote head、command-bound push / remote verification receipt、publication digest を
-固定し、remote head mismatch や push / remote verification failure を GitHub handoff へ
+remote head、command-bound push / remote verification receipt、GitHub protected
+branch provider policy receipt、publication digest を固定し、remote head mismatch、
+push / remote verification failure、protected branch 未保護 / unknown を GitHub handoff へ
 進めない。raw batch / apply plan / dry-run / worker receipt / verification /
 checkout mutation / patch cleanup / commit finalization / publication / push /
-remote verification payload は保存しない。
+remote verification / protected branch provider payload は保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、
