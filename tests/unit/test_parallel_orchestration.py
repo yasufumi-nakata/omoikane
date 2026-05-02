@@ -1497,7 +1497,19 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["ready_for_github_handoff"])
         self.assertTrue(validation["source_execution_receipt_digest_bound"])
         self.assertTrue(validation["source_execution_commit_finalization_ready"])
+        self.assertTrue(validation["source_execution_current_checkout_head_bound"])
         self.assertTrue(validation["local_commit_head_matches_source"])
+        self.assertTrue(validation["pre_push_remote_head_matches_source"])
+        self.assertTrue(validation["pre_push_remote_verification_digest_bound"])
+        self.assertTrue(
+            validation["pre_push_remote_verification_output_digest_bound"]
+        )
+        self.assertTrue(
+            validation["pre_push_remote_verification_observed_head_matches"]
+        )
+        self.assertTrue(
+            validation["pre_push_remote_verification_observed_ref_matches"]
+        )
         self.assertTrue(validation["remote_head_matches_local_commit"])
         self.assertTrue(validation["push_command_digest_bound"])
         self.assertTrue(validation["remote_verification_digest_bound"])
@@ -1526,6 +1538,19 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             "git push origin HEAD:refs/heads/main",
             publication["push_command_result"]["command"],
         )
+        self.assertEqual(
+            "git ls-remote origin refs/heads/main",
+            publication["pre_push_remote_verification_result"]["command"],
+        )
+        self.assertEqual(
+            MAIN_HEAD,
+            publication["pre_push_remote_verification_observed_head"],
+        )
+        self.assertEqual(
+            "refs/heads/main",
+            publication["pre_push_remote_verification_observed_ref"],
+        )
+        self.assertTrue(publication["pre_push_remote_verification_output_digest_bound"])
         self.assertEqual(
             "git ls-remote origin refs/heads/main",
             publication["remote_verification_result"]["command"],
@@ -1562,6 +1587,12 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         )
         self.assertTrue(publication["protected_branch_receipt_digest_bound"])
         self.assertFalse(publication["raw_post_commit_publication_payload_stored"])
+        self.assertFalse(
+            publication["raw_pre_push_remote_verification_stdout_stored"]
+        )
+        self.assertFalse(
+            publication["raw_pre_push_remote_verification_stderr_stored"]
+        )
         self.assertFalse(publication["raw_push_stdout_stored"])
         self.assertFalse(publication["raw_push_stderr_stored"])
         self.assertFalse(publication["raw_remote_verification_stdout_stored"])
@@ -1622,6 +1653,41 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             stale_remote_output_head,
             publication["remote_verification_observed_head"],
         )
+        self.assertTrue(validation["publication_digest_bound"])
+
+    def test_post_commit_publication_blocks_advanced_pre_push_remote_head(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+        advanced_remote_head = "d" * 40
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            pre_push_remote_head=advanced_remote_head,
+            remote_head=local_commit_head,
+            result_summary=(
+                "Publication blocks when origin/main advanced after the "
+                "source execution checkout head."
+            ),
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "pre-push remote head must match source execution current checkout head",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertFalse(validation["pre_push_remote_head_matches_source"])
+        self.assertTrue(validation["pre_push_remote_verification_digest_bound"])
+        self.assertTrue(
+            validation["pre_push_remote_verification_output_digest_bound"]
+        )
+        self.assertTrue(validation["remote_head_matches_local_commit"])
         self.assertTrue(validation["publication_digest_bound"])
 
     def test_post_commit_publication_blocks_remote_head_mismatch(self) -> None:

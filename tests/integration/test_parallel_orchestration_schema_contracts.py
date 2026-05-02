@@ -473,6 +473,21 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             ]
         )
         self.assertTrue(
+            result["validation"][
+                "post_commit_publication_pre_push_remote_head_matches_source"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_pre_push_remote_verification_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_pre_push_remote_verification_output_bound"
+            ]
+        )
+        self.assertTrue(
             result["validation"]["post_commit_publication_remote_head_matches"]
         )
         self.assertTrue(
@@ -560,6 +575,17 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             result["post_commit_publication_receipt"]["push_command_result"][
                 "command"
             ],
+        )
+        self.assertEqual(
+            "git ls-remote origin refs/heads/main",
+            result["post_commit_publication_receipt"][
+                "pre_push_remote_verification_result"
+            ]["command"],
+        )
+        self.assertTrue(
+            result["post_commit_publication_receipt"][
+                "pre_push_remote_verification_output_digest_bound"
+            ]
         )
         self.assertEqual(
             "protected",

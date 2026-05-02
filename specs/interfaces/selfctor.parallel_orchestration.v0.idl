@@ -2,7 +2,7 @@ idl_version: 1
 kind: service
 namespace: selfctor.parallel_orchestration.v0
 service: ParallelCodexOrchestrationService
-summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff or structured patch-segment classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, repo-local patch artifact bindings, command-bound git apply dry-run manifests, context-bound post-apply verification manifests, checkout mutation attestations, patch artifact cleanup receipts, commit finalization gates, and post-commit origin/main publication plus protected-branch provider policy receipts before GitHub handoff.
+summary: Bind parallel Codex, remote branch / PR, and Yaoyorozu worker-dispatch results to digest-only receipts with signed worker identity, repo-local workspace marker diff or structured patch-segment classification, source metadata, remote source revocation evidence, signed provider timestamp evidence, timestamp replay guards, remote source content identity, remote source main-head ancestry, batch-level changed-file conflict arbitration, quarantined blocked receipt set digests, ordered apply plan digests, repo-local patch artifact bindings, command-bound git apply dry-run manifests, context-bound post-apply verification manifests, checkout mutation attestations, patch artifact cleanup receipts, commit finalization gates, and post-commit origin/main publication with pre-push remote freshness plus protected-branch provider policy receipts before GitHub handoff.
 imports:
   parallel_codex_worker_result_receipt: ../schemas/parallel_codex_worker_result_receipt.schema
   parallel_codex_integration_batch_receipt: ../schemas/parallel_codex_integration_batch_receipt.schema
@@ -347,7 +347,7 @@ operations:
       - commit finalization gate must bind source batch digest, current checkout head, apply plan digest, patch artifact manifest digest, pre-apply dry-run manifest digest, post-apply verification context digest, checkout mutation event digest, post-apply head, patch artifact cleanup digest, changed-file owner manifest digest, and passing verification state before commit
       - conflict, worker receipt, batch, patch, dry-run stdout/stderr, verification stdout/stderr, checkout mutation event payload, patch cleanup payload, commit finalization payload, and other raw payloads are never stored
   plan_post_commit_publication:
-    summary: Bind a commit-finalized integration execution receipt to a command-level `git push origin HEAD:refs/heads/main` receipt, `git ls-remote origin refs/heads/main` remote-head verification receipt, ls-remote head/ref output binding, and digest-only protected-branch provider policy receipt with freshness / signed timestamp / replay guard before GitHub handoff.
+    summary: Bind a commit-finalized integration execution receipt to a pre-push `git ls-remote origin refs/heads/main` freshness receipt, command-level `git push origin HEAD:refs/heads/main` receipt, post-push `git ls-remote origin refs/heads/main` remote-head verification receipt, ls-remote head/ref output bindings, and digest-only protected-branch provider policy receipt with freshness / signed timestamp / replay guard before GitHub handoff.
     input:
       inline_schema:
         type: object
@@ -366,10 +366,16 @@ operations:
           remote_head:
             type: string
             pattern: "^[a-f0-9]{40}$"
+          pre_push_remote_head:
+            type: string
+            pattern: "^[a-f0-9]{40}$"
           remote_name:
             const: origin
           remote_ref:
             const: refs/heads/main
+          pre_push_remote_verification_result:
+            type: object
+            additionalProperties: true
           push_result:
             type: object
             additionalProperties: true
@@ -425,13 +431,15 @@ operations:
     guarantees:
       - source execution receipt digest must be bound and validation-ready before publication_status can become published
       - source commit finalization must be ready before a push result can be treated as GitHub handoff evidence
+      - pre-push origin/main head must match the source execution current checkout head before a push result can be treated as GitHub handoff evidence
       - local commit head must match the source execution post-apply head and remote head must match that local commit
-      - push command is fixed to `git push origin HEAD:refs/heads/main` and remote verification command is fixed to `git ls-remote origin refs/heads/main`
-      - remote verification output must bind an observed commit head and `refs/heads/main` ref to the command stdout digest before GitHub handoff
+      - push command is fixed to `git push origin HEAD:refs/heads/main` and both pre-push and post-push remote verification commands are fixed to `git ls-remote origin refs/heads/main`
+      - pre-push remote verification output must bind the source execution current checkout head and `refs/heads/main` ref to the command stdout digest before GitHub handoff
+      - post-push remote verification output must bind the published commit head and `refs/heads/main` ref to the command stdout digest before GitHub handoff
       - protected branch provider evidence must show github refs/heads/main as protected, fresh within 900 seconds, signed-current by the provider timestamp, replay-guard unique, and must bind the required reference verification checks before ready_for_github_handoff can become true
-      - push and remote verification stdout/stderr plus provider branch-protection / freshness / timestamp / replay-guard payloads are stored only as digests, and publication_digest binds source execution, local head, remote head, command receipts, remote verification output digest, and protected branch receipt
+      - pre-push verification, push, and post-push verification stdout/stderr plus provider branch-protection / freshness / timestamp / replay-guard payloads are stored only as digests, and publication_digest binds source execution, local head, pre-push remote head, published remote head, command receipts, remote verification output digests, and protected branch receipt
   validate_post_commit_publication_receipt:
-    summary: Recompute post-commit publication command digests, ls-remote output binding digest, protected branch policy/freshness/timestamp/replay digests, publication digest, receipt digest, and blocking reasons.
+    summary: Recompute post-commit publication command digests, pre-push/post-push ls-remote output binding digests, protected branch policy/freshness/timestamp/replay digests, publication digest, receipt digest, and blocking reasons.
     input:
       schema_ref: parallel_codex_post_commit_publication_receipt
     output:

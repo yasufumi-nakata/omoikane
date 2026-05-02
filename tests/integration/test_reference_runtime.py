@@ -1188,6 +1188,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_pre_push_remote_head_matches_source"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_pre_push_remote_verification_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_pre_push_remote_verification_output_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_remote_verification_digest_bound"
             ]
         )

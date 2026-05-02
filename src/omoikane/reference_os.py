@@ -996,6 +996,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-02_parallel-codex-checkout-mutation-attestation.md",
             "meta/decision-log/2026-05-02_parallel-codex-commit-finalization-gate.md",
             "meta/decision-log/2026-05-02_parallel-codex-post-commit-publication.md",
+            "meta/decision-log/2026-05-02_parallel-codex-pre-push-remote-freshness.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1568,6 +1569,19 @@ class OmoikaneReferenceOS:
                 "post_commit_publication_remote_ref": (
                     post_commit_publication_receipt["remote_ref"]
                 ),
+                "post_commit_publication_pre_push_remote_head": (
+                    post_commit_publication_receipt["pre_push_remote_head"]
+                ),
+                "post_commit_publication_pre_push_remote_verification_digest": (
+                    post_commit_publication_receipt[
+                        "pre_push_remote_verification_command_receipt_digest"
+                    ]
+                ),
+                "post_commit_publication_pre_push_remote_verification_output_digest": (
+                    post_commit_publication_receipt[
+                        "pre_push_remote_verification_output_digest"
+                    ]
+                ),
                 "post_commit_publication_remote_head": (
                     post_commit_publication_receipt["remote_head"]
                 ),
@@ -1666,6 +1680,7 @@ class OmoikaneReferenceOS:
                 "raw_patch_artifact_cleanup_payload_stored": False,
                 "raw_commit_finalization_payload_stored": False,
                 "raw_post_commit_publication_payload_stored": False,
+                "raw_pre_push_remote_verification_payload_stored": False,
                 "raw_push_stdout_stored": False,
                 "raw_push_stderr_stored": False,
                 "raw_remote_verification_stdout_stored": False,
@@ -2333,6 +2348,21 @@ class OmoikaneReferenceOS:
                         "local_commit_head_matches_source"
                     ]
                 ),
+                "post_commit_publication_pre_push_remote_head_matches_source": (
+                    post_commit_publication_validation[
+                        "pre_push_remote_head_matches_source"
+                    ]
+                ),
+                "post_commit_publication_pre_push_remote_verification_digest_bound": (
+                    post_commit_publication_validation[
+                        "pre_push_remote_verification_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_pre_push_remote_verification_output_bound": (
+                    post_commit_publication_validation[
+                        "pre_push_remote_verification_output_digest_bound"
+                    ]
+                ),
                 "post_commit_publication_remote_head_matches": (
                     post_commit_publication_validation[
                         "remote_head_matches_local_commit"
@@ -2421,6 +2451,9 @@ class OmoikaneReferenceOS:
                 "post_commit_publication_raw_payload_redacted": (
                     post_commit_publication_validation[
                         "raw_publication_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_pre_push_remote_verification_output_redacted"
                     ]
                     and post_commit_publication_validation[
                         "raw_push_output_redacted"

@@ -3,8 +3,9 @@ target: selfctor.parallel_orchestration
 summary: >
   parallel-orchestration-demo が commit-finalized execution receipt を
   origin/main 公開レシートへ縮約し、source execution digest、local commit head、
-  remote head、command-bound git push receipt、command-bound git ls-remote
-  verification receipt、ls-remote output の observed head/ref digest、
+  pre-push remote head、remote head、command-bound pre-push git ls-remote
+  freshness receipt、command-bound git push receipt、command-bound post-push
+  git ls-remote verification receipt、ls-remote output の observed head/ref digest、
   protected branch provider policy receipt、
   provider policy freshness、signed provider timestamp、timestamp replay guard、
   publication digest、raw execution / push / remote verification /
@@ -17,6 +18,9 @@ expect:
   post_commit_publication_source_execution_bound: true
   post_commit_publication_commit_finalization_ready: true
   post_commit_publication_local_commit_matches_source: true
+  post_commit_publication_pre_push_remote_head_matches_source: true
+  post_commit_publication_pre_push_remote_verification_digest_bound: true
+  post_commit_publication_pre_push_remote_verification_output_bound: true
   post_commit_publication_remote_head_matches: true
   post_commit_publication_push_command_digest_bound: true
   post_commit_publication_remote_verification_digest_bound: true

@@ -2118,8 +2118,10 @@ class ParallelCodexOrchestrationService:
         local_commit_head: str,
         remote_head: str,
         result_summary: str,
+        pre_push_remote_head: str = "",
         remote_name: str = "origin",
         remote_ref: str = "refs/heads/main",
+        pre_push_remote_verification_result: Mapping[str, Any] | None = None,
         push_result: Mapping[str, Any] | None = None,
         remote_verification_result: Mapping[str, Any] | None = None,
         protected_branch_provider: str = (
@@ -2164,6 +2166,12 @@ class ParallelCodexOrchestrationService:
         normalized_remote_head = remote_head.strip()
         normalized_remote_name = remote_name.strip() or "origin"
         normalized_remote_ref = remote_ref.strip() or "refs/heads/main"
+        source_current_checkout_head = str(
+            execution_receipt.get("current_checkout_head", ""),
+        ).strip()
+        normalized_pre_push_remote_head = (
+            pre_push_remote_head.strip() or source_current_checkout_head
+        )
         remote_tracking_ref = normalized_remote_ref.replace(
             "refs/heads/",
             f"refs/remotes/{normalized_remote_name}/",
@@ -2174,6 +2182,23 @@ class ParallelCodexOrchestrationService:
         )
         remote_verification_command = (
             f"git ls-remote {normalized_remote_name} {normalized_remote_ref}"
+        )
+        raw_pre_push_remote_verification_result = (
+            pre_push_remote_verification_result
+            or {
+                "stdout_excerpt": (
+                    f"{normalized_pre_push_remote_head}\t{normalized_remote_ref}"
+                ),
+            }
+        )
+        normalized_pre_push_remote_verification_result = (
+            self._normalize_post_commit_publication_command(
+                raw_pre_push_remote_verification_result,
+                default_command=remote_verification_command,
+                command_profile=(
+                    PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+                ),
+            )
         )
         normalized_push_result = self._normalize_post_commit_publication_command(
             push_result or {},
@@ -2329,6 +2354,36 @@ class ParallelCodexOrchestrationService:
             _is_sha256(protected_branch_provider_timestamp_replay_digest)
         )
         (
+            pre_push_remote_verification_observed_head,
+            pre_push_remote_verification_observed_ref,
+        ) = self._post_commit_remote_verification_observed_output(
+            raw_pre_push_remote_verification_result,
+            expected_head=normalized_pre_push_remote_head,
+            expected_ref=normalized_remote_ref,
+            stdout_digest=normalized_pre_push_remote_verification_result[
+                "stdout_digest"
+            ],
+        )
+        pre_push_remote_verification_output_digest = (
+            self._post_commit_remote_verification_output_digest(
+                observed_head=pre_push_remote_verification_observed_head,
+                observed_ref=pre_push_remote_verification_observed_ref,
+                stdout_digest=normalized_pre_push_remote_verification_result[
+                    "stdout_digest"
+                ],
+            )
+        )
+        pre_push_remote_verification_output_digest_bound = (
+            pre_push_remote_verification_observed_head
+            == normalized_pre_push_remote_head
+            and pre_push_remote_verification_observed_ref == normalized_remote_ref
+            and self._post_commit_remote_verification_stdout_digest_matches(
+                normalized_pre_push_remote_verification_result["stdout_digest"],
+                head=pre_push_remote_verification_observed_head,
+                ref=pre_push_remote_verification_observed_ref,
+            )
+        )
+        (
             remote_verification_observed_head,
             remote_verification_observed_ref,
         ) = self._post_commit_remote_verification_observed_output(
@@ -2387,6 +2442,7 @@ class ParallelCodexOrchestrationService:
             "source_execution_commit_finalization_ready": (
                 execution_validation["commit_finalization_ready"]
             ),
+            "source_execution_current_checkout_head": source_current_checkout_head,
             "source_execution_post_apply_head": source_post_apply_head,
             "local_commit_head": normalized_local_head,
             "local_commit_head_matches_source": (
@@ -2395,6 +2451,36 @@ class ParallelCodexOrchestrationService:
             "remote_name": normalized_remote_name,
             "remote_ref": normalized_remote_ref,
             "remote_tracking_ref": remote_tracking_ref,
+            "pre_push_remote_head": normalized_pre_push_remote_head,
+            "pre_push_remote_head_matches_source": (
+                normalized_pre_push_remote_head == source_current_checkout_head
+            ),
+            "pre_push_remote_verification_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+            ),
+            "pre_push_remote_verification_result": (
+                normalized_pre_push_remote_verification_result
+            ),
+            "pre_push_remote_verification_command_receipt_digest": (
+                normalized_pre_push_remote_verification_result[
+                    "command_receipt_digest"
+                ]
+            ),
+            "pre_push_remote_verification_output_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
+            ),
+            "pre_push_remote_verification_observed_head": (
+                pre_push_remote_verification_observed_head
+            ),
+            "pre_push_remote_verification_observed_ref": (
+                pre_push_remote_verification_observed_ref
+            ),
+            "pre_push_remote_verification_output_digest": (
+                pre_push_remote_verification_output_digest
+            ),
+            "pre_push_remote_verification_output_digest_bound": (
+                pre_push_remote_verification_output_digest_bound
+            ),
             "remote_head": normalized_remote_head,
             "remote_head_matches_local_commit": (
                 normalized_remote_head == normalized_local_head
@@ -2502,6 +2588,8 @@ class ParallelCodexOrchestrationService:
             "result_summary": result_summary,
             "raw_execution_payload_stored": False,
             "raw_post_commit_publication_payload_stored": False,
+            "raw_pre_push_remote_verification_stdout_stored": False,
+            "raw_pre_push_remote_verification_stderr_stored": False,
             "raw_push_stdout_stored": False,
             "raw_push_stderr_stored": False,
             "raw_remote_verification_stdout_stored": False,
@@ -2564,6 +2652,9 @@ class ParallelCodexOrchestrationService:
             f"{receipt.get('remote_ref', '')}"
         )
         push_result = dict(receipt.get("push_command_result", {}))
+        pre_push_remote_verification_result = dict(
+            receipt.get("pre_push_remote_verification_result", {}),
+        )
         remote_verification_result = dict(
             receipt.get("remote_verification_result", {}),
         )
@@ -2573,6 +2664,14 @@ class ParallelCodexOrchestrationService:
             and push_result.get("command_receipt_digest")
             == receipt.get("push_command_receipt_digest")
         )
+        pre_push_remote_verification_digest_bound = (
+            receipt.get("pre_push_remote_verification_command_receipt_digest")
+            == self._post_commit_publication_command_receipt_digest(
+                pre_push_remote_verification_result,
+            )
+            and pre_push_remote_verification_result.get("command_receipt_digest")
+            == receipt.get("pre_push_remote_verification_command_receipt_digest")
+        )
         remote_verification_digest_bound = (
             receipt.get("remote_verification_command_receipt_digest")
             == self._post_commit_publication_command_receipt_digest(
@@ -2580,6 +2679,34 @@ class ParallelCodexOrchestrationService:
             )
             and remote_verification_result.get("command_receipt_digest")
             == receipt.get("remote_verification_command_receipt_digest")
+        )
+        pre_push_remote_verification_output_digest_bound = (
+            receipt.get("pre_push_remote_verification_output_digest")
+            == self._post_commit_remote_verification_output_digest(
+                observed_head=str(
+                    receipt.get("pre_push_remote_verification_observed_head", ""),
+                ),
+                observed_ref=str(
+                    receipt.get("pre_push_remote_verification_observed_ref", ""),
+                ),
+                stdout_digest=str(
+                    pre_push_remote_verification_result.get("stdout_digest", ""),
+                ),
+            )
+            and receipt.get("pre_push_remote_verification_output_digest_bound") is True
+            and receipt.get("pre_push_remote_verification_observed_head")
+            == receipt.get("pre_push_remote_head")
+            and receipt.get("pre_push_remote_verification_observed_ref")
+            == receipt.get("remote_ref")
+            and self._post_commit_remote_verification_stdout_digest_matches(
+                str(pre_push_remote_verification_result.get("stdout_digest", "")),
+                head=str(
+                    receipt.get("pre_push_remote_verification_observed_head", ""),
+                ),
+                ref=str(
+                    receipt.get("pre_push_remote_verification_observed_ref", ""),
+                ),
+            )
         )
         remote_verification_output_digest_bound = (
             receipt.get("remote_verification_output_digest")
@@ -2711,10 +2838,20 @@ class ParallelCodexOrchestrationService:
         ):
             errors.append("remote_verification_profile mismatch")
         if (
+            receipt.get("pre_push_remote_verification_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+        ):
+            errors.append("pre_push_remote_verification_profile mismatch")
+        if (
             receipt.get("remote_verification_output_profile")
             != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
         ):
             errors.append("remote_verification_output_profile mismatch")
+        if (
+            receipt.get("pre_push_remote_verification_output_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
+        ):
+            errors.append("pre_push_remote_verification_output_profile mismatch")
         if (
             receipt.get("protected_branch_profile")
             != PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
@@ -2740,10 +2877,18 @@ class ParallelCodexOrchestrationService:
             )
         if push_result.get("command") != push_command:
             errors.append("push command must target origin main")
+        if pre_push_remote_verification_result.get("command") != (
+            remote_verification_command
+        ):
+            errors.append("pre-push remote verification command mismatch")
         if remote_verification_result.get("command") != remote_verification_command:
             errors.append("remote verification command mismatch")
         if not push_command_digest_bound:
             errors.append("push_command_receipt_digest mismatch")
+        if not pre_push_remote_verification_digest_bound:
+            errors.append("pre_push_remote_verification_command_receipt_digest mismatch")
+        if not pre_push_remote_verification_output_digest_bound:
+            errors.append("pre_push_remote_verification_output_digest mismatch")
         if not remote_verification_digest_bound:
             errors.append("remote_verification_command_receipt_digest mismatch")
         if not publication_digest_bound:
@@ -2762,6 +2907,20 @@ class ParallelCodexOrchestrationService:
             errors.append("raw_execution_payload_stored must be false")
         if receipt.get("raw_post_commit_publication_payload_stored") is not False:
             errors.append("raw_post_commit_publication_payload_stored must be false")
+        if (
+            receipt.get("raw_pre_push_remote_verification_stdout_stored")
+            is not False
+        ):
+            errors.append(
+                "raw_pre_push_remote_verification_stdout_stored must be false",
+            )
+        if (
+            receipt.get("raw_pre_push_remote_verification_stderr_stored")
+            is not False
+        ):
+            errors.append(
+                "raw_pre_push_remote_verification_stderr_stored must be false",
+            )
         if receipt.get("raw_push_stdout_stored") is not False:
             errors.append("raw_push_stdout_stored must be false")
         if receipt.get("raw_push_stderr_stored") is not False:
@@ -2814,11 +2973,35 @@ class ParallelCodexOrchestrationService:
             "source_execution_commit_finalization_ready": (
                 receipt.get("source_execution_commit_finalization_ready") is True
             ),
+            "source_execution_current_checkout_head_bound": _is_commit(
+                receipt.get("source_execution_current_checkout_head"),
+            ),
             "local_commit_head_bound": _is_commit(
                 receipt.get("local_commit_head"),
             ),
             "local_commit_head_matches_source": (
                 receipt.get("local_commit_head_matches_source") is True
+            ),
+            "pre_push_remote_head_matches_source": (
+                receipt.get("pre_push_remote_head_matches_source") is True
+            ),
+            "pre_push_remote_verification_digest_bound": (
+                pre_push_remote_verification_digest_bound
+            ),
+            "pre_push_remote_verification_passed": (
+                pre_push_remote_verification_result.get("status") == "pass"
+                and pre_push_remote_verification_result.get("exit_code") == 0
+            ),
+            "pre_push_remote_verification_output_digest_bound": (
+                pre_push_remote_verification_output_digest_bound
+            ),
+            "pre_push_remote_verification_observed_head_matches": (
+                receipt.get("pre_push_remote_verification_observed_head")
+                == receipt.get("pre_push_remote_head")
+            ),
+            "pre_push_remote_verification_observed_ref_matches": (
+                receipt.get("pre_push_remote_verification_observed_ref")
+                == receipt.get("remote_ref")
             ),
             "remote_head_matches_local_commit": (
                 receipt.get("remote_head_matches_local_commit") is True
@@ -2894,6 +3077,16 @@ class ParallelCodexOrchestrationService:
             "receipt_digest_bound": receipt_digest_bound,
             "raw_publication_payload_redacted": (
                 receipt.get("raw_post_commit_publication_payload_stored")
+                is False
+            ),
+            "raw_pre_push_remote_verification_output_redacted": (
+                receipt.get("raw_pre_push_remote_verification_stdout_stored")
+                is False
+                and receipt.get("raw_pre_push_remote_verification_stderr_stored")
+                is False
+                and pre_push_remote_verification_result.get("raw_stdout_stored")
+                is False
+                and pre_push_remote_verification_result.get("raw_stderr_stored")
                 is False
             ),
             "raw_push_output_redacted": (
@@ -5249,6 +5442,10 @@ class ParallelCodexOrchestrationService:
                         "source_execution_commit_finalization_ready",
                         False,
                     ),
+                    "source_execution_current_checkout_head": receipt.get(
+                        "source_execution_current_checkout_head",
+                        "",
+                    ),
                     "source_execution_post_apply_head": receipt.get(
                         "source_execution_post_apply_head",
                         "",
@@ -5261,6 +5458,35 @@ class ParallelCodexOrchestrationService:
                     "remote_name": receipt.get("remote_name", ""),
                     "remote_ref": receipt.get("remote_ref", ""),
                     "remote_tracking_ref": receipt.get("remote_tracking_ref", ""),
+                    "pre_push_remote_head": receipt.get("pre_push_remote_head", ""),
+                    "pre_push_remote_head_matches_source": receipt.get(
+                        "pre_push_remote_head_matches_source",
+                        False,
+                    ),
+                    "pre_push_remote_verification_command_receipt_digest": receipt.get(
+                        "pre_push_remote_verification_command_receipt_digest",
+                        "",
+                    ),
+                    "pre_push_remote_verification_output_profile": receipt.get(
+                        "pre_push_remote_verification_output_profile",
+                        "",
+                    ),
+                    "pre_push_remote_verification_observed_head": receipt.get(
+                        "pre_push_remote_verification_observed_head",
+                        "",
+                    ),
+                    "pre_push_remote_verification_observed_ref": receipt.get(
+                        "pre_push_remote_verification_observed_ref",
+                        "",
+                    ),
+                    "pre_push_remote_verification_output_digest": receipt.get(
+                        "pre_push_remote_verification_output_digest",
+                        "",
+                    ),
+                    "pre_push_remote_verification_output_digest_bound": receipt.get(
+                        "pre_push_remote_verification_output_digest_bound",
+                        False,
+                    ),
                     "remote_head": receipt.get("remote_head", ""),
                     "remote_head_matches_local_commit": receipt.get(
                         "remote_head_matches_local_commit",
@@ -5365,6 +5591,8 @@ class ParallelCodexOrchestrationService:
                     ),
                     "raw_execution_payload_stored": False,
                     "raw_post_commit_publication_payload_stored": False,
+                    "raw_pre_push_remote_verification_stdout_stored": False,
+                    "raw_pre_push_remote_verification_stderr_stored": False,
                     "raw_push_stdout_stored": False,
                     "raw_push_stderr_stored": False,
                     "raw_remote_verification_stdout_stored": False,
@@ -5851,6 +6079,9 @@ class ParallelCodexOrchestrationService:
     ) -> list[str]:
         reasons: list[str] = []
         push_result = dict(receipt.get("push_command_result", {}))
+        pre_push_remote_verification_result = dict(
+            receipt.get("pre_push_remote_verification_result", {}),
+        )
         remote_verification_result = dict(
             receipt.get("remote_verification_result", {}),
         )
@@ -5875,6 +6106,8 @@ class ParallelCodexOrchestrationService:
             receipt.get("source_execution_commit_finalization_digest"),
         ):
             reasons.append("commit finalization digest must be sha256")
+        if not _is_commit(receipt.get("source_execution_current_checkout_head")):
+            reasons.append("source execution current checkout head must be a commit hash")
         if not _is_commit(receipt.get("source_execution_post_apply_head")):
             reasons.append("source execution post-apply head must be a commit hash")
         if not _is_commit(receipt.get("local_commit_head")):
@@ -5891,16 +6124,32 @@ class ParallelCodexOrchestrationService:
             reasons.append("remote_ref must be refs/heads/main")
         if receipt.get("remote_tracking_ref") != "refs/remotes/origin/main":
             reasons.append("remote_tracking_ref must be refs/remotes/origin/main")
+        if not _is_commit(receipt.get("pre_push_remote_head")):
+            reasons.append("pre-push remote head must be a commit hash")
+        if receipt.get("pre_push_remote_head_matches_source") is not True:
+            reasons.append(
+                "pre-push remote head must match source execution current checkout head",
+            )
         if (
             receipt.get("push_command_profile")
             != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
         ):
             reasons.append("push_command_profile mismatch")
         if (
+            receipt.get("pre_push_remote_verification_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+        ):
+            reasons.append("pre_push_remote_verification_profile mismatch")
+        if (
             receipt.get("remote_verification_profile")
             != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
         ):
             reasons.append("remote_verification_profile mismatch")
+        if (
+            receipt.get("pre_push_remote_verification_output_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
+        ):
+            reasons.append("pre_push_remote_verification_output_profile mismatch")
         if (
             receipt.get("remote_verification_output_profile")
             != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
@@ -5925,6 +6174,62 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw push stdout must not be stored")
         if push_result.get("raw_stderr_stored") is not False:
             reasons.append("raw push stderr must not be stored")
+        if pre_push_remote_verification_result.get("command_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
+        ):
+            reasons.append("pre-push remote verification result profile mismatch")
+        if pre_push_remote_verification_result.get("command") != expected_remote_command:
+            reasons.append("pre-push remote verification command mismatch")
+        if (
+            pre_push_remote_verification_result.get("status") != "pass"
+            or pre_push_remote_verification_result.get("exit_code") != 0
+        ):
+            reasons.append("pre-push remote verification command must pass")
+        if (
+            receipt.get("pre_push_remote_verification_command_receipt_digest")
+            != self._post_commit_publication_command_receipt_digest(
+                pre_push_remote_verification_result,
+            )
+            or pre_push_remote_verification_result.get("command_receipt_digest")
+            != receipt.get("pre_push_remote_verification_command_receipt_digest")
+        ):
+            reasons.append("pre_push_remote_verification_command_receipt_digest mismatch")
+        if pre_push_remote_verification_result.get("raw_stdout_stored") is not False:
+            reasons.append("raw pre-push remote verification stdout must not be stored")
+        if pre_push_remote_verification_result.get("raw_stderr_stored") is not False:
+            reasons.append("raw pre-push remote verification stderr must not be stored")
+        if (
+            receipt.get("pre_push_remote_verification_output_digest")
+            != self._post_commit_remote_verification_output_digest(
+                observed_head=str(
+                    receipt.get("pre_push_remote_verification_observed_head", ""),
+                ),
+                observed_ref=str(
+                    receipt.get("pre_push_remote_verification_observed_ref", ""),
+                ),
+                stdout_digest=str(
+                    pre_push_remote_verification_result.get("stdout_digest", ""),
+                ),
+            )
+            or receipt.get("pre_push_remote_verification_output_digest_bound")
+            is not True
+            or receipt.get("pre_push_remote_verification_observed_head")
+            != receipt.get("pre_push_remote_head")
+            or receipt.get("pre_push_remote_verification_observed_ref")
+            != receipt.get("remote_ref")
+            or not self._post_commit_remote_verification_stdout_digest_matches(
+                str(pre_push_remote_verification_result.get("stdout_digest", "")),
+                head=str(
+                    receipt.get("pre_push_remote_verification_observed_head", ""),
+                ),
+                ref=str(
+                    receipt.get("pre_push_remote_verification_observed_ref", ""),
+                ),
+            )
+        ):
+            reasons.append(
+                "pre-push remote verification output must bind source head and ref",
+            )
         if remote_verification_result.get("command_profile") != (
             PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
         ):
@@ -6170,6 +6475,20 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw_execution_payload_stored must be false")
         if receipt.get("raw_post_commit_publication_payload_stored") is not False:
             reasons.append("raw_post_commit_publication_payload_stored must be false")
+        if (
+            receipt.get("raw_pre_push_remote_verification_stdout_stored")
+            is not False
+        ):
+            reasons.append(
+                "raw_pre_push_remote_verification_stdout_stored must be false",
+            )
+        if (
+            receipt.get("raw_pre_push_remote_verification_stderr_stored")
+            is not False
+        ):
+            reasons.append(
+                "raw_pre_push_remote_verification_stderr_stored must be false",
+            )
         if receipt.get("raw_push_stdout_stored") is not False:
             reasons.append("raw_push_stdout_stored must be false")
         if receipt.get("raw_push_stderr_stored") is not False:

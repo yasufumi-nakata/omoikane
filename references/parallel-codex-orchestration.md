@@ -92,11 +92,13 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   post-apply head、patch artifact cleanup digest、changed-file owner manifest digest、
   passing verification state を束縛し、未 ready の execution を commit へ進めない
 - post-commit publication receipt は commit-finalized execution receipt digest、
-  local commit head、origin/main remote head、`git push origin HEAD:refs/heads/main`
-  command receipt digest、`git ls-remote origin refs/heads/main` remote verification
-  digest、同 command stdout から観測した head/ref output digest、
+  local commit head、push 前 origin/main head、pre-push `git ls-remote origin refs/heads/main`
+  freshness digest、origin/main remote head、`git push origin HEAD:refs/heads/main`
+  command receipt digest、post-push `git ls-remote origin refs/heads/main` remote
+  verification digest、同 command stdout から観測した head/ref output digest、
   GitHub protected branch provider policy receipt digest、policy freshness digest、
   signed provider timestamp digest、timestamp replay guard digest を publication digest に束縛し、
+  push 前 origin/main が source execution current checkout head と一致しない、
   remote head が local commit と一致しない、`ls-remote` output が remote head /
   `refs/heads/main` と一致しない、provider policy が `refs/heads/main`
   を protected として示さない、policy freshness が 900 秒以内の `fresh` でない、

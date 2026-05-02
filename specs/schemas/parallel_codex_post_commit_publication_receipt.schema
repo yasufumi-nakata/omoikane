@@ -4,10 +4,11 @@ title: ParallelCodexPostCommitPublicationReceipt
 description: >
   Digest-only receipt for binding a commit-finalized Parallel Codex integration
   execution to a command-level origin/main push, remote-head verification,
-  ls-remote head/ref output binding, and protected-branch provider policy
-  receipt before GitHub handoff. The receipt keeps raw execution, push, remote
-  verification, and branch-provider payloads redacted while preserving command,
-  observed head/ref, policy, provider freshness, signed timestamp, timestamp
+  pre-push and post-push ls-remote head/ref output bindings, and
+  protected-branch provider policy receipt before GitHub handoff. The receipt
+  keeps raw execution, pre-push verification, push, remote verification, and
+  branch-provider payloads redacted while preserving command, observed
+  head/ref, policy, provider freshness, signed timestamp, timestamp
   replay-guard, provider receipt, and publication digests.
 type: object
 additionalProperties: false
@@ -27,12 +28,23 @@ required:
   - source_execution_commit_finalization_ref
   - source_execution_commit_finalization_digest
   - source_execution_commit_finalization_ready
+  - source_execution_current_checkout_head
   - source_execution_post_apply_head
   - local_commit_head
   - local_commit_head_matches_source
   - remote_name
   - remote_ref
   - remote_tracking_ref
+  - pre_push_remote_head
+  - pre_push_remote_head_matches_source
+  - pre_push_remote_verification_profile
+  - pre_push_remote_verification_result
+  - pre_push_remote_verification_command_receipt_digest
+  - pre_push_remote_verification_output_profile
+  - pre_push_remote_verification_observed_head
+  - pre_push_remote_verification_observed_ref
+  - pre_push_remote_verification_output_digest
+  - pre_push_remote_verification_output_digest_bound
   - remote_head
   - remote_head_matches_local_commit
   - push_command_profile
@@ -82,6 +94,8 @@ required:
   - result_summary
   - raw_execution_payload_stored
   - raw_post_commit_publication_payload_stored
+  - raw_pre_push_remote_verification_stdout_stored
+  - raw_pre_push_remote_verification_stderr_stored
   - raw_push_stdout_stored
   - raw_push_stderr_stored
   - raw_remote_verification_stdout_stored
@@ -132,6 +146,9 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   source_execution_commit_finalization_ready:
     type: boolean
+  source_execution_current_checkout_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
   source_execution_post_apply_head:
     type: string
     pattern: "^[a-f0-9]{40}$"
@@ -146,6 +163,30 @@ properties:
     const: refs/heads/main
   remote_tracking_ref:
     const: refs/remotes/origin/main
+  pre_push_remote_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  pre_push_remote_head_matches_source:
+    type: boolean
+  pre_push_remote_verification_profile:
+    const: command-bound-git-ls-remote-origin-main-v1
+  pre_push_remote_verification_result:
+    $ref: "#/$defs/command_result"
+  pre_push_remote_verification_command_receipt_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  pre_push_remote_verification_output_profile:
+    const: ls-remote-head-ref-output-binding-v1
+  pre_push_remote_verification_observed_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  pre_push_remote_verification_observed_ref:
+    const: refs/heads/main
+  pre_push_remote_verification_output_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  pre_push_remote_verification_output_digest_bound:
+    type: boolean
   remote_head:
     type: string
     pattern: "^[a-f0-9]{40}$"
@@ -282,6 +323,10 @@ properties:
   raw_execution_payload_stored:
     const: false
   raw_post_commit_publication_payload_stored:
+    const: false
+  raw_pre_push_remote_verification_stdout_stored:
+    const: false
+  raw_pre_push_remote_verification_stderr_stored:
     const: false
   raw_push_stdout_stored:
     const: false
