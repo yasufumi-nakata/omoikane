@@ -347,7 +347,7 @@ operations:
       - commit finalization gate must bind source batch digest, current checkout head, apply plan digest, patch artifact manifest digest, pre-apply dry-run manifest digest, post-apply verification context digest, checkout mutation event digest, post-apply head, patch artifact cleanup digest, changed-file owner manifest digest, and passing verification state before commit
       - conflict, worker receipt, batch, patch, dry-run stdout/stderr, verification stdout/stderr, checkout mutation event payload, patch cleanup payload, commit finalization payload, and other raw payloads are never stored
   plan_post_commit_publication:
-    summary: Bind a commit-finalized integration execution receipt to a pre-push `git ls-remote origin refs/heads/main` freshness receipt, command-level `git push origin HEAD:refs/heads/main` receipt, post-push `git ls-remote origin refs/heads/main` remote-head verification receipt, ls-remote head/ref output bindings, digest-only protected-branch provider policy receipt with freshness / signed timestamp / replay guard, post-push status/check suite evidence, and status/check suite freshness before GitHub handoff.
+    summary: Bind a commit-finalized integration execution receipt to a pre-push `git ls-remote origin refs/heads/main` freshness receipt, command-level `git push origin HEAD:refs/heads/main` receipt, post-push `git ls-remote origin refs/heads/main` remote-head verification receipt, ls-remote head/ref output bindings, digest-only protected-branch provider policy receipt with freshness / signed timestamp / replay guard, post-push status/check suite evidence, status/check suite freshness, and status/check signed timestamp / replay guard before GitHub handoff.
     input:
       inline_schema:
         type: object
@@ -452,6 +452,19 @@ operations:
           status_check_suite_freshness_digest:
             type: string
             pattern: "^[a-f0-9]{64}$"
+          status_check_suite_timestamp_ref:
+            type: string
+            minLength: 1
+          status_check_suite_timestamp_status:
+            enum: [signed-current, stale, invalid]
+          status_check_suite_timestamp_signature_digest:
+            type: string
+            pattern: "^[a-f0-9]{64}$"
+          status_check_suite_timestamp_nonce_ref:
+            type: string
+            minLength: 1
+          status_check_suite_timestamp_replay_status:
+            enum: [unique, replayed]
           result_summary:
             type: string
             minLength: 1
@@ -466,10 +479,10 @@ operations:
       - pre-push remote verification output must bind the source execution current checkout head and `refs/heads/main` ref to the command stdout digest before GitHub handoff
       - post-push remote verification output must bind the published commit head and `refs/heads/main` ref to the command stdout digest before GitHub handoff
       - protected branch provider evidence must show github refs/heads/main as protected, fresh within 900 seconds, signed-current by the provider timestamp, replay-guard unique, and must bind the required reference verification checks before ready_for_github_handoff can become true
-      - post-push status/check suite evidence must cover the protected branch required checks, bind each check-run digest to the published commit head, show completed/success, and carry a fresh <=900s suite snapshot digest before ready_for_github_handoff can become true
-      - pre-push verification, push, and post-push verification stdout/stderr plus provider branch-protection / freshness / timestamp / replay-guard / status-check / status-check freshness payloads are stored only as digests, and publication_digest binds source execution, local head, pre-push remote head, published remote head, command receipts, remote verification output digests, protected branch receipt, status-check suite digest, and status-check freshness digest
+      - post-push status/check suite evidence must cover the protected branch required checks, bind each check-run digest to the published commit head, show completed/success, carry a fresh <=900s suite snapshot digest, and bind a signed-current / replay-unique provider timestamp before ready_for_github_handoff can become true
+      - pre-push verification, push, and post-push verification stdout/stderr plus provider branch-protection / freshness / timestamp / replay-guard / status-check / status-check freshness / status-check timestamp / status-check timestamp replay payloads are stored only as digests, and publication_digest binds source execution, local head, pre-push remote head, published remote head, command receipts, remote verification output digests, protected branch receipt, status-check suite digest, status-check freshness digest, and status-check timestamp digests
   validate_post_commit_publication_receipt:
-    summary: Recompute post-commit publication command digests, pre-push/post-push ls-remote output binding digests, protected branch policy/freshness/timestamp/replay digests, post-push status/check suite digest, status/check suite freshness digest, publication digest, receipt digest, and blocking reasons.
+    summary: Recompute post-commit publication command digests, pre-push/post-push ls-remote output binding digests, protected branch policy/freshness/timestamp/replay digests, post-push status/check suite digest, status/check suite freshness and timestamp/replay digests, publication digest, receipt digest, and blocking reasons.
     input:
       schema_ref: parallel_codex_post_commit_publication_receipt
     output:

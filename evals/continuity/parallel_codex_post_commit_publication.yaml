@@ -9,10 +9,11 @@ summary: >
   protected branch provider policy receipt、
   provider policy freshness、signed provider timestamp、timestamp replay guard、
   post-push status/check suite digest、suite freshness digest、
+  status/check suite signed provider timestamp、timestamp replay guard、
   required check success、publication digest、
   raw execution / push / remote verification / protected branch provider /
-  freshness / timestamp / replay guard / status check / status check freshness
-  payload 非保存を固定すること
+  freshness / timestamp / replay guard / status check / status check freshness /
+  status check timestamp / status check timestamp replay payload 非保存を固定すること
 checks:
   - name: parallel Codex post-commit publication smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -46,6 +47,10 @@ expect:
   post_commit_publication_status_check_suite_freshness_digest_bound: true
   post_commit_publication_status_check_suite_fresh: true
   post_commit_publication_status_check_suite_freshness_window_bound: true
+  post_commit_publication_status_check_suite_timestamp_digest_bound: true
+  post_commit_publication_status_check_suite_timestamp_signed_current: true
+  post_commit_publication_status_check_suite_timestamp_replay_digest_bound: true
+  post_commit_publication_status_check_suite_timestamp_unique: true
   post_commit_publication_publication_digest_bound: true
   post_commit_publication_raw_payload_redacted: true
   blocked_post_commit_publication_result_blocked: true

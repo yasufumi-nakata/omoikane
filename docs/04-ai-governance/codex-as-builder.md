@@ -89,13 +89,16 @@ head、command-bound pre-push remote freshness / push / post-push remote verific
 observed head/ref digest、GitHub protected branch provider policy receipt、
 provider policy freshness、signed provider timestamp、timestamp replay guard、
 post-push status/check suite digest、status/check suite freshness digest、
+status/check suite signed provider timestamp digest、timestamp replay guard digest、
 publication digest を固定し、push 前 origin/main が source execution current checkout head と
 一致しない状態、remote head mismatch、ls-remote output mismatch、push / remote verification failure、protected branch 未保護 / unknown、stale
 provider policy、unsigned/replayed provider timestamp、required status check failure /
-missing / stale commit / stale suite snapshot を GitHub handoff へ進めない。
+missing / stale commit / stale suite snapshot、unsigned/replayed status check suite
+timestamp を GitHub handoff へ進めない。
 raw batch / apply plan / dry-run / worker receipt / verification / checkout
 mutation / patch cleanup / commit finalization / publication / push / remote
-verification / protected branch provider / status check provider payload は保存しない。
+verification / protected branch provider / status check provider / status check
+timestamp payload は保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

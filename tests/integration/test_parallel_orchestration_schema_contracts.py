@@ -575,6 +575,26 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_status_check_suite_timestamp_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_timestamp_signed_current"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_timestamp_replay_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_timestamp_unique"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_publication_digest_bound"
             ]
         )
@@ -617,9 +637,41 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
                 "status_check_suite_freshness_digest_bound"
             ]
         )
+        self.assertEqual(
+            "signed-current",
+            result["post_commit_publication_receipt"][
+                "status_check_suite_timestamp_status"
+            ],
+        )
+        self.assertTrue(
+            result["post_commit_publication_receipt"][
+                "status_check_suite_timestamp_digest_bound"
+            ]
+        )
+        self.assertEqual(
+            "unique",
+            result["post_commit_publication_receipt"][
+                "status_check_suite_timestamp_replay_status"
+            ],
+        )
+        self.assertTrue(
+            result["post_commit_publication_receipt"][
+                "status_check_suite_timestamp_replay_digest_bound"
+            ]
+        )
         self.assertFalse(
             result["post_commit_publication_receipt"][
                 "raw_status_check_suite_freshness_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["post_commit_publication_receipt"][
+                "raw_status_check_suite_timestamp_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["post_commit_publication_receipt"][
+                "raw_status_check_suite_timestamp_replay_guard_payload_stored"
             ]
         )
         self.assertFalse(

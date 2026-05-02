@@ -107,12 +107,15 @@ required verification checks、policy digest、freshness window、signed provide
 timestamp、timestamp replay guard、provider receipt digest を raw provider payload
 なしで束縛する。さらに post-push status/check suite が同じ remote head 上の
 required verification checks を completed/success として check-run digest に束縛し、
-suite freshness digest が 900 秒以内の `fresh` snapshot を示すことも要求する。
+suite freshness digest が 900 秒以内の `fresh` snapshot を示し、同じ suite の
+provider timestamp が `signed-current` かつ replay guard が `unique` であることも
+要求する。
 push 前 origin/main が source execution current checkout head と
 一致しない場合、push 失敗、remote head mismatch、ls-remote output mismatch、
 protected branch が未保護 / unknown、provider policy freshness が expired /
 unknown、timestamp が stale / invalid、replay guard が replayed、status/check suite が
-missing / failure / stale commit、suite freshness が stale、または source execution / commit finalization が未 ready の場合は schema-bound のまま
+missing / failure / stale commit、suite freshness が stale、suite provider timestamp が
+stale / invalid、suite timestamp replay guard が replayed、または source execution / commit finalization が未 ready の場合は schema-bound のまま
 `ready_for_github_handoff=false` に留まる。
 
 ## Mirage Self（サンドボックス自我）

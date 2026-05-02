@@ -999,6 +999,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-02_parallel-codex-pre-push-remote-freshness.md",
             "meta/decision-log/2026-05-02_parallel-codex-post-push-status-check-suite.md",
             "meta/decision-log/2026-05-02_parallel-codex-status-check-freshness.md",
+            "meta/decision-log/2026-05-02_parallel-codex-status-check-suite-timestamp.md",
             "meta/decision-log/README.md",
             "references/parallel-codex-orchestration.md",
         ]
@@ -1664,6 +1665,26 @@ class OmoikaneReferenceOS:
                         "status_check_suite_freshness_status"
                     ]
                 ),
+                "post_commit_publication_status_check_suite_timestamp_digest": (
+                    post_commit_publication_receipt[
+                        "status_check_suite_timestamp_digest"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_timestamp_status": (
+                    post_commit_publication_receipt[
+                        "status_check_suite_timestamp_status"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_timestamp_replay_digest": (
+                    post_commit_publication_receipt[
+                        "status_check_suite_timestamp_replay_digest"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_timestamp_replay_status": (
+                    post_commit_publication_receipt[
+                        "status_check_suite_timestamp_replay_status"
+                    ]
+                ),
                 "post_commit_publication_status_check_all_required_passed": (
                     post_commit_publication_receipt[
                         "status_check_all_required_passed"
@@ -1714,6 +1735,8 @@ class OmoikaneReferenceOS:
                 ),
                 "raw_status_check_provider_payload_stored": False,
                 "raw_status_check_suite_freshness_payload_stored": False,
+                "raw_status_check_suite_timestamp_payload_stored": False,
+                "raw_status_check_suite_timestamp_replay_guard_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -2506,6 +2529,26 @@ class OmoikaneReferenceOS:
                         "status_check_suite_freshness_window_bound"
                     ]
                 ),
+                "post_commit_publication_status_check_suite_timestamp_digest_bound": (
+                    post_commit_publication_validation[
+                        "status_check_suite_timestamp_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_timestamp_signed_current": (
+                    post_commit_publication_validation[
+                        "status_check_suite_timestamp_signed_current"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_timestamp_replay_digest_bound": (
+                    post_commit_publication_validation[
+                        "status_check_suite_timestamp_replay_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_timestamp_unique": (
+                    post_commit_publication_validation[
+                        "status_check_suite_timestamp_unique"
+                    ]
+                ),
                 "post_commit_publication_publication_digest_bound": (
                     post_commit_publication_validation[
                         "publication_digest_bound"
@@ -2541,6 +2584,12 @@ class OmoikaneReferenceOS:
                     ]
                     and post_commit_publication_validation[
                         "raw_status_check_suite_freshness_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_status_check_suite_timestamp_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_status_check_suite_timestamp_replay_guard_payload_redacted"
                     ]
                 ),
                 "blocked_post_commit_publication_receipt_ok": (

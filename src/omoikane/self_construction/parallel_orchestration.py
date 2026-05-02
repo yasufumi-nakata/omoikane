@@ -96,6 +96,15 @@ PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE = (
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE = (
     "post-push-provider-status-check-suite-freshness-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE = (
+    "post-push-provider-status-check-suite-signed-timestamp-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNATURE_PROFILE = (
+    "post-push-provider-status-check-suite-timestamp-signature-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_REPLAY_PROFILE = (
+    "post-push-provider-status-check-suite-timestamp-replay-guard-v1"
+)
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS = "protected"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS = "fresh"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_EXPIRED_STATUS = "expired"
@@ -113,6 +122,11 @@ PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION = "success"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS = "fresh"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_EXPIRED_STATUS = "expired"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_UNKNOWN_STATUS = "unknown"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS = "signed-current"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_STALE_STATUS = "stale"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_INVALID_STATUS = "invalid"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_UNIQUE_STATUS = "unique"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_REPLAYED_STATUS = "replayed"
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -219,6 +233,12 @@ PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_REF = (
 )
 PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_CHECKED_AT_REF = (
     "checks://github/omoikane/refs/heads/main/checked-at/v1"
+)
+PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_REF = (
+    "timestamp://github/status-check-suite/refs/heads/main/provider-clock/v1"
+)
+PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_NONCE_REF = (
+    "nonce://github/status-check-suite/refs/heads/main/provider-clock/v1"
 )
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
@@ -370,6 +390,12 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_status_check_freshness_profile": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE
             ),
+            "post_commit_publication_status_check_timestamp_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE
+            ),
+            "post_commit_publication_status_check_timestamp_replay_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_REPLAY_PROFILE
+            ),
             "post_commit_publication_protected_branch_required_status": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
             ),
@@ -394,6 +420,12 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_status_check_required_freshness_status": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
             ),
+            "post_commit_publication_status_check_required_timestamp_status": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS
+            ),
+            "post_commit_publication_status_check_required_timestamp_replay_status": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_UNIQUE_STATUS
+            ),
             "post_commit_publication_status_check_max_freshness_window_seconds": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
             ),
@@ -417,6 +449,12 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "default_status_check_suite_checked_at_ref": (
                 PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_CHECKED_AT_REF
+            ),
+            "default_status_check_suite_timestamp_ref": (
+                PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_REF
+            ),
+            "default_status_check_suite_timestamp_nonce_ref": (
+                PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_NONCE_REF
             ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
@@ -520,6 +558,8 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "raw_status_check_provider_payload_stored": False,
             "raw_status_check_suite_freshness_payload_stored": False,
+            "raw_status_check_suite_timestamp_payload_stored": False,
+            "raw_status_check_suite_timestamp_replay_guard_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -2223,6 +2263,19 @@ class ParallelCodexOrchestrationService:
             PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
         ),
         status_check_suite_freshness_digest: str = "",
+        status_check_suite_timestamp_ref: str = (
+            PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_REF
+        ),
+        status_check_suite_timestamp_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS
+        ),
+        status_check_suite_timestamp_signature_digest: str = "",
+        status_check_suite_timestamp_nonce_ref: str = (
+            PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_NONCE_REF
+        ),
+        status_check_suite_timestamp_replay_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_UNIQUE_STATUS
+        ),
     ) -> Dict[str, Any]:
         execution_validation = self.validate_integration_execution_receipt(
             execution_receipt,
@@ -2499,6 +2552,68 @@ class ParallelCodexOrchestrationService:
             normalized_status_check_suite_freshness_digest
             == expected_status_check_suite_freshness_digest
         )
+        normalized_status_check_suite_timestamp_ref = (
+            status_check_suite_timestamp_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_REF
+        )
+        normalized_status_check_suite_timestamp_status = (
+            status_check_suite_timestamp_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS
+        )
+        normalized_status_check_suite_timestamp_signature_digest = (
+            status_check_suite_timestamp_signature_digest.strip()
+        )
+        if not _is_sha256(normalized_status_check_suite_timestamp_signature_digest):
+            normalized_status_check_suite_timestamp_signature_digest = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": (
+                            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNATURE_PROFILE
+                        ),
+                        "provider": normalized_status_check_provider,
+                        "suite_ref": normalized_status_check_suite_ref,
+                        "suite_digest": normalized_status_check_suite_digest,
+                        "timestamp_ref": normalized_status_check_suite_timestamp_ref,
+                        "timestamp_status": normalized_status_check_suite_timestamp_status,
+                        "raw_status_check_suite_timestamp_payload_stored": False,
+                    }
+                )
+            )
+        status_check_suite_timestamp_digest = (
+            self._post_commit_status_check_suite_timestamp_digest(
+                provider=normalized_status_check_provider,
+                suite_ref=normalized_status_check_suite_ref,
+                suite_digest=normalized_status_check_suite_digest,
+                timestamp_ref=normalized_status_check_suite_timestamp_ref,
+                timestamp_status=normalized_status_check_suite_timestamp_status,
+                timestamp_signature_digest=(
+                    normalized_status_check_suite_timestamp_signature_digest
+                ),
+            )
+        )
+        status_check_suite_timestamp_digest_bound = _is_sha256(
+            status_check_suite_timestamp_digest,
+        )
+        normalized_status_check_suite_timestamp_nonce_ref = (
+            status_check_suite_timestamp_nonce_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_NONCE_REF
+        )
+        normalized_status_check_suite_timestamp_replay_status = (
+            status_check_suite_timestamp_replay_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_UNIQUE_STATUS
+        )
+        status_check_suite_timestamp_replay_digest = (
+            self._post_commit_status_check_suite_timestamp_replay_digest(
+                provider=normalized_status_check_provider,
+                suite_ref=normalized_status_check_suite_ref,
+                timestamp_ref=normalized_status_check_suite_timestamp_ref,
+                nonce_ref=normalized_status_check_suite_timestamp_nonce_ref,
+                replay_status=normalized_status_check_suite_timestamp_replay_status,
+            )
+        )
+        status_check_suite_timestamp_replay_digest_bound = _is_sha256(
+            status_check_suite_timestamp_replay_digest,
+        )
         (
             pre_push_remote_verification_observed_head,
             pre_push_remote_verification_observed_ref,
@@ -2756,6 +2871,42 @@ class ParallelCodexOrchestrationService:
             "status_check_suite_freshness_digest_bound": (
                 status_check_suite_freshness_digest_bound
             ),
+            "status_check_suite_timestamp_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE
+            ),
+            "status_check_suite_timestamp_ref": (
+                normalized_status_check_suite_timestamp_ref
+            ),
+            "status_check_suite_timestamp_status": (
+                normalized_status_check_suite_timestamp_status
+            ),
+            "status_check_suite_timestamp_signature_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNATURE_PROFILE
+            ),
+            "status_check_suite_timestamp_signature_digest": (
+                normalized_status_check_suite_timestamp_signature_digest
+            ),
+            "status_check_suite_timestamp_digest": (
+                status_check_suite_timestamp_digest
+            ),
+            "status_check_suite_timestamp_digest_bound": (
+                status_check_suite_timestamp_digest_bound
+            ),
+            "status_check_suite_timestamp_replay_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_REPLAY_PROFILE
+            ),
+            "status_check_suite_timestamp_nonce_ref": (
+                normalized_status_check_suite_timestamp_nonce_ref
+            ),
+            "status_check_suite_timestamp_replay_status": (
+                normalized_status_check_suite_timestamp_replay_status
+            ),
+            "status_check_suite_timestamp_replay_digest": (
+                status_check_suite_timestamp_replay_digest
+            ),
+            "status_check_suite_timestamp_replay_digest_bound": (
+                status_check_suite_timestamp_replay_digest_bound
+            ),
             "protected_branch_receipt_digest": "",
             "protected_branch_receipt_digest_bound": False,
             "publication_digest": "",
@@ -2779,6 +2930,8 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_status_check_provider_payload_stored": False,
             "raw_status_check_suite_freshness_payload_stored": False,
+            "raw_status_check_suite_timestamp_payload_stored": False,
+            "raw_status_check_suite_timestamp_replay_guard_payload_stored": False,
             "receipt_digest": "",
         }
         normalized_protected_branch_receipt_digest = (
@@ -3040,6 +3193,47 @@ class ParallelCodexOrchestrationService:
             )
             and receipt.get("status_check_suite_freshness_digest_bound") is True
         )
+        status_check_suite_timestamp_digest_bound = (
+            receipt.get("status_check_suite_timestamp_digest")
+            == self._post_commit_status_check_suite_timestamp_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                suite_digest=str(receipt.get("status_check_suite_digest", "")),
+                timestamp_ref=str(
+                    receipt.get("status_check_suite_timestamp_ref", ""),
+                ),
+                timestamp_status=str(
+                    receipt.get("status_check_suite_timestamp_status", ""),
+                ),
+                timestamp_signature_digest=str(
+                    receipt.get(
+                        "status_check_suite_timestamp_signature_digest",
+                        "",
+                    ),
+                ),
+            )
+            and receipt.get("status_check_suite_timestamp_digest_bound") is True
+        )
+        status_check_suite_timestamp_replay_digest_bound = (
+            receipt.get("status_check_suite_timestamp_replay_digest")
+            == self._post_commit_status_check_suite_timestamp_replay_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                timestamp_ref=str(
+                    receipt.get("status_check_suite_timestamp_ref", ""),
+                ),
+                nonce_ref=str(
+                    receipt.get("status_check_suite_timestamp_nonce_ref", ""),
+                ),
+                replay_status=str(
+                    receipt.get(
+                        "status_check_suite_timestamp_replay_status",
+                        "",
+                    ),
+                ),
+            )
+            and receipt.get("status_check_suite_timestamp_replay_digest_bound") is True
+        )
         receipt_digest_bound = (
             receipt.get("receipt_digest") == self._receipt_digest(receipt)
         )
@@ -3117,6 +3311,10 @@ class ParallelCodexOrchestrationService:
             errors.append("status_check_suite_digest mismatch")
         if not status_check_suite_freshness_digest_bound:
             errors.append("status_check_suite_freshness_digest mismatch")
+        if not status_check_suite_timestamp_digest_bound:
+            errors.append("status_check_suite_timestamp_digest mismatch")
+        if not status_check_suite_timestamp_replay_digest_bound:
+            errors.append("status_check_suite_timestamp_replay_digest mismatch")
         if push_result.get("command") != push_command:
             errors.append("push command must target origin main")
         if pre_push_remote_verification_result.get("command") != (
@@ -3201,6 +3399,19 @@ class ParallelCodexOrchestrationService:
         if receipt.get("raw_status_check_suite_freshness_payload_stored") is not False:
             errors.append(
                 "raw_status_check_suite_freshness_payload_stored must be false",
+            )
+        if receipt.get("raw_status_check_suite_timestamp_payload_stored") is not False:
+            errors.append(
+                "raw_status_check_suite_timestamp_payload_stored must be false",
+            )
+        if (
+            receipt.get(
+                "raw_status_check_suite_timestamp_replay_guard_payload_stored",
+            )
+            is not False
+        ):
+            errors.append(
+                "raw_status_check_suite_timestamp_replay_guard_payload_stored must be false",
             )
 
         return {
@@ -3346,6 +3557,20 @@ class ParallelCodexOrchestrationService:
                 )
                 <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
             ),
+            "status_check_suite_timestamp_digest_bound": (
+                status_check_suite_timestamp_digest_bound
+            ),
+            "status_check_suite_timestamp_signed_current": (
+                receipt.get("status_check_suite_timestamp_status")
+                == PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS
+            ),
+            "status_check_suite_timestamp_replay_digest_bound": (
+                status_check_suite_timestamp_replay_digest_bound
+            ),
+            "status_check_suite_timestamp_unique": (
+                receipt.get("status_check_suite_timestamp_replay_status")
+                == PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_UNIQUE_STATUS
+            ),
             "publication_digest_bound": publication_digest_bound,
             "receipt_digest_bound": receipt_digest_bound,
             "raw_publication_payload_redacted": (
@@ -3401,6 +3626,16 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_status_check_suite_freshness_payload_redacted": (
                 receipt.get("raw_status_check_suite_freshness_payload_stored")
+                is False
+            ),
+            "raw_status_check_suite_timestamp_payload_redacted": (
+                receipt.get("raw_status_check_suite_timestamp_payload_stored")
+                is False
+            ),
+            "raw_status_check_suite_timestamp_replay_guard_payload_redacted": (
+                receipt.get(
+                    "raw_status_check_suite_timestamp_replay_guard_payload_stored",
+                )
                 is False
             ),
         }
@@ -5703,6 +5938,61 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    @staticmethod
+    def _post_commit_status_check_suite_timestamp_digest(
+        *,
+        provider: str,
+        suite_ref: str,
+        suite_digest: str,
+        timestamp_ref: str,
+        timestamp_status: str,
+        timestamp_signature_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE
+                    ),
+                    "provider": provider,
+                    "suite_ref": suite_ref,
+                    "suite_digest": suite_digest,
+                    "timestamp_ref": timestamp_ref,
+                    "timestamp_status": timestamp_status,
+                    "timestamp_signature_profile": (
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNATURE_PROFILE
+                    ),
+                    "timestamp_signature_digest": timestamp_signature_digest,
+                    "raw_status_check_suite_timestamp_payload_stored": False,
+                }
+            )
+        )
+
+    @staticmethod
+    def _post_commit_status_check_suite_timestamp_replay_digest(
+        *,
+        provider: str,
+        suite_ref: str,
+        timestamp_ref: str,
+        nonce_ref: str,
+        replay_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_REPLAY_PROFILE
+                    ),
+                    "provider": provider,
+                    "suite_ref": suite_ref,
+                    "timestamp_ref": timestamp_ref,
+                    "nonce_ref": nonce_ref,
+                    "replay_status": replay_status,
+                    "raw_status_check_suite_timestamp_replay_guard_payload_stored": False,
+                }
+            )
+        )
+
     def _post_commit_protected_branch_policy_digest(
         self,
         *,
@@ -6122,6 +6412,22 @@ class ParallelCodexOrchestrationService:
                         "status_check_suite_freshness_digest_bound",
                         False,
                     ),
+                    "status_check_suite_timestamp_digest": receipt.get(
+                        "status_check_suite_timestamp_digest",
+                        "",
+                    ),
+                    "status_check_suite_timestamp_digest_bound": receipt.get(
+                        "status_check_suite_timestamp_digest_bound",
+                        False,
+                    ),
+                    "status_check_suite_timestamp_replay_digest": receipt.get(
+                        "status_check_suite_timestamp_replay_digest",
+                        "",
+                    ),
+                    "status_check_suite_timestamp_replay_digest_bound": receipt.get(
+                        "status_check_suite_timestamp_replay_digest_bound",
+                        False,
+                    ),
                     "raw_execution_payload_stored": False,
                     "raw_post_commit_publication_payload_stored": False,
                     "raw_pre_push_remote_verification_stdout_stored": False,
@@ -6138,6 +6444,10 @@ class ParallelCodexOrchestrationService:
                     ),
                     "raw_status_check_provider_payload_stored": False,
                     "raw_status_check_suite_freshness_payload_stored": False,
+                    "raw_status_check_suite_timestamp_payload_stored": False,
+                    "raw_status_check_suite_timestamp_replay_guard_payload_stored": (
+                        False
+                    ),
                 }
             )
         )
@@ -7057,6 +7367,80 @@ class ParallelCodexOrchestrationService:
             <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
         ):
             reasons.append("status check suite freshness window expired")
+        expected_status_check_suite_timestamp_digest = (
+            self._post_commit_status_check_suite_timestamp_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                suite_digest=str(receipt.get("status_check_suite_digest", "")),
+                timestamp_ref=str(
+                    receipt.get("status_check_suite_timestamp_ref", ""),
+                ),
+                timestamp_status=str(
+                    receipt.get("status_check_suite_timestamp_status", ""),
+                ),
+                timestamp_signature_digest=str(
+                    receipt.get(
+                        "status_check_suite_timestamp_signature_digest",
+                        "",
+                    ),
+                ),
+            )
+        )
+        if receipt.get("status_check_suite_timestamp_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE
+        ):
+            reasons.append("status_check_suite_timestamp_profile mismatch")
+        if (
+            receipt.get("status_check_suite_timestamp_digest")
+            != expected_status_check_suite_timestamp_digest
+        ):
+            reasons.append("status_check_suite_timestamp_digest mismatch")
+        if receipt.get("status_check_suite_timestamp_digest_bound") is not True:
+            reasons.append("status check suite timestamp digest must be bound")
+        if receipt.get("status_check_suite_timestamp_status") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS
+        ):
+            reasons.append("status check suite provider timestamp must be signed-current")
+        if not _is_sha256(
+            receipt.get("status_check_suite_timestamp_signature_digest"),
+        ):
+            reasons.append("status check suite provider timestamp signature must bind")
+        expected_status_check_suite_timestamp_replay_digest = (
+            self._post_commit_status_check_suite_timestamp_replay_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                timestamp_ref=str(
+                    receipt.get("status_check_suite_timestamp_ref", ""),
+                ),
+                nonce_ref=str(
+                    receipt.get("status_check_suite_timestamp_nonce_ref", ""),
+                ),
+                replay_status=str(
+                    receipt.get(
+                        "status_check_suite_timestamp_replay_status",
+                        "",
+                    ),
+                ),
+            )
+        )
+        if receipt.get("status_check_suite_timestamp_replay_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_REPLAY_PROFILE
+        ):
+            reasons.append("status_check_suite_timestamp_replay_profile mismatch")
+        if (
+            receipt.get("status_check_suite_timestamp_replay_digest")
+            != expected_status_check_suite_timestamp_replay_digest
+        ):
+            reasons.append("status_check_suite_timestamp_replay_digest mismatch")
+        if (
+            receipt.get("status_check_suite_timestamp_replay_digest_bound")
+            is not True
+        ):
+            reasons.append("status check suite timestamp replay digest must be bound")
+        if receipt.get("status_check_suite_timestamp_replay_status") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_UNIQUE_STATUS
+        ):
+            reasons.append("status check suite provider timestamp replay must be unique")
         if not self._post_commit_status_check_all_required_passed(
             required_checks=receipt.get("status_check_required_checks", []),
             commit_head=str(receipt.get("status_check_commit_head", "")),
@@ -7070,6 +7454,19 @@ class ParallelCodexOrchestrationService:
         if receipt.get("raw_status_check_suite_freshness_payload_stored") is not False:
             reasons.append(
                 "raw_status_check_suite_freshness_payload_stored must be false",
+            )
+        if receipt.get("raw_status_check_suite_timestamp_payload_stored") is not False:
+            reasons.append(
+                "raw_status_check_suite_timestamp_payload_stored must be false",
+            )
+        if (
+            receipt.get(
+                "raw_status_check_suite_timestamp_replay_guard_payload_stored",
+            )
+            is not False
+        ):
+            reasons.append(
+                "raw_status_check_suite_timestamp_replay_guard_payload_stored must be false",
             )
         if receipt.get("raw_protected_branch_provider_payload_stored") is not False:
             reasons.append("raw_protected_branch_provider_payload_stored must be false")

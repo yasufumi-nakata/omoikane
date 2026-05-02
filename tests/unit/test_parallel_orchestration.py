@@ -1541,6 +1541,12 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["status_check_suite_freshness_digest_bound"])
         self.assertTrue(validation["status_check_suite_fresh"])
         self.assertTrue(validation["status_check_suite_freshness_window_bound"])
+        self.assertTrue(validation["status_check_suite_timestamp_digest_bound"])
+        self.assertTrue(validation["status_check_suite_timestamp_signed_current"])
+        self.assertTrue(
+            validation["status_check_suite_timestamp_replay_digest_bound"]
+        )
+        self.assertTrue(validation["status_check_suite_timestamp_unique"])
         self.assertTrue(validation["publication_digest_bound"])
         self.assertEqual(
             "git push origin HEAD:refs/heads/main",
@@ -1608,6 +1614,22 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         )
         self.assertEqual("fresh", publication["status_check_suite_freshness_status"])
         self.assertTrue(publication["status_check_suite_freshness_digest_bound"])
+        self.assertEqual(
+            "post-push-provider-status-check-suite-signed-timestamp-v1",
+            publication["status_check_suite_timestamp_profile"],
+        )
+        self.assertEqual(
+            "signed-current",
+            publication["status_check_suite_timestamp_status"],
+        )
+        self.assertEqual(
+            "unique",
+            publication["status_check_suite_timestamp_replay_status"],
+        )
+        self.assertTrue(publication["status_check_suite_timestamp_digest_bound"])
+        self.assertTrue(
+            publication["status_check_suite_timestamp_replay_digest_bound"]
+        )
         self.assertTrue(publication["protected_branch_receipt_digest_bound"])
         self.assertFalse(publication["raw_post_commit_publication_payload_stored"])
         self.assertFalse(
@@ -1637,6 +1659,12 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(publication["raw_status_check_provider_payload_stored"])
         self.assertFalse(
             publication["raw_status_check_suite_freshness_payload_stored"]
+        )
+        self.assertFalse(publication["raw_status_check_suite_timestamp_payload_stored"])
+        self.assertFalse(
+            publication[
+                "raw_status_check_suite_timestamp_replay_guard_payload_stored"
+            ]
         )
         self.assertTrue(
             all(
@@ -1898,6 +1926,62 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["status_check_suite_digest_bound"])
         self.assertTrue(validation["status_check_suite_freshness_digest_bound"])
         self.assertFalse(validation["status_check_suite_fresh"])
+        self.assertTrue(validation["publication_digest_bound"])
+
+    def test_post_commit_publication_blocks_stale_status_check_provider_timestamp(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            status_check_suite_timestamp_status="stale",
+            result_summary="Publication blocks stale status/check provider timestamps.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "status check suite provider timestamp must be signed-current",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["status_check_suite_timestamp_digest_bound"])
+        self.assertFalse(validation["status_check_suite_timestamp_signed_current"])
+        self.assertTrue(validation["publication_digest_bound"])
+
+    def test_post_commit_publication_blocks_replayed_status_check_provider_timestamp(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            status_check_suite_timestamp_replay_status="replayed",
+            result_summary="Publication blocks replayed status/check timestamps.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "status check suite provider timestamp replay must be unique",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(
+            validation["status_check_suite_timestamp_replay_digest_bound"]
+        )
+        self.assertFalse(validation["status_check_suite_timestamp_unique"])
         self.assertTrue(validation["publication_digest_bound"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
