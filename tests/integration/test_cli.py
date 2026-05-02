@@ -208,6 +208,11 @@ class CliIntegrationTests(unittest.TestCase):
                 "post_commit_publication_status_check_suite_digest_bound"
             ]
         )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_freshness_digest_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["conflict_execution_blocked"])
         self.assertEqual(
             "parallel-codex-integration-execution-plan-v1",

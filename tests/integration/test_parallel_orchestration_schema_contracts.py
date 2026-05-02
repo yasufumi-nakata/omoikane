@@ -560,6 +560,21 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_status_check_suite_freshness_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_fresh"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_freshness_window_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_publication_digest_bound"
             ]
         )
@@ -590,6 +605,22 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertEqual(
             "protected",
             result["post_commit_publication_receipt"]["protected_branch_status"],
+        )
+        self.assertEqual(
+            "fresh",
+            result["post_commit_publication_receipt"][
+                "status_check_suite_freshness_status"
+            ],
+        )
+        self.assertTrue(
+            result["post_commit_publication_receipt"][
+                "status_check_suite_freshness_digest_bound"
+            ]
+        )
+        self.assertFalse(
+            result["post_commit_publication_receipt"][
+                "raw_status_check_suite_freshness_payload_stored"
+            ]
         )
         self.assertFalse(
             result["post_commit_publication_receipt"][

@@ -93,6 +93,9 @@ PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_SUITE_PROFILE = (
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE = (
     "post-push-provider-status-check-run-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE = (
+    "post-push-provider-status-check-suite-freshness-v1"
+)
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS = "protected"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS = "fresh"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_EXPIRED_STATUS = "expired"
@@ -107,6 +110,9 @@ PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS = 900
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_PROVIDER = "github"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_STATUS = "completed"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION = "success"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS = "fresh"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_EXPIRED_STATUS = "expired"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_UNKNOWN_STATUS = "unknown"
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -210,6 +216,9 @@ PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_NONCE_REF = (
 )
 PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_REF = (
     "checks://github/omoikane/refs/heads/main"
+)
+PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_CHECKED_AT_REF = (
+    "checks://github/omoikane/refs/heads/main/checked-at/v1"
 )
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
@@ -358,6 +367,9 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_status_check_run_profile": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE
             ),
+            "post_commit_publication_status_check_freshness_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE
+            ),
             "post_commit_publication_protected_branch_required_status": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
             ),
@@ -379,6 +391,12 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_status_check_required_conclusion": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION
             ),
+            "post_commit_publication_status_check_required_freshness_status": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
+            ),
+            "post_commit_publication_status_check_max_freshness_window_seconds": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
+            ),
             "default_protected_branch_provider": (
                 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
             ),
@@ -396,6 +414,9 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "default_status_check_suite_ref": (
                 PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_REF
+            ),
+            "default_status_check_suite_checked_at_ref": (
+                PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_CHECKED_AT_REF
             ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
@@ -498,6 +519,7 @@ class ParallelCodexOrchestrationPolicy:
                 False
             ),
             "raw_status_check_provider_payload_stored": False,
+            "raw_status_check_suite_freshness_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -2191,6 +2213,16 @@ class ParallelCodexOrchestrationService:
         status_check_commit_head: str = "",
         status_check_results: Sequence[Mapping[str, Any]] | None = None,
         status_check_suite_digest: str = "",
+        status_check_suite_checked_at_ref: str = (
+            PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_CHECKED_AT_REF
+        ),
+        status_check_suite_freshness_window_seconds: int = (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
+        ),
+        status_check_suite_freshness_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
+        ),
+        status_check_suite_freshness_digest: str = "",
     ) -> Dict[str, Any]:
         execution_validation = self.validate_integration_execution_receipt(
             execution_receipt,
@@ -2432,6 +2464,41 @@ class ParallelCodexOrchestrationService:
             normalized_status_check_suite_digest
             == expected_status_check_suite_digest
         )
+        normalized_status_check_suite_checked_at_ref = (
+            status_check_suite_checked_at_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_CHECKED_AT_REF
+        )
+        normalized_status_check_suite_freshness_window_seconds = _coerce_int(
+            status_check_suite_freshness_window_seconds,
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS,
+        )
+        normalized_status_check_suite_freshness_status = (
+            status_check_suite_freshness_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
+        )
+        normalized_status_check_suite_freshness_digest = (
+            status_check_suite_freshness_digest.strip()
+        )
+        expected_status_check_suite_freshness_digest = (
+            self._post_commit_status_check_suite_freshness_digest(
+                provider=normalized_status_check_provider,
+                suite_ref=normalized_status_check_suite_ref,
+                suite_digest=normalized_status_check_suite_digest,
+                checked_at_ref=normalized_status_check_suite_checked_at_ref,
+                freshness_window_seconds=(
+                    normalized_status_check_suite_freshness_window_seconds
+                ),
+                freshness_status=normalized_status_check_suite_freshness_status,
+            )
+        )
+        if not _is_sha256(normalized_status_check_suite_freshness_digest):
+            normalized_status_check_suite_freshness_digest = (
+                expected_status_check_suite_freshness_digest
+            )
+        status_check_suite_freshness_digest_bound = (
+            normalized_status_check_suite_freshness_digest
+            == expected_status_check_suite_freshness_digest
+        )
         (
             pre_push_remote_verification_observed_head,
             pre_push_remote_verification_observed_ref,
@@ -2671,6 +2738,24 @@ class ParallelCodexOrchestrationService:
             "status_check_all_required_passed": status_check_all_required_passed,
             "status_check_suite_digest": normalized_status_check_suite_digest,
             "status_check_suite_digest_bound": status_check_suite_digest_bound,
+            "status_check_suite_freshness_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE
+            ),
+            "status_check_suite_checked_at_ref": (
+                normalized_status_check_suite_checked_at_ref
+            ),
+            "status_check_suite_freshness_window_seconds": (
+                normalized_status_check_suite_freshness_window_seconds
+            ),
+            "status_check_suite_freshness_status": (
+                normalized_status_check_suite_freshness_status
+            ),
+            "status_check_suite_freshness_digest": (
+                normalized_status_check_suite_freshness_digest
+            ),
+            "status_check_suite_freshness_digest_bound": (
+                status_check_suite_freshness_digest_bound
+            ),
             "protected_branch_receipt_digest": "",
             "protected_branch_receipt_digest_bound": False,
             "publication_digest": "",
@@ -2693,6 +2778,7 @@ class ParallelCodexOrchestrationService:
                 False
             ),
             "raw_status_check_provider_payload_stored": False,
+            "raw_status_check_suite_freshness_payload_stored": False,
             "receipt_digest": "",
         }
         normalized_protected_branch_receipt_digest = (
@@ -2935,6 +3021,25 @@ class ParallelCodexOrchestrationService:
             )
             and receipt.get("status_check_suite_digest_bound") is True
         )
+        status_check_suite_freshness_digest_bound = (
+            receipt.get("status_check_suite_freshness_digest")
+            == self._post_commit_status_check_suite_freshness_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                suite_digest=str(receipt.get("status_check_suite_digest", "")),
+                checked_at_ref=str(
+                    receipt.get("status_check_suite_checked_at_ref", ""),
+                ),
+                freshness_window_seconds=_coerce_int(
+                    receipt.get("status_check_suite_freshness_window_seconds"),
+                    0,
+                ),
+                freshness_status=str(
+                    receipt.get("status_check_suite_freshness_status", ""),
+                ),
+            )
+            and receipt.get("status_check_suite_freshness_digest_bound") is True
+        )
         receipt_digest_bound = (
             receipt.get("receipt_digest") == self._receipt_digest(receipt)
         )
@@ -3010,6 +3115,8 @@ class ParallelCodexOrchestrationService:
             errors.append("status_check_results digest mismatch")
         if not status_check_suite_digest_bound:
             errors.append("status_check_suite_digest mismatch")
+        if not status_check_suite_freshness_digest_bound:
+            errors.append("status_check_suite_freshness_digest mismatch")
         if push_result.get("command") != push_command:
             errors.append("push command must target origin main")
         if pre_push_remote_verification_result.get("command") != (
@@ -3091,6 +3198,10 @@ class ParallelCodexOrchestrationService:
             )
         if receipt.get("raw_status_check_provider_payload_stored") is not False:
             errors.append("raw_status_check_provider_payload_stored must be false")
+        if receipt.get("raw_status_check_suite_freshness_payload_stored") is not False:
+            errors.append(
+                "raw_status_check_suite_freshness_payload_stored must be false",
+            )
 
         return {
             "ok": not errors,
@@ -3220,6 +3331,21 @@ class ParallelCodexOrchestrationService:
             "status_check_results_bound": status_check_results_bound,
             "status_check_all_required_passed": status_check_all_required_passed,
             "status_check_suite_digest_bound": status_check_suite_digest_bound,
+            "status_check_suite_freshness_digest_bound": (
+                status_check_suite_freshness_digest_bound
+            ),
+            "status_check_suite_fresh": (
+                receipt.get("status_check_suite_freshness_status")
+                == PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
+            ),
+            "status_check_suite_freshness_window_bound": (
+                0
+                < _coerce_int(
+                    receipt.get("status_check_suite_freshness_window_seconds"),
+                    0,
+                )
+                <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
+            ),
             "publication_digest_bound": publication_digest_bound,
             "receipt_digest_bound": receipt_digest_bound,
             "raw_publication_payload_redacted": (
@@ -3272,6 +3398,10 @@ class ParallelCodexOrchestrationService:
                     result.get("raw_status_check_payload_stored") is False
                     for result in status_check_results
                 )
+            ),
+            "raw_status_check_suite_freshness_payload_redacted": (
+                receipt.get("raw_status_check_suite_freshness_payload_stored")
+                is False
             ),
         }
 
@@ -5546,6 +5676,33 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    @staticmethod
+    def _post_commit_status_check_suite_freshness_digest(
+        *,
+        provider: str,
+        suite_ref: str,
+        suite_digest: str,
+        checked_at_ref: str,
+        freshness_window_seconds: int,
+        freshness_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE
+                    ),
+                    "provider": provider,
+                    "suite_ref": suite_ref,
+                    "suite_digest": suite_digest,
+                    "checked_at_ref": checked_at_ref,
+                    "freshness_window_seconds": freshness_window_seconds,
+                    "freshness_status": freshness_status,
+                    "raw_status_check_suite_freshness_payload_stored": False,
+                }
+            )
+        )
+
     def _post_commit_protected_branch_policy_digest(
         self,
         *,
@@ -5941,6 +6098,30 @@ class ParallelCodexOrchestrationService:
                         "status_check_suite_digest_bound",
                         False,
                     ),
+                    "status_check_suite_freshness_profile": receipt.get(
+                        "status_check_suite_freshness_profile",
+                        "",
+                    ),
+                    "status_check_suite_checked_at_ref": receipt.get(
+                        "status_check_suite_checked_at_ref",
+                        "",
+                    ),
+                    "status_check_suite_freshness_window_seconds": receipt.get(
+                        "status_check_suite_freshness_window_seconds",
+                        0,
+                    ),
+                    "status_check_suite_freshness_status": receipt.get(
+                        "status_check_suite_freshness_status",
+                        "",
+                    ),
+                    "status_check_suite_freshness_digest": receipt.get(
+                        "status_check_suite_freshness_digest",
+                        "",
+                    ),
+                    "status_check_suite_freshness_digest_bound": receipt.get(
+                        "status_check_suite_freshness_digest_bound",
+                        False,
+                    ),
                     "raw_execution_payload_stored": False,
                     "raw_post_commit_publication_payload_stored": False,
                     "raw_pre_push_remote_verification_stdout_stored": False,
@@ -5956,6 +6137,7 @@ class ParallelCodexOrchestrationService:
                         False
                     ),
                     "raw_status_check_provider_payload_stored": False,
+                    "raw_status_check_suite_freshness_payload_stored": False,
                 }
             )
         )
@@ -6835,6 +7017,46 @@ class ParallelCodexOrchestrationService:
             or receipt.get("status_check_suite_digest_bound") is not True
         ):
             reasons.append("status_check_suite_digest mismatch")
+        expected_status_check_suite_freshness_digest = (
+            self._post_commit_status_check_suite_freshness_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                suite_digest=str(receipt.get("status_check_suite_digest", "")),
+                checked_at_ref=str(
+                    receipt.get("status_check_suite_checked_at_ref", ""),
+                ),
+                freshness_window_seconds=_coerce_int(
+                    receipt.get("status_check_suite_freshness_window_seconds"),
+                    0,
+                ),
+                freshness_status=str(
+                    receipt.get("status_check_suite_freshness_status", ""),
+                ),
+            )
+        )
+        if receipt.get("status_check_suite_freshness_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE
+        ):
+            reasons.append("status_check_suite_freshness_profile mismatch")
+        if (
+            receipt.get("status_check_suite_freshness_digest")
+            != expected_status_check_suite_freshness_digest
+            or receipt.get("status_check_suite_freshness_digest_bound") is not True
+        ):
+            reasons.append("status_check_suite_freshness_digest mismatch")
+        if receipt.get("status_check_suite_freshness_status") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
+        ):
+            reasons.append("status check suite freshness must be fresh")
+        if not (
+            0
+            < _coerce_int(
+                receipt.get("status_check_suite_freshness_window_seconds"),
+                0,
+            )
+            <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
+        ):
+            reasons.append("status check suite freshness window expired")
         if not self._post_commit_status_check_all_required_passed(
             required_checks=receipt.get("status_check_required_checks", []),
             commit_head=str(receipt.get("status_check_commit_head", "")),
@@ -6845,6 +7067,10 @@ class ParallelCodexOrchestrationService:
             reasons.append("status_check_all_required_passed must be true")
         if receipt.get("raw_status_check_provider_payload_stored") is not False:
             reasons.append("raw_status_check_provider_payload_stored must be false")
+        if receipt.get("raw_status_check_suite_freshness_payload_stored") is not False:
+            reasons.append(
+                "raw_status_check_suite_freshness_payload_stored must be false",
+            )
         if receipt.get("raw_protected_branch_provider_payload_stored") is not False:
             reasons.append("raw_protected_branch_provider_payload_stored must be false")
         if (

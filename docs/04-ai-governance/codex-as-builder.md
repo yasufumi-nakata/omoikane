@@ -88,10 +88,11 @@ digest、changed-file owner manifest digest、passing verification state を束�
 head、command-bound pre-push remote freshness / push / post-push remote verification receipt、ls-remote output の
 observed head/ref digest、GitHub protected branch provider policy receipt、
 provider policy freshness、signed provider timestamp、timestamp replay guard、
-post-push status/check suite digest、publication digest を固定し、push 前 origin/main が source execution current checkout head と
+post-push status/check suite digest、status/check suite freshness digest、
+publication digest を固定し、push 前 origin/main が source execution current checkout head と
 一致しない状態、remote head mismatch、ls-remote output mismatch、push / remote verification failure、protected branch 未保護 / unknown、stale
 provider policy、unsigned/replayed provider timestamp、required status check failure /
-missing / stale commit を GitHub handoff へ進めない。
+missing / stale commit / stale suite snapshot を GitHub handoff へ進めない。
 raw batch / apply plan / dry-run / worker receipt / verification / checkout
 mutation / patch cleanup / commit finalization / publication / push / remote
 verification / protected branch provider / status check provider payload は保存しない。

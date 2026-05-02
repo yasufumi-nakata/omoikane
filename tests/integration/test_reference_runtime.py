@@ -1263,6 +1263,21 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_status_check_suite_freshness_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_fresh"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_freshness_window_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_publication_digest_bound"
             ]
         )

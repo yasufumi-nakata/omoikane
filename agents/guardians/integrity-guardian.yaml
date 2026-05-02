@@ -74,6 +74,7 @@ capabilities:
   - parallel-codex.integration-batch-quarantine.attest
   - parallel-codex.integration-execution.attest
   - parallel-codex.commit-finalization.attest
+  - parallel-codex.status-check-suite-freshness.attest
   - parallel-codex.yaoyorozu-dispatch-bridge.attest
   - ethics.consent-authenticity-redaction.attest
   - yaoyorozu.agent-source.research-evidence-scope.attest

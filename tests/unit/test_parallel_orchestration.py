@@ -1538,6 +1538,9 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["status_check_results_bound"])
         self.assertTrue(validation["status_check_all_required_passed"])
         self.assertTrue(validation["status_check_suite_digest_bound"])
+        self.assertTrue(validation["status_check_suite_freshness_digest_bound"])
+        self.assertTrue(validation["status_check_suite_fresh"])
+        self.assertTrue(validation["status_check_suite_freshness_window_bound"])
         self.assertTrue(validation["publication_digest_bound"])
         self.assertEqual(
             "git push origin HEAD:refs/heads/main",
@@ -1599,6 +1602,12 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(publication["status_check_results_bound"])
         self.assertTrue(publication["status_check_all_required_passed"])
         self.assertTrue(publication["status_check_suite_digest_bound"])
+        self.assertEqual(
+            "post-push-provider-status-check-suite-freshness-v1",
+            publication["status_check_suite_freshness_profile"],
+        )
+        self.assertEqual("fresh", publication["status_check_suite_freshness_status"])
+        self.assertTrue(publication["status_check_suite_freshness_digest_bound"])
         self.assertTrue(publication["protected_branch_receipt_digest_bound"])
         self.assertFalse(publication["raw_post_commit_publication_payload_stored"])
         self.assertFalse(
@@ -1626,6 +1635,9 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             ]
         )
         self.assertFalse(publication["raw_status_check_provider_payload_stored"])
+        self.assertFalse(
+            publication["raw_status_check_suite_freshness_payload_stored"]
+        )
         self.assertTrue(
             all(
                 result["raw_status_check_payload_stored"] is False
@@ -1858,6 +1870,34 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["status_check_results_bound"])
         self.assertFalse(validation["status_check_all_required_passed"])
         self.assertTrue(validation["status_check_suite_digest_bound"])
+        self.assertTrue(validation["publication_digest_bound"])
+
+    def test_post_commit_publication_blocks_stale_status_check_suite_freshness(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            status_check_suite_freshness_status="expired",
+            result_summary="Publication blocks stale post-push status check evidence.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "status check suite freshness must be fresh",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["status_check_suite_digest_bound"])
+        self.assertTrue(validation["status_check_suite_freshness_digest_bound"])
+        self.assertFalse(validation["status_check_suite_fresh"])
         self.assertTrue(validation["publication_digest_bound"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:

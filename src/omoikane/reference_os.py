@@ -997,6 +997,9 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-02_parallel-codex-commit-finalization-gate.md",
             "meta/decision-log/2026-05-02_parallel-codex-post-commit-publication.md",
             "meta/decision-log/2026-05-02_parallel-codex-pre-push-remote-freshness.md",
+            "meta/decision-log/2026-05-02_parallel-codex-post-push-status-check-suite.md",
+            "meta/decision-log/2026-05-02_parallel-codex-status-check-freshness.md",
+            "meta/decision-log/README.md",
             "references/parallel-codex-orchestration.md",
         ]
         ready_receipt = self.parallel_orchestration.ingest_worker_result(
@@ -1651,6 +1654,16 @@ class OmoikaneReferenceOS:
                 "post_commit_publication_status_check_suite_digest": (
                     post_commit_publication_receipt["status_check_suite_digest"]
                 ),
+                "post_commit_publication_status_check_suite_freshness_digest": (
+                    post_commit_publication_receipt[
+                        "status_check_suite_freshness_digest"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_freshness_status": (
+                    post_commit_publication_receipt[
+                        "status_check_suite_freshness_status"
+                    ]
+                ),
                 "post_commit_publication_status_check_all_required_passed": (
                     post_commit_publication_receipt[
                         "status_check_all_required_passed"
@@ -1700,6 +1713,7 @@ class OmoikaneReferenceOS:
                     False
                 ),
                 "raw_status_check_provider_payload_stored": False,
+                "raw_status_check_suite_freshness_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -2477,6 +2491,21 @@ class OmoikaneReferenceOS:
                         "status_check_suite_digest_bound"
                     ]
                 ),
+                "post_commit_publication_status_check_suite_freshness_digest_bound": (
+                    post_commit_publication_validation[
+                        "status_check_suite_freshness_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_fresh": (
+                    post_commit_publication_validation[
+                        "status_check_suite_fresh"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_freshness_window_bound": (
+                    post_commit_publication_validation[
+                        "status_check_suite_freshness_window_bound"
+                    ]
+                ),
                 "post_commit_publication_publication_digest_bound": (
                     post_commit_publication_validation[
                         "publication_digest_bound"
@@ -2509,6 +2538,9 @@ class OmoikaneReferenceOS:
                     ]
                     and post_commit_publication_validation[
                         "raw_status_check_provider_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_status_check_suite_freshness_payload_redacted"
                     ]
                 ),
                 "blocked_post_commit_publication_receipt_ok": (

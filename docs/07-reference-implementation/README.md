@@ -1001,12 +1001,13 @@ post-push `git ls-remote origin refs/heads/main` の remote verification command
 同 command stdout から観測した head/ref output digest、
 GitHub protected branch provider policy receipt、provider policy freshness、
 signed provider timestamp、timestamp replay guard、post-push status/check suite digest、
-publication digest を固定する。
+status/check suite freshness digest、publication digest を固定する。
 protected branch receipt は `refs/heads/main` の provider policy ref、
 required verification checks、policy digest、freshness digest、timestamp digest、
 replay guard digest、receipt digest、protected status を raw provider payload なしで
 束縛する。status/check suite は同じ remote head 上の required verification checks が
-completed/success であることを check-run digest と suite digest に束縛する。
+completed/success で、suite snapshot が 900 秒以内の `fresh` evidence であることを
+check-run digest / suite digest / freshness digest に束縛する。
 push 前 origin/main が source execution current checkout head と
 一致しない場合、remote head が local commit と一致しない場合、
 push / remote verification が失敗した場合、`ls-remote` output が remote head /

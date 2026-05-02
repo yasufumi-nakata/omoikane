@@ -10,7 +10,8 @@ description: >
   verification, push, remote verification, branch-provider, and status-check
   payloads redacted while preserving command, observed head/ref, policy,
   provider freshness, signed timestamp, timestamp replay-guard, provider
-  receipt, status-check suite, and publication digests.
+  receipt, status-check suite, status-check suite freshness, and publication
+  digests.
 type: object
 additionalProperties: false
 required:
@@ -97,6 +98,12 @@ required:
   - status_check_all_required_passed
   - status_check_suite_digest
   - status_check_suite_digest_bound
+  - status_check_suite_freshness_profile
+  - status_check_suite_checked_at_ref
+  - status_check_suite_freshness_window_seconds
+  - status_check_suite_freshness_status
+  - status_check_suite_freshness_digest
+  - status_check_suite_freshness_digest_bound
   - protected_branch_receipt_digest
   - protected_branch_receipt_digest_bound
   - publication_digest
@@ -117,6 +124,7 @@ required:
   - raw_protected_branch_provider_timestamp_payload_stored
   - raw_protected_branch_provider_timestamp_replay_guard_payload_stored
   - raw_status_check_provider_payload_stored
+  - raw_status_check_suite_freshness_payload_stored
   - receipt_digest
   - receipt_ref
 properties:
@@ -345,6 +353,25 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   status_check_suite_digest_bound:
     type: boolean
+  status_check_suite_freshness_profile:
+    const: post-push-provider-status-check-suite-freshness-v1
+  status_check_suite_checked_at_ref:
+    type: string
+    minLength: 1
+  status_check_suite_freshness_window_seconds:
+    type: integer
+    minimum: 1
+    maximum: 900
+  status_check_suite_freshness_status:
+    enum:
+      - fresh
+      - expired
+      - unknown
+  status_check_suite_freshness_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  status_check_suite_freshness_digest_bound:
+    type: boolean
   protected_branch_receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -391,6 +418,8 @@ properties:
   raw_protected_branch_provider_timestamp_replay_guard_payload_stored:
     const: false
   raw_status_check_provider_payload_stored:
+    const: false
+  raw_status_check_suite_freshness_payload_stored:
     const: false
   receipt_digest:
     type: string
