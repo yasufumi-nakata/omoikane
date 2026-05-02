@@ -83,6 +83,7 @@ capabilities:
   - yaoyorozu.agent-source.research-evidence-scope.attest
   - yaoyorozu.agent-source.research-evidence-schema.attest
   - yaoyorozu.research-evidence.verifier-readback.attest
+  - yaoyorozu.research-evidence.verifier-timestamp-replay.attest
   - yaoyorozu.research-evidence.exchange-ledger.attest
   - yaoyorozu.research-evidence.synthesis-ledger.attest
   - yaoyorozu.agent-source.digest-manifest.attest
@@ -226,7 +227,7 @@ when_to_invoke: |
   - Yaoyorozu councilor source definition が deliberation_scope_refs と deliberation_policy_ref を registry entry へ保持し、raw deliberation transcript ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が research_domain_refs と evidence_policy_ref を registry entry へ保持し、raw research payload ではなく repo-local ref だけを渡していることを検証する時
   - Yaoyorozu researcher source definition が Council schema ではなく research_evidence_request / research_evidence_report schema に固定されていることを検証する時
-  - Yaoyorozu researcher evidence verifier receipt が expected / observed digest readback と live verifier quorum に束縛され、raw evidence / raw response / raw signature payload と decision authority を持たないことを検証する時
+  - Yaoyorozu researcher evidence verifier receipt が expected / observed digest readback、live verifier quorum、signed-current provider timestamp、replay-unique nonce guard に束縛され、raw evidence / raw response / raw signature payload と decision authority を持たないことを検証する時
   - Yaoyorozu researcher request/report exchange が source digest、evidence digest、Council+Guardian 署名付き ledger entry に束縛され、raw research payload と decision authority を持たないことを検証する時
   - Yaoyorozu 複数 researcher exchange synthesis が exchange digest set、evidence digest set、Council+Guardian 署名付き ledger entry に束縛され、raw exchange / raw research payload と decision authority を持たないことを検証する時
   - Yaoyorozu registry snapshot が raw agents/**/*.yaml source set を digest-only manifest に束縛し、raw source payload を保存していないことを検証する時

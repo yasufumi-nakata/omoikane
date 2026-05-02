@@ -146,7 +146,7 @@ operations:
       - selected researcher must be a researcher registry entry with role-specific research_evidence_request and research_evidence_report schema refs
       - request_digest and report_digest must bind the nested request/report payloads
       - report evidence_items must bind repo-local evidence refs and digests while raw_research_payload_stored remains false
-      - evidence_verifier_receipt must independently read back the same repo-local evidence refs, bind expected and observed digests, bind literature-index / publisher-record live verifier transport quorum with signed responses and freshness windows, and store no raw evidence, raw network response, or raw signature payload
+      - evidence_verifier_receipt must independently read back the same repo-local evidence refs, bind expected and observed digests, bind literature-index / publisher-record live verifier transport quorum with signed responses, 900 second freshness windows, signed-current provider timestamp evidence, and replay-unique nonce guard evidence, and store no raw evidence, raw network response, or raw signature payload
       - claim_ceiling must remain implementation-advisory and all design implications must be advisory-only
       - decision_authority_claimed and request decision_authority_allowed must remain false
       - ContinuityLedger event must use the yaoyorozu-research-evidence category and council+guardian signature roles
@@ -180,6 +180,7 @@ operations:
       - every source exchange must already be valid, ledger-appended, and bound to the same registry snapshot and source manifest digest
       - exchange_refs, exchange_digests, research_domain_refs, evidence_refs, and evidence_digest_set must be derived from the source exchanges
       - evidence_verifier_refs, evidence_verifier_digests, evidence_verifier_digest_set_digest, evidence_verifier_quorum_digests, and evidence_verifier_quorum_digest_set_digest must be derived from the source exchanges
+      - every source verifier must carry freshness_timestamp_bound=true and freshness_replay_guard_bound=true before synthesis can validate as advisory Council input
       - synthesis must remain implementation-advisory and advisory-only
       - raw exchange payloads, raw research payloads, and researcher decision authority must remain absent
       - synthesis receipt must be appended to ContinuityLedger with council and guardian signature roles

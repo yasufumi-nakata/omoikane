@@ -374,3 +374,4 @@ status: decided | superseded
 - [2026-05-02_parallel-codex-status-check-poll-budget.md](2026-05-02_parallel-codex-status-check-poll-budget.md)
 - [2026-05-02_parallel-codex-status-check-suite-timestamp.md](2026-05-02_parallel-codex-status-check-suite-timestamp.md)
 - [2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md](2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md)
+- [2026-05-02_yaoyorozu-research-evidence-verifier-timestamp-replay.md](2026-05-02_yaoyorozu-research-evidence-verifier-timestamp-replay.md)

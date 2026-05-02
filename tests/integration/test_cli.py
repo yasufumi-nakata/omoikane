@@ -2955,6 +2955,22 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["research_evidence_report_digest_bound"])
         self.assertTrue(result["validation"]["research_evidence_exchange_digest_bound"])
         self.assertTrue(result["validation"]["research_evidence_refs_bound"])
+        self.assertTrue(result["validation"]["research_evidence_verifier_bound"])
+        self.assertTrue(result["validation"]["research_evidence_verifier_digest_bound"])
+        self.assertTrue(result["validation"]["research_evidence_verifier_transport_bound"])
+        self.assertTrue(result["validation"]["research_evidence_verifier_quorum_bound"])
+        self.assertTrue(
+            result["validation"]["research_evidence_verifier_signed_response_envelope_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["research_evidence_verifier_freshness_window_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["research_evidence_verifier_freshness_timestamp_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["research_evidence_verifier_freshness_replay_guard_bound"]
+        )
         self.assertTrue(result["validation"]["research_evidence_advisory_only"])
         self.assertTrue(result["validation"]["research_evidence_ledger_entry_appended"])
         self.assertTrue(result["validation"]["research_evidence_ledger_entry_digest_bound"])

@@ -197,6 +197,8 @@ properties:
       - evidence_verifier_quorum_bound
       - evidence_verifier_signed_response_envelope_bound
       - evidence_verifier_freshness_window_bound
+      - evidence_verifier_freshness_timestamp_bound
+      - evidence_verifier_freshness_replay_guard_bound
       - evidence_verifier_raw_payload_stored
       - evidence_verifier_network_payload_stored
       - evidence_verifier_raw_response_payload_stored
@@ -240,6 +242,10 @@ properties:
       evidence_verifier_signed_response_envelope_bound:
         const: true
       evidence_verifier_freshness_window_bound:
+        const: true
+      evidence_verifier_freshness_timestamp_bound:
+        const: true
+      evidence_verifier_freshness_replay_guard_bound:
         const: true
       evidence_verifier_raw_payload_stored:
         const: false
@@ -373,6 +379,17 @@ examples:
       signed_response_envelope_bound: true
       freshness_window_seconds: 900
       freshness_window_bound: true
+      freshness_timestamp_ref: timestamp://yaoyorozu/research-evidence/verifier/provider-clock/v1
+      freshness_timestamp_status: signed-current
+      freshness_timestamp_digest: d123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      freshness_timestamp_signing_key_ref: key://research-evidence-verifier/provider-clock/v1
+      freshness_timestamp_signature_digest: e123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      freshness_timestamp_nonce_ref: nonce://yaoyorozu/research-evidence/verifier/provider-clock/v1
+      freshness_timestamp_previous_nonce_digest: f123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      freshness_timestamp_replay_status: unique
+      freshness_timestamp_replay_guard_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      freshness_timestamp_bound: true
+      freshness_replay_guard_bound: true
       raw_evidence_payload_stored: false
       network_payload_stored: false
       raw_verifier_response_payload_stored: false
@@ -388,6 +405,8 @@ examples:
         verifier_quorum_bound: true
         signed_response_envelope_bound: true
         freshness_window_bound: true
+        freshness_timestamp_bound: true
+        freshness_replay_guard_bound: true
         verifier_digest_bound: true
         raw_evidence_payload_stored: false
         network_payload_stored: false
@@ -479,6 +498,8 @@ examples:
       evidence_verifier_quorum_bound: true
       evidence_verifier_signed_response_envelope_bound: true
       evidence_verifier_freshness_window_bound: true
+      evidence_verifier_freshness_timestamp_bound: true
+      evidence_verifier_freshness_replay_guard_bound: true
       evidence_verifier_raw_payload_stored: false
       evidence_verifier_network_payload_stored: false
       evidence_verifier_raw_response_payload_stored: false

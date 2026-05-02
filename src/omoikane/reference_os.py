@@ -6356,6 +6356,16 @@ json.dump(response, sys.stdout)
                         "evidence_verifier_freshness_window_bound"
                     ]
                 ),
+                "research_evidence_verifier_freshness_timestamp_bound": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_freshness_timestamp_bound"
+                    ]
+                ),
+                "research_evidence_verifier_freshness_replay_guard_bound": (
+                    research_evidence_exchange_validation[
+                        "evidence_verifier_freshness_replay_guard_bound"
+                    ]
+                ),
                 "research_evidence_verifier_raw_payload_stored": (
                     research_evidence_exchange_validation[
                         "evidence_verifier_raw_payload_stored"

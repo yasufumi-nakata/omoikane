@@ -131,6 +131,17 @@ YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_REQUIRED_JURISDICTIONS = [
     "US-CA",
 ]
 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_FRESHNESS_WINDOW_SECONDS = 900
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REF = (
+    "timestamp://yaoyorozu/research-evidence/verifier/provider-clock/v1"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNING_KEY_REF = (
+    "key://research-evidence-verifier/provider-clock/v1"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNED_STATUS = "signed-current"
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_NONCE_REF = (
+    "nonce://yaoyorozu/research-evidence/verifier/provider-clock/v1"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REPLAY_STATUS = "unique"
 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TRANSPORT_RECEIPT_KIND = (
     "yaoyorozu_research_evidence_verifier_transport_receipt"
 )
@@ -1184,6 +1195,35 @@ def _research_evidence_verifier_digest_payload(
         ],
         "freshness_window_seconds": verifier_receipt["freshness_window_seconds"],
         "freshness_window_bound": verifier_receipt["freshness_window_bound"],
+        "freshness_timestamp_ref": verifier_receipt["freshness_timestamp_ref"],
+        "freshness_timestamp_status": verifier_receipt[
+            "freshness_timestamp_status"
+        ],
+        "freshness_timestamp_digest": verifier_receipt[
+            "freshness_timestamp_digest"
+        ],
+        "freshness_timestamp_signing_key_ref": verifier_receipt[
+            "freshness_timestamp_signing_key_ref"
+        ],
+        "freshness_timestamp_signature_digest": verifier_receipt[
+            "freshness_timestamp_signature_digest"
+        ],
+        "freshness_timestamp_nonce_ref": verifier_receipt[
+            "freshness_timestamp_nonce_ref"
+        ],
+        "freshness_timestamp_previous_nonce_digest": verifier_receipt[
+            "freshness_timestamp_previous_nonce_digest"
+        ],
+        "freshness_timestamp_replay_status": verifier_receipt[
+            "freshness_timestamp_replay_status"
+        ],
+        "freshness_timestamp_replay_guard_digest": verifier_receipt[
+            "freshness_timestamp_replay_guard_digest"
+        ],
+        "freshness_timestamp_bound": verifier_receipt["freshness_timestamp_bound"],
+        "freshness_replay_guard_bound": verifier_receipt[
+            "freshness_replay_guard_bound"
+        ],
         "raw_evidence_payload_stored": verifier_receipt[
             "raw_evidence_payload_stored"
         ],
@@ -1196,6 +1236,78 @@ def _research_evidence_verifier_digest_payload(
         ],
         "decision_authority_claimed": verifier_receipt[
             "decision_authority_claimed"
+        ],
+    }
+
+
+def _research_evidence_verifier_timestamp_payload(
+    verifier_receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "freshness_timestamp_ref": verifier_receipt["freshness_timestamp_ref"],
+        "freshness_timestamp_signing_key_ref": verifier_receipt[
+            "freshness_timestamp_signing_key_ref"
+        ],
+        "freshness_timestamp_status": verifier_receipt[
+            "freshness_timestamp_status"
+        ],
+        "exchange_ref": verifier_receipt["exchange_ref"],
+        "verifier_transport_receipt_digests": verifier_receipt[
+            "verifier_transport_receipt_digests"
+        ],
+        "verifier_transport_quorum_digest": verifier_receipt[
+            "verifier_transport_quorum_digest"
+        ],
+        "freshness_window_seconds": verifier_receipt["freshness_window_seconds"],
+        "checked_at_refs": [
+            receipt["checked_at_ref"]
+            for receipt in verifier_receipt.get("verifier_transport_receipts", [])
+        ],
+    }
+
+
+def _research_evidence_verifier_timestamp_signature_payload(
+    verifier_receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "freshness_timestamp_digest": verifier_receipt["freshness_timestamp_digest"],
+        "freshness_timestamp_signing_key_ref": verifier_receipt[
+            "freshness_timestamp_signing_key_ref"
+        ],
+        "freshness_timestamp_status": verifier_receipt[
+            "freshness_timestamp_status"
+        ],
+    }
+
+
+def _research_evidence_verifier_previous_nonce_payload(
+    verifier_receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "freshness_timestamp_nonce_ref": verifier_receipt[
+            "freshness_timestamp_nonce_ref"
+        ],
+        "exchange_ref": verifier_receipt["exchange_ref"],
+        "previous_nonce_ref": "none",
+    }
+
+
+def _research_evidence_verifier_replay_guard_payload(
+    verifier_receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "freshness_timestamp_digest": verifier_receipt["freshness_timestamp_digest"],
+        "freshness_timestamp_nonce_ref": verifier_receipt[
+            "freshness_timestamp_nonce_ref"
+        ],
+        "freshness_timestamp_previous_nonce_digest": verifier_receipt[
+            "freshness_timestamp_previous_nonce_digest"
+        ],
+        "freshness_timestamp_replay_status": verifier_receipt[
+            "freshness_timestamp_replay_status"
+        ],
+        "verifier_transport_quorum_digest": verifier_receipt[
+            "verifier_transport_quorum_digest"
         ],
     }
 
@@ -4725,6 +4837,68 @@ class YaoyorozuRegistryService:
                 }
             )
         )
+        timestamp_core: Dict[str, Any] = {
+            "freshness_timestamp_ref": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REF
+            ),
+            "freshness_timestamp_status": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNED_STATUS
+            ),
+            "freshness_timestamp_signing_key_ref": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNING_KEY_REF
+            ),
+            "exchange_ref": str(exchange.get("exchange_ref", "")),
+            "verifier_transport_receipt_digests": verifier_transport_receipt_digests,
+            "verifier_transport_quorum_digest": verifier_transport_quorum_digest,
+            "freshness_window_seconds": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_FRESHNESS_WINDOW_SECONDS
+            ),
+            "checked_at_refs": [
+                receipt["checked_at_ref"] for receipt in verifier_transport_receipts
+            ],
+        }
+        freshness_timestamp_digest = sha256_text(canonical_json(timestamp_core))
+        freshness_timestamp_signature_digest = sha256_text(
+            canonical_json(
+                {
+                    "freshness_timestamp_digest": freshness_timestamp_digest,
+                    "freshness_timestamp_signing_key_ref": (
+                        YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNING_KEY_REF
+                    ),
+                    "freshness_timestamp_status": (
+                        YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNED_STATUS
+                    ),
+                }
+            )
+        )
+        freshness_timestamp_previous_nonce_digest = sha256_text(
+            canonical_json(
+                {
+                    "freshness_timestamp_nonce_ref": (
+                        YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_NONCE_REF
+                    ),
+                    "exchange_ref": str(exchange.get("exchange_ref", "")),
+                    "previous_nonce_ref": "none",
+                }
+            )
+        )
+        freshness_timestamp_replay_guard_digest = sha256_text(
+            canonical_json(
+                {
+                    "freshness_timestamp_digest": freshness_timestamp_digest,
+                    "freshness_timestamp_nonce_ref": (
+                        YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_NONCE_REF
+                    ),
+                    "freshness_timestamp_previous_nonce_digest": (
+                        freshness_timestamp_previous_nonce_digest
+                    ),
+                    "freshness_timestamp_replay_status": (
+                        YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REPLAY_STATUS
+                    ),
+                    "verifier_transport_quorum_digest": verifier_transport_quorum_digest,
+                }
+            )
+        )
         signed_response_envelope_bound = all(
             receipt.get("signed_response_envelope_ref")
             and receipt.get("response_signing_key_ref")
@@ -4736,6 +4910,8 @@ class YaoyorozuRegistryService:
             == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_FRESHNESS_WINDOW_SECONDS
             for receipt in verifier_transport_receipts
         )
+        freshness_timestamp_bound = True
+        freshness_replay_guard_bound = True
         verifier_quorum_status = (
             "complete"
             if set(YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_REQUIRED_CLASSES).issubset(
@@ -4747,6 +4923,8 @@ class YaoyorozuRegistryService:
             and len(accepted_verifier_jurisdictions) >= verifier_quorum_threshold
             and signed_response_envelope_bound
             and freshness_window_bound
+            and freshness_timestamp_bound
+            and freshness_replay_guard_bound
             else "incomplete"
         )
         verifier_id = new_id("yaoyorozu-research-evidence-verifier")
@@ -4801,6 +4979,33 @@ class YaoyorozuRegistryService:
                 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_FRESHNESS_WINDOW_SECONDS
             ),
             "freshness_window_bound": freshness_window_bound,
+            "freshness_timestamp_ref": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REF
+            ),
+            "freshness_timestamp_status": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNED_STATUS
+            ),
+            "freshness_timestamp_digest": freshness_timestamp_digest,
+            "freshness_timestamp_signing_key_ref": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNING_KEY_REF
+            ),
+            "freshness_timestamp_signature_digest": (
+                freshness_timestamp_signature_digest
+            ),
+            "freshness_timestamp_nonce_ref": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_NONCE_REF
+            ),
+            "freshness_timestamp_previous_nonce_digest": (
+                freshness_timestamp_previous_nonce_digest
+            ),
+            "freshness_timestamp_replay_status": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REPLAY_STATUS
+            ),
+            "freshness_timestamp_replay_guard_digest": (
+                freshness_timestamp_replay_guard_digest
+            ),
+            "freshness_timestamp_bound": freshness_timestamp_bound,
+            "freshness_replay_guard_bound": freshness_replay_guard_bound,
             "raw_evidence_payload_stored": False,
             "network_payload_stored": False,
             "raw_verifier_response_payload_stored": False,
@@ -5046,6 +5251,70 @@ class YaoyorozuRegistryService:
             errors.append("live verifier responses must bind freshness windows")
 
         try:
+            expected_timestamp_digest = sha256_text(
+                canonical_json(
+                    _research_evidence_verifier_timestamp_payload(verifier_receipt)
+                )
+            )
+            expected_timestamp_signature_digest = sha256_text(
+                canonical_json(
+                    _research_evidence_verifier_timestamp_signature_payload(
+                        verifier_receipt
+                    )
+                )
+            )
+            freshness_timestamp_bound = (
+                verifier_receipt.get("freshness_timestamp_ref")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REF
+                and verifier_receipt.get("freshness_timestamp_status")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNED_STATUS
+                and verifier_receipt.get("freshness_timestamp_signing_key_ref")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_SIGNING_KEY_REF
+                and verifier_receipt.get("freshness_timestamp_digest")
+                == expected_timestamp_digest
+                and verifier_receipt.get("freshness_timestamp_signature_digest")
+                == expected_timestamp_signature_digest
+                and verifier_receipt.get("freshness_timestamp_bound") is True
+            )
+        except (KeyError, TypeError):
+            freshness_timestamp_bound = False
+            errors.append("research evidence verifier timestamp payload is incomplete")
+        if not freshness_timestamp_bound:
+            errors.append("live verifier freshness must bind signed provider timestamp")
+
+        try:
+            expected_previous_nonce_digest = sha256_text(
+                canonical_json(
+                    _research_evidence_verifier_previous_nonce_payload(
+                        verifier_receipt
+                    )
+                )
+            )
+            expected_replay_guard_digest = sha256_text(
+                canonical_json(
+                    _research_evidence_verifier_replay_guard_payload(
+                        verifier_receipt
+                    )
+                )
+            )
+            freshness_replay_guard_bound = (
+                verifier_receipt.get("freshness_timestamp_nonce_ref")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_NONCE_REF
+                and verifier_receipt.get("freshness_timestamp_previous_nonce_digest")
+                == expected_previous_nonce_digest
+                and verifier_receipt.get("freshness_timestamp_replay_status")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TIMESTAMP_REPLAY_STATUS
+                and verifier_receipt.get("freshness_timestamp_replay_guard_digest")
+                == expected_replay_guard_digest
+                and verifier_receipt.get("freshness_replay_guard_bound") is True
+            )
+        except (KeyError, TypeError):
+            freshness_replay_guard_bound = False
+            errors.append("research evidence verifier replay guard payload is incomplete")
+        if not freshness_replay_guard_bound:
+            errors.append("live verifier freshness timestamp must bind replay guard")
+
+        try:
             verifier_digest_bound = verifier_receipt.get("verifier_digest") == sha256_text(
                 canonical_json(
                     _research_evidence_verifier_digest_payload(verifier_receipt)
@@ -5097,9 +5366,17 @@ class YaoyorozuRegistryService:
             "evidence_ref_set_bound": evidence_ref_set_bound,
             "evidence_digest_set_bound": evidence_digest_set_bound,
             "live_verifier_transport_bound": live_verifier_transport_bound,
-            "verifier_quorum_bound": live_verifier_transport_bound,
+            "verifier_quorum_bound": (
+                live_verifier_transport_bound
+                and signed_response_envelope_bound
+                and freshness_window_bound
+                and freshness_timestamp_bound
+                and freshness_replay_guard_bound
+            ),
             "signed_response_envelope_bound": signed_response_envelope_bound,
             "freshness_window_bound": freshness_window_bound,
+            "freshness_timestamp_bound": freshness_timestamp_bound,
+            "freshness_replay_guard_bound": freshness_replay_guard_bound,
             "verifier_digest_bound": verifier_digest_bound,
             "raw_evidence_payload_stored": raw_evidence_payload_stored,
             "network_payload_stored": network_payload_stored,
@@ -5320,6 +5597,8 @@ class YaoyorozuRegistryService:
                 "verifier_quorum_bound": False,
                 "signed_response_envelope_bound": False,
                 "freshness_window_bound": False,
+                "freshness_timestamp_bound": False,
+                "freshness_replay_guard_bound": False,
                 "verifier_digest_bound": False,
                 "raw_evidence_payload_stored": True,
                 "network_payload_stored": True,
@@ -5418,6 +5697,12 @@ class YaoyorozuRegistryService:
             "evidence_verifier_freshness_window_bound": evidence_verifier_validation[
                 "freshness_window_bound"
             ],
+            "evidence_verifier_freshness_timestamp_bound": (
+                evidence_verifier_validation["freshness_timestamp_bound"]
+            ),
+            "evidence_verifier_freshness_replay_guard_bound": (
+                evidence_verifier_validation["freshness_replay_guard_bound"]
+            ),
             "evidence_verifier_raw_payload_stored": (
                 evidence_verifier_validation["raw_evidence_payload_stored"]
             ),

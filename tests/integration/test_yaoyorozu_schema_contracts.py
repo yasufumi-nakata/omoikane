@@ -203,6 +203,12 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             exchange["validation"]["evidence_verifier_signed_response_envelope_bound"]
         )
         self.assertTrue(exchange["validation"]["evidence_verifier_freshness_window_bound"])
+        self.assertTrue(
+            exchange["validation"]["evidence_verifier_freshness_timestamp_bound"]
+        )
+        self.assertTrue(
+            exchange["validation"]["evidence_verifier_freshness_replay_guard_bound"]
+        )
         self._assert_schema_valid(
             "specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema",
             exchange["evidence_verifier_receipt"],
@@ -233,6 +239,16 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(exchange["evidence_verifier_receipt"]["signed_response_envelope_bound"])
         self.assertTrue(exchange["evidence_verifier_receipt"]["freshness_window_bound"])
+        self.assertTrue(exchange["evidence_verifier_receipt"]["freshness_timestamp_bound"])
+        self.assertTrue(exchange["evidence_verifier_receipt"]["freshness_replay_guard_bound"])
+        self.assertEqual(
+            "signed-current",
+            exchange["evidence_verifier_receipt"]["freshness_timestamp_status"],
+        )
+        self.assertEqual(
+            "unique",
+            exchange["evidence_verifier_receipt"]["freshness_timestamp_replay_status"],
+        )
         self.assertFalse(exchange["evidence_verifier_receipt"]["raw_evidence_payload_stored"])
         self.assertFalse(exchange["evidence_verifier_receipt"]["network_payload_stored"])
         self.assertFalse(

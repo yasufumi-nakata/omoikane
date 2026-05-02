@@ -569,7 +569,8 @@ researcher source digest、request/report digest、repo-local evidence digest、
 `repo-local-research-evidence-verifier-v1` の digest readback と
 `digest-only-live-research-evidence-verifier-quorum-v1` の verifier transport quorum、
 literature-index / publisher-record class、JP-13 / US-CA threshold、
-signed response envelope、900 秒 freshness window、
+signed response envelope、900 秒 freshness window、signed-current provider timestamp、
+replay-unique nonce guard、
 Council+Guardian 署名付き ContinuityLedger entry ref/hash/payload ref に束縛し、
 raw evidence / raw research / raw verifier response / raw signature payload 非保存と
 decision authority 不保持を

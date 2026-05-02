@@ -9,6 +9,8 @@ must:
   - live verifier transport receipts must bind literature-index and publisher-record classes
   - verifier quorum must cover JP-13 and US-CA jurisdictions with threshold 2
   - signed response envelope refs and 900 second freshness windows must be bound
+  - freshness windows must be bound to signed-current provider timestamp evidence
+  - provider timestamp evidence must carry a replay-unique nonce guard
   - verifier transport quorum digest must be derived from transport receipt digests
   - verifier_digest must bind the verifier receipt
   - raw evidence, network response, signature payloads, and decision authority must remain absent
@@ -28,6 +30,10 @@ expected:
   signed_response_envelope_bound: true
   freshness_window_seconds: 900
   freshness_window_bound: true
+  freshness_timestamp_status: signed-current
+  freshness_timestamp_bound: true
+  freshness_timestamp_replay_status: unique
+  freshness_replay_guard_bound: true
   raw_evidence_payload_stored: false
   network_payload_stored: false
   raw_verifier_response_payload_stored: false
