@@ -2,6 +2,8 @@
 
 hourly builder や broad automation が repo 内 gap を埋める時の最小 runbook です。
 thin prompt でも、次の順序は崩しません。
+日次または毎時の継続運用では [Daily Automation Direction](daily-automation-direction.md)
+を先に読み、進展が無い日の no-op を正常完了として扱います。
 
 ## 1. Preflight
 
@@ -12,6 +14,7 @@ thin prompt でも、次の順序は崩しません。
 ## 2. 初期トリアージ
 
 - `meta/open-questions.md`
+- `references/daily-automation-direction.md`
 - `docs/07-reference-implementation/README.md`
 - `specs/catalog.yaml`
 - `PYTHONPATH=src python3 -m omoikane.cli gap-report --json`
@@ -27,6 +30,7 @@ truth-source と現行 runtime を読み、repo 内で machine-checkable に閉�
 - `future work` / `未実装` が current truth-source に残るなら最優先で閉じる
 - truth-source が clean でも、automation 自体を阻害する欠落は優先して埋める
 - repo 外依存が強い open-world 実装より、repo 内で deterministic に検証できる contract を優先する
+- repo 内 gap も新しい研究根拠も無い場合は、差分を作らず `no-op-watch` として報告する
 
 ## 4. 実装範囲
 
@@ -45,3 +49,4 @@ truth-source と現行 runtime を読み、repo 内で machine-checkable に閉�
 - 実装・docs・tests が同じ contract を共有している
 - `gap-report` が新しい residual gap を残していない
 - meaningful change なら commit して `origin` へ push する
+- no-op の場合は commit を作らず、確認した gate と更新しなかった理由を日本語で残す

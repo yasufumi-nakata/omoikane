@@ -51,6 +51,27 @@ class GapScannerTests(unittest.TestCase):
                 )
             )
 
+    def test_scan_requires_daily_automation_direction_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "references" / "daily-automation-direction.md").unlink()
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["missing_required_reference_file_count"])
+            self.assertEqual(
+                ["references/daily-automation-direction.md"],
+                report["missing_required_reference_files"],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "missing-reference-file"
+                    and "daily-automation-direction.md" in task["summary"]
+                    for task in report["prioritized_tasks"]
+                )
+            )
+
     def test_scan_reports_missing_required_reference_policy_section(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -1181,6 +1202,7 @@ class GapScannerTests(unittest.TestCase):
         references_root = repo_root / "references"
         references_root.mkdir(parents=True, exist_ok=True)
         for filename in (
+            "daily-automation-direction.md",
             "operating-playbook.md",
             "parallel-codex-orchestration.md",
             "repo-coverage-checklist.md",

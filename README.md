@@ -63,6 +63,7 @@ meta/                 ── 用語集・決定履歴
 - 今日の技術で実装できない部分は多いが、L1/L4/L5 の統率や append-only ledger のような骨格は今から prototype 化できる。
 - L6 では BDB（Biological-Digital Bridge）の bounded viability を proxy 実装し、ms 級 latency budget・fail-safe fallback・可逆な置換比率調整までは reference runtime で検証できる。
 - L6 では BioData Transmitter も reference runtime 化し、人間から取られる神経・心血管・呼吸・皮膚・筋・眼・体温・運動・音声・生化学系などの宣言済み生体信号を catalog / family map に束縛し、体内状態 latent を経由して別モダリティの生体データ proxy を生成し、未知 target は汎用 biosignal proxy として digest-bound に扱い、複数日の latent digest から個人内 calibration profile と identity / loopback confidence gate を作る境界を検証できる。
+- automation は [Daily Automation Direction](references/daily-automation-direction.md) に従い、repo 内 gap または追跡可能な研究進展がある時だけ更新する。進展が無い日は no-op とし、意識再現や同一性達成を装う差分を作らない。
 - このリポジトリは「設計が成熟するほど、必要な研究が明確になり、reference runtime も厚くなる」ことを目指す。
 
 ## すぐ動かせるもの

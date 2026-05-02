@@ -103,7 +103,7 @@ entry ごとの signature digest / verifier key ref、raw key / raw signature �
 
 `gap-report` は open question / missing file / empty eval / placeholder に加えて、
 automation が前提にする repo-local `references/*.md` の欠落
-(`operating-playbook.md` / `parallel-codex-orchestration.md` /
+(`daily-automation-direction.md` / `operating-playbook.md` / `parallel-codex-orchestration.md` /
 `repo-coverage-checklist.md` / `verification-checklist.md`) と、
 各 runbook の必須 section-level policy
 (`Preflight` / `Gate Order` / `Worker Boundaries` / `Verification` など) の欠落、

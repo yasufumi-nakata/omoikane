@@ -3592,10 +3592,11 @@ entries:
     consumers:
       - reference-runtime
       - src/omoikane/self_construction/gaps.py
+      - references/daily-automation-direction.md
       - references/parallel-codex-orchestration.md
       - docs/07-reference-implementation/README.md
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects automation pull-first and parallel Codex runbook assumptions by requiring gap-report to surface missing repo-local reference files and missing required section-level policies before all-zero gate completion.
+    rationale: Protects automation pull-first, daily no-op, claim-ceiling, and parallel Codex runbook assumptions by requiring gap-report to surface missing repo-local reference files and missing required section-level policies before all-zero gate completion.
   - priority: P1
     kind: schema
     file: specs/schemas/gap_report.schema

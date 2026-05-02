@@ -51,12 +51,22 @@ DECISION_LOG_IGNORED_NAME_SNIPPETS = ("gap-report",)
 DECISION_LOG_NEXT_GAP_IDS_KEY = "next_gap_ids"
 DECISION_LOG_CLOSES_NEXT_GAPS_KEY = "closes_next_gaps"
 REQUIRED_REFERENCE_FILES = (
+    "references/daily-automation-direction.md",
     "references/operating-playbook.md",
     "references/parallel-codex-orchestration.md",
     "references/repo-coverage-checklist.md",
     "references/verification-checklist.md",
 )
 REQUIRED_REFERENCE_POLICY_SECTIONS = {
+    "references/daily-automation-direction.md": (
+        "## Purpose",
+        "## Daily Triage",
+        "## Update Classes",
+        "## Claim Ceiling",
+        "## No-Progress Policy",
+        "## Evidence Intake",
+        "## Reporting",
+    ),
     "references/operating-playbook.md": (
         "## 1. Preflight",
         "## 2. 初期トリアージ",
