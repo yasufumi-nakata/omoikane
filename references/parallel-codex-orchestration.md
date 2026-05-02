@@ -101,7 +101,8 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   GitHub protected branch provider policy receipt digest、policy freshness digest、
   signed provider timestamp digest、timestamp replay guard digest、post-push
   status/check suite digest、status/check suite freshness digest、status/check
-  suite signed provider timestamp digest、timestamp replay guard digest を
+  poll budget digest、status/check suite signed provider timestamp digest、
+  timestamp replay guard digest を
   publication digest に束縛し、
   push 前 origin/main が source execution current checkout head と一致しない、
   remote head が local commit と一致しない、`ls-remote` output が remote head /
@@ -110,8 +111,9 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
   provider timestamp が `signed-current` でない、または timestamp replay guard が
   `unique` でない、required status/check が published commit 上で
   completed/success でない、status/check suite snapshot が 900 秒以内の
-  `fresh` でない、status/check suite provider timestamp が `signed-current`
-  でない、または status/check suite timestamp replay guard が `unique` でない
+  `fresh` でない、status/check polling が budget 内で `completed` へ到達しない、
+  status/check suite provider timestamp が `signed-current` でない、または
+  status/check suite timestamp replay guard が `unique` でない
   handoff は `ready_for_github_handoff=false` のまま fail-closed にする
 - patch artifact cleanup receipt は ordered apply step の
   `artifacts/parallel-codex/*.patch` path、patch artifact manifest digest、

@@ -1018,8 +1018,9 @@ post-push `git ls-remote origin refs/heads/main` の remote verification command
 同 command stdout から観測した head/ref output digest、
 GitHub protected branch provider policy receipt、provider policy freshness、
 signed provider timestamp、timestamp replay guard、post-push status/check suite digest、
-status/check suite freshness digest、status/check suite signed provider timestamp、
-status/check suite timestamp replay guard、publication digest を固定する。
+status/check suite freshness digest、bounded status/check poll budget digest、
+status/check suite signed provider timestamp、status/check suite timestamp replay guard、
+publication digest を固定する。
 protected branch receipt は `refs/heads/main` の provider policy ref、
 required verification checks、policy digest、freshness digest、timestamp digest、
 replay guard digest、receipt digest、protected status を raw provider payload なしで
@@ -1027,22 +1028,25 @@ replay guard digest、receipt digest、protected status を raw provider payload
 completed/success で、suite snapshot が 900 秒以内の `fresh` evidence であることを
 check-run digest / suite digest / freshness digest に束縛し、suite provider
 timestamp が `signed-current` で replay guard が `unique` であることも
-timestamp digest / replay digest に束縛する。
+timestamp digest / replay digest に束縛する。status/check poll budget は
+attempt count、max attempts、poll interval、terminal status、suite digest、
+freshness digest を `post-push-status-check-poll-budget-v1` として束縛し、
+terminal status が `completed` でなければ GitHub handoff へ進めない。
 push 前 origin/main が source execution current checkout head と
 一致しない場合、remote head が local commit と一致しない場合、
 push / remote verification が失敗した場合、`ls-remote` output が remote head /
 `refs/heads/main` と一致しない場合、protected branch status が `protected`
 でない場合、provider policy freshness が `fresh` でない場合、provider timestamp が
 `signed-current` でない場合、timestamp replay guard が `unique` でない場合、
-required status check が missing / failed / stale commit の場合、または
-status/check suite provider timestamp が unsigned / replayed の場合、または
+required status check が missing / failed / stale commit の場合、status/check polling が
+exhausted の場合、または status/check suite provider timestamp が unsigned / replayed の場合、または
 source execution が `ready-to-apply` でない場合は schema-bound のまま
 `ready_for_github_handoff=false` に留まる。
 raw batch payload、raw apply plan payload、raw dry-run payload、raw worker receipt
 payload、raw verification output、raw checkout mutation payload、raw patch cleanup
 payload、raw commit finalization payload、raw publication / push / remote verification /
 protected branch provider / freshness / timestamp / replay guard / status check payload は保存しない。
-status/check suite timestamp payload も保存しない。
+status/check polling payload と status/check suite timestamp payload も保存しない。
 
 `memory-demo` は L2 MemoryCrystal の暫定 compaction policy
 (`append-only-segment-rollup-v1`) を JSON で可視化し、

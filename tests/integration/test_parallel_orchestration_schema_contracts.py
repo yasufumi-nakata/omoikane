@@ -618,6 +618,21 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_status_check_poll_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_poll_terminal_completed"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_poll_attempt_budget_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_status_check_suite_timestamp_digest_bound"
             ]
         )
@@ -681,6 +696,21 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             ]
         )
         self.assertEqual(
+            "post-push-status-check-poll-budget-v1",
+            result["post_commit_publication_receipt"]["status_check_poll_profile"],
+        )
+        self.assertEqual(
+            "completed",
+            result["post_commit_publication_receipt"][
+                "status_check_poll_terminal_status"
+            ],
+        )
+        self.assertTrue(
+            result["post_commit_publication_receipt"][
+                "status_check_poll_digest_bound"
+            ]
+        )
+        self.assertEqual(
             "signed-current",
             result["post_commit_publication_receipt"][
                 "status_check_suite_timestamp_status"
@@ -705,6 +735,11 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertFalse(
             result["post_commit_publication_receipt"][
                 "raw_status_check_suite_freshness_payload_stored"
+            ]
+        )
+        self.assertFalse(
+            result["post_commit_publication_receipt"][
+                "raw_status_check_poll_payload_stored"
             ]
         )
         self.assertFalse(

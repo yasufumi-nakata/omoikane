@@ -96,6 +96,9 @@ PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE = (
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE = (
     "post-push-provider-status-check-suite-freshness-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_PROFILE = (
+    "post-push-status-check-poll-budget-v1"
+)
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE = (
     "post-push-provider-status-check-suite-signed-timestamp-v1"
 )
@@ -122,6 +125,10 @@ PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION = "success"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS = "fresh"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_EXPIRED_STATUS = "expired"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_UNKNOWN_STATUS = "unknown"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_COMPLETED_STATUS = "completed"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_EXHAUSTED_STATUS = "exhausted"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_MAX_ATTEMPTS = 5
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_INTERVAL_SECONDS = 30
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS = "signed-current"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_STALE_STATUS = "stale"
 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_INVALID_STATUS = "invalid"
@@ -395,6 +402,9 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_status_check_freshness_profile": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESHNESS_PROFILE
             ),
+            "post_commit_publication_status_check_poll_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_PROFILE
+            ),
             "post_commit_publication_status_check_timestamp_profile": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE
             ),
@@ -424,6 +434,15 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "post_commit_publication_status_check_required_freshness_status": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
+            ),
+            "post_commit_publication_status_check_poll_required_terminal_status": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_COMPLETED_STATUS
+            ),
+            "post_commit_publication_status_check_poll_default_max_attempts": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_MAX_ATTEMPTS
+            ),
+            "post_commit_publication_status_check_poll_default_interval_seconds": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_INTERVAL_SECONDS
             ),
             "post_commit_publication_status_check_required_timestamp_status": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_SIGNED_STATUS
@@ -563,6 +582,7 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "raw_status_check_provider_payload_stored": False,
             "raw_status_check_suite_freshness_payload_stored": False,
+            "raw_status_check_poll_payload_stored": False,
             "raw_status_check_suite_timestamp_payload_stored": False,
             "raw_status_check_suite_timestamp_replay_guard_payload_stored": False,
             "raw_transcript_payload_stored": False,
@@ -2391,6 +2411,17 @@ class ParallelCodexOrchestrationService:
             PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_FRESH_STATUS
         ),
         status_check_suite_freshness_digest: str = "",
+        status_check_poll_attempt_count: int = 1,
+        status_check_poll_max_attempts: int = (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_MAX_ATTEMPTS
+        ),
+        status_check_poll_interval_seconds: int = (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_INTERVAL_SECONDS
+        ),
+        status_check_poll_terminal_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_COMPLETED_STATUS
+        ),
+        status_check_poll_digest: str = "",
         status_check_suite_timestamp_ref: str = (
             PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_TIMESTAMP_REF
         ),
@@ -2679,6 +2710,47 @@ class ParallelCodexOrchestrationService:
         status_check_suite_freshness_digest_bound = (
             normalized_status_check_suite_freshness_digest
             == expected_status_check_suite_freshness_digest
+        )
+        normalized_status_check_poll_attempt_count = max(
+            1,
+            _coerce_int(status_check_poll_attempt_count, 1),
+        )
+        normalized_status_check_poll_max_attempts = max(
+            1,
+            _coerce_int(
+                status_check_poll_max_attempts,
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_MAX_ATTEMPTS,
+            ),
+        )
+        normalized_status_check_poll_interval_seconds = max(
+            1,
+            _coerce_int(
+                status_check_poll_interval_seconds,
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_INTERVAL_SECONDS,
+            ),
+        )
+        normalized_status_check_poll_terminal_status = (
+            status_check_poll_terminal_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_COMPLETED_STATUS
+        )
+        normalized_status_check_poll_digest = status_check_poll_digest.strip()
+        expected_status_check_poll_digest = self._post_commit_status_check_poll_digest(
+            provider=normalized_status_check_provider,
+            suite_ref=normalized_status_check_suite_ref,
+            commit_head=normalized_status_check_commit_head,
+            suite_digest=normalized_status_check_suite_digest,
+            suite_freshness_digest=normalized_status_check_suite_freshness_digest,
+            status_check_results=normalized_status_check_results,
+            all_required_passed=status_check_all_required_passed,
+            attempt_count=normalized_status_check_poll_attempt_count,
+            max_attempts=normalized_status_check_poll_max_attempts,
+            interval_seconds=normalized_status_check_poll_interval_seconds,
+            terminal_status=normalized_status_check_poll_terminal_status,
+        )
+        if not _is_sha256(normalized_status_check_poll_digest):
+            normalized_status_check_poll_digest = expected_status_check_poll_digest
+        status_check_poll_digest_bound = (
+            normalized_status_check_poll_digest == expected_status_check_poll_digest
         )
         normalized_status_check_suite_timestamp_ref = (
             status_check_suite_timestamp_ref.strip()
@@ -2999,6 +3071,23 @@ class ParallelCodexOrchestrationService:
             "status_check_suite_freshness_digest_bound": (
                 status_check_suite_freshness_digest_bound
             ),
+            "status_check_poll_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_PROFILE
+            ),
+            "status_check_poll_attempt_count": (
+                normalized_status_check_poll_attempt_count
+            ),
+            "status_check_poll_max_attempts": (
+                normalized_status_check_poll_max_attempts
+            ),
+            "status_check_poll_interval_seconds": (
+                normalized_status_check_poll_interval_seconds
+            ),
+            "status_check_poll_terminal_status": (
+                normalized_status_check_poll_terminal_status
+            ),
+            "status_check_poll_digest": normalized_status_check_poll_digest,
+            "status_check_poll_digest_bound": status_check_poll_digest_bound,
             "status_check_suite_timestamp_profile": (
                 PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_PROFILE
             ),
@@ -3058,6 +3147,7 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_status_check_provider_payload_stored": False,
             "raw_status_check_suite_freshness_payload_stored": False,
+            "raw_status_check_poll_payload_stored": False,
             "raw_status_check_suite_timestamp_payload_stored": False,
             "raw_status_check_suite_timestamp_replay_guard_payload_stored": False,
             "receipt_digest": "",
@@ -3321,6 +3411,38 @@ class ParallelCodexOrchestrationService:
             )
             and receipt.get("status_check_suite_freshness_digest_bound") is True
         )
+        status_check_poll_digest_bound = (
+            receipt.get("status_check_poll_digest")
+            == self._post_commit_status_check_poll_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                commit_head=str(receipt.get("status_check_commit_head", "")),
+                suite_digest=str(receipt.get("status_check_suite_digest", "")),
+                suite_freshness_digest=str(
+                    receipt.get("status_check_suite_freshness_digest", ""),
+                ),
+                status_check_results=status_check_results,
+                all_required_passed=bool(
+                    receipt.get("status_check_all_required_passed", False),
+                ),
+                attempt_count=_coerce_int(
+                    receipt.get("status_check_poll_attempt_count"),
+                    0,
+                ),
+                max_attempts=_coerce_int(
+                    receipt.get("status_check_poll_max_attempts"),
+                    0,
+                ),
+                interval_seconds=_coerce_int(
+                    receipt.get("status_check_poll_interval_seconds"),
+                    0,
+                ),
+                terminal_status=str(
+                    receipt.get("status_check_poll_terminal_status", ""),
+                ),
+            )
+            and receipt.get("status_check_poll_digest_bound") is True
+        )
         status_check_suite_timestamp_digest_bound = (
             receipt.get("status_check_suite_timestamp_digest")
             == self._post_commit_status_check_suite_timestamp_digest(
@@ -3439,6 +3561,13 @@ class ParallelCodexOrchestrationService:
             errors.append("status_check_suite_digest mismatch")
         if not status_check_suite_freshness_digest_bound:
             errors.append("status_check_suite_freshness_digest mismatch")
+        if (
+            receipt.get("status_check_poll_profile")
+            != PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_PROFILE
+        ):
+            errors.append("status_check_poll_profile mismatch")
+        if not status_check_poll_digest_bound:
+            errors.append("status_check_poll_digest mismatch")
         if not status_check_suite_timestamp_digest_bound:
             errors.append("status_check_suite_timestamp_digest mismatch")
         if not status_check_suite_timestamp_replay_digest_bound:
@@ -3528,6 +3657,8 @@ class ParallelCodexOrchestrationService:
             errors.append(
                 "raw_status_check_suite_freshness_payload_stored must be false",
             )
+        if receipt.get("raw_status_check_poll_payload_stored") is not False:
+            errors.append("raw_status_check_poll_payload_stored must be false")
         if receipt.get("raw_status_check_suite_timestamp_payload_stored") is not False:
             errors.append(
                 "raw_status_check_suite_timestamp_payload_stored must be false",
@@ -3685,6 +3816,20 @@ class ParallelCodexOrchestrationService:
                 )
                 <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
             ),
+            "status_check_poll_digest_bound": status_check_poll_digest_bound,
+            "status_check_poll_terminal_completed": (
+                receipt.get("status_check_poll_terminal_status")
+                == PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_COMPLETED_STATUS
+            ),
+            "status_check_poll_attempt_budget_bound": (
+                0
+                < _coerce_int(receipt.get("status_check_poll_attempt_count"), 0)
+                <= _coerce_int(receipt.get("status_check_poll_max_attempts"), 0)
+                <= PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_MAX_ATTEMPTS
+                and 0
+                < _coerce_int(receipt.get("status_check_poll_interval_seconds"), 0)
+                <= PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_INTERVAL_SECONDS
+            ),
             "status_check_suite_timestamp_digest_bound": (
                 status_check_suite_timestamp_digest_bound
             ),
@@ -3755,6 +3900,9 @@ class ParallelCodexOrchestrationService:
             "raw_status_check_suite_freshness_payload_redacted": (
                 receipt.get("raw_status_check_suite_freshness_payload_stored")
                 is False
+            ),
+            "raw_status_check_poll_payload_redacted": (
+                receipt.get("raw_status_check_poll_payload_stored") is False
             ),
             "raw_status_check_suite_timestamp_payload_redacted": (
                 receipt.get("raw_status_check_suite_timestamp_payload_stored")
@@ -6151,6 +6299,49 @@ class ParallelCodexOrchestrationService:
         )
 
     @staticmethod
+    def _post_commit_status_check_poll_digest(
+        *,
+        provider: str,
+        suite_ref: str,
+        commit_head: str,
+        suite_digest: str,
+        suite_freshness_digest: str,
+        status_check_results: Sequence[Mapping[str, Any]],
+        all_required_passed: bool,
+        attempt_count: int,
+        max_attempts: int,
+        interval_seconds: int,
+        terminal_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_PROFILE
+                    ),
+                    "provider": provider,
+                    "suite_ref": suite_ref,
+                    "commit_head": commit_head,
+                    "suite_digest": suite_digest,
+                    "suite_freshness_digest": suite_freshness_digest,
+                    "check_run_digests": [
+                        {
+                            "check_name": result.get("check_name", ""),
+                            "check_run_digest": result.get("check_run_digest", ""),
+                        }
+                        for result in status_check_results
+                    ],
+                    "all_required_passed": all_required_passed,
+                    "attempt_count": attempt_count,
+                    "max_attempts": max_attempts,
+                    "interval_seconds": interval_seconds,
+                    "terminal_status": terminal_status,
+                    "raw_status_check_poll_payload_stored": False,
+                }
+            )
+        )
+
+    @staticmethod
     def _post_commit_status_check_suite_timestamp_digest(
         *,
         provider: str,
@@ -6624,6 +6815,34 @@ class ParallelCodexOrchestrationService:
                         "status_check_suite_freshness_digest_bound",
                         False,
                     ),
+                    "status_check_poll_profile": receipt.get(
+                        "status_check_poll_profile",
+                        "",
+                    ),
+                    "status_check_poll_attempt_count": receipt.get(
+                        "status_check_poll_attempt_count",
+                        0,
+                    ),
+                    "status_check_poll_max_attempts": receipt.get(
+                        "status_check_poll_max_attempts",
+                        0,
+                    ),
+                    "status_check_poll_interval_seconds": receipt.get(
+                        "status_check_poll_interval_seconds",
+                        0,
+                    ),
+                    "status_check_poll_terminal_status": receipt.get(
+                        "status_check_poll_terminal_status",
+                        "",
+                    ),
+                    "status_check_poll_digest": receipt.get(
+                        "status_check_poll_digest",
+                        "",
+                    ),
+                    "status_check_poll_digest_bound": receipt.get(
+                        "status_check_poll_digest_bound",
+                        False,
+                    ),
                     "status_check_suite_timestamp_digest": receipt.get(
                         "status_check_suite_timestamp_digest",
                         "",
@@ -6656,6 +6875,7 @@ class ParallelCodexOrchestrationService:
                     ),
                     "raw_status_check_provider_payload_stored": False,
                     "raw_status_check_suite_freshness_payload_stored": False,
+                    "raw_status_check_poll_payload_stored": False,
                     "raw_status_check_suite_timestamp_payload_stored": False,
                     "raw_status_check_suite_timestamp_replay_guard_payload_stored": (
                         False
@@ -7579,6 +7799,63 @@ class ParallelCodexOrchestrationService:
             <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
         ):
             reasons.append("status check suite freshness window expired")
+        expected_status_check_poll_digest = (
+            self._post_commit_status_check_poll_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                commit_head=str(receipt.get("status_check_commit_head", "")),
+                suite_digest=str(receipt.get("status_check_suite_digest", "")),
+                suite_freshness_digest=str(
+                    receipt.get("status_check_suite_freshness_digest", ""),
+                ),
+                status_check_results=status_check_results,
+                all_required_passed=bool(
+                    receipt.get("status_check_all_required_passed", False),
+                ),
+                attempt_count=_coerce_int(
+                    receipt.get("status_check_poll_attempt_count"),
+                    0,
+                ),
+                max_attempts=_coerce_int(
+                    receipt.get("status_check_poll_max_attempts"),
+                    0,
+                ),
+                interval_seconds=_coerce_int(
+                    receipt.get("status_check_poll_interval_seconds"),
+                    0,
+                ),
+                terminal_status=str(
+                    receipt.get("status_check_poll_terminal_status", ""),
+                ),
+            )
+        )
+        if receipt.get("status_check_poll_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_PROFILE
+        ):
+            reasons.append("status_check_poll_profile mismatch")
+        if (
+            receipt.get("status_check_poll_digest")
+            != expected_status_check_poll_digest
+            or receipt.get("status_check_poll_digest_bound") is not True
+        ):
+            reasons.append("status_check_poll_digest mismatch")
+        if not (
+            0
+            < _coerce_int(receipt.get("status_check_poll_attempt_count"), 0)
+            <= _coerce_int(receipt.get("status_check_poll_max_attempts"), 0)
+            <= PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_MAX_ATTEMPTS
+        ):
+            reasons.append("status check polling attempts exceeded budget")
+        if not (
+            0
+            < _coerce_int(receipt.get("status_check_poll_interval_seconds"), 0)
+            <= PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_DEFAULT_INTERVAL_SECONDS
+        ):
+            reasons.append("status check polling interval exceeded budget")
+        if receipt.get("status_check_poll_terminal_status") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_POLL_COMPLETED_STATUS
+        ):
+            reasons.append("status check polling must reach completed terminal state")
         expected_status_check_suite_timestamp_digest = (
             self._post_commit_status_check_suite_timestamp_digest(
                 provider=str(receipt.get("status_check_provider", "")),
@@ -7667,6 +7944,8 @@ class ParallelCodexOrchestrationService:
             reasons.append(
                 "raw_status_check_suite_freshness_payload_stored must be false",
             )
+        if receipt.get("raw_status_check_poll_payload_stored") is not False:
+            reasons.append("raw_status_check_poll_payload_stored must be false")
         if receipt.get("raw_status_check_suite_timestamp_payload_stored") is not False:
             reasons.append(
                 "raw_status_check_suite_timestamp_payload_stored must be false",

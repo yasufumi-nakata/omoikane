@@ -999,6 +999,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-02_parallel-codex-pre-push-remote-freshness.md",
             "meta/decision-log/2026-05-02_parallel-codex-post-push-status-check-suite.md",
             "meta/decision-log/2026-05-02_parallel-codex-status-check-freshness.md",
+            "meta/decision-log/2026-05-02_parallel-codex-status-check-poll-budget.md",
             "meta/decision-log/2026-05-02_parallel-codex-status-check-suite-timestamp.md",
             "meta/decision-log/2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md",
             "meta/decision-log/README.md",
@@ -1289,7 +1290,8 @@ class OmoikaneReferenceOS:
                     "command-level origin/main push receipt and a remote-head "
                     "verification receipt, ls-remote output binding, and "
                     "protected-branch provider policy plus post-push status "
-                    "check suite receipts before GitHub handoff."
+                    "check suite receipts with bounded poll evidence before "
+                    "GitHub handoff."
                 ),
             )
         )
@@ -1725,6 +1727,14 @@ class OmoikaneReferenceOS:
                         "status_check_suite_freshness_status"
                     ]
                 ),
+                "post_commit_publication_status_check_poll_digest": (
+                    post_commit_publication_receipt["status_check_poll_digest"]
+                ),
+                "post_commit_publication_status_check_poll_terminal_status": (
+                    post_commit_publication_receipt[
+                        "status_check_poll_terminal_status"
+                    ]
+                ),
                 "post_commit_publication_status_check_suite_timestamp_digest": (
                     post_commit_publication_receipt[
                         "status_check_suite_timestamp_digest"
@@ -1795,6 +1805,7 @@ class OmoikaneReferenceOS:
                 ),
                 "raw_status_check_provider_payload_stored": False,
                 "raw_status_check_suite_freshness_payload_stored": False,
+                "raw_status_check_poll_payload_stored": False,
                 "raw_status_check_suite_timestamp_payload_stored": False,
                 "raw_status_check_suite_timestamp_replay_guard_payload_stored": False,
                 "raw_transcript_payload_stored": False,
@@ -2669,6 +2680,21 @@ class OmoikaneReferenceOS:
                         "status_check_suite_freshness_window_bound"
                     ]
                 ),
+                "post_commit_publication_status_check_poll_digest_bound": (
+                    post_commit_publication_validation[
+                        "status_check_poll_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_status_check_poll_terminal_completed": (
+                    post_commit_publication_validation[
+                        "status_check_poll_terminal_completed"
+                    ]
+                ),
+                "post_commit_publication_status_check_poll_attempt_budget_bound": (
+                    post_commit_publication_validation[
+                        "status_check_poll_attempt_budget_bound"
+                    ]
+                ),
                 "post_commit_publication_status_check_suite_timestamp_digest_bound": (
                     post_commit_publication_validation[
                         "status_check_suite_timestamp_digest_bound"
@@ -2724,6 +2750,9 @@ class OmoikaneReferenceOS:
                     ]
                     and post_commit_publication_validation[
                         "raw_status_check_suite_freshness_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_status_check_poll_payload_redacted"
                     ]
                     and post_commit_publication_validation[
                         "raw_status_check_suite_timestamp_payload_redacted"

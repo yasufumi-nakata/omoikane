@@ -11,8 +11,8 @@ description: >
   payloads redacted while preserving command, observed head/ref, policy,
   provider freshness, signed timestamp, timestamp replay-guard, provider
   receipt, status-check suite, status-check suite freshness, status-check
-  signed timestamp, status-check timestamp replay-guard, and publication
-  digests.
+  poll budget, signed timestamp, status-check timestamp replay-guard, and
+  publication digests.
 type: object
 additionalProperties: false
 required:
@@ -105,6 +105,13 @@ required:
   - status_check_suite_freshness_status
   - status_check_suite_freshness_digest
   - status_check_suite_freshness_digest_bound
+  - status_check_poll_profile
+  - status_check_poll_attempt_count
+  - status_check_poll_max_attempts
+  - status_check_poll_interval_seconds
+  - status_check_poll_terminal_status
+  - status_check_poll_digest
+  - status_check_poll_digest_bound
   - status_check_suite_timestamp_profile
   - status_check_suite_timestamp_ref
   - status_check_suite_timestamp_status
@@ -138,6 +145,7 @@ required:
   - raw_protected_branch_provider_timestamp_replay_guard_payload_stored
   - raw_status_check_provider_payload_stored
   - raw_status_check_suite_freshness_payload_stored
+  - raw_status_check_poll_payload_stored
   - raw_status_check_suite_timestamp_payload_stored
   - raw_status_check_suite_timestamp_replay_guard_payload_stored
   - receipt_digest
@@ -387,6 +395,29 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   status_check_suite_freshness_digest_bound:
     type: boolean
+  status_check_poll_profile:
+    const: post-push-status-check-poll-budget-v1
+  status_check_poll_attempt_count:
+    type: integer
+    minimum: 1
+    maximum: 5
+  status_check_poll_max_attempts:
+    type: integer
+    minimum: 1
+    maximum: 5
+  status_check_poll_interval_seconds:
+    type: integer
+    minimum: 1
+    maximum: 30
+  status_check_poll_terminal_status:
+    enum:
+      - completed
+      - exhausted
+  status_check_poll_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  status_check_poll_digest_bound:
+    type: boolean
   status_check_suite_timestamp_profile:
     const: post-push-provider-status-check-suite-signed-timestamp-v1
   status_check_suite_timestamp_ref:
@@ -469,6 +500,8 @@ properties:
   raw_status_check_provider_payload_stored:
     const: false
   raw_status_check_suite_freshness_payload_stored:
+    const: false
+  raw_status_check_poll_payload_stored:
     const: false
   raw_status_check_suite_timestamp_payload_stored:
     const: false

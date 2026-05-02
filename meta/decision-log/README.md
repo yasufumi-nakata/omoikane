@@ -371,5 +371,6 @@ status: decided | superseded
 - [2026-05-02_parallel-codex-protected-branch-publication-gate.md](2026-05-02_parallel-codex-protected-branch-publication-gate.md)
 - [2026-05-02_parallel-codex-repo-local-patch-artifact-binding.md](2026-05-02_parallel-codex-repo-local-patch-artifact-binding.md)
 - [2026-05-02_parallel-codex-status-check-freshness.md](2026-05-02_parallel-codex-status-check-freshness.md)
+- [2026-05-02_parallel-codex-status-check-poll-budget.md](2026-05-02_parallel-codex-status-check-poll-budget.md)
 - [2026-05-02_parallel-codex-status-check-suite-timestamp.md](2026-05-02_parallel-codex-status-check-suite-timestamp.md)
 - [2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md](2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md)

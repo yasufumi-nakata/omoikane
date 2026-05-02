@@ -202,7 +202,7 @@ commit finalization gate 未 ready execution を fail-closed にできるか。
 - `parallel_codex_integration_batch.yaml`
 - `parallel_codex_integration_execution.yaml`
 - `parallel_codex_post_commit_publication.yaml`
-  - commit-finalized Parallel Codex handoff が pre-push origin/main freshness、push / remote-head verification、ls-remote output の observed head/ref digest、GitHub protected branch provider policy receipt、required verification checks、post-push status/check suite digest、status/check suite freshness digest、status/check suite signed provider timestamp / replay guard digest、raw provider / status check / status check freshness / status check timestamp payload 非保存まで束縛すること
+  - commit-finalized Parallel Codex handoff が pre-push origin/main freshness、push / remote-head verification、ls-remote output の observed head/ref digest、GitHub protected branch provider policy receipt、required verification checks、post-push status/check suite digest、status/check suite freshness digest、bounded status/check poll budget digest、status/check suite signed provider timestamp / replay guard digest、raw provider / status check / status check freshness / status check polling / status check timestamp payload 非保存まで束縛すること
 - `parallel_codex_result_ingestion.yaml`
   - Yaoyorozu dispatch bridge が upstream dispatch result count / patch-candidate coverage / validation digest を束縛し、coverage 不足の bridge receipt を blocked にすること
 - `patch_generator_direct_contract.yaml`

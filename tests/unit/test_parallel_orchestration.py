@@ -1616,6 +1616,9 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["status_check_suite_freshness_digest_bound"])
         self.assertTrue(validation["status_check_suite_fresh"])
         self.assertTrue(validation["status_check_suite_freshness_window_bound"])
+        self.assertTrue(validation["status_check_poll_digest_bound"])
+        self.assertTrue(validation["status_check_poll_terminal_completed"])
+        self.assertTrue(validation["status_check_poll_attempt_budget_bound"])
         self.assertTrue(validation["status_check_suite_timestamp_digest_bound"])
         self.assertTrue(validation["status_check_suite_timestamp_signed_current"])
         self.assertTrue(
@@ -1690,6 +1693,15 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertEqual("fresh", publication["status_check_suite_freshness_status"])
         self.assertTrue(publication["status_check_suite_freshness_digest_bound"])
         self.assertEqual(
+            "post-push-status-check-poll-budget-v1",
+            publication["status_check_poll_profile"],
+        )
+        self.assertEqual(1, publication["status_check_poll_attempt_count"])
+        self.assertEqual(5, publication["status_check_poll_max_attempts"])
+        self.assertEqual(30, publication["status_check_poll_interval_seconds"])
+        self.assertEqual("completed", publication["status_check_poll_terminal_status"])
+        self.assertTrue(publication["status_check_poll_digest_bound"])
+        self.assertEqual(
             "post-push-provider-status-check-suite-signed-timestamp-v1",
             publication["status_check_suite_timestamp_profile"],
         )
@@ -1735,6 +1747,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(
             publication["raw_status_check_suite_freshness_payload_stored"]
         )
+        self.assertFalse(publication["raw_status_check_poll_payload_stored"])
         self.assertFalse(publication["raw_status_check_suite_timestamp_payload_stored"])
         self.assertFalse(
             publication[
@@ -2001,6 +2014,36 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["status_check_suite_digest_bound"])
         self.assertTrue(validation["status_check_suite_freshness_digest_bound"])
         self.assertFalse(validation["status_check_suite_fresh"])
+        self.assertTrue(validation["publication_digest_bound"])
+
+    def test_post_commit_publication_blocks_exhausted_status_check_poll(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            status_check_poll_attempt_count=5,
+            status_check_poll_terminal_status="exhausted",
+            result_summary="Publication blocks exhausted status/check polling.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "status check polling must reach completed terminal state",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["status_check_poll_digest_bound"])
+        self.assertTrue(validation["status_check_poll_attempt_budget_bound"])
+        self.assertFalse(validation["status_check_poll_terminal_completed"])
+        self.assertEqual("exhausted", publication["status_check_poll_terminal_status"])
         self.assertTrue(validation["publication_digest_bound"])
 
     def test_post_commit_publication_blocks_stale_status_check_provider_timestamp(self) -> None:
