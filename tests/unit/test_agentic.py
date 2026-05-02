@@ -4518,6 +4518,38 @@ class YaoyorozuRegistryServiceTests(unittest.TestCase):
             validation["errors"],
         )
 
+    def test_research_evidence_exchange_rejects_verifier_roster_tamper(self) -> None:
+        runtime = OmoikaneReferenceOS()
+        result = runtime.run_yaoyorozu_demo()
+        tampered = json.loads(json.dumps(result["research_evidence_exchange"]))
+        receipt = tampered["evidence_verifier_receipt"]
+        receipt["verifier_roster_status"] = "stale"
+        receipt["verifier_roster_digest"] = "0" * 64
+
+        receipt_validation = runtime.yaoyorozu.validate_research_evidence_verifier_receipt(
+            receipt,
+            tampered,
+        )
+        validation = runtime.yaoyorozu.validate_research_evidence_exchange(
+            tampered,
+            result["registry"],
+        )
+
+        self.assertFalse(receipt_validation["ok"])
+        self.assertFalse(receipt_validation["verifier_roster_bound"])
+        self.assertIn(
+            "live verifier quorum must bind verifier roster policy",
+            receipt_validation["errors"],
+        )
+        self.assertFalse(validation["ok"])
+        self.assertFalse(validation["evidence_verifier_bound"])
+        self.assertFalse(validation["evidence_verifier_roster_bound"])
+        self.assertFalse(validation["evidence_verifier_transport_bound"])
+        self.assertIn(
+            "evidence verifier receipt must bind exchange evidence readback",
+            validation["errors"],
+        )
+
     def test_research_evidence_exchange_rejects_verifier_timestamp_replay_tamper(self) -> None:
         runtime = OmoikaneReferenceOS()
         result = runtime.run_yaoyorozu_demo()

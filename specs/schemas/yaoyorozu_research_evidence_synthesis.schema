@@ -260,6 +260,7 @@ properties:
       - evidence_digest_set_bound
       - evidence_verifiers_bound
       - evidence_verifier_quorums_bound
+      - evidence_verifier_rosters_bound
       - advisory_only
       - raw_exchange_payload_stored
       - raw_research_payload_stored
@@ -289,6 +290,8 @@ properties:
       evidence_verifiers_bound:
         const: true
       evidence_verifier_quorums_bound:
+        const: true
+      evidence_verifier_rosters_bound:
         const: true
       advisory_only:
         const: true

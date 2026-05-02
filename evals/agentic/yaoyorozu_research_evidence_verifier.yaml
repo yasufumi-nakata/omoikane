@@ -8,6 +8,7 @@ must:
   - expected and observed repo-local evidence digests must match for every evidence item
   - live verifier transport receipts must bind literature-index and publisher-record classes
   - verifier quorum must cover JP-13 and US-CA jurisdictions with threshold 2
+  - verifier quorum must bind a policy-bound verifier roster digest before being treated as complete
   - signed response envelope refs and 900 second freshness windows must be bound
   - freshness windows must be bound to signed-current provider timestamp evidence
   - provider timestamp evidence must carry a replay-unique nonce guard
@@ -18,6 +19,11 @@ expected:
   transport_profile: digest-only-live-research-evidence-verifier-quorum-v1
   verifier_network_scope: digest-only-research-evidence-verifier-transport
   verifier_quorum_policy_id: research-evidence-live-verifier-quorum-policy-v1
+  verifier_roster_policy_id: research-evidence-verifier-roster-policy-v1
+  verifier_roster_profile: policy-bound-research-evidence-verifier-roster-v1
+  verifier_roster_ref: verifier-roster://yaoyorozu/research-evidence/current
+  verifier_roster_status: bound
+  verifier_roster_bound: true
   required_verifier_classes:
     - literature-index
     - publisher-record
@@ -38,4 +44,5 @@ expected:
   network_payload_stored: false
   raw_verifier_response_payload_stored: false
   raw_verifier_signature_payload_stored: false
+  raw_verifier_roster_payload_stored: false
   decision_authority_claimed: false

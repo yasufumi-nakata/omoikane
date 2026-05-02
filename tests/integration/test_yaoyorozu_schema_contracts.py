@@ -199,6 +199,7 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self.assertTrue(exchange["validation"]["evidence_verifier_digest_bound"])
         self.assertTrue(exchange["validation"]["evidence_verifier_transport_bound"])
         self.assertTrue(exchange["validation"]["evidence_verifier_quorum_bound"])
+        self.assertTrue(exchange["validation"]["evidence_verifier_roster_bound"])
         self.assertTrue(
             exchange["validation"]["evidence_verifier_signed_response_envelope_bound"]
         )
@@ -228,6 +229,14 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self.assertEqual(
             "complete",
             exchange["evidence_verifier_receipt"]["verifier_quorum_status"],
+        )
+        self.assertEqual(
+            "research-evidence-verifier-roster-policy-v1",
+            exchange["evidence_verifier_receipt"]["verifier_roster_policy_id"],
+        )
+        self.assertTrue(exchange["evidence_verifier_receipt"]["verifier_roster_bound"])
+        self.assertFalse(
+            exchange["evidence_verifier_receipt"]["raw_verifier_roster_payload_stored"]
         )
         self.assertEqual(
             ["literature-index", "publisher-record"],
@@ -296,6 +305,7 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self.assertTrue(synthesis["validation"]["evidence_digest_set_bound"])
         self.assertTrue(synthesis["validation"]["evidence_verifiers_bound"])
         self.assertTrue(synthesis["validation"]["evidence_verifier_quorums_bound"])
+        self.assertTrue(synthesis["validation"]["evidence_verifier_rosters_bound"])
         self.assertEqual(
             [
                 exchange["evidence_verifier_ref"]

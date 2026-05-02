@@ -119,6 +119,16 @@ YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TRANSPORT_PROFILE = (
 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_QUORUM_POLICY_ID = (
     "research-evidence-live-verifier-quorum-policy-v1"
 )
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_POLICY_ID = (
+    "research-evidence-verifier-roster-policy-v1"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_PROFILE = (
+    "policy-bound-research-evidence-verifier-roster-v1"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_REF = (
+    "verifier-roster://yaoyorozu/research-evidence/current"
+)
+YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_STATUS = "bound"
 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_NETWORK_SCOPE = (
     "digest-only-research-evidence-verifier-transport"
 )
@@ -1162,6 +1172,11 @@ def _research_evidence_verifier_digest_payload(
         "transport_profile": verifier_receipt["transport_profile"],
         "verifier_network_scope": verifier_receipt["verifier_network_scope"],
         "verifier_quorum_policy_id": verifier_receipt["verifier_quorum_policy_id"],
+        "verifier_roster_policy_id": verifier_receipt["verifier_roster_policy_id"],
+        "verifier_roster_profile": verifier_receipt["verifier_roster_profile"],
+        "verifier_roster_ref": verifier_receipt["verifier_roster_ref"],
+        "verifier_roster_digest": verifier_receipt["verifier_roster_digest"],
+        "verifier_roster_status": verifier_receipt["verifier_roster_status"],
         "exchange_ref": verifier_receipt["exchange_ref"],
         "researcher_agent_id": verifier_receipt["researcher_agent_id"],
         "evidence_refs": verifier_receipt["evidence_refs"],
@@ -1190,6 +1205,7 @@ def _research_evidence_verifier_digest_payload(
         "verifier_transport_quorum_digest": verifier_receipt[
             "verifier_transport_quorum_digest"
         ],
+        "verifier_roster_bound": verifier_receipt["verifier_roster_bound"],
         "signed_response_envelope_bound": verifier_receipt[
             "signed_response_envelope_bound"
         ],
@@ -1234,9 +1250,29 @@ def _research_evidence_verifier_digest_payload(
         "raw_verifier_signature_payload_stored": verifier_receipt[
             "raw_verifier_signature_payload_stored"
         ],
+        "raw_verifier_roster_payload_stored": verifier_receipt[
+            "raw_verifier_roster_payload_stored"
+        ],
         "decision_authority_claimed": verifier_receipt[
             "decision_authority_claimed"
         ],
+    }
+
+
+def _research_evidence_verifier_roster_digest_payload(
+    verifier_receipt: Mapping[str, Any],
+) -> Dict[str, Any]:
+    return {
+        "verifier_roster_policy_id": verifier_receipt["verifier_roster_policy_id"],
+        "verifier_roster_profile": verifier_receipt["verifier_roster_profile"],
+        "verifier_roster_ref": verifier_receipt["verifier_roster_ref"],
+        "required_verifier_classes": verifier_receipt["required_verifier_classes"],
+        "required_verifier_jurisdictions": verifier_receipt[
+            "required_verifier_jurisdictions"
+        ],
+        "verifier_quorum_threshold": verifier_receipt["verifier_quorum_threshold"],
+        "transport_profile": verifier_receipt["transport_profile"],
+        "verifier_network_scope": verifier_receipt["verifier_network_scope"],
     }
 
 
@@ -1258,6 +1294,7 @@ def _research_evidence_verifier_timestamp_payload(
         "verifier_transport_quorum_digest": verifier_receipt[
             "verifier_transport_quorum_digest"
         ],
+        "verifier_roster_digest": verifier_receipt["verifier_roster_digest"],
         "freshness_window_seconds": verifier_receipt["freshness_window_seconds"],
         "checked_at_refs": [
             receipt["checked_at_ref"]
@@ -4827,6 +4864,32 @@ class YaoyorozuRegistryService:
         verifier_quorum_threshold = len(
             YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_REQUIRED_JURISDICTIONS
         )
+        verifier_roster_payload = {
+            "verifier_roster_policy_id": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_POLICY_ID
+            ),
+            "verifier_roster_profile": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_PROFILE
+            ),
+            "verifier_roster_ref": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_REF
+            ),
+            "required_verifier_classes": list(
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_REQUIRED_CLASSES
+            ),
+            "required_verifier_jurisdictions": list(
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_REQUIRED_JURISDICTIONS
+            ),
+            "verifier_quorum_threshold": verifier_quorum_threshold,
+            "transport_profile": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_TRANSPORT_PROFILE
+            ),
+            "verifier_network_scope": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_NETWORK_SCOPE
+            ),
+        }
+        verifier_roster_digest = sha256_text(canonical_json(verifier_roster_payload))
+        verifier_roster_bound = True
         verifier_transport_quorum_digest = sha256_text(
             canonical_json(
                 {
@@ -4834,6 +4897,7 @@ class YaoyorozuRegistryService:
                     "accepted_verifier_classes": accepted_verifier_classes,
                     "accepted_verifier_jurisdictions": accepted_verifier_jurisdictions,
                     "evidence_digest_set_digest": digest_set_digest,
+                    "verifier_roster_digest": verifier_roster_digest,
                 }
             )
         )
@@ -4850,6 +4914,7 @@ class YaoyorozuRegistryService:
             "exchange_ref": str(exchange.get("exchange_ref", "")),
             "verifier_transport_receipt_digests": verifier_transport_receipt_digests,
             "verifier_transport_quorum_digest": verifier_transport_quorum_digest,
+            "verifier_roster_digest": verifier_roster_digest,
             "freshness_window_seconds": (
                 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_FRESHNESS_WINDOW_SECONDS
             ),
@@ -4925,6 +4990,7 @@ class YaoyorozuRegistryService:
             and freshness_window_bound
             and freshness_timestamp_bound
             and freshness_replay_guard_bound
+            and verifier_roster_bound
             else "incomplete"
         )
         verifier_id = new_id("yaoyorozu-research-evidence-verifier")
@@ -4939,6 +5005,17 @@ class YaoyorozuRegistryService:
             "verifier_network_scope": YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_NETWORK_SCOPE,
             "verifier_quorum_policy_id": (
                 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_QUORUM_POLICY_ID
+            ),
+            "verifier_roster_policy_id": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_POLICY_ID
+            ),
+            "verifier_roster_profile": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_PROFILE
+            ),
+            "verifier_roster_ref": YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_REF,
+            "verifier_roster_digest": verifier_roster_digest,
+            "verifier_roster_status": (
+                YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_STATUS
             ),
             "exchange_ref": str(exchange.get("exchange_ref", "")),
             "researcher_agent_id": str(exchange.get("researcher_agent_id", "")),
@@ -4974,6 +5051,7 @@ class YaoyorozuRegistryService:
             "verifier_transport_receipts": verifier_transport_receipts,
             "verifier_transport_receipt_digests": verifier_transport_receipt_digests,
             "verifier_transport_quorum_digest": verifier_transport_quorum_digest,
+            "verifier_roster_bound": verifier_roster_bound,
             "signed_response_envelope_bound": signed_response_envelope_bound,
             "freshness_window_seconds": (
                 YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_FRESHNESS_WINDOW_SECONDS
@@ -5010,6 +5088,7 @@ class YaoyorozuRegistryService:
             "network_payload_stored": False,
             "raw_verifier_response_payload_stored": False,
             "raw_verifier_signature_payload_stored": False,
+            "raw_verifier_roster_payload_stored": False,
             "decision_authority_claimed": False,
         }
         verifier_receipt = {
@@ -5049,6 +5128,8 @@ class YaoyorozuRegistryService:
             == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_NETWORK_SCOPE
             and verifier_receipt.get("verifier_quorum_policy_id")
             == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_QUORUM_POLICY_ID
+            and verifier_receipt.get("verifier_roster_policy_id")
+            == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_POLICY_ID
             and verifier_receipt.get("exchange_ref") == exchange.get("exchange_ref")
             and verifier_receipt.get("researcher_agent_id")
             == exchange.get("researcher_agent_id")
@@ -5198,9 +5279,40 @@ class YaoyorozuRegistryService:
                     "evidence_digest_set_digest": verifier_receipt.get(
                         "evidence_digest_set_digest"
                     ),
+                    "verifier_roster_digest": verifier_receipt.get(
+                        "verifier_roster_digest"
+                    ),
                 }
             )
         )
+        try:
+            expected_roster_digest = sha256_text(
+                canonical_json(
+                    _research_evidence_verifier_roster_digest_payload(
+                        verifier_receipt
+                    )
+                )
+            )
+            verifier_roster_bound = (
+                verifier_receipt.get("verifier_roster_policy_id")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_POLICY_ID
+                and verifier_receipt.get("verifier_roster_profile")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_PROFILE
+                and verifier_receipt.get("verifier_roster_ref")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_REF
+                and verifier_receipt.get("verifier_roster_digest")
+                == expected_roster_digest
+                and verifier_receipt.get("verifier_roster_status")
+                == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_ROSTER_STATUS
+                and verifier_receipt.get("verifier_roster_bound") is True
+                and verifier_receipt.get("raw_verifier_roster_payload_stored")
+                is False
+            )
+        except (KeyError, TypeError):
+            verifier_roster_bound = False
+            errors.append("research evidence verifier roster payload is incomplete")
+        if not verifier_roster_bound:
+            errors.append("live verifier quorum must bind verifier roster policy")
         live_verifier_transport_bound = (
             verifier_receipt.get("required_verifier_classes")
             == YAOYOROZU_RESEARCH_EVIDENCE_VERIFIER_REQUIRED_CLASSES
@@ -5219,6 +5331,7 @@ class YaoyorozuRegistryService:
             == expected_transport_digests
             and verifier_receipt.get("verifier_transport_quorum_digest")
             == expected_quorum_digest
+            and verifier_roster_bound
         )
         if not live_verifier_transport_bound:
             errors.append("live verifier transport receipts must satisfy quorum policy")
@@ -5346,6 +5459,9 @@ class YaoyorozuRegistryService:
                 for receipt in verifier_receipt.get("verifier_transport_receipts", [])
             )
         )
+        raw_verifier_roster_payload_stored = (
+            verifier_receipt.get("raw_verifier_roster_payload_stored") is not False
+        )
         decision_authority_claimed = (
             verifier_receipt.get("decision_authority_claimed") is not False
         )
@@ -5357,6 +5473,8 @@ class YaoyorozuRegistryService:
             errors.append("live verifier must not store raw response payloads")
         if raw_verifier_signature_payload_stored:
             errors.append("live verifier must not store raw signature payloads")
+        if raw_verifier_roster_payload_stored:
+            errors.append("live verifier must not store raw roster payloads")
         if decision_authority_claimed:
             errors.append("evidence verifier must not claim decision authority")
 
@@ -5368,11 +5486,13 @@ class YaoyorozuRegistryService:
             "live_verifier_transport_bound": live_verifier_transport_bound,
             "verifier_quorum_bound": (
                 live_verifier_transport_bound
+                and verifier_roster_bound
                 and signed_response_envelope_bound
                 and freshness_window_bound
                 and freshness_timestamp_bound
                 and freshness_replay_guard_bound
             ),
+            "verifier_roster_bound": verifier_roster_bound,
             "signed_response_envelope_bound": signed_response_envelope_bound,
             "freshness_window_bound": freshness_window_bound,
             "freshness_timestamp_bound": freshness_timestamp_bound,
@@ -5382,6 +5502,7 @@ class YaoyorozuRegistryService:
             "network_payload_stored": network_payload_stored,
             "raw_verifier_response_payload_stored": raw_verifier_response_payload_stored,
             "raw_verifier_signature_payload_stored": raw_verifier_signature_payload_stored,
+            "raw_verifier_roster_payload_stored": raw_verifier_roster_payload_stored,
             "decision_authority_claimed": decision_authority_claimed,
             "errors": errors,
         }
@@ -5595,6 +5716,7 @@ class YaoyorozuRegistryService:
                 "evidence_digest_set_bound": False,
                 "live_verifier_transport_bound": False,
                 "verifier_quorum_bound": False,
+                "verifier_roster_bound": False,
                 "signed_response_envelope_bound": False,
                 "freshness_window_bound": False,
                 "freshness_timestamp_bound": False,
@@ -5604,6 +5726,7 @@ class YaoyorozuRegistryService:
                 "network_payload_stored": True,
                 "raw_verifier_response_payload_stored": True,
                 "raw_verifier_signature_payload_stored": True,
+                "raw_verifier_roster_payload_stored": True,
                 "decision_authority_claimed": True,
                 "errors": ["evidence_verifier_receipt must be an object"],
             }
@@ -5691,6 +5814,9 @@ class YaoyorozuRegistryService:
             "evidence_verifier_quorum_bound": evidence_verifier_validation[
                 "verifier_quorum_bound"
             ],
+            "evidence_verifier_roster_bound": evidence_verifier_validation[
+                "verifier_roster_bound"
+            ],
             "evidence_verifier_signed_response_envelope_bound": (
                 evidence_verifier_validation["signed_response_envelope_bound"]
             ),
@@ -5714,6 +5840,9 @@ class YaoyorozuRegistryService:
             ),
             "evidence_verifier_raw_signature_payload_stored": (
                 evidence_verifier_validation["raw_verifier_signature_payload_stored"]
+            ),
+            "evidence_verifier_raw_roster_payload_stored": (
+                evidence_verifier_validation["raw_verifier_roster_payload_stored"]
             ),
             "request_forbids_authority": bool(request_forbids_authority),
             "advisory_only": advisory_only,
@@ -6100,6 +6229,11 @@ class YaoyorozuRegistryService:
             else ""
             for exchange in exchanges
         ]
+        evidence_verifier_rosters_bound = all(
+            isinstance(exchange.get("validation"), Mapping)
+            and exchange["validation"].get("evidence_verifier_roster_bound") is True
+            for exchange in exchanges
+        )
         evidence_verifiers_bound = (
             synthesis.get("evidence_verifier_refs") == evidence_verifier_refs
             and synthesis.get("evidence_verifier_digests") == evidence_verifier_digests
@@ -6114,12 +6248,15 @@ class YaoyorozuRegistryService:
                 and exchange["validation"].get("evidence_verifier_bound") is True
                 and exchange["validation"].get("evidence_verifier_digest_bound") is True
                 and exchange["validation"].get("evidence_verifier_quorum_bound") is True
+                and exchange["validation"].get("evidence_verifier_roster_bound") is True
                 and exchange["validation"].get("evidence_verifier_transport_bound") is True
                 for exchange in exchanges
             )
         )
         if not evidence_verifiers_bound:
             errors.append("synthesis must bind source evidence verifier receipts")
+        if not evidence_verifier_rosters_bound:
+            errors.append("synthesis source verifiers must bind roster policy digests")
 
         evidence_verifier_quorums_bound = (
             synthesis.get("evidence_verifier_quorum_digests")
@@ -6220,6 +6357,7 @@ class YaoyorozuRegistryService:
             "evidence_digest_set_bound": evidence_digest_set_bound,
             "evidence_verifiers_bound": evidence_verifiers_bound,
             "evidence_verifier_quorums_bound": evidence_verifier_quorums_bound,
+            "evidence_verifier_rosters_bound": evidence_verifier_rosters_bound,
             "advisory_only": advisory_only,
             "raw_exchange_payload_stored": bool(
                 synthesis.get("raw_exchange_payload_stored")

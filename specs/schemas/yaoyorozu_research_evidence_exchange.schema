@@ -195,6 +195,7 @@ properties:
       - evidence_verifier_digest_bound
       - evidence_verifier_transport_bound
       - evidence_verifier_quorum_bound
+      - evidence_verifier_roster_bound
       - evidence_verifier_signed_response_envelope_bound
       - evidence_verifier_freshness_window_bound
       - evidence_verifier_freshness_timestamp_bound
@@ -203,6 +204,7 @@ properties:
       - evidence_verifier_network_payload_stored
       - evidence_verifier_raw_response_payload_stored
       - evidence_verifier_raw_signature_payload_stored
+      - evidence_verifier_raw_roster_payload_stored
       - request_forbids_authority
       - advisory_only
       - raw_research_payload_stored
@@ -239,6 +241,8 @@ properties:
         const: true
       evidence_verifier_quorum_bound:
         const: true
+      evidence_verifier_roster_bound:
+        const: true
       evidence_verifier_signed_response_envelope_bound:
         const: true
       evidence_verifier_freshness_window_bound:
@@ -254,6 +258,8 @@ properties:
       evidence_verifier_raw_response_payload_stored:
         const: false
       evidence_verifier_raw_signature_payload_stored:
+        const: false
+      evidence_verifier_raw_roster_payload_stored:
         const: false
       request_forbids_authority:
         const: true
@@ -313,6 +319,11 @@ examples:
       transport_profile: digest-only-live-research-evidence-verifier-quorum-v1
       verifier_network_scope: digest-only-research-evidence-verifier-transport
       verifier_quorum_policy_id: research-evidence-live-verifier-quorum-policy-v1
+      verifier_roster_policy_id: research-evidence-verifier-roster-policy-v1
+      verifier_roster_profile: policy-bound-research-evidence-verifier-roster-v1
+      verifier_roster_ref: verifier-roster://yaoyorozu/research-evidence/current
+      verifier_roster_digest: abcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcd
+      verifier_roster_status: bound
       exchange_ref: research-evidence-exchange://yaoyorozu-research-evidence-exchange-012345abcdef
       researcher_agent_id: neuroscience-scout
       evidence_refs:
@@ -376,6 +387,7 @@ examples:
         - 9123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
         - b123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       verifier_transport_quorum_digest: c123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+      verifier_roster_bound: true
       signed_response_envelope_bound: true
       freshness_window_seconds: 900
       freshness_window_bound: true
@@ -394,6 +406,7 @@ examples:
       network_payload_stored: false
       raw_verifier_response_payload_stored: false
       raw_verifier_signature_payload_stored: false
+      raw_verifier_roster_payload_stored: false
       decision_authority_claimed: false
       verifier_digest: 7123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
       validation:
@@ -403,6 +416,7 @@ examples:
         evidence_digest_set_bound: true
         live_verifier_transport_bound: true
         verifier_quorum_bound: true
+        verifier_roster_bound: true
         signed_response_envelope_bound: true
         freshness_window_bound: true
         freshness_timestamp_bound: true
@@ -412,6 +426,7 @@ examples:
         network_payload_stored: false
         raw_verifier_response_payload_stored: false
         raw_verifier_signature_payload_stored: false
+        raw_verifier_roster_payload_stored: false
         decision_authority_claimed: false
         errors: []
     claim_ceiling: implementation-advisory
@@ -496,6 +511,7 @@ examples:
       evidence_verifier_digest_bound: true
       evidence_verifier_transport_bound: true
       evidence_verifier_quorum_bound: true
+      evidence_verifier_roster_bound: true
       evidence_verifier_signed_response_envelope_bound: true
       evidence_verifier_freshness_window_bound: true
       evidence_verifier_freshness_timestamp_bound: true
@@ -504,6 +520,7 @@ examples:
       evidence_verifier_network_payload_stored: false
       evidence_verifier_raw_response_payload_stored: false
       evidence_verifier_raw_signature_payload_stored: false
+      evidence_verifier_raw_roster_payload_stored: false
       request_forbids_authority: true
       advisory_only: true
       raw_research_payload_stored: false
