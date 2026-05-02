@@ -75,7 +75,29 @@ PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE = (
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE = (
     "protected-branch-provider-policy-receipt-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESHNESS_PROFILE = (
+    "protected-branch-provider-policy-freshness-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_PROFILE = (
+    "protected-branch-provider-policy-signed-timestamp-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNATURE_PROFILE = (
+    "protected-branch-provider-policy-timestamp-signature-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAY_PROFILE = (
+    "protected-branch-provider-policy-timestamp-replay-guard-v1"
+)
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS = "protected"
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS = "fresh"
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_EXPIRED_STATUS = "expired"
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNED_STATUS = (
+    "signed-current"
+)
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_STALE_STATUS = "stale"
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_INVALID_STATUS = "invalid"
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS = "unique"
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAYED_STATUS = "replayed"
+PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS = 900
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -167,6 +189,15 @@ PARALLEL_CODEX_DEFAULT_REMOTE_SOURCE_CONTENT_REF = (
 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER = "github"
 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_REF = (
     "provider://github/protected-branch/origin-main/v1"
+)
+PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_CHECKED_AT_REF = (
+    "provider://github/protected-branch/origin-main/checked-at/v1"
+)
+PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_REF = (
+    "timestamp://github/protected-branch/origin-main/provider-clock/v1"
+)
+PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_NONCE_REF = (
+    "nonce://github/protected-branch/origin-main/provider-clock/v1"
 )
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
@@ -300,14 +331,44 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_protected_branch_profile": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
             ),
+            "post_commit_publication_protected_branch_freshness_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESHNESS_PROFILE
+            ),
+            "post_commit_publication_protected_branch_timestamp_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_PROFILE
+            ),
+            "post_commit_publication_protected_branch_timestamp_replay_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAY_PROFILE
+            ),
             "post_commit_publication_protected_branch_required_status": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
+            ),
+            "post_commit_publication_protected_branch_required_freshness_status": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS
+            ),
+            "post_commit_publication_protected_branch_required_timestamp_status": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNED_STATUS
+            ),
+            "post_commit_publication_protected_branch_required_timestamp_replay_status": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS
+            ),
+            "post_commit_publication_protected_branch_max_freshness_window_seconds": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
             ),
             "default_protected_branch_provider": (
                 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
             ),
             "default_protected_branch_policy_ref": (
                 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_REF
+            ),
+            "default_protected_branch_policy_checked_at_ref": (
+                PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_CHECKED_AT_REF
+            ),
+            "default_protected_branch_policy_timestamp_ref": (
+                PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_REF
+            ),
+            "default_protected_branch_policy_timestamp_nonce_ref": (
+                PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_NONCE_REF
             ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
@@ -404,6 +465,11 @@ class ParallelCodexOrchestrationPolicy:
             "raw_remote_verification_stdout_stored": False,
             "raw_remote_verification_stderr_stored": False,
             "raw_protected_branch_provider_payload_stored": False,
+            "raw_protected_branch_policy_freshness_payload_stored": False,
+            "raw_protected_branch_provider_timestamp_payload_stored": False,
+            "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
+                False
+            ),
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -2067,6 +2133,28 @@ class ParallelCodexOrchestrationService:
             PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
         ),
         protected_branch_required_checks: Sequence[str] | None = None,
+        protected_branch_policy_checked_at_ref: str = (
+            PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_CHECKED_AT_REF
+        ),
+        protected_branch_policy_freshness_window_seconds: int = (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
+        ),
+        protected_branch_policy_freshness_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS
+        ),
+        protected_branch_provider_timestamp_ref: str = (
+            PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_REF
+        ),
+        protected_branch_provider_timestamp_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNED_STATUS
+        ),
+        protected_branch_provider_timestamp_signature_digest: str = "",
+        protected_branch_provider_timestamp_nonce_ref: str = (
+            PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_NONCE_REF
+        ),
+        protected_branch_provider_timestamp_replay_status: str = (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS
+        ),
         protected_branch_receipt_digest: str = "",
     ) -> Dict[str, Any]:
         execution_validation = self.validate_integration_execution_receipt(
@@ -2134,6 +2222,52 @@ class ParallelCodexOrchestrationService:
             protected_branch_status.strip()
             or PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
         )
+        normalized_policy_checked_at_ref = (
+            protected_branch_policy_checked_at_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_CHECKED_AT_REF
+        )
+        normalized_policy_freshness_window_seconds = _coerce_int(
+            protected_branch_policy_freshness_window_seconds,
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS,
+        )
+        normalized_policy_freshness_status = (
+            protected_branch_policy_freshness_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS
+        )
+        normalized_provider_timestamp_ref = (
+            protected_branch_provider_timestamp_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_REF
+        )
+        normalized_provider_timestamp_status = (
+            protected_branch_provider_timestamp_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNED_STATUS
+        )
+        normalized_provider_timestamp_signature_digest = (
+            protected_branch_provider_timestamp_signature_digest.strip()
+        )
+        if not _is_sha256(normalized_provider_timestamp_signature_digest):
+            normalized_provider_timestamp_signature_digest = sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": (
+                            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNATURE_PROFILE
+                        ),
+                        "provider": normalized_protected_branch_provider,
+                        "branch_ref": normalized_remote_ref,
+                        "timestamp_ref": normalized_provider_timestamp_ref,
+                        "timestamp_status": normalized_provider_timestamp_status,
+                        "raw_provider_timestamp_payload_stored": False,
+                    }
+                )
+            )
+        normalized_provider_timestamp_nonce_ref = (
+            protected_branch_provider_timestamp_nonce_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_NONCE_REF
+        )
+        normalized_provider_timestamp_replay_status = (
+            protected_branch_provider_timestamp_replay_status.strip()
+            or PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS
+        )
         normalized_protected_branch_policy_digest = (
             protected_branch_policy_digest.strip()
         )
@@ -2152,6 +2286,47 @@ class ParallelCodexOrchestrationService:
         protected_branch_policy_bound = (
             normalized_protected_branch_policy_digest
             == expected_protected_branch_policy_digest
+        )
+        protected_branch_policy_freshness_digest = (
+            self._post_commit_protected_branch_freshness_digest(
+                provider=normalized_protected_branch_provider,
+                branch_ref=normalized_remote_ref,
+                policy_ref=normalized_protected_branch_policy_ref,
+                policy_digest=normalized_protected_branch_policy_digest,
+                checked_at_ref=normalized_policy_checked_at_ref,
+                freshness_window_seconds=normalized_policy_freshness_window_seconds,
+                freshness_status=normalized_policy_freshness_status,
+            )
+        )
+        protected_branch_policy_freshness_bound = _is_sha256(
+            protected_branch_policy_freshness_digest,
+        )
+        protected_branch_provider_timestamp_digest = (
+            self._post_commit_protected_branch_timestamp_digest(
+                provider=normalized_protected_branch_provider,
+                branch_ref=normalized_remote_ref,
+                policy_digest=normalized_protected_branch_policy_digest,
+                timestamp_ref=normalized_provider_timestamp_ref,
+                timestamp_status=normalized_provider_timestamp_status,
+                timestamp_signature_digest=(
+                    normalized_provider_timestamp_signature_digest
+                ),
+            )
+        )
+        protected_branch_provider_timestamp_bound = (
+            _is_sha256(protected_branch_provider_timestamp_digest)
+        )
+        protected_branch_provider_timestamp_replay_digest = (
+            self._post_commit_protected_branch_timestamp_replay_digest(
+                provider=normalized_protected_branch_provider,
+                branch_ref=normalized_remote_ref,
+                timestamp_ref=normalized_provider_timestamp_ref,
+                nonce_ref=normalized_provider_timestamp_nonce_ref,
+                replay_status=normalized_provider_timestamp_replay_status,
+            )
+        )
+        protected_branch_provider_timestamp_replay_bound = (
+            _is_sha256(protected_branch_provider_timestamp_replay_digest)
         )
         (
             remote_verification_observed_head,
@@ -2264,6 +2439,60 @@ class ParallelCodexOrchestrationService:
             "protected_branch_required_check_count": len(
                 normalized_protected_branch_checks,
             ),
+            "protected_branch_policy_freshness_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESHNESS_PROFILE
+            ),
+            "protected_branch_policy_checked_at_ref": (
+                normalized_policy_checked_at_ref
+            ),
+            "protected_branch_policy_freshness_window_seconds": (
+                normalized_policy_freshness_window_seconds
+            ),
+            "protected_branch_policy_freshness_status": (
+                normalized_policy_freshness_status
+            ),
+            "protected_branch_policy_freshness_digest": (
+                protected_branch_policy_freshness_digest
+            ),
+            "protected_branch_policy_freshness_digest_bound": (
+                protected_branch_policy_freshness_bound
+            ),
+            "protected_branch_provider_timestamp_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_PROFILE
+            ),
+            "protected_branch_provider_timestamp_ref": (
+                normalized_provider_timestamp_ref
+            ),
+            "protected_branch_provider_timestamp_status": (
+                normalized_provider_timestamp_status
+            ),
+            "protected_branch_provider_timestamp_signature_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNATURE_PROFILE
+            ),
+            "protected_branch_provider_timestamp_signature_digest": (
+                normalized_provider_timestamp_signature_digest
+            ),
+            "protected_branch_provider_timestamp_digest": (
+                protected_branch_provider_timestamp_digest
+            ),
+            "protected_branch_provider_timestamp_digest_bound": (
+                protected_branch_provider_timestamp_bound
+            ),
+            "protected_branch_provider_timestamp_replay_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAY_PROFILE
+            ),
+            "protected_branch_provider_timestamp_nonce_ref": (
+                normalized_provider_timestamp_nonce_ref
+            ),
+            "protected_branch_provider_timestamp_replay_status": (
+                normalized_provider_timestamp_replay_status
+            ),
+            "protected_branch_provider_timestamp_replay_digest": (
+                protected_branch_provider_timestamp_replay_digest
+            ),
+            "protected_branch_provider_timestamp_replay_digest_bound": (
+                protected_branch_provider_timestamp_replay_bound
+            ),
             "protected_branch_receipt_digest": "",
             "protected_branch_receipt_digest_bound": False,
             "publication_digest": "",
@@ -2278,6 +2507,11 @@ class ParallelCodexOrchestrationService:
             "raw_remote_verification_stdout_stored": False,
             "raw_remote_verification_stderr_stored": False,
             "raw_protected_branch_provider_payload_stored": False,
+            "raw_protected_branch_policy_freshness_payload_stored": False,
+            "raw_protected_branch_provider_timestamp_payload_stored": False,
+            "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
+                False
+            ),
             "receipt_digest": "",
         }
         normalized_protected_branch_receipt_digest = (
@@ -2390,6 +2624,70 @@ class ParallelCodexOrchestrationService:
             == self._post_commit_protected_branch_receipt_digest(receipt)
             and receipt.get("protected_branch_receipt_digest_bound") is True
         )
+        protected_branch_policy_freshness_digest_bound = (
+            receipt.get("protected_branch_policy_freshness_digest")
+            == self._post_commit_protected_branch_freshness_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                policy_ref=str(receipt.get("protected_branch_policy_ref", "")),
+                policy_digest=str(receipt.get("protected_branch_policy_digest", "")),
+                checked_at_ref=str(
+                    receipt.get("protected_branch_policy_checked_at_ref", ""),
+                ),
+                freshness_window_seconds=_coerce_int(
+                    receipt.get("protected_branch_policy_freshness_window_seconds"),
+                    0,
+                ),
+                freshness_status=str(
+                    receipt.get("protected_branch_policy_freshness_status", ""),
+                ),
+            )
+            and receipt.get("protected_branch_policy_freshness_digest_bound") is True
+        )
+        protected_branch_provider_timestamp_digest_bound = (
+            receipt.get("protected_branch_provider_timestamp_digest")
+            == self._post_commit_protected_branch_timestamp_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                policy_digest=str(receipt.get("protected_branch_policy_digest", "")),
+                timestamp_ref=str(
+                    receipt.get("protected_branch_provider_timestamp_ref", ""),
+                ),
+                timestamp_status=str(
+                    receipt.get("protected_branch_provider_timestamp_status", ""),
+                ),
+                timestamp_signature_digest=str(
+                    receipt.get(
+                        "protected_branch_provider_timestamp_signature_digest",
+                        "",
+                    ),
+                ),
+            )
+            and receipt.get("protected_branch_provider_timestamp_digest_bound") is True
+        )
+        protected_branch_provider_timestamp_replay_digest_bound = (
+            receipt.get("protected_branch_provider_timestamp_replay_digest")
+            == self._post_commit_protected_branch_timestamp_replay_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                timestamp_ref=str(
+                    receipt.get("protected_branch_provider_timestamp_ref", ""),
+                ),
+                nonce_ref=str(
+                    receipt.get("protected_branch_provider_timestamp_nonce_ref", ""),
+                ),
+                replay_status=str(
+                    receipt.get(
+                        "protected_branch_provider_timestamp_replay_status",
+                        "",
+                    ),
+                ),
+            )
+            and receipt.get(
+                "protected_branch_provider_timestamp_replay_digest_bound",
+            )
+            is True
+        )
         receipt_digest_bound = (
             receipt.get("receipt_digest") == self._receipt_digest(receipt)
         )
@@ -2432,6 +2730,14 @@ class ParallelCodexOrchestrationService:
             errors.append("protected_branch_policy_digest mismatch")
         if not protected_branch_receipt_digest_bound:
             errors.append("protected_branch_receipt_digest mismatch")
+        if not protected_branch_policy_freshness_digest_bound:
+            errors.append("protected_branch_policy_freshness_digest mismatch")
+        if not protected_branch_provider_timestamp_digest_bound:
+            errors.append("protected_branch_provider_timestamp_digest mismatch")
+        if not protected_branch_provider_timestamp_replay_digest_bound:
+            errors.append(
+                "protected_branch_provider_timestamp_replay_digest mismatch",
+            )
         if push_result.get("command") != push_command:
             errors.append("push command must target origin main")
         if remote_verification_result.get("command") != remote_verification_command:
@@ -2466,6 +2772,29 @@ class ParallelCodexOrchestrationService:
             errors.append("raw_remote_verification_stderr_stored must be false")
         if receipt.get("raw_protected_branch_provider_payload_stored") is not False:
             errors.append("raw_protected_branch_provider_payload_stored must be false")
+        if (
+            receipt.get("raw_protected_branch_policy_freshness_payload_stored")
+            is not False
+        ):
+            errors.append(
+                "raw_protected_branch_policy_freshness_payload_stored must be false",
+            )
+        if (
+            receipt.get("raw_protected_branch_provider_timestamp_payload_stored")
+            is not False
+        ):
+            errors.append(
+                "raw_protected_branch_provider_timestamp_payload_stored must be false",
+            )
+        if (
+            receipt.get(
+                "raw_protected_branch_provider_timestamp_replay_guard_payload_stored",
+            )
+            is not False
+        ):
+            errors.append(
+                "raw_protected_branch_provider_timestamp_replay_guard_payload_stored must be false",
+            )
 
         return {
             "ok": not errors,
@@ -2532,6 +2861,35 @@ class ParallelCodexOrchestrationService:
                     receipt.get("protected_branch_required_checks", []),
                 )
             ),
+            "protected_branch_policy_freshness_digest_bound": (
+                protected_branch_policy_freshness_digest_bound
+            ),
+            "protected_branch_policy_fresh": (
+                receipt.get("protected_branch_policy_freshness_status")
+                == PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS
+            ),
+            "protected_branch_policy_freshness_window_bound": (
+                0
+                < _coerce_int(
+                    receipt.get("protected_branch_policy_freshness_window_seconds"),
+                    0,
+                )
+                <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
+            ),
+            "protected_branch_provider_timestamp_digest_bound": (
+                protected_branch_provider_timestamp_digest_bound
+            ),
+            "protected_branch_provider_timestamp_signed_current": (
+                receipt.get("protected_branch_provider_timestamp_status")
+                == PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNED_STATUS
+            ),
+            "protected_branch_provider_timestamp_replay_digest_bound": (
+                protected_branch_provider_timestamp_replay_digest_bound
+            ),
+            "protected_branch_provider_timestamp_unique": (
+                receipt.get("protected_branch_provider_timestamp_replay_status")
+                == PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS
+            ),
             "publication_digest_bound": publication_digest_bound,
             "receipt_digest_bound": receipt_digest_bound,
             "raw_publication_payload_redacted": (
@@ -2552,6 +2910,20 @@ class ParallelCodexOrchestrationService:
             ),
             "raw_protected_branch_provider_payload_redacted": (
                 receipt.get("raw_protected_branch_provider_payload_stored")
+                is False
+            ),
+            "raw_protected_branch_policy_freshness_payload_redacted": (
+                receipt.get("raw_protected_branch_policy_freshness_payload_stored")
+                is False
+            ),
+            "raw_protected_branch_provider_timestamp_payload_redacted": (
+                receipt.get("raw_protected_branch_provider_timestamp_payload_stored")
+                is False
+            ),
+            "raw_protected_branch_provider_timestamp_replay_guard_payload_redacted": (
+                receipt.get(
+                    "raw_protected_branch_provider_timestamp_replay_guard_payload_stored",
+                )
                 is False
             ),
         }
@@ -4719,7 +5091,118 @@ class ParallelCodexOrchestrationService:
                     "required_checks": _dedupe_strings(
                         receipt.get("protected_branch_required_checks", []),
                     ),
+                    "policy_freshness_digest": receipt.get(
+                        "protected_branch_policy_freshness_digest",
+                        "",
+                    ),
+                    "policy_freshness_digest_bound": receipt.get(
+                        "protected_branch_policy_freshness_digest_bound",
+                        False,
+                    ),
+                    "provider_timestamp_digest": receipt.get(
+                        "protected_branch_provider_timestamp_digest",
+                        "",
+                    ),
+                    "provider_timestamp_digest_bound": receipt.get(
+                        "protected_branch_provider_timestamp_digest_bound",
+                        False,
+                    ),
+                    "provider_timestamp_replay_digest": receipt.get(
+                        "protected_branch_provider_timestamp_replay_digest",
+                        "",
+                    ),
+                    "provider_timestamp_replay_digest_bound": receipt.get(
+                        "protected_branch_provider_timestamp_replay_digest_bound",
+                        False,
+                    ),
                     "raw_provider_payload_stored": False,
+                    "raw_policy_freshness_payload_stored": False,
+                    "raw_provider_timestamp_payload_stored": False,
+                    "raw_provider_timestamp_replay_guard_payload_stored": False,
+                }
+            )
+        )
+
+    @staticmethod
+    def _post_commit_protected_branch_freshness_digest(
+        *,
+        provider: str,
+        branch_ref: str,
+        policy_ref: str,
+        policy_digest: str,
+        checked_at_ref: str,
+        freshness_window_seconds: int,
+        freshness_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESHNESS_PROFILE
+                    ),
+                    "provider": provider,
+                    "branch_ref": branch_ref,
+                    "policy_ref": policy_ref,
+                    "policy_digest": policy_digest,
+                    "checked_at_ref": checked_at_ref,
+                    "freshness_window_seconds": freshness_window_seconds,
+                    "freshness_status": freshness_status,
+                    "raw_policy_freshness_payload_stored": False,
+                }
+            )
+        )
+
+    @staticmethod
+    def _post_commit_protected_branch_timestamp_digest(
+        *,
+        provider: str,
+        branch_ref: str,
+        policy_digest: str,
+        timestamp_ref: str,
+        timestamp_status: str,
+        timestamp_signature_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_PROFILE
+                    ),
+                    "provider": provider,
+                    "branch_ref": branch_ref,
+                    "policy_digest": policy_digest,
+                    "timestamp_ref": timestamp_ref,
+                    "timestamp_status": timestamp_status,
+                    "timestamp_signature_profile": (
+                        PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNATURE_PROFILE
+                    ),
+                    "timestamp_signature_digest": timestamp_signature_digest,
+                    "raw_provider_timestamp_payload_stored": False,
+                }
+            )
+        )
+
+    @staticmethod
+    def _post_commit_protected_branch_timestamp_replay_digest(
+        *,
+        provider: str,
+        branch_ref: str,
+        timestamp_ref: str,
+        nonce_ref: str,
+        replay_status: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAY_PROFILE
+                    ),
+                    "provider": provider,
+                    "branch_ref": branch_ref,
+                    "timestamp_ref": timestamp_ref,
+                    "nonce_ref": nonce_ref,
+                    "replay_status": replay_status,
+                    "raw_provider_timestamp_replay_guard_payload_stored": False,
                 }
             )
         )
@@ -4850,6 +5333,36 @@ class ParallelCodexOrchestrationService:
                         "protected_branch_receipt_digest_bound",
                         False,
                     ),
+                    "protected_branch_policy_freshness_digest": receipt.get(
+                        "protected_branch_policy_freshness_digest",
+                        "",
+                    ),
+                    "protected_branch_policy_freshness_digest_bound": (
+                        receipt.get(
+                            "protected_branch_policy_freshness_digest_bound",
+                            False,
+                        )
+                    ),
+                    "protected_branch_provider_timestamp_digest": receipt.get(
+                        "protected_branch_provider_timestamp_digest",
+                        "",
+                    ),
+                    "protected_branch_provider_timestamp_digest_bound": receipt.get(
+                        "protected_branch_provider_timestamp_digest_bound",
+                        False,
+                    ),
+                    "protected_branch_provider_timestamp_replay_digest": (
+                        receipt.get(
+                            "protected_branch_provider_timestamp_replay_digest",
+                            "",
+                        )
+                    ),
+                    "protected_branch_provider_timestamp_replay_digest_bound": (
+                        receipt.get(
+                            "protected_branch_provider_timestamp_replay_digest_bound",
+                            False,
+                        )
+                    ),
                     "raw_execution_payload_stored": False,
                     "raw_post_commit_publication_payload_stored": False,
                     "raw_push_stdout_stored": False,
@@ -4857,6 +5370,11 @@ class ParallelCodexOrchestrationService:
                     "raw_remote_verification_stdout_stored": False,
                     "raw_remote_verification_stderr_stored": False,
                     "raw_protected_branch_provider_payload_stored": False,
+                    "raw_protected_branch_policy_freshness_payload_stored": False,
+                    "raw_protected_branch_provider_timestamp_payload_stored": False,
+                    "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
+                        False
+                    ),
                 }
             )
         )
@@ -5492,6 +6010,127 @@ class ParallelCodexOrchestrationService:
             != len(_dedupe_strings(receipt.get("protected_branch_required_checks", [])))
         ):
             reasons.append("protected_branch_required_check_count mismatch")
+        expected_freshness_digest = (
+            self._post_commit_protected_branch_freshness_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                policy_ref=str(receipt.get("protected_branch_policy_ref", "")),
+                policy_digest=str(receipt.get("protected_branch_policy_digest", "")),
+                checked_at_ref=str(
+                    receipt.get("protected_branch_policy_checked_at_ref", ""),
+                ),
+                freshness_window_seconds=_coerce_int(
+                    receipt.get("protected_branch_policy_freshness_window_seconds"),
+                    0,
+                ),
+                freshness_status=str(
+                    receipt.get("protected_branch_policy_freshness_status", ""),
+                ),
+            )
+        )
+        if receipt.get("protected_branch_policy_freshness_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESHNESS_PROFILE
+        ):
+            reasons.append("protected_branch_policy_freshness_profile mismatch")
+        if receipt.get("protected_branch_policy_freshness_digest") != (
+            expected_freshness_digest
+        ):
+            reasons.append("protected_branch_policy_freshness_digest mismatch")
+        if receipt.get("protected_branch_policy_freshness_digest_bound") is not True:
+            reasons.append("protected branch policy freshness digest must be bound")
+        if receipt.get("protected_branch_policy_freshness_status") != (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS
+        ):
+            reasons.append("protected branch provider policy freshness must be fresh")
+        if not (
+            0
+            < _coerce_int(
+                receipt.get("protected_branch_policy_freshness_window_seconds"),
+                0,
+            )
+            <= PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
+        ):
+            reasons.append("protected branch provider policy freshness window expired")
+        expected_timestamp_digest = (
+            self._post_commit_protected_branch_timestamp_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                policy_digest=str(receipt.get("protected_branch_policy_digest", "")),
+                timestamp_ref=str(
+                    receipt.get("protected_branch_provider_timestamp_ref", ""),
+                ),
+                timestamp_status=str(
+                    receipt.get("protected_branch_provider_timestamp_status", ""),
+                ),
+                timestamp_signature_digest=str(
+                    receipt.get(
+                        "protected_branch_provider_timestamp_signature_digest",
+                        "",
+                    ),
+                ),
+            )
+        )
+        if receipt.get("protected_branch_provider_timestamp_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_PROFILE
+        ):
+            reasons.append("protected_branch_provider_timestamp_profile mismatch")
+        if receipt.get("protected_branch_provider_timestamp_digest") != (
+            expected_timestamp_digest
+        ):
+            reasons.append("protected_branch_provider_timestamp_digest mismatch")
+        if receipt.get("protected_branch_provider_timestamp_digest_bound") is not True:
+            reasons.append("protected branch provider timestamp digest must be bound")
+        if receipt.get("protected_branch_provider_timestamp_status") != (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNED_STATUS
+        ):
+            reasons.append("protected branch provider timestamp must be signed-current")
+        if not _is_sha256(
+            receipt.get("protected_branch_provider_timestamp_signature_digest"),
+        ):
+            reasons.append("protected branch provider timestamp signature must bind")
+        expected_replay_digest = (
+            self._post_commit_protected_branch_timestamp_replay_digest(
+                provider=str(receipt.get("protected_branch_provider", "")),
+                branch_ref=str(receipt.get("protected_branch_ref", "")),
+                timestamp_ref=str(
+                    receipt.get("protected_branch_provider_timestamp_ref", ""),
+                ),
+                nonce_ref=str(
+                    receipt.get("protected_branch_provider_timestamp_nonce_ref", ""),
+                ),
+                replay_status=str(
+                    receipt.get(
+                        "protected_branch_provider_timestamp_replay_status",
+                        "",
+                    ),
+                ),
+            )
+        )
+        if receipt.get("protected_branch_provider_timestamp_replay_profile") != (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAY_PROFILE
+        ):
+            reasons.append(
+                "protected_branch_provider_timestamp_replay_profile mismatch",
+            )
+        if receipt.get("protected_branch_provider_timestamp_replay_digest") != (
+            expected_replay_digest
+        ):
+            reasons.append(
+                "protected_branch_provider_timestamp_replay_digest mismatch",
+            )
+        if (
+            receipt.get(
+                "protected_branch_provider_timestamp_replay_digest_bound",
+            )
+            is not True
+        ):
+            reasons.append(
+                "protected branch provider timestamp replay digest must be bound",
+            )
+        if receipt.get("protected_branch_provider_timestamp_replay_status") != (
+            PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS
+        ):
+            reasons.append("protected branch provider timestamp replay must be unique")
         if (
             receipt.get("protected_branch_receipt_digest")
             != self._post_commit_protected_branch_receipt_digest(receipt)
@@ -5500,6 +6139,29 @@ class ParallelCodexOrchestrationService:
             reasons.append("protected_branch_receipt_digest mismatch")
         if receipt.get("raw_protected_branch_provider_payload_stored") is not False:
             reasons.append("raw_protected_branch_provider_payload_stored must be false")
+        if (
+            receipt.get("raw_protected_branch_policy_freshness_payload_stored")
+            is not False
+        ):
+            reasons.append(
+                "raw_protected_branch_policy_freshness_payload_stored must be false",
+            )
+        if (
+            receipt.get("raw_protected_branch_provider_timestamp_payload_stored")
+            is not False
+        ):
+            reasons.append(
+                "raw_protected_branch_provider_timestamp_payload_stored must be false",
+            )
+        if (
+            receipt.get(
+                "raw_protected_branch_provider_timestamp_replay_guard_payload_stored",
+            )
+            is not False
+        ):
+            reasons.append(
+                "raw_protected_branch_provider_timestamp_replay_guard_payload_stored must be false",
+            )
         if receipt.get("publication_digest") != self._post_commit_publication_digest(
             receipt,
         ):

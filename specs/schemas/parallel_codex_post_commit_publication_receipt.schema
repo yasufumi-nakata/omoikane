@@ -7,7 +7,8 @@ description: >
   ls-remote head/ref output binding, and protected-branch provider policy
   receipt before GitHub handoff. The receipt keeps raw execution, push, remote
   verification, and branch-provider payloads redacted while preserving command,
-  observed head/ref, policy, provider receipt, and publication digests.
+  observed head/ref, policy, provider freshness, signed timestamp, timestamp
+  replay-guard, provider receipt, and publication digests.
 type: object
 additionalProperties: false
 required:
@@ -54,6 +55,24 @@ required:
   - protected_branch_status
   - protected_branch_required_checks
   - protected_branch_required_check_count
+  - protected_branch_policy_freshness_profile
+  - protected_branch_policy_checked_at_ref
+  - protected_branch_policy_freshness_window_seconds
+  - protected_branch_policy_freshness_status
+  - protected_branch_policy_freshness_digest
+  - protected_branch_policy_freshness_digest_bound
+  - protected_branch_provider_timestamp_profile
+  - protected_branch_provider_timestamp_ref
+  - protected_branch_provider_timestamp_status
+  - protected_branch_provider_timestamp_signature_profile
+  - protected_branch_provider_timestamp_signature_digest
+  - protected_branch_provider_timestamp_digest
+  - protected_branch_provider_timestamp_digest_bound
+  - protected_branch_provider_timestamp_replay_profile
+  - protected_branch_provider_timestamp_nonce_ref
+  - protected_branch_provider_timestamp_replay_status
+  - protected_branch_provider_timestamp_replay_digest
+  - protected_branch_provider_timestamp_replay_digest_bound
   - protected_branch_receipt_digest
   - protected_branch_receipt_digest_bound
   - publication_digest
@@ -68,6 +87,9 @@ required:
   - raw_remote_verification_stdout_stored
   - raw_remote_verification_stderr_stored
   - raw_protected_branch_provider_payload_stored
+  - raw_protected_branch_policy_freshness_payload_stored
+  - raw_protected_branch_provider_timestamp_payload_stored
+  - raw_protected_branch_provider_timestamp_replay_guard_payload_stored
   - receipt_digest
   - receipt_ref
 properties:
@@ -183,6 +205,59 @@ properties:
   protected_branch_required_check_count:
     type: integer
     minimum: 1
+  protected_branch_policy_freshness_profile:
+    const: protected-branch-provider-policy-freshness-v1
+  protected_branch_policy_checked_at_ref:
+    type: string
+    minLength: 1
+  protected_branch_policy_freshness_window_seconds:
+    type: integer
+    minimum: 1
+    maximum: 900
+  protected_branch_policy_freshness_status:
+    enum:
+      - fresh
+      - expired
+      - unknown
+  protected_branch_policy_freshness_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  protected_branch_policy_freshness_digest_bound:
+    type: boolean
+  protected_branch_provider_timestamp_profile:
+    const: protected-branch-provider-policy-signed-timestamp-v1
+  protected_branch_provider_timestamp_ref:
+    type: string
+    minLength: 1
+  protected_branch_provider_timestamp_status:
+    enum:
+      - signed-current
+      - stale
+      - invalid
+  protected_branch_provider_timestamp_signature_profile:
+    const: protected-branch-provider-policy-timestamp-signature-v1
+  protected_branch_provider_timestamp_signature_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  protected_branch_provider_timestamp_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  protected_branch_provider_timestamp_digest_bound:
+    type: boolean
+  protected_branch_provider_timestamp_replay_profile:
+    const: protected-branch-provider-policy-timestamp-replay-guard-v1
+  protected_branch_provider_timestamp_nonce_ref:
+    type: string
+    minLength: 1
+  protected_branch_provider_timestamp_replay_status:
+    enum:
+      - unique
+      - replayed
+  protected_branch_provider_timestamp_replay_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  protected_branch_provider_timestamp_replay_digest_bound:
+    type: boolean
   protected_branch_receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -217,6 +292,12 @@ properties:
   raw_remote_verification_stderr_stored:
     const: false
   raw_protected_branch_provider_payload_stored:
+    const: false
+  raw_protected_branch_policy_freshness_payload_stored:
+    const: false
+  raw_protected_branch_provider_timestamp_payload_stored:
+    const: false
+  raw_protected_branch_provider_timestamp_replay_guard_payload_stored:
     const: false
   receipt_digest:
     type: string

@@ -517,6 +517,34 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_protected_branch_freshness_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["post_commit_publication_protected_branch_fresh"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_timestamp_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_timestamp_signed_current"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_timestamp_replay_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_protected_branch_timestamp_unique"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_publication_digest_bound"
             ]
         )

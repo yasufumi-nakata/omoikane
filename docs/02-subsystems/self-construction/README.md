@@ -101,11 +101,13 @@ commit finalization gate が ready になった execution だけが
 origin/main remote head、command-bound `git push origin HEAD:refs/heads/main`
 receipt、command-bound `git ls-remote origin refs/heads/main` receipt を
 stdout 由来の observed head/ref digest とともに publication digest に束縛する。
-加えて GitHub protected branch provider policy
-receipt が `refs/heads/main`、required verification checks、policy digest、
-provider receipt digest を raw provider payload なしで束縛する。push 失敗、
-remote head mismatch、ls-remote output mismatch、protected branch が未保護 / unknown、または source execution /
-commit finalization が未 ready の場合は schema-bound のまま
+加えて GitHub protected branch provider policy receipt が `refs/heads/main`、
+required verification checks、policy digest、freshness window、signed provider
+timestamp、timestamp replay guard、provider receipt digest を raw provider payload
+なしで束縛する。push 失敗、remote head mismatch、ls-remote output mismatch、
+protected branch が未保護 / unknown、provider policy freshness が expired /
+unknown、timestamp が stale / invalid、replay guard が replayed、または source
+execution / commit finalization が未 ready の場合は schema-bound のまま
 `ready_for_github_handoff=false` に留まる。
 
 ## Mirage Self（サンドボックス自我）

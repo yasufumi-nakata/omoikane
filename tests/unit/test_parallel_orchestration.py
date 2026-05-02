@@ -1508,6 +1508,19 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["protected_branch_receipt_digest_bound"])
         self.assertTrue(validation["protected_branch_status_protected"])
         self.assertTrue(validation["protected_branch_required_checks_bound"])
+        self.assertTrue(validation["protected_branch_policy_freshness_digest_bound"])
+        self.assertTrue(validation["protected_branch_policy_fresh"])
+        self.assertTrue(validation["protected_branch_policy_freshness_window_bound"])
+        self.assertTrue(
+            validation["protected_branch_provider_timestamp_digest_bound"]
+        )
+        self.assertTrue(
+            validation["protected_branch_provider_timestamp_signed_current"]
+        )
+        self.assertTrue(
+            validation["protected_branch_provider_timestamp_replay_digest_bound"]
+        )
+        self.assertTrue(validation["protected_branch_provider_timestamp_unique"])
         self.assertTrue(validation["publication_digest_bound"])
         self.assertEqual(
             "git push origin HEAD:refs/heads/main",
@@ -1530,6 +1543,23 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertEqual("refs/heads/main", publication["protected_branch_ref"])
         self.assertEqual("protected", publication["protected_branch_status"])
         self.assertTrue(publication["protected_branch_policy_bound"])
+        self.assertEqual(
+            "fresh",
+            publication["protected_branch_policy_freshness_status"],
+        )
+        self.assertEqual(
+            "signed-current",
+            publication["protected_branch_provider_timestamp_status"],
+        )
+        self.assertEqual(
+            "unique",
+            publication["protected_branch_provider_timestamp_replay_status"],
+        )
+        self.assertTrue(publication["protected_branch_policy_freshness_digest_bound"])
+        self.assertTrue(publication["protected_branch_provider_timestamp_digest_bound"])
+        self.assertTrue(
+            publication["protected_branch_provider_timestamp_replay_digest_bound"]
+        )
         self.assertTrue(publication["protected_branch_receipt_digest_bound"])
         self.assertFalse(publication["raw_post_commit_publication_payload_stored"])
         self.assertFalse(publication["raw_push_stdout_stored"])
@@ -1538,6 +1568,17 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(publication["raw_remote_verification_stderr_stored"])
         self.assertFalse(
             publication["raw_protected_branch_provider_payload_stored"]
+        )
+        self.assertFalse(
+            publication["raw_protected_branch_policy_freshness_payload_stored"]
+        )
+        self.assertFalse(
+            publication["raw_protected_branch_provider_timestamp_payload_stored"]
+        )
+        self.assertFalse(
+            publication[
+                "raw_protected_branch_provider_timestamp_replay_guard_payload_stored"
+            ]
         )
 
     def test_post_commit_publication_blocks_ls_remote_output_mismatch(self) -> None:
@@ -1637,6 +1678,60 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["protected_branch_policy_digest_bound"])
         self.assertTrue(validation["protected_branch_receipt_digest_bound"])
         self.assertFalse(validation["protected_branch_status_protected"])
+
+    def test_post_commit_publication_blocks_stale_provider_policy_freshness(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            protected_branch_policy_freshness_status="expired",
+            result_summary="Publication blocks stale branch protection evidence.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "protected branch provider policy freshness must be fresh",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["protected_branch_policy_freshness_digest_bound"])
+        self.assertFalse(validation["protected_branch_policy_fresh"])
+
+    def test_post_commit_publication_blocks_replayed_provider_timestamp(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            protected_branch_provider_timestamp_replay_status="replayed",
+            result_summary="Publication blocks replayed provider timestamp evidence.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "protected branch provider timestamp replay must be unique",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(
+            validation["protected_branch_provider_timestamp_replay_digest_bound"]
+        )
+        self.assertFalse(validation["protected_branch_provider_timestamp_unique"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
         changed_file = "src/omoikane/self_construction/parallel_orchestration.py"

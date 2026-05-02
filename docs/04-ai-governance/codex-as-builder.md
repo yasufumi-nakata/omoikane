@@ -87,11 +87,13 @@ digest、changed-file owner manifest digest、passing verification state を束�
 `parallel_codex_post_commit_publication_receipt` で local commit head、origin/main
 remote head、command-bound push / remote verification receipt、ls-remote output の
 observed head/ref digest、GitHub protected branch provider policy receipt、
+provider policy freshness、signed provider timestamp、timestamp replay guard、
 publication digest を固定し、remote head mismatch、ls-remote output mismatch、
-push / remote verification failure、protected branch 未保護 / unknown を GitHub handoff へ
-進めない。raw batch / apply plan / dry-run / worker receipt / verification /
-checkout mutation / patch cleanup / commit finalization / publication / push /
-remote verification / protected branch provider payload は保存しない。
+push / remote verification failure、protected branch 未保護 / unknown、stale
+provider policy、unsigned/replayed provider timestamp を GitHub handoff へ進めない。
+raw batch / apply plan / dry-run / worker receipt / verification / checkout
+mutation / patch cleanup / commit finalization / publication / push / remote
+verification / protected branch provider payload は保存しない。
 `builder-live-demo` の actual command receipt は
 artifact payload に束縛された integrity Guardian の reviewer verifier-network attestation を前提に発行され、
 rollback execution はその receipt にも束縛され、

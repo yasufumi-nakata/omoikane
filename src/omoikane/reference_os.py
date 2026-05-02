@@ -1604,6 +1604,36 @@ class OmoikaneReferenceOS:
                 "post_commit_publication_protected_branch_status": (
                     post_commit_publication_receipt["protected_branch_status"]
                 ),
+                "post_commit_publication_protected_branch_freshness_digest": (
+                    post_commit_publication_receipt[
+                        "protected_branch_policy_freshness_digest"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_freshness_status": (
+                    post_commit_publication_receipt[
+                        "protected_branch_policy_freshness_status"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_digest": (
+                    post_commit_publication_receipt[
+                        "protected_branch_provider_timestamp_digest"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_status": (
+                    post_commit_publication_receipt[
+                        "protected_branch_provider_timestamp_status"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_replay_digest": (
+                    post_commit_publication_receipt[
+                        "protected_branch_provider_timestamp_replay_digest"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_replay_status": (
+                    post_commit_publication_receipt[
+                        "protected_branch_provider_timestamp_replay_status"
+                    ]
+                ),
                 "blocked_post_commit_publication_receipt_ref": (
                     blocked_post_commit_publication_receipt["receipt_ref"]
                 ),
@@ -1641,6 +1671,11 @@ class OmoikaneReferenceOS:
                 "raw_remote_verification_stdout_stored": False,
                 "raw_remote_verification_stderr_stored": False,
                 "raw_protected_branch_provider_payload_stored": False,
+                "raw_protected_branch_policy_freshness_payload_stored": False,
+                "raw_protected_branch_provider_timestamp_payload_stored": False,
+                "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
+                    False
+                ),
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -2348,6 +2383,36 @@ class OmoikaneReferenceOS:
                         "protected_branch_required_checks_bound"
                     ]
                 ),
+                "post_commit_publication_protected_branch_freshness_bound": (
+                    post_commit_publication_validation[
+                        "protected_branch_policy_freshness_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_fresh": (
+                    post_commit_publication_validation[
+                        "protected_branch_policy_fresh"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_bound": (
+                    post_commit_publication_validation[
+                        "protected_branch_provider_timestamp_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_signed_current": (
+                    post_commit_publication_validation[
+                        "protected_branch_provider_timestamp_signed_current"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_replay_bound": (
+                    post_commit_publication_validation[
+                        "protected_branch_provider_timestamp_replay_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_protected_branch_timestamp_unique": (
+                    post_commit_publication_validation[
+                        "protected_branch_provider_timestamp_unique"
+                    ]
+                ),
                 "post_commit_publication_publication_digest_bound": (
                     post_commit_publication_validation[
                         "publication_digest_bound"
@@ -2365,6 +2430,15 @@ class OmoikaneReferenceOS:
                     ]
                     and post_commit_publication_validation[
                         "raw_protected_branch_provider_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_protected_branch_policy_freshness_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_protected_branch_provider_timestamp_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_protected_branch_provider_timestamp_replay_guard_payload_redacted"
                     ]
                 ),
                 "blocked_post_commit_publication_receipt_ok": (
