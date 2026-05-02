@@ -1245,8 +1245,8 @@ class OmoikaneReferenceOS:
                     "Commit-finalized Parallel Codex execution is bound to a "
                     "command-level origin/main push receipt and a remote-head "
                     "verification receipt, ls-remote output binding, and "
-                    "protected-branch provider policy receipt before GitHub "
-                    "handoff."
+                    "protected-branch provider policy plus post-push status "
+                    "check suite receipts before GitHub handoff."
                 ),
             )
         )
@@ -1648,6 +1648,14 @@ class OmoikaneReferenceOS:
                         "protected_branch_provider_timestamp_replay_status"
                     ]
                 ),
+                "post_commit_publication_status_check_suite_digest": (
+                    post_commit_publication_receipt["status_check_suite_digest"]
+                ),
+                "post_commit_publication_status_check_all_required_passed": (
+                    post_commit_publication_receipt[
+                        "status_check_all_required_passed"
+                    ]
+                ),
                 "blocked_post_commit_publication_receipt_ref": (
                     blocked_post_commit_publication_receipt["receipt_ref"]
                 ),
@@ -1691,6 +1699,7 @@ class OmoikaneReferenceOS:
                 "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
                     False
                 ),
+                "raw_status_check_provider_payload_stored": False,
                 "raw_transcript_payload_stored": False,
                 "raw_verification_payload_stored": False,
             },
@@ -2443,6 +2452,31 @@ class OmoikaneReferenceOS:
                         "protected_branch_provider_timestamp_unique"
                     ]
                 ),
+                "post_commit_publication_status_check_commit_matches_remote": (
+                    post_commit_publication_validation[
+                        "status_check_commit_matches_remote"
+                    ]
+                ),
+                "post_commit_publication_status_check_required_checks_bound": (
+                    post_commit_publication_validation[
+                        "status_check_required_checks_bound"
+                    ]
+                ),
+                "post_commit_publication_status_check_results_bound": (
+                    post_commit_publication_validation[
+                        "status_check_results_bound"
+                    ]
+                ),
+                "post_commit_publication_status_check_all_required_passed": (
+                    post_commit_publication_validation[
+                        "status_check_all_required_passed"
+                    ]
+                ),
+                "post_commit_publication_status_check_suite_digest_bound": (
+                    post_commit_publication_validation[
+                        "status_check_suite_digest_bound"
+                    ]
+                ),
                 "post_commit_publication_publication_digest_bound": (
                     post_commit_publication_validation[
                         "publication_digest_bound"
@@ -2472,6 +2506,9 @@ class OmoikaneReferenceOS:
                     ]
                     and post_commit_publication_validation[
                         "raw_protected_branch_provider_timestamp_replay_guard_payload_redacted"
+                    ]
+                    and post_commit_publication_validation[
+                        "raw_status_check_provider_payload_redacted"
                     ]
                 ),
                 "blocked_post_commit_publication_receipt_ok": (

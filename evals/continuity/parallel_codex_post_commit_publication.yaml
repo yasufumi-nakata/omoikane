@@ -8,8 +8,9 @@ summary: >
   git ls-remote verification receipt、ls-remote output の observed head/ref digest、
   protected branch provider policy receipt、
   provider policy freshness、signed provider timestamp、timestamp replay guard、
-  publication digest、raw execution / push / remote verification /
-  protected branch provider / freshness / timestamp / replay guard payload 非保存を固定すること
+  post-push status/check suite digest、required check success、publication digest、
+  raw execution / push / remote verification / protected branch provider /
+  freshness / timestamp / replay guard / status check payload 非保存を固定すること
 checks:
   - name: parallel Codex post-commit publication smoke
     command: PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
@@ -35,6 +36,11 @@ expect:
   post_commit_publication_protected_branch_timestamp_signed_current: true
   post_commit_publication_protected_branch_timestamp_replay_bound: true
   post_commit_publication_protected_branch_timestamp_unique: true
+  post_commit_publication_status_check_commit_matches_remote: true
+  post_commit_publication_status_check_required_checks_bound: true
+  post_commit_publication_status_check_results_bound: true
+  post_commit_publication_status_check_all_required_passed: true
+  post_commit_publication_status_check_suite_digest_bound: true
   post_commit_publication_publication_digest_bound: true
   post_commit_publication_raw_payload_redacted: true
   blocked_post_commit_publication_result_blocked: true

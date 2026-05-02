@@ -87,6 +87,12 @@ PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_SIGNATURE_PROFILE = (
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAY_PROFILE = (
     "protected-branch-provider-policy-timestamp-replay-guard-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_SUITE_PROFILE = (
+    "post-push-provider-status-check-suite-v1"
+)
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE = (
+    "post-push-provider-status-check-run-v1"
+)
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS = "protected"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_FRESH_STATUS = "fresh"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_EXPIRED_STATUS = "expired"
@@ -98,6 +104,9 @@ PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_INVALID_STATUS = "invalid"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS = "unique"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAYED_STATUS = "replayed"
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS = 900
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_PROVIDER = "github"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_STATUS = "completed"
+PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION = "success"
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
@@ -198,6 +207,9 @@ PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_REF = (
 )
 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_NONCE_REF = (
     "nonce://github/protected-branch/origin-main/provider-clock/v1"
+)
+PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_REF = (
+    "checks://github/omoikane/refs/heads/main"
 )
 PARALLEL_CODEX_REFERENCE_RUNBOOK_REF = "references/parallel-codex-orchestration.md"
 PARALLEL_CODEX_REQUIRED_VERIFICATIONS = (
@@ -340,6 +352,12 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_protected_branch_timestamp_replay_profile": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_REPLAY_PROFILE
             ),
+            "post_commit_publication_status_check_suite_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_SUITE_PROFILE
+            ),
+            "post_commit_publication_status_check_run_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE
+            ),
             "post_commit_publication_protected_branch_required_status": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_REQUIRED_STATUS
             ),
@@ -355,6 +373,12 @@ class ParallelCodexOrchestrationPolicy:
             "post_commit_publication_protected_branch_max_freshness_window_seconds": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_MAX_FRESHNESS_WINDOW_SECONDS
             ),
+            "post_commit_publication_status_check_required_status": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_STATUS
+            ),
+            "post_commit_publication_status_check_required_conclusion": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION
+            ),
             "default_protected_branch_provider": (
                 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_PROVIDER
             ),
@@ -369,6 +393,9 @@ class ParallelCodexOrchestrationPolicy:
             ),
             "default_protected_branch_policy_timestamp_nonce_ref": (
                 PARALLEL_CODEX_DEFAULT_PROTECTED_BRANCH_POLICY_TIMESTAMP_NONCE_REF
+            ),
+            "default_status_check_suite_ref": (
+                PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_REF
             ),
             "reference_runbook_ref": self.reference_runbook_ref,
             "required_verifications": list(self.required_verifications),
@@ -470,6 +497,7 @@ class ParallelCodexOrchestrationPolicy:
             "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
                 False
             ),
+            "raw_status_check_provider_payload_stored": False,
             "raw_transcript_payload_stored": False,
             "raw_verification_payload_stored": False,
         }
@@ -2158,6 +2186,11 @@ class ParallelCodexOrchestrationService:
             PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS
         ),
         protected_branch_receipt_digest: str = "",
+        status_check_provider: str = PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_PROVIDER,
+        status_check_suite_ref: str = PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_REF,
+        status_check_commit_head: str = "",
+        status_check_results: Sequence[Mapping[str, Any]] | None = None,
+        status_check_suite_digest: str = "",
     ) -> Dict[str, Any]:
         execution_validation = self.validate_integration_execution_receipt(
             execution_receipt,
@@ -2352,6 +2385,52 @@ class ParallelCodexOrchestrationService:
         )
         protected_branch_provider_timestamp_replay_bound = (
             _is_sha256(protected_branch_provider_timestamp_replay_digest)
+        )
+        normalized_status_check_provider = (
+            status_check_provider.strip()
+            or PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_PROVIDER
+        )
+        normalized_status_check_suite_ref = (
+            status_check_suite_ref.strip()
+            or PARALLEL_CODEX_DEFAULT_STATUS_CHECK_SUITE_REF
+        )
+        normalized_status_check_commit_head = (
+            status_check_commit_head.strip() or normalized_remote_head
+        )
+        normalized_status_check_results = (
+            self._normalize_post_commit_status_check_results(
+                provider=normalized_status_check_provider,
+                commit_head=normalized_status_check_commit_head,
+                required_checks=normalized_protected_branch_checks,
+                status_check_results=status_check_results,
+            )
+        )
+        status_check_results_bound = self._post_commit_status_check_results_bound(
+            normalized_status_check_results,
+        )
+        status_check_all_required_passed = (
+            self._post_commit_status_check_all_required_passed(
+                required_checks=normalized_protected_branch_checks,
+                commit_head=normalized_status_check_commit_head,
+                status_check_results=normalized_status_check_results,
+            )
+        )
+        normalized_status_check_suite_digest = status_check_suite_digest.strip()
+        expected_status_check_suite_digest = (
+            self._post_commit_status_check_suite_digest(
+                provider=normalized_status_check_provider,
+                suite_ref=normalized_status_check_suite_ref,
+                commit_head=normalized_status_check_commit_head,
+                required_checks=normalized_protected_branch_checks,
+                status_check_results=normalized_status_check_results,
+                all_required_passed=status_check_all_required_passed,
+            )
+        )
+        if not _is_sha256(normalized_status_check_suite_digest):
+            normalized_status_check_suite_digest = expected_status_check_suite_digest
+        status_check_suite_digest_bound = (
+            normalized_status_check_suite_digest
+            == expected_status_check_suite_digest
         )
         (
             pre_push_remote_verification_observed_head,
@@ -2579,6 +2658,19 @@ class ParallelCodexOrchestrationService:
             "protected_branch_provider_timestamp_replay_digest_bound": (
                 protected_branch_provider_timestamp_replay_bound
             ),
+            "status_check_profile": (
+                PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_SUITE_PROFILE
+            ),
+            "status_check_provider": normalized_status_check_provider,
+            "status_check_suite_ref": normalized_status_check_suite_ref,
+            "status_check_commit_head": normalized_status_check_commit_head,
+            "status_check_required_checks": normalized_protected_branch_checks,
+            "status_check_results": normalized_status_check_results,
+            "status_check_result_count": len(normalized_status_check_results),
+            "status_check_results_bound": status_check_results_bound,
+            "status_check_all_required_passed": status_check_all_required_passed,
+            "status_check_suite_digest": normalized_status_check_suite_digest,
+            "status_check_suite_digest_bound": status_check_suite_digest_bound,
             "protected_branch_receipt_digest": "",
             "protected_branch_receipt_digest_bound": False,
             "publication_digest": "",
@@ -2600,6 +2692,7 @@ class ParallelCodexOrchestrationService:
             "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
                 False
             ),
+            "raw_status_check_provider_payload_stored": False,
             "receipt_digest": "",
         }
         normalized_protected_branch_receipt_digest = (
@@ -2815,6 +2908,33 @@ class ParallelCodexOrchestrationService:
             )
             is True
         )
+        status_check_results = list(receipt.get("status_check_results", []))
+        status_check_results_bound = (
+            self._post_commit_status_check_results_bound(status_check_results)
+            and receipt.get("status_check_results_bound") is True
+        )
+        status_check_all_required_passed = (
+            self._post_commit_status_check_all_required_passed(
+                required_checks=receipt.get("status_check_required_checks", []),
+                commit_head=str(receipt.get("status_check_commit_head", "")),
+                status_check_results=status_check_results,
+            )
+            and receipt.get("status_check_all_required_passed") is True
+        )
+        status_check_suite_digest_bound = (
+            receipt.get("status_check_suite_digest")
+            == self._post_commit_status_check_suite_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                commit_head=str(receipt.get("status_check_commit_head", "")),
+                required_checks=receipt.get("status_check_required_checks", []),
+                status_check_results=status_check_results,
+                all_required_passed=bool(
+                    receipt.get("status_check_all_required_passed", False),
+                ),
+            )
+            and receipt.get("status_check_suite_digest_bound") is True
+        )
         receipt_digest_bound = (
             receipt.get("receipt_digest") == self._receipt_digest(receipt)
         )
@@ -2875,6 +2995,21 @@ class ParallelCodexOrchestrationService:
             errors.append(
                 "protected_branch_provider_timestamp_replay_digest mismatch",
             )
+        if (
+            receipt.get("status_check_profile")
+            != PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_SUITE_PROFILE
+        ):
+            errors.append("status_check_profile mismatch")
+        if receipt.get("status_check_provider") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_PROVIDER
+        ):
+            errors.append("status_check_provider must be github")
+        if receipt.get("status_check_result_count") != len(status_check_results):
+            errors.append("status_check_result_count mismatch")
+        if not status_check_results_bound:
+            errors.append("status_check_results digest mismatch")
+        if not status_check_suite_digest_bound:
+            errors.append("status_check_suite_digest mismatch")
         if push_result.get("command") != push_command:
             errors.append("push command must target origin main")
         if pre_push_remote_verification_result.get("command") != (
@@ -2954,6 +3089,8 @@ class ParallelCodexOrchestrationService:
             errors.append(
                 "raw_protected_branch_provider_timestamp_replay_guard_payload_stored must be false",
             )
+        if receipt.get("raw_status_check_provider_payload_stored") is not False:
+            errors.append("raw_status_check_provider_payload_stored must be false")
 
         return {
             "ok": not errors,
@@ -3073,6 +3210,16 @@ class ParallelCodexOrchestrationService:
                 receipt.get("protected_branch_provider_timestamp_replay_status")
                 == PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_TIMESTAMP_UNIQUE_STATUS
             ),
+            "status_check_commit_matches_remote": (
+                receipt.get("status_check_commit_head") == receipt.get("remote_head")
+            ),
+            "status_check_required_checks_bound": (
+                receipt.get("status_check_required_checks")
+                == receipt.get("protected_branch_required_checks")
+            ),
+            "status_check_results_bound": status_check_results_bound,
+            "status_check_all_required_passed": status_check_all_required_passed,
+            "status_check_suite_digest_bound": status_check_suite_digest_bound,
             "publication_digest_bound": publication_digest_bound,
             "receipt_digest_bound": receipt_digest_bound,
             "raw_publication_payload_redacted": (
@@ -3118,6 +3265,13 @@ class ParallelCodexOrchestrationService:
                     "raw_protected_branch_provider_timestamp_replay_guard_payload_stored",
                 )
                 is False
+            ),
+            "raw_status_check_provider_payload_redacted": (
+                receipt.get("raw_status_check_provider_payload_stored") is False
+                and all(
+                    result.get("raw_status_check_payload_stored") is False
+                    for result in status_check_results
+                )
             ),
         }
 
@@ -5236,6 +5390,162 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    def _normalize_post_commit_status_check_results(
+        self,
+        *,
+        provider: str,
+        commit_head: str,
+        required_checks: Sequence[str],
+        status_check_results: Sequence[Mapping[str, Any]] | None,
+    ) -> list[Dict[str, Any]]:
+        if status_check_results is None:
+            raw_results: Sequence[Mapping[str, Any]] = [
+                {
+                    "check_name": check_name,
+                    "status": PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_STATUS,
+                    "conclusion": (
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION
+                    ),
+                }
+                for check_name in _dedupe_strings(required_checks)
+            ]
+        else:
+            raw_results = status_check_results
+
+        normalized: list[Dict[str, Any]] = []
+        for result in raw_results:
+            check_name = str(result.get("check_name", "")).strip()
+            if not check_name:
+                continue
+            result_commit_head = str(
+                result.get("commit_head", commit_head),
+            ).strip() or commit_head
+            details_ref = str(result.get("details_ref", "")).strip()
+            if not details_ref:
+                details_ref = f"checks://{provider}/{result_commit_head}/{check_name}"
+            normalized_result = {
+                "check_profile": PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE,
+                "check_name": check_name,
+                "status": str(
+                    result.get(
+                        "status",
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_STATUS,
+                    ),
+                ).strip()
+                or PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_STATUS,
+                "conclusion": str(
+                    result.get(
+                        "conclusion",
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION,
+                    ),
+                ).strip()
+                or PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION,
+                "commit_head": result_commit_head,
+                "details_ref": details_ref,
+                "raw_status_check_payload_stored": bool(
+                    result.get("raw_status_check_payload_stored", False),
+                ),
+                "check_run_digest": str(
+                    result.get("check_run_digest", ""),
+                ).strip(),
+            }
+            if not _is_sha256(normalized_result["check_run_digest"]):
+                normalized_result["check_run_digest"] = (
+                    self._post_commit_status_check_run_digest(normalized_result)
+                )
+            normalized.append(normalized_result)
+        return normalized
+
+    @staticmethod
+    def _post_commit_status_check_run_digest(
+        result: Mapping[str, Any],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE,
+                    "check_name": result.get("check_name", ""),
+                    "status": result.get("status", ""),
+                    "conclusion": result.get("conclusion", ""),
+                    "commit_head": result.get("commit_head", ""),
+                    "details_ref": result.get("details_ref", ""),
+                    "raw_status_check_payload_stored": False,
+                }
+            )
+        )
+
+    def _post_commit_status_check_results_bound(
+        self,
+        status_check_results: Sequence[Mapping[str, Any]],
+    ) -> bool:
+        return all(
+            result.get("check_profile")
+            == PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_RUN_PROFILE
+            and result.get("check_run_digest")
+            == self._post_commit_status_check_run_digest(result)
+            and result.get("raw_status_check_payload_stored") is False
+            for result in status_check_results
+        )
+
+    def _post_commit_status_check_all_required_passed(
+        self,
+        *,
+        required_checks: Sequence[str],
+        commit_head: str,
+        status_check_results: Sequence[Mapping[str, Any]],
+    ) -> bool:
+        required = set(_dedupe_strings(required_checks))
+        by_name = {
+            str(result.get("check_name", "")).strip(): result
+            for result in status_check_results
+        }
+        if not required or not required.issubset(by_name):
+            return False
+        return all(
+            by_name[check_name].get("status")
+            == PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_STATUS
+            and by_name[check_name].get("conclusion")
+            == PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_REQUIRED_CONCLUSION
+            and by_name[check_name].get("commit_head") == commit_head
+            and by_name[check_name].get("raw_status_check_payload_stored") is False
+            and by_name[check_name].get("check_run_digest")
+            == self._post_commit_status_check_run_digest(by_name[check_name])
+            for check_name in required
+        )
+
+    @staticmethod
+    def _post_commit_status_check_suite_digest(
+        *,
+        provider: str,
+        suite_ref: str,
+        commit_head: str,
+        required_checks: Sequence[str],
+        status_check_results: Sequence[Mapping[str, Any]],
+        all_required_passed: bool,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": (
+                        PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_SUITE_PROFILE
+                    ),
+                    "provider": provider,
+                    "suite_ref": suite_ref,
+                    "commit_head": commit_head,
+                    "required_checks": _dedupe_strings(required_checks),
+                    "check_run_digests": [
+                        {
+                            "check_name": result.get("check_name", ""),
+                            "check_run_digest": result.get("check_run_digest", ""),
+                        }
+                        for result in status_check_results
+                    ],
+                    "all_required_passed": all_required_passed,
+                    "raw_status_check_payload_stored": False,
+                }
+            )
+        )
+
     def _post_commit_protected_branch_policy_digest(
         self,
         *,
@@ -5589,6 +5899,48 @@ class ParallelCodexOrchestrationService:
                             False,
                         )
                     ),
+                    "status_check_profile": receipt.get(
+                        "status_check_profile",
+                        "",
+                    ),
+                    "status_check_provider": receipt.get(
+                        "status_check_provider",
+                        "",
+                    ),
+                    "status_check_suite_ref": receipt.get(
+                        "status_check_suite_ref",
+                        "",
+                    ),
+                    "status_check_commit_head": receipt.get(
+                        "status_check_commit_head",
+                        "",
+                    ),
+                    "status_check_required_checks": _dedupe_strings(
+                        receipt.get("status_check_required_checks", []),
+                    ),
+                    "status_check_result_digests": [
+                        {
+                            "check_name": result.get("check_name", ""),
+                            "check_run_digest": result.get("check_run_digest", ""),
+                        }
+                        for result in receipt.get("status_check_results", [])
+                    ],
+                    "status_check_results_bound": receipt.get(
+                        "status_check_results_bound",
+                        False,
+                    ),
+                    "status_check_all_required_passed": receipt.get(
+                        "status_check_all_required_passed",
+                        False,
+                    ),
+                    "status_check_suite_digest": receipt.get(
+                        "status_check_suite_digest",
+                        "",
+                    ),
+                    "status_check_suite_digest_bound": receipt.get(
+                        "status_check_suite_digest_bound",
+                        False,
+                    ),
                     "raw_execution_payload_stored": False,
                     "raw_post_commit_publication_payload_stored": False,
                     "raw_pre_push_remote_verification_stdout_stored": False,
@@ -5603,6 +5955,7 @@ class ParallelCodexOrchestrationService:
                     "raw_protected_branch_provider_timestamp_replay_guard_payload_stored": (
                         False
                     ),
+                    "raw_status_check_provider_payload_stored": False,
                 }
             )
         )
@@ -6085,6 +6438,7 @@ class ParallelCodexOrchestrationService:
         remote_verification_result = dict(
             receipt.get("remote_verification_result", {}),
         )
+        status_check_results = list(receipt.get("status_check_results", []))
         remote_name = str(receipt.get("remote_name", "")).strip()
         remote_ref = str(receipt.get("remote_ref", "")).strip()
         expected_push_command = f"git push {remote_name} HEAD:{remote_ref}"
@@ -6442,6 +6796,55 @@ class ParallelCodexOrchestrationService:
             or receipt.get("protected_branch_receipt_digest_bound") is not True
         ):
             reasons.append("protected_branch_receipt_digest mismatch")
+        if (
+            receipt.get("status_check_profile")
+            != PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_SUITE_PROFILE
+        ):
+            reasons.append("status_check_profile mismatch")
+        if receipt.get("status_check_provider") != (
+            PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_PROVIDER
+        ):
+            reasons.append("status check provider must be github")
+        if receipt.get("status_check_commit_head") != receipt.get("remote_head"):
+            reasons.append("status check commit head must match remote head")
+        if receipt.get("status_check_required_checks") != (
+            receipt.get("protected_branch_required_checks")
+        ):
+            reasons.append("status check required checks must mirror branch policy")
+        if receipt.get("status_check_result_count") != len(status_check_results):
+            reasons.append("status_check_result_count mismatch")
+        if not self._post_commit_status_check_results_bound(status_check_results):
+            reasons.append("status check result digests must be bound")
+        if receipt.get("status_check_results_bound") is not True:
+            reasons.append("status_check_results_bound must be true")
+        expected_status_check_suite_digest = (
+            self._post_commit_status_check_suite_digest(
+                provider=str(receipt.get("status_check_provider", "")),
+                suite_ref=str(receipt.get("status_check_suite_ref", "")),
+                commit_head=str(receipt.get("status_check_commit_head", "")),
+                required_checks=receipt.get("status_check_required_checks", []),
+                status_check_results=status_check_results,
+                all_required_passed=bool(
+                    receipt.get("status_check_all_required_passed", False),
+                ),
+            )
+        )
+        if (
+            receipt.get("status_check_suite_digest")
+            != expected_status_check_suite_digest
+            or receipt.get("status_check_suite_digest_bound") is not True
+        ):
+            reasons.append("status_check_suite_digest mismatch")
+        if not self._post_commit_status_check_all_required_passed(
+            required_checks=receipt.get("status_check_required_checks", []),
+            commit_head=str(receipt.get("status_check_commit_head", "")),
+            status_check_results=status_check_results,
+        ):
+            reasons.append("all required status checks must pass before handoff")
+        if receipt.get("status_check_all_required_passed") is not True:
+            reasons.append("status_check_all_required_passed must be true")
+        if receipt.get("raw_status_check_provider_payload_stored") is not False:
+            reasons.append("raw_status_check_provider_payload_stored must be false")
         if receipt.get("raw_protected_branch_provider_payload_stored") is not False:
             reasons.append("raw_protected_branch_provider_payload_stored must be false")
         if (

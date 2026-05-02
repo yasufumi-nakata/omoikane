@@ -1238,6 +1238,31 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_status_check_commit_matches_remote"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_required_checks_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_results_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_all_required_passed"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_status_check_suite_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_publication_digest_bound"
             ]
         )

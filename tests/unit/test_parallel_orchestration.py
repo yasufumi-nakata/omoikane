@@ -1533,6 +1533,11 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             validation["protected_branch_provider_timestamp_replay_digest_bound"]
         )
         self.assertTrue(validation["protected_branch_provider_timestamp_unique"])
+        self.assertTrue(validation["status_check_commit_matches_remote"])
+        self.assertTrue(validation["status_check_required_checks_bound"])
+        self.assertTrue(validation["status_check_results_bound"])
+        self.assertTrue(validation["status_check_all_required_passed"])
+        self.assertTrue(validation["status_check_suite_digest_bound"])
         self.assertTrue(validation["publication_digest_bound"])
         self.assertEqual(
             "git push origin HEAD:refs/heads/main",
@@ -1585,6 +1590,15 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(
             publication["protected_branch_provider_timestamp_replay_digest_bound"]
         )
+        self.assertEqual("github", publication["status_check_provider"])
+        self.assertEqual(local_commit_head, publication["status_check_commit_head"])
+        self.assertEqual(
+            publication["protected_branch_required_checks"],
+            publication["status_check_required_checks"],
+        )
+        self.assertTrue(publication["status_check_results_bound"])
+        self.assertTrue(publication["status_check_all_required_passed"])
+        self.assertTrue(publication["status_check_suite_digest_bound"])
         self.assertTrue(publication["protected_branch_receipt_digest_bound"])
         self.assertFalse(publication["raw_post_commit_publication_payload_stored"])
         self.assertFalse(
@@ -1610,6 +1624,13 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             publication[
                 "raw_protected_branch_provider_timestamp_replay_guard_payload_stored"
             ]
+        )
+        self.assertFalse(publication["raw_status_check_provider_payload_stored"])
+        self.assertTrue(
+            all(
+                result["raw_status_check_payload_stored"] is False
+                for result in publication["status_check_results"]
+            )
         )
 
     def test_post_commit_publication_blocks_ls_remote_output_mismatch(self) -> None:
@@ -1798,6 +1819,46 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             validation["protected_branch_provider_timestamp_replay_digest_bound"]
         )
         self.assertFalse(validation["protected_branch_provider_timestamp_unique"])
+
+    def test_post_commit_publication_blocks_failed_status_check_suite(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+        status_check_results = [
+            {
+                "check_name": check_name,
+                "status": "completed",
+                "conclusion": "failure" if index == 0 else "success",
+            }
+            for index, check_name in enumerate(
+                self.service._policy.required_verifications,
+            )
+        ]
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            status_check_results=status_check_results,
+            result_summary="Publication blocks failed post-push status checks.",
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "all required status checks must pass before handoff",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["status_check_commit_matches_remote"])
+        self.assertTrue(validation["status_check_required_checks_bound"])
+        self.assertTrue(validation["status_check_results_bound"])
+        self.assertFalse(validation["status_check_all_required_passed"])
+        self.assertTrue(validation["status_check_suite_digest_bound"])
+        self.assertTrue(validation["publication_digest_bound"])
 
     def test_integration_execution_blocks_conflict_batch(self) -> None:
         changed_file = "src/omoikane/self_construction/parallel_orchestration.py"

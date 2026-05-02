@@ -5,11 +5,12 @@ description: >
   Digest-only receipt for binding a commit-finalized Parallel Codex integration
   execution to a command-level origin/main push, remote-head verification,
   pre-push and post-push ls-remote head/ref output bindings, and
-  protected-branch provider policy receipt before GitHub handoff. The receipt
-  keeps raw execution, pre-push verification, push, remote verification, and
-  branch-provider payloads redacted while preserving command, observed
-  head/ref, policy, provider freshness, signed timestamp, timestamp
-  replay-guard, provider receipt, and publication digests.
+  protected-branch provider policy receipt, and post-push status/check suite
+  evidence before GitHub handoff. The receipt keeps raw execution, pre-push
+  verification, push, remote verification, branch-provider, and status-check
+  payloads redacted while preserving command, observed head/ref, policy,
+  provider freshness, signed timestamp, timestamp replay-guard, provider
+  receipt, status-check suite, and publication digests.
 type: object
 additionalProperties: false
 required:
@@ -85,6 +86,17 @@ required:
   - protected_branch_provider_timestamp_replay_status
   - protected_branch_provider_timestamp_replay_digest
   - protected_branch_provider_timestamp_replay_digest_bound
+  - status_check_profile
+  - status_check_provider
+  - status_check_suite_ref
+  - status_check_commit_head
+  - status_check_required_checks
+  - status_check_results
+  - status_check_result_count
+  - status_check_results_bound
+  - status_check_all_required_passed
+  - status_check_suite_digest
+  - status_check_suite_digest_bound
   - protected_branch_receipt_digest
   - protected_branch_receipt_digest_bound
   - publication_digest
@@ -104,6 +116,7 @@ required:
   - raw_protected_branch_policy_freshness_payload_stored
   - raw_protected_branch_provider_timestamp_payload_stored
   - raw_protected_branch_provider_timestamp_replay_guard_payload_stored
+  - raw_status_check_provider_payload_stored
   - receipt_digest
   - receipt_ref
 properties:
@@ -299,6 +312,39 @@ properties:
     pattern: "^[a-f0-9]{64}$"
   protected_branch_provider_timestamp_replay_digest_bound:
     type: boolean
+  status_check_profile:
+    const: post-push-provider-status-check-suite-v1
+  status_check_provider:
+    const: github
+  status_check_suite_ref:
+    type: string
+    minLength: 1
+  status_check_commit_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  status_check_required_checks:
+    type: array
+    minItems: 1
+    items:
+      type: string
+      minLength: 1
+  status_check_results:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/status_check_result"
+  status_check_result_count:
+    type: integer
+    minimum: 1
+  status_check_results_bound:
+    type: boolean
+  status_check_all_required_passed:
+    type: boolean
+  status_check_suite_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  status_check_suite_digest_bound:
+    type: boolean
   protected_branch_receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -344,6 +390,8 @@ properties:
     const: false
   raw_protected_branch_provider_timestamp_replay_guard_payload_stored:
     const: false
+  raw_status_check_provider_payload_stored:
+    const: false
   receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
@@ -388,5 +436,50 @@ $defs:
       raw_stderr_stored:
         const: false
       command_receipt_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  status_check_result:
+    type: object
+    additionalProperties: false
+    required:
+      - check_profile
+      - check_name
+      - status
+      - conclusion
+      - commit_head
+      - details_ref
+      - raw_status_check_payload_stored
+      - check_run_digest
+    properties:
+      check_profile:
+        const: post-push-provider-status-check-run-v1
+      check_name:
+        type: string
+        minLength: 1
+      status:
+        enum:
+          - completed
+          - queued
+          - in_progress
+          - failed
+          - unknown
+      conclusion:
+        enum:
+          - success
+          - failure
+          - cancelled
+          - timed_out
+          - neutral
+          - skipped
+          - unknown
+      commit_head:
+        type: string
+        pattern: "^[a-f0-9]{40}$"
+      details_ref:
+        type: string
+        minLength: 1
+      raw_status_check_payload_stored:
+        const: false
+      check_run_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
