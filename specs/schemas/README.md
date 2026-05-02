@@ -155,7 +155,7 @@
 - `research_evidence_request.schema`
   - role-specific Yaoyorozu researcher input contract for bounded evidence questions, repo-local evidence boundaries, and no raw payload retention
 - `yaoyorozu_research_evidence_verifier_receipt.schema`
-  - binds repo-local researcher evidence refs to expected / observed digest readback plus live verifier transport quorum, policy-bound verifier roster digest, signed response envelope, and freshness window without storing raw evidence, raw network response, raw roster, or raw signature payloads
+  - binds repo-local researcher evidence refs to expected / observed digest readback plus live verifier transport quorum, policy-bound verifier roster digest, roster freshness / revocation status, signed response envelope, and freshness window without storing raw evidence, raw network response, raw roster, roster freshness, or raw signature payloads
 - `yaoyorozu_research_evidence_exchange.schema`
   - binds one selected researcher request/report pair to registry source digest, repo-local evidence refs, verifier readback receipt, and a Council+Guardian ContinuityLedger append
 - `yaoyorozu_research_evidence_synthesis.schema`

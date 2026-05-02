@@ -376,3 +376,4 @@ status: decided | superseded
 - [2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md](2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md)
 - [2026-05-02_yaoyorozu-research-evidence-verifier-timestamp-replay.md](2026-05-02_yaoyorozu-research-evidence-verifier-timestamp-replay.md)
 - [2026-05-03_yaoyorozu-research-evidence-verifier-roster-policy.md](2026-05-03_yaoyorozu-research-evidence-verifier-roster-policy.md)
+- [2026-05-03_yaoyorozu-research-evidence-verifier-roster-freshness.md](2026-05-03_yaoyorozu-research-evidence-verifier-roster-freshness.md)

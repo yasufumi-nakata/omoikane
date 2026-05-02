@@ -201,6 +201,9 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self.assertTrue(exchange["validation"]["evidence_verifier_quorum_bound"])
         self.assertTrue(exchange["validation"]["evidence_verifier_roster_bound"])
         self.assertTrue(
+            exchange["validation"]["evidence_verifier_roster_freshness_bound"]
+        )
+        self.assertTrue(
             exchange["validation"]["evidence_verifier_signed_response_envelope_bound"]
         )
         self.assertTrue(exchange["validation"]["evidence_verifier_freshness_window_bound"])
@@ -235,8 +238,34 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
             exchange["evidence_verifier_receipt"]["verifier_roster_policy_id"],
         )
         self.assertTrue(exchange["evidence_verifier_receipt"]["verifier_roster_bound"])
+        self.assertTrue(
+            exchange["evidence_verifier_receipt"]["verifier_roster_freshness_bound"]
+        )
+        self.assertEqual(
+            "policy-bound-research-evidence-verifier-roster-freshness-v1",
+            exchange["evidence_verifier_receipt"]["verifier_roster_freshness_profile"],
+        )
+        self.assertEqual(
+            "fresh",
+            exchange["evidence_verifier_receipt"]["verifier_roster_freshness_status"],
+        )
+        self.assertEqual(
+            "not-revoked",
+            exchange["evidence_verifier_receipt"]["verifier_roster_revocation_status"],
+        )
+        self.assertEqual(
+            86400,
+            exchange["evidence_verifier_receipt"][
+                "verifier_roster_freshness_window_seconds"
+            ],
+        )
         self.assertFalse(
             exchange["evidence_verifier_receipt"]["raw_verifier_roster_payload_stored"]
+        )
+        self.assertFalse(
+            exchange["evidence_verifier_receipt"][
+                "raw_verifier_roster_freshness_payload_stored"
+            ]
         )
         self.assertEqual(
             ["literature-index", "publisher-record"],
@@ -306,6 +335,9 @@ class YaoyorozuSchemaContractTests(unittest.TestCase):
         self.assertTrue(synthesis["validation"]["evidence_verifiers_bound"])
         self.assertTrue(synthesis["validation"]["evidence_verifier_quorums_bound"])
         self.assertTrue(synthesis["validation"]["evidence_verifier_rosters_bound"])
+        self.assertTrue(
+            synthesis["validation"]["evidence_verifier_roster_freshness_bound"]
+        )
         self.assertEqual(
             [
                 exchange["evidence_verifier_ref"]

@@ -137,8 +137,10 @@ schema contract として返す。
 repo-local evidence ref の expected / observed digest readback に加え、
 literature-index / publisher-record の live verifier transport quorum、
 JP-13 / US-CA threshold、signed response envelope、900 秒 freshness window、
-signed-current provider timestamp、replay-unique nonce guard を束縛し、
-raw evidence payload、raw verifier response、raw signature payload を保存しない。
+policy-bound verifier roster digest、86400 秒 roster freshness window、
+not-revoked revocation status、signed-current provider timestamp、
+replay-unique nonce guard を束縛し、raw evidence payload、raw verifier response、
+raw roster payload、raw roster freshness payload、raw signature payload を保存しない。
 複数 researcher の exchange は `yaoyorozu_research_evidence_synthesis` により
 exchange digest set / evidence digest set / verifier digest set / verifier quorum digest set /
 Council session ref へ束縛され、

@@ -8,7 +8,7 @@ must:
   - synthesis evidence_digest_set is derived from the nested researcher reports
   - synthesis evidence verifier refs and digest set are derived from source exchange verifier receipts
   - synthesis evidence verifier quorum digest set is derived from source exchange transport quorums
-  - every source verifier must carry verifier_roster_bound=true before synthesis validates
+  - every source verifier must carry verifier_roster_bound=true and verifier_roster_freshness_bound=true before synthesis validates
   - claim ceiling remains implementation-advisory and all implications remain advisory-only
   - raw exchange payloads and raw research payloads are not stored
   - synthesis receipt is appended to ContinuityLedger with council and guardian signature roles
@@ -22,6 +22,7 @@ expected:
     - guardian
   verifier_quorums_bound: true
   source_verifier_rosters_bound: true
+  source_verifier_roster_freshness_bound: true
   raw_exchange_payload_stored: false
   raw_research_payload_stored: false
   decision_authority_claimed: false

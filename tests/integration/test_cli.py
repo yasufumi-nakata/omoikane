@@ -2961,6 +2961,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["research_evidence_verifier_quorum_bound"])
         self.assertTrue(result["validation"]["research_evidence_verifier_roster_bound"])
         self.assertTrue(
+            result["validation"]["research_evidence_verifier_roster_freshness_bound"]
+        )
+        self.assertTrue(
             result["validation"]["research_evidence_verifier_signed_response_envelope_bound"]
         )
         self.assertTrue(
@@ -2980,6 +2983,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertFalse(
             result["validation"]["research_evidence_verifier_raw_roster_payload_stored"]
         )
+        self.assertFalse(
+            result["validation"][
+                "research_evidence_verifier_raw_roster_freshness_payload_stored"
+            ]
+        )
         self.assertFalse(result["validation"]["research_evidence_raw_payload_stored"])
         self.assertGreaterEqual(result["validation"]["research_evidence_exchange_count"], 2)
         self.assertTrue(result["validation"]["research_evidence_synthesis_ok"])
@@ -2991,6 +2999,11 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"]["research_evidence_synthesis_verifier_rosters_bound"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "research_evidence_synthesis_verifier_roster_freshness_bound"
+            ]
         )
         self.assertTrue(result["validation"]["research_evidence_synthesis_advisory_only"])
         self.assertFalse(
