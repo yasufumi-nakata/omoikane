@@ -167,7 +167,7 @@
 - `parallel_codex_integration_execution_receipt.schema`
   - integration-ready batch receipt を main checkout 適用直前の ordered apply plan、repo-local patch artifact manifest、`artifacts/parallel-codex/*.patch` path、command-bound git-apply-check dry-run receipt、post-apply verification manifest、apply context digest、checkout mutation event digest、patch artifact cleanup digest、commit finalization digest に縮約し、source batch digest、current head、apply step digest、apply plan / patch artifact / pre-apply dry-run / checkout mutation / cleanup / commit finalization digest binding、raw batch / apply / dry-run / worker / verification / checkout mutation / patch cleanup / commit finalization payload 非保存を固定する
 - `parallel_codex_post_commit_publication_receipt.schema`
-  - commit-finalized execution receipt を `git push origin HEAD:refs/heads/main` と `git ls-remote origin refs/heads/main` の command receipt digest、local commit head、remote head、GitHub protected branch provider policy receipt、publication digest へ縮約し、origin/main 公開後の GitHub handoff 可否を raw execution / push / remote verification / protected branch provider payload 非保存で固定する
+  - commit-finalized execution receipt を `git push origin HEAD:refs/heads/main` と `git ls-remote origin refs/heads/main` の command receipt digest、local commit head、remote head、ls-remote output の observed head/ref digest、GitHub protected branch provider policy receipt、publication digest へ縮約し、origin/main 公開後の GitHub handoff 可否を raw execution / push / remote verification / protected branch provider payload 非保存で固定する
 - `patch_descriptor.schema`
 - `perception_frame.schema`
 - `perception_shift.schema`

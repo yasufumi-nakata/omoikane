@@ -1501,6 +1501,9 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertTrue(validation["remote_head_matches_local_commit"])
         self.assertTrue(validation["push_command_digest_bound"])
         self.assertTrue(validation["remote_verification_digest_bound"])
+        self.assertTrue(validation["remote_verification_output_digest_bound"])
+        self.assertTrue(validation["remote_verification_observed_head_matches"])
+        self.assertTrue(validation["remote_verification_observed_ref_matches"])
         self.assertTrue(validation["protected_branch_policy_digest_bound"])
         self.assertTrue(validation["protected_branch_receipt_digest_bound"])
         self.assertTrue(validation["protected_branch_status_protected"])
@@ -1514,6 +1517,15 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
             "git ls-remote origin refs/heads/main",
             publication["remote_verification_result"]["command"],
         )
+        self.assertEqual(
+            local_commit_head,
+            publication["remote_verification_observed_head"],
+        )
+        self.assertEqual(
+            "refs/heads/main",
+            publication["remote_verification_observed_ref"],
+        )
+        self.assertTrue(publication["remote_verification_output_digest_bound"])
         self.assertEqual("github", publication["protected_branch_provider"])
         self.assertEqual("refs/heads/main", publication["protected_branch_ref"])
         self.assertEqual("protected", publication["protected_branch_status"])
@@ -1527,6 +1539,49 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertFalse(
             publication["raw_protected_branch_provider_payload_stored"]
         )
+
+    def test_post_commit_publication_blocks_ls_remote_output_mismatch(self) -> None:
+        execution = self._ready_execution_receipt()
+        local_commit_head = str(execution["checkout_mutation_post_apply_head"])
+        stale_remote_output_head = "d" * 40
+
+        publication = self.service.plan_post_commit_publication(
+            execution_receipt=execution,
+            local_commit_head=local_commit_head,
+            remote_head=local_commit_head,
+            remote_verification_result={
+                "stdout_excerpt": (
+                    f"{stale_remote_output_head}\trefs/heads/main"
+                ),
+            },
+            result_summary=(
+                "Publication blocks when ls-remote output does not bind "
+                "the accepted remote head."
+            ),
+        )
+        validation = self.service.validate_post_commit_publication_receipt(
+            publication,
+        )
+
+        self.assertEqual("blocked", publication["publication_status"])
+        self.assertFalse(publication["ready_for_github_handoff"])
+        self.assertIn(
+            "remote verification output must bind remote head and ref",
+            publication["blocking_reasons"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_github_handoff"])
+        self.assertTrue(validation["remote_head_matches_local_commit"])
+        self.assertFalse(validation["remote_verification_output_digest_bound"])
+        self.assertFalse(
+            validation["remote_verification_observed_head_matches"]
+        )
+        self.assertTrue(validation["remote_verification_observed_ref_matches"])
+        self.assertEqual(
+            stale_remote_output_head,
+            publication["remote_verification_observed_head"],
+        )
+        self.assertTrue(validation["publication_digest_bound"])
 
     def test_post_commit_publication_blocks_remote_head_mismatch(self) -> None:
         execution = self._ready_execution_receipt()

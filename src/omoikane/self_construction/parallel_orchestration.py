@@ -69,6 +69,9 @@ PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE = (
 PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE = (
     "command-bound-git-ls-remote-origin-main-v1"
 )
+PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE = (
+    "ls-remote-head-ref-output-binding-v1"
+)
 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE = (
     "protected-branch-provider-policy-receipt-v1"
 )
@@ -2091,13 +2094,12 @@ class ParallelCodexOrchestrationService:
                 PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
             ),
         )
+        raw_remote_verification_result = remote_verification_result or {
+            "stdout_excerpt": f"{normalized_remote_head}\t{normalized_remote_ref}",
+        }
         normalized_remote_verification_result = (
             self._normalize_post_commit_publication_command(
-                remote_verification_result or {
-                    "stdout_excerpt": (
-                        f"{normalized_remote_head}\t{normalized_remote_ref}"
-                    ),
-                },
+                raw_remote_verification_result,
                 default_command=remote_verification_command,
                 command_profile=(
                     PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
@@ -2150,6 +2152,33 @@ class ParallelCodexOrchestrationService:
         protected_branch_policy_bound = (
             normalized_protected_branch_policy_digest
             == expected_protected_branch_policy_digest
+        )
+        (
+            remote_verification_observed_head,
+            remote_verification_observed_ref,
+        ) = self._post_commit_remote_verification_observed_output(
+            raw_remote_verification_result,
+            expected_head=normalized_remote_head,
+            expected_ref=normalized_remote_ref,
+            stdout_digest=normalized_remote_verification_result["stdout_digest"],
+        )
+        remote_verification_output_digest = (
+            self._post_commit_remote_verification_output_digest(
+                observed_head=remote_verification_observed_head,
+                observed_ref=remote_verification_observed_ref,
+                stdout_digest=normalized_remote_verification_result[
+                    "stdout_digest"
+                ],
+            )
+        )
+        remote_verification_output_digest_bound = (
+            remote_verification_observed_head == normalized_remote_head
+            and remote_verification_observed_ref == normalized_remote_ref
+            and self._post_commit_remote_verification_stdout_digest_matches(
+                normalized_remote_verification_result["stdout_digest"],
+                head=remote_verification_observed_head,
+                ref=remote_verification_observed_ref,
+            )
         )
         receipt = {
             "kind": "parallel_codex_post_commit_publication_receipt",
@@ -2208,6 +2237,17 @@ class ParallelCodexOrchestrationService:
             "remote_verification_result": normalized_remote_verification_result,
             "remote_verification_command_receipt_digest": (
                 normalized_remote_verification_result["command_receipt_digest"]
+            ),
+            "remote_verification_output_profile": (
+                PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
+            ),
+            "remote_verification_observed_head": (
+                remote_verification_observed_head
+            ),
+            "remote_verification_observed_ref": remote_verification_observed_ref,
+            "remote_verification_output_digest": remote_verification_output_digest,
+            "remote_verification_output_digest_bound": (
+                remote_verification_output_digest_bound
             ),
             "protected_branch_profile": (
                 PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
@@ -2307,6 +2347,30 @@ class ParallelCodexOrchestrationService:
             and remote_verification_result.get("command_receipt_digest")
             == receipt.get("remote_verification_command_receipt_digest")
         )
+        remote_verification_output_digest_bound = (
+            receipt.get("remote_verification_output_digest")
+            == self._post_commit_remote_verification_output_digest(
+                observed_head=str(
+                    receipt.get("remote_verification_observed_head", ""),
+                ),
+                observed_ref=str(
+                    receipt.get("remote_verification_observed_ref", ""),
+                ),
+                stdout_digest=str(
+                    remote_verification_result.get("stdout_digest", ""),
+                ),
+            )
+            and receipt.get("remote_verification_output_digest_bound") is True
+            and receipt.get("remote_verification_observed_head")
+            == receipt.get("remote_head")
+            and receipt.get("remote_verification_observed_ref")
+            == receipt.get("remote_ref")
+            and self._post_commit_remote_verification_stdout_digest_matches(
+                str(remote_verification_result.get("stdout_digest", "")),
+                head=str(receipt.get("remote_verification_observed_head", "")),
+                ref=str(receipt.get("remote_verification_observed_ref", "")),
+            )
+        )
         publication_digest_bound = (
             receipt.get("publication_digest")
             == self._post_commit_publication_digest(receipt)
@@ -2348,6 +2412,11 @@ class ParallelCodexOrchestrationService:
             != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
         ):
             errors.append("remote_verification_profile mismatch")
+        if (
+            receipt.get("remote_verification_output_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
+        ):
+            errors.append("remote_verification_output_profile mismatch")
         if (
             receipt.get("protected_branch_profile")
             != PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE
@@ -2436,6 +2505,17 @@ class ParallelCodexOrchestrationService:
             "remote_verification_passed": (
                 remote_verification_result.get("status") == "pass"
                 and remote_verification_result.get("exit_code") == 0
+            ),
+            "remote_verification_output_digest_bound": (
+                remote_verification_output_digest_bound
+            ),
+            "remote_verification_observed_head_matches": (
+                receipt.get("remote_verification_observed_head")
+                == receipt.get("remote_head")
+            ),
+            "remote_verification_observed_ref_matches": (
+                receipt.get("remote_verification_observed_ref")
+                == receipt.get("remote_ref")
             ),
             "protected_branch_policy_digest_bound": (
                 protected_branch_policy_digest_bound
@@ -4527,6 +4607,70 @@ class ParallelCodexOrchestrationService:
             )
         )
 
+    @staticmethod
+    def _post_commit_remote_verification_stdout_digest_matches(
+        stdout_digest: str,
+        *,
+        head: str,
+        ref: str,
+    ) -> bool:
+        if not _is_commit(head) or not ref:
+            return False
+        return stdout_digest in {
+            sha256_text(f"{head}\t{ref}"),
+            sha256_text(f"{head}\t{ref}\n"),
+        }
+
+    def _post_commit_remote_verification_observed_output(
+        self,
+        result: Mapping[str, Any],
+        *,
+        expected_head: str,
+        expected_ref: str,
+        stdout_digest: str,
+    ) -> tuple[str, str]:
+        observed_head = str(result.get("observed_head", "")).strip()
+        observed_ref = str(result.get("observed_ref", "")).strip()
+        if _is_commit(observed_head) and observed_ref:
+            return observed_head, observed_ref
+
+        stdout_excerpt = str(result.get("stdout_excerpt", "")).strip()
+        for line in stdout_excerpt.splitlines():
+            parts = line.strip().split()
+            if len(parts) >= 2 and _is_commit(parts[0]):
+                head, ref = parts[0], parts[1]
+                if ref == expected_ref:
+                    return head, ref
+
+        if self._post_commit_remote_verification_stdout_digest_matches(
+            stdout_digest,
+            head=expected_head,
+            ref=expected_ref,
+        ):
+            return expected_head, expected_ref
+        return expected_head, expected_ref
+
+    @staticmethod
+    def _post_commit_remote_verification_output_digest(
+        *,
+        observed_head: str,
+        observed_ref: str,
+        stdout_digest: str,
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile": (
+                        PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
+                    ),
+                    "observed_head": observed_head,
+                    "observed_ref": observed_ref,
+                    "stdout_digest": stdout_digest,
+                    "raw_stdout_stored": False,
+                }
+            )
+        )
+
     def _post_commit_protected_branch_policy_digest(
         self,
         *,
@@ -4646,6 +4790,26 @@ class ParallelCodexOrchestrationService:
                     "remote_verification_command_receipt_digest": receipt.get(
                         "remote_verification_command_receipt_digest",
                         "",
+                    ),
+                    "remote_verification_output_profile": receipt.get(
+                        "remote_verification_output_profile",
+                        "",
+                    ),
+                    "remote_verification_observed_head": receipt.get(
+                        "remote_verification_observed_head",
+                        "",
+                    ),
+                    "remote_verification_observed_ref": receipt.get(
+                        "remote_verification_observed_ref",
+                        "",
+                    ),
+                    "remote_verification_output_digest": receipt.get(
+                        "remote_verification_output_digest",
+                        "",
+                    ),
+                    "remote_verification_output_digest_bound": receipt.get(
+                        "remote_verification_output_digest_bound",
+                        False,
                     ),
                     "protected_branch_profile": receipt.get(
                         "protected_branch_profile",
@@ -5219,6 +5383,11 @@ class ParallelCodexOrchestrationService:
             != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_VERIFY_PROFILE
         ):
             reasons.append("remote_verification_profile mismatch")
+        if (
+            receipt.get("remote_verification_output_profile")
+            != PARALLEL_CODEX_POST_COMMIT_PUBLICATION_REMOTE_OUTPUT_PROFILE
+        ):
+            reasons.append("remote_verification_output_profile mismatch")
         if push_result.get("command_profile") != (
             PARALLEL_CODEX_POST_COMMIT_PUBLICATION_PUSH_COMMAND_PROFILE
         ):
@@ -5262,6 +5431,31 @@ class ParallelCodexOrchestrationService:
             reasons.append("raw remote verification stdout must not be stored")
         if remote_verification_result.get("raw_stderr_stored") is not False:
             reasons.append("raw remote verification stderr must not be stored")
+        if (
+            receipt.get("remote_verification_output_digest")
+            != self._post_commit_remote_verification_output_digest(
+                observed_head=str(
+                    receipt.get("remote_verification_observed_head", ""),
+                ),
+                observed_ref=str(
+                    receipt.get("remote_verification_observed_ref", ""),
+                ),
+                stdout_digest=str(
+                    remote_verification_result.get("stdout_digest", ""),
+                ),
+            )
+            or receipt.get("remote_verification_output_digest_bound") is not True
+            or receipt.get("remote_verification_observed_head")
+            != receipt.get("remote_head")
+            or receipt.get("remote_verification_observed_ref")
+            != receipt.get("remote_ref")
+            or not self._post_commit_remote_verification_stdout_digest_matches(
+                str(remote_verification_result.get("stdout_digest", "")),
+                head=str(receipt.get("remote_verification_observed_head", "")),
+                ref=str(receipt.get("remote_verification_observed_ref", "")),
+            )
+        ):
+            reasons.append("remote verification output must bind remote head and ref")
         if (
             receipt.get("protected_branch_profile")
             != PARALLEL_CODEX_POST_COMMIT_PROTECTED_BRANCH_PROFILE

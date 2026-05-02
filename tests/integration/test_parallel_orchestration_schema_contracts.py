@@ -487,6 +487,21 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             result["validation"][
+                "post_commit_publication_remote_verification_output_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_remote_verification_observed_head_matches"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_remote_verification_observed_ref_matches"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
                 "post_commit_publication_protected_branch_policy_bound"
             ]
         )

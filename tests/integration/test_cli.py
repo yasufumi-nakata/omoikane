@@ -198,6 +198,11 @@ class CliIntegrationTests(unittest.TestCase):
             result["validation"]["execution_patch_artifact_cleanup_verified"]
         )
         self.assertTrue(result["validation"]["execution_commit_finalization_ready"])
+        self.assertTrue(
+            result["validation"][
+                "post_commit_publication_remote_verification_output_bound"
+            ]
+        )
         self.assertTrue(result["validation"]["conflict_execution_blocked"])
         self.assertEqual(
             "parallel-codex-integration-execution-plan-v1",

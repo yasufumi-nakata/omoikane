@@ -85,8 +85,9 @@ context digest、checkout mutation event digest、post-apply head、patch artifa
 digest、changed-file owner manifest digest、passing verification state を束縛し、未 ready
 の execution を commit へ進めない。commit-finalized execution はさらに
 `parallel_codex_post_commit_publication_receipt` で local commit head、origin/main
-remote head、command-bound push / remote verification receipt、GitHub protected
-branch provider policy receipt、publication digest を固定し、remote head mismatch、
+remote head、command-bound push / remote verification receipt、ls-remote output の
+observed head/ref digest、GitHub protected branch provider policy receipt、
+publication digest を固定し、remote head mismatch、ls-remote output mismatch、
 push / remote verification failure、protected branch 未保護 / unknown を GitHub handoff へ
 進めない。raw batch / apply plan / dry-run / worker receipt / verification /
 checkout mutation / patch cleanup / commit finalization / publication / push /

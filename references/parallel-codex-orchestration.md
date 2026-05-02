@@ -94,8 +94,10 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - post-commit publication receipt は commit-finalized execution receipt digest、
   local commit head、origin/main remote head、`git push origin HEAD:refs/heads/main`
   command receipt digest、`git ls-remote origin refs/heads/main` remote verification
-  digest、GitHub protected branch provider policy receipt digest を publication digest に束縛し、
-  remote head が local commit と一致しない、または provider policy が `refs/heads/main`
+  digest、同 command stdout から観測した head/ref output digest、
+  GitHub protected branch provider policy receipt digest を publication digest に束縛し、
+  remote head が local commit と一致しない、`ls-remote` output が remote head /
+  `refs/heads/main` と一致しない、または provider policy が `refs/heads/main`
   を protected として示さない handoff は `ready_for_github_handoff=false` のまま
   fail-closed にする
 - patch artifact cleanup receipt は ordered apply step の

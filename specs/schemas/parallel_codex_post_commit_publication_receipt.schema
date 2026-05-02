@@ -3,11 +3,11 @@ $id: "https://omoikane.dev/specs/schemas/parallel_codex_post_commit_publication_
 title: ParallelCodexPostCommitPublicationReceipt
 description: >
   Digest-only receipt for binding a commit-finalized Parallel Codex integration
-  execution to a command-level origin/main push, remote-head verification, and
-  protected-branch provider policy receipt before GitHub handoff. The receipt
-  keeps raw execution, push, remote verification, and branch-provider payloads
-  redacted while preserving command, policy, provider receipt, and publication
-  digests.
+  execution to a command-level origin/main push, remote-head verification,
+  ls-remote head/ref output binding, and protected-branch provider policy
+  receipt before GitHub handoff. The receipt keeps raw execution, push, remote
+  verification, and branch-provider payloads redacted while preserving command,
+  observed head/ref, policy, provider receipt, and publication digests.
 type: object
 additionalProperties: false
 required:
@@ -40,6 +40,11 @@ required:
   - remote_verification_profile
   - remote_verification_result
   - remote_verification_command_receipt_digest
+  - remote_verification_output_profile
+  - remote_verification_observed_head
+  - remote_verification_observed_ref
+  - remote_verification_output_digest
+  - remote_verification_output_digest_bound
   - protected_branch_profile
   - protected_branch_provider
   - protected_branch_ref
@@ -138,6 +143,18 @@ properties:
   remote_verification_command_receipt_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"
+  remote_verification_output_profile:
+    const: ls-remote-head-ref-output-binding-v1
+  remote_verification_observed_head:
+    type: string
+    pattern: "^[a-f0-9]{40}$"
+  remote_verification_observed_ref:
+    const: refs/heads/main
+  remote_verification_output_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  remote_verification_output_digest_bound:
+    type: boolean
   protected_branch_profile:
     const: protected-branch-provider-policy-receipt-v1
   protected_branch_provider:

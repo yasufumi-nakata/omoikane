@@ -997,11 +997,13 @@ commit-finalized execution はさらに
 digest、commit finalization readiness、local commit head、origin/main remote head、
 `git push origin HEAD:refs/heads/main` の command receipt digest、
 `git ls-remote origin refs/heads/main` の remote verification command receipt digest、
+同 command stdout から観測した head/ref output digest、
 GitHub protected branch provider policy receipt、publication digest を固定する。
 protected branch receipt は `refs/heads/main` の provider policy ref、
 required verification checks、policy digest、receipt digest、protected status を
 raw provider payload なしで束縛する。remote head が local commit と一致しない場合、
-push / remote verification が失敗した場合、protected branch status が `protected`
+push / remote verification が失敗した場合、`ls-remote` output が remote head /
+`refs/heads/main` と一致しない場合、protected branch status が `protected`
 でない場合、または source execution が `ready-to-apply` でない場合は schema-bound のまま
 `ready_for_github_handoff=false` に留まる。
 raw batch payload、raw apply plan payload、raw dry-run payload、raw worker receipt

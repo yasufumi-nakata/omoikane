@@ -1243,8 +1243,9 @@ class OmoikaneReferenceOS:
                 result_summary=(
                     "Commit-finalized Parallel Codex execution is bound to a "
                     "command-level origin/main push receipt and a remote-head "
-                    "verification receipt plus protected-branch provider "
-                    "policy receipt before GitHub handoff."
+                    "verification receipt, ls-remote output binding, and "
+                    "protected-branch provider policy receipt before GitHub "
+                    "handoff."
                 ),
             )
         )
@@ -1578,6 +1579,21 @@ class OmoikaneReferenceOS:
                 "post_commit_publication_remote_verification_digest": (
                     post_commit_publication_receipt[
                         "remote_verification_command_receipt_digest"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_output_digest": (
+                    post_commit_publication_receipt[
+                        "remote_verification_output_digest"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_observed_head": (
+                    post_commit_publication_receipt[
+                        "remote_verification_observed_head"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_observed_ref": (
+                    post_commit_publication_receipt[
+                        "remote_verification_observed_ref"
                     ]
                 ),
                 "post_commit_publication_protected_branch_digest": (
@@ -2295,6 +2311,21 @@ class OmoikaneReferenceOS:
                 "post_commit_publication_remote_verification_digest_bound": (
                     post_commit_publication_validation[
                         "remote_verification_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_output_bound": (
+                    post_commit_publication_validation[
+                        "remote_verification_output_digest_bound"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_observed_head_matches": (
+                    post_commit_publication_validation[
+                        "remote_verification_observed_head_matches"
+                    ]
+                ),
+                "post_commit_publication_remote_verification_observed_ref_matches": (
+                    post_commit_publication_validation[
+                        "remote_verification_observed_ref_matches"
                     ]
                 ),
                 "post_commit_publication_protected_branch_policy_bound": (
