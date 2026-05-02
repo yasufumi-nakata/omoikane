@@ -112,6 +112,7 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(0, receipt["counts"]["worktree_workspace_marker_count"])
             self.assertEqual(0, receipt["counts"]["tracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["untracked_generated_artifact_count"])
+            self.assertEqual(0, receipt["counts"]["decision_log_index_inventory_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
             self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
@@ -639,6 +640,83 @@ class GapScannerTests(unittest.TestCase):
             )
             self.assertTrue(
                 any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_reports_decision_log_index_inventory_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "README.md").write_text(
+                "# Decision Log\n\n"
+                "## 既存ログ\n\n"
+                "- [2026-04-23_listed-gap.md](2026-04-23_listed-gap.md)\n",
+                encoding="utf-8",
+            )
+            (decision_log_root / "2026-04-23_listed-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "---\n",
+                encoding="utf-8",
+            )
+            (decision_log_root / "2026-04-23_unlisted-gap.md").write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "status: decided\n"
+                "---\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["decision_log_index_inventory_count"])
+            self.assertEqual(
+                "meta/decision-log/README.md",
+                report["decision_log_index_inventory_hits"][0]["path"],
+            )
+            self.assertEqual(
+                "2026-04-23_unlisted-gap.md",
+                report["decision_log_index_inventory_hits"][0]["decision_log_file"],
+            )
+            self.assertIn(
+                "missing from the decision-log README index",
+                report["decision_log_index_inventory_hits"][0]["line"],
+            )
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"]["decision_log_index_inventory_count"],
+            )
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertTrue(
+                any(
+                    task["kind"] == "decision-log-index-inventory"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+
+    def test_scan_reports_stale_decision_log_index_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_root = repo_root / "meta" / "decision-log"
+            (decision_log_root / "README.md").write_text(
+                "# Decision Log\n\n"
+                "## 既存ログ\n\n"
+                "- [2026-04-23_missing-gap.md](2026-04-23_missing-gap.md)\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["decision_log_index_inventory_count"])
+            self.assertEqual(
+                "2026-04-23_missing-gap.md",
+                report["decision_log_index_inventory_hits"][0]["decision_log_file"],
+            )
+            self.assertIn(
+                "is listed in the decision-log README index but the file is missing",
+                report["decision_log_index_inventory_hits"][0]["line"],
             )
 
     def test_scan_reports_uncataloged_implemented_spec_files(self) -> None:

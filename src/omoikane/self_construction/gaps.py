@@ -109,6 +109,7 @@ TOP_LEVEL_EVAL_INVENTORY_SPEC = (
     (".yaml", ".yml"),
 )
 EVAL_INVENTORY_GLOB = "evals/*/README.md"
+DECISION_LOG_INDEX_README = "meta/decision-log/README.md"
 IMPLEMENTATION_STUB_GLOB = "src/omoikane/**/*.py"
 IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES = ("Backend",)
 WORKTREE_DIFF_SCAN_SURFACE = "git:tracked-worktree-diff"
@@ -205,6 +206,9 @@ class GapScanner:
         )
         untracked_generated_artifact_hits = (
             self._untracked_generated_artifact_hits(repo_root)
+        )
+        decision_log_index_inventory_hits = (
+            self._decision_log_index_inventory_hits(repo_root)
         )
         decision_log_gap_hits = self._decision_log_gap_hits(repo_root)
         decision_log_residual_hits = [
@@ -311,6 +315,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in decision_log_index_inventory_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "decision-log-index-inventory",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in decision_log_frontier_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -365,6 +377,9 @@ class GapScanner:
             "untracked_generated_artifact_count": len(
                 untracked_generated_artifact_hits
             ),
+            "decision_log_index_inventory_count": len(
+                decision_log_index_inventory_hits
+            ),
             "decision_log_residual_count": len(decision_log_residual_hits),
             "decision_log_frontier_count": len(decision_log_frontier_hits),
             "open_questions": open_questions,
@@ -384,6 +399,7 @@ class GapScanner:
             "worktree_workspace_marker_hits": worktree_workspace_marker_hits,
             "tracked_generated_artifact_hits": tracked_generated_artifact_hits,
             "untracked_generated_artifact_hits": untracked_generated_artifact_hits,
+            "decision_log_index_inventory_hits": decision_log_index_inventory_hits,
             "decision_log_residual_hits": decision_log_residual_hits,
             "decision_log_frontier_hits": decision_log_frontier_hits,
             "prioritized_tasks": prioritized_tasks,
@@ -415,6 +431,9 @@ class GapScanner:
             ),
             "untracked_generated_artifact_count": int(
                 report["untracked_generated_artifact_count"]
+            ),
+            "decision_log_index_inventory_count": int(
+                report["decision_log_index_inventory_count"]
             ),
             "decision_log_residual_count": int(report["decision_log_residual_count"]),
             "decision_log_frontier_count": int(report["decision_log_frontier_count"]),
@@ -1121,6 +1140,76 @@ class GapScanner:
                     }
                 )
         return hits
+
+    def _decision_log_index_inventory_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, str]]:
+        decision_log_root = repo_root / "meta" / "decision-log"
+        readme_path = repo_root / DECISION_LOG_INDEX_README
+        if not decision_log_root.exists() or not readme_path.exists():
+            return []
+
+        listed_entries = set(self._extract_decision_log_index_entries(readme_path))
+        actual_entries = {
+            path.name
+            for path in decision_log_root.glob("*.md")
+            if path.is_file()
+            and path.name != "README.md"
+            and self._looks_like_iso_date(path.name[:10])
+        }
+
+        hits: List[Dict[str, str]] = []
+        for missing_entry in sorted(actual_entries - listed_entries):
+            hits.append(
+                {
+                    "kind": "decision-log-index-inventory",
+                    "path": DECISION_LOG_INDEX_README,
+                    "line": (
+                        f"`{missing_entry}` exists but is missing from the "
+                        "decision-log README index"
+                    ),
+                    "decision_log_file": missing_entry,
+                }
+            )
+        for stale_entry in sorted(listed_entries - actual_entries):
+            hits.append(
+                {
+                    "kind": "decision-log-index-inventory",
+                    "path": DECISION_LOG_INDEX_README,
+                    "line": (
+                        f"`{stale_entry}` is listed in the decision-log README "
+                        "index but the file is missing"
+                    ),
+                    "decision_log_file": stale_entry,
+                }
+            )
+        return hits
+
+    @staticmethod
+    def _extract_decision_log_index_entries(readme_path: Path) -> List[str]:
+        entries: List[str] = []
+        try:
+            lines = readme_path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            return entries
+        for line in lines:
+            stripped = line.strip()
+            if not stripped.startswith("- ["):
+                continue
+            link_start = stripped.find("](")
+            if link_start == -1:
+                continue
+            target_start = link_start + 2
+            target_end = stripped.find(")", target_start)
+            if target_end == -1:
+                continue
+            candidate = Path(stripped[target_start:target_end].strip()).name
+            if not candidate.endswith(".md"):
+                continue
+            if not GapScanner._looks_like_iso_date(candidate[:10]):
+                continue
+            entries.append(candidate)
+        return entries
 
     def _catalog_coverage_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         catalog_path = repo_root / "specs" / "catalog.yaml"

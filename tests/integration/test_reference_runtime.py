@@ -1388,6 +1388,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual([], report["tracked_generated_artifact_hits"])
         self.assertEqual(0, report["untracked_generated_artifact_count"])
         self.assertEqual([], report["untracked_generated_artifact_hits"])
+        self.assertEqual(0, report["decision_log_index_inventory_count"])
+        self.assertEqual([], report["decision_log_index_inventory_hits"])
         self.assertIn("decision_log_residual_count", report)
         self.assertEqual(
             report["decision_log_residual_count"],

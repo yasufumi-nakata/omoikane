@@ -5,8 +5,8 @@ description: >
   gap-report が all-zero / non-zero 判定、prioritized task count、scan surface、
   top-level eval inventory、report digest、各 truth-source の surface digest manifest、continuity ledger 用
   event ref / digest と実 ContinuityLedger append entry を public schema と digest-bound receipt に固定し、
-  build / cache / platform metadata 生成物の path manifest も含めて automation gate の判定形を
-  reviewer-facing に検証できること
+  build / cache / platform metadata 生成物の path manifest と decision-log README index drift も含めて
+  automation gate の判定形を reviewer-facing に検証できること
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli gap-report --json
@@ -18,6 +18,7 @@ expected:
   worktree_workspace_marker_count: 0
   tracked_generated_artifact_count: 0
   untracked_generated_artifact_count: 0
+  decision_log_index_inventory_count: 0
   validation_ok: true
   counts_match_report: true
   report_digest_bound: true
@@ -39,6 +40,7 @@ expected:
   tracked_worktree_diff_surface_bound: true
   tracked_generated_artifacts_surface_bound: true
   untracked_generated_artifacts_surface_bound: true
+  decision_log_index_inventory_gate_bound: true
   raw_artifact_payload_stored: false
   raw_continuity_event_payload_stored: false
 metric: boolean

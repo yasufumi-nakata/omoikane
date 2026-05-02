@@ -141,6 +141,9 @@ decision log 側で append-only に gap chain を保つ時は、
 frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
 `evals/README.md` は全 eval YAML を repo-local eval path で列挙する top-level inventory として扱い、
 `evals/*/README.md` の surface 別 inventory と同じ `inventory_drift_hits` gate に入る。
+`meta/decision-log/README.md` は全ての dated decision-log markdown file を列挙する
+append-only index として扱い、実在 log の未掲載や存在しない log への stale link を
+`decision_log_index_inventory_hits` として all-zero gate の外へ出す。
 同じ report は `self-construction-gap-report-scan-receipt-v1` の `scan_receipt` を返し、
 counts、prioritized task count、scan surface、report digest、
 truth-source ごとの digest-only `scan_surface_digests` / `surface_manifest_digest`、

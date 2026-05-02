@@ -95,6 +95,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             counts["untracked_generated_artifact_count"],
         )
         self.assertEqual(
+            report["decision_log_index_inventory_count"],
+            counts["decision_log_index_inventory_count"],
+        )
+        self.assertEqual(
             report["decision_log_residual_count"],
             counts["decision_log_residual_count"],
         )

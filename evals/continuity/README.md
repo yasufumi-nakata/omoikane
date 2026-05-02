@@ -142,7 +142,9 @@ path manifest に含められるか。未追跡生成物も
 `git:untracked-generated-artifacts` の path manifest digest と
 `untracked_generated_artifact_hits` により raw artifact payload なしで
 all-zero gate の外へ出せるか。cache / platform metadata 生成物も同じ
-path manifest に含められるか。
+path manifest に含められるか。`meta/decision-log/README.md` が dated
+decision log file を全て列挙し、存在しない stale link を残していないことも
+`decision_log_index_inventory_hits` として all-zero gate の外へ出せるか。
 
 ### Parallel Codex Result Ingestion
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、
