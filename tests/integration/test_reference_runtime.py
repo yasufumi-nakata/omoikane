@@ -1380,6 +1380,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(0, report["inventory_drift_count"])
         self.assertEqual(0, report["catalog_coverage_gap_count"])
         self.assertEqual([], report["catalog_coverage_gap_hits"])
+        self.assertEqual(0, report["agent_source_definition_violation_count"])
+        self.assertEqual([], report["agent_source_definition_violation_hits"])
         self.assertEqual(0, report["implementation_stub_count"])
         self.assertEqual([], report["implementation_stub_hits"])
         self.assertEqual(0, report["worktree_workspace_marker_count"])

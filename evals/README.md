@@ -14,6 +14,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `agentic/council_expedited_timeout_defer.yaml`
 - `agentic/council_guardian_veto.yaml`
 - `agentic/council_timeout_fallback.yaml`
+- `agentic/gap_report_agent_source_definition_validation.yaml`
 - `agentic/distributed_council_resolution.yaml`
 - `agentic/distributed_transport_authenticity.yaml`
 - `agentic/distributed_transport_authority_churn.yaml`

@@ -79,6 +79,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
         )
         self.assertEqual(report["future_work_hit_count"], counts["future_work_hit_count"])
         self.assertEqual(
+            report["agent_source_definition_violation_count"],
+            counts["agent_source_definition_violation_count"],
+        )
+        self.assertEqual(
             report["implementation_stub_count"],
             counts["implementation_stub_count"],
         )
@@ -142,6 +146,13 @@ class GapReportSchemaContractTests(unittest.TestCase):
             any(
                 entry["path"] == "evals/README.md"
                 and entry["surface_pattern"] == "evals/README.md"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+        self.assertTrue(
+            any(
+                entry["path"].startswith("agents/")
+                and entry["surface_pattern"] == "agents/**/*.yaml"
                 for entry in receipt["scan_surface_digests"]
             )
         )

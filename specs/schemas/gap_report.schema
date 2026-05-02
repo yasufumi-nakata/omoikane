@@ -5,8 +5,9 @@ description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
   including top-level eval inventory drift checks, tracked worktree marker-residue
   checks, tracked/untracked generated artifact hygiene checks for build output,
-  caches, and platform metadata, decision-log README index inventory checks, and
-  a digest-bound scan receipt for automation gating.
+  caches, and platform metadata, decision-log README index inventory checks,
+  agent source definition validation, and a digest-bound scan receipt for
+  automation gating.
 type: object
 additionalProperties: false
 required:
@@ -20,6 +21,7 @@ required:
   - inventory_drift_count
   - catalog_coverage_gap_count
   - future_work_hit_count
+  - agent_source_definition_violation_count
   - implementation_stub_count
   - worktree_workspace_marker_count
   - tracked_generated_artifact_count
@@ -38,6 +40,7 @@ required:
   - inventory_drift_hits
   - catalog_coverage_gap_hits
   - future_work_hits
+  - agent_source_definition_violation_hits
   - implementation_stub_hits
   - worktree_workspace_marker_hits
   - tracked_generated_artifact_hits
@@ -76,6 +79,9 @@ properties:
     type: integer
     minimum: 0
   future_work_hit_count:
+    type: integer
+    minimum: 0
+  agent_source_definition_violation_count:
     type: integer
     minimum: 0
   implementation_stub_count:
@@ -151,6 +157,13 @@ properties:
     items:
       $ref: "#/$defs/gap_hit"
   future_work_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  agent_source_definition_violation_hits:
+    description: >
+      Repo-local agents/**/*.yaml definitions that violate the Yaoyorozu
+      agent_source_definition contract before an all-zero automation gate passes.
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -315,6 +328,7 @@ properties:
           - inventory_drift_count
           - catalog_coverage_gap_count
           - future_work_hit_count
+          - agent_source_definition_violation_count
           - implementation_stub_count
           - worktree_workspace_marker_count
           - tracked_generated_artifact_count
@@ -350,6 +364,9 @@ properties:
             type: integer
             minimum: 0
           future_work_hit_count:
+            type: integer
+            minimum: 0
+          agent_source_definition_violation_count:
             type: integer
             minimum: 0
           implementation_stub_count:
@@ -526,6 +543,20 @@ $defs:
       required_section:
         type: string
         minLength: 1
+      agent_source_policy_id:
+        type: string
+        minLength: 1
+      agent_id:
+        type: string
+        minLength: 1
+      role:
+        type: string
+        minLength: 1
+      error_count:
+        type: integer
+        minimum: 1
+      raw_agent_source_payload_stored:
+        const: false
 examples:
   - repo_root: /repo
     open_question_count: 0
@@ -537,6 +568,7 @@ examples:
     inventory_drift_count: 0
     catalog_coverage_gap_count: 0
     future_work_hit_count: 0
+    agent_source_definition_violation_count: 0
     implementation_stub_count: 0
     worktree_workspace_marker_count: 0
     tracked_generated_artifact_count: 0
@@ -555,6 +587,7 @@ examples:
     inventory_drift_hits: []
     catalog_coverage_gap_hits: []
     future_work_hits: []
+    agent_source_definition_violation_hits: []
     implementation_stub_hits: []
     worktree_workspace_marker_hits: []
     tracked_generated_artifact_hits: []
@@ -600,6 +633,7 @@ examples:
         inventory_drift_count: 0
         catalog_coverage_gap_count: 0
         future_work_hit_count: 0
+        agent_source_definition_violation_count: 0
         implementation_stub_count: 0
         worktree_workspace_marker_count: 0
         tracked_generated_artifact_count: 0

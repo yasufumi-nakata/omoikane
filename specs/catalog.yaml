@@ -3557,6 +3557,16 @@ entries:
     rationale: Protects gap-report from missing non-abstract runtime stubs that survive open-question, catalog, inventory, and decision-log scans.
   - priority: P1
     kind: eval
+    file: evals/agentic/gap_report_agent_source_definition_validation.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/self_construction/gaps.py
+      - specs/schemas/gap_report.schema
+      - specs/interfaces/selfctor.gap_report.v0.idl
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Protects gap-report from passing all-zero while repo-local agents/**/*.yaml violates the Yaoyorozu schema-bound agent source definition contract.
+  - priority: P1
+    kind: eval
     file: evals/continuity/gap_scanner_required_reference_files.yaml
     consumers:
       - reference-runtime
@@ -3572,8 +3582,9 @@ entries:
       - specs/interfaces/selfctor.gap_report.v0.idl
       - reference-runtime
       - evals/continuity/gap_report_scan_receipt.yaml
+      - evals/agentic/gap_report_agent_source_definition_validation.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including top-level eval inventory drift, decision-log README index drift, missing reference policy sections, tracked worktree marker residue checks, tracked/untracked build/cache/platform generated artifact hygiene checks, source surface digests, continuity-ledger event binding, and actual ledger entry append evidence for automation gate review.
+    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including top-level eval inventory drift, decision-log README index drift, agent source definition violations, missing reference policy sections, tracked worktree marker residue checks, tracked/untracked build/cache/platform generated artifact hygiene checks, source surface digests, continuity-ledger event binding, and actual ledger entry append evidence for automation gate review.
   - priority: P1
     kind: interface
     file: specs/interfaces/selfctor.gap_report.v0.idl
@@ -3582,7 +3593,7 @@ entries:
       - specs/schemas/gap_report.schema
       - evals/continuity/gap_report_scan_receipt.yaml
       - docs/07-reference-implementation/README.md
-    rationale: Required to bind the self-construction gap-report scan operation to the public schema, top-level eval inventory scan, decision-log README index scan, required reference policy section scan, tracked worktree marker residue detection, tracked/untracked build/cache/platform generated artifact detection, scan receipt contract, and continuity-ledger event plus appended entry evidence.
+    rationale: Required to bind the self-construction gap-report scan operation to the public schema, top-level eval inventory scan, decision-log README index scan, agent source definition validation, required reference policy section scan, tracked worktree marker residue detection, tracked/untracked build/cache/platform generated artifact detection, scan receipt contract, and continuity-ledger event plus appended entry evidence.
   - priority: P1
     kind: eval
     file: evals/continuity/gap_report_scan_receipt.yaml

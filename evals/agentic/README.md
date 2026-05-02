@@ -168,6 +168,7 @@ panel と `runtime/schema/eval/docs` の full required worker dispatch、
 - `council_expedited_timeout_defer.yaml`
 - `council_guardian_veto.yaml`
 - `council_timeout_fallback.yaml`
+- `gap_report_agent_source_definition_validation.yaml`
 - `distributed_council_resolution.yaml`
 - `distributed_transport_authenticity.yaml`
 - `distributed_transport_authority_churn.yaml`

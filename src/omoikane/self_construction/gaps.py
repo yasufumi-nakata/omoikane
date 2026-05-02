@@ -110,6 +110,8 @@ TOP_LEVEL_EVAL_INVENTORY_SPEC = (
 )
 EVAL_INVENTORY_GLOB = "evals/*/README.md"
 DECISION_LOG_INDEX_README = "meta/decision-log/README.md"
+AGENT_SOURCE_DEFINITION_GLOB = "agents/**/*.yaml"
+AGENT_SOURCE_DEFINITION_POLICY_ID = "schema-bound-agent-source-definition-v1"
 IMPLEMENTATION_STUB_GLOB = "src/omoikane/**/*.py"
 IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES = ("Backend",)
 WORKTREE_DIFF_SCAN_SURFACE = "git:tracked-worktree-diff"
@@ -174,6 +176,7 @@ SCAN_RECEIPT_SURFACES = (
     "docs/07-reference-implementation/README.md",
     "specs/interfaces/**/*.idl",
     "specs/schemas/README.md",
+    AGENT_SOURCE_DEFINITION_GLOB,
     "src/omoikane/**/*.py",
     "meta/decision-log/*.md",
     WORKTREE_DIFF_SCAN_SURFACE,
@@ -199,6 +202,7 @@ class GapScanner:
         inventory_drift_hits = self._inventory_drift_hits(repo_root)
         catalog_coverage_hits = self._catalog_coverage_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
+        agent_source_definition_hits = self._agent_source_definition_hits(repo_root)
         implementation_stub_hits = self._implementation_stub_hits(repo_root)
         worktree_workspace_marker_hits = self._worktree_workspace_marker_hits(repo_root)
         tracked_generated_artifact_hits = (
@@ -280,6 +284,14 @@ class GapScanner:
                 {
                     "priority": "high",
                     "kind": "future-work",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
+        for hit in agent_source_definition_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "agent-source-definition",
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
@@ -369,6 +381,9 @@ class GapScanner:
             "inventory_drift_count": len(inventory_drift_hits),
             "catalog_coverage_gap_count": len(catalog_coverage_hits),
             "future_work_hit_count": len(future_work_hits),
+            "agent_source_definition_violation_count": len(
+                agent_source_definition_hits
+            ),
             "implementation_stub_count": len(implementation_stub_hits),
             "worktree_workspace_marker_count": len(worktree_workspace_marker_hits),
             "tracked_generated_artifact_count": len(
@@ -395,6 +410,7 @@ class GapScanner:
             "inventory_drift_hits": inventory_drift_hits,
             "catalog_coverage_gap_hits": catalog_coverage_hits,
             "future_work_hits": future_work_hits,
+            "agent_source_definition_violation_hits": agent_source_definition_hits,
             "implementation_stub_hits": implementation_stub_hits,
             "worktree_workspace_marker_hits": worktree_workspace_marker_hits,
             "tracked_generated_artifact_hits": tracked_generated_artifact_hits,
@@ -422,6 +438,9 @@ class GapScanner:
             "inventory_drift_count": int(report["inventory_drift_count"]),
             "catalog_coverage_gap_count": int(report["catalog_coverage_gap_count"]),
             "future_work_hit_count": int(report["future_work_hit_count"]),
+            "agent_source_definition_violation_count": int(
+                report["agent_source_definition_violation_count"]
+            ),
             "implementation_stub_count": int(report["implementation_stub_count"]),
             "worktree_workspace_marker_count": int(
                 report["worktree_workspace_marker_count"]
@@ -1301,6 +1320,51 @@ class GapScanner:
             visitor = _ImplementationStubVisitor(relative_path, line_lookup)
             visitor.visit(tree)
             hits.extend(visitor.hits)
+        return hits
+
+    def _agent_source_definition_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, Any]]:
+        """Validate repo-local agent YAML before an all-zero automation gate passes."""
+
+        from ..agentic.yaoyorozu import (
+            _parse_agent_definition,
+            _validate_agent_source_definition,
+        )
+
+        hits: List[Dict[str, Any]] = []
+        for path in sorted(repo_root.glob(AGENT_SOURCE_DEFINITION_GLOB)):
+            if not path.is_file():
+                continue
+            relative_path = str(path.relative_to(repo_root))
+            try:
+                parsed = _parse_agent_definition(path)
+                errors = _validate_agent_source_definition(parsed, path, repo_root)
+            except (OSError, UnicodeDecodeError) as exc:
+                parsed = {}
+                errors = [f"agent source definition could not be read: {exc}"]
+            if not errors:
+                continue
+            agent_id = str(parsed.get("name") or path.stem).strip() or path.stem
+            role = str(parsed.get("role") or "unknown").strip() or "unknown"
+            error_summary = "; ".join(errors[:3])
+            if len(errors) > 3:
+                error_summary += f"; +{len(errors) - 3} more"
+            hits.append(
+                {
+                    "kind": "agent-source-definition",
+                    "path": relative_path,
+                    "line": (
+                        f"violates {AGENT_SOURCE_DEFINITION_POLICY_ID}: "
+                        f"{error_summary}"
+                    ),
+                    "agent_id": agent_id,
+                    "role": role,
+                    "error_count": len(errors),
+                    "agent_source_policy_id": AGENT_SOURCE_DEFINITION_POLICY_ID,
+                    "raw_agent_source_payload_stored": False,
+                }
+            )
         return hits
 
     def _decision_log_gap_hits(self, repo_root: Path) -> List[Dict[str, str]]:

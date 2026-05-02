@@ -28,6 +28,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(0, result["inventory_drift_count"])
         self.assertEqual(0, result["catalog_coverage_gap_count"])
         self.assertEqual([], result["catalog_coverage_gap_hits"])
+        self.assertEqual(0, result["agent_source_definition_violation_count"])
+        self.assertEqual([], result["agent_source_definition_violation_hits"])
         self.assertEqual(0, result["implementation_stub_count"])
         self.assertEqual([], result["implementation_stub_hits"])
         self.assertEqual(0, result["tracked_generated_artifact_count"])

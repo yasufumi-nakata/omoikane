@@ -1,0 +1,18 @@
+eval_id: gap_report_agent_source_definition_validation
+target: selfctor.gap_report.agent_source_definition
+level: L4
+description: gap-report が agents/**/*.yaml の Yaoyorozu agent source definition violation を all-zero gate 前に検出し、raw agent source payload を保存しないこと
+inputs:
+  - valid agents/**/*.yaml source definitions
+  - invalid agent source definition with out-of-range trust_floor
+  - schema-bound-agent-source-definition-v1 policy
+expected:
+  valid_agent_source_definition_violation_count: 0
+  invalid_agent_source_definition_violation_count: 1
+  prioritized_task_kind: agent-source-definition
+  scan_surface_pattern: agents/**/*.yaml
+  agent_source_policy_id: schema-bound-agent-source-definition-v1
+  raw_agent_source_payload_stored: false
+metric: boolean
+threshold: true
+ethics_check: true

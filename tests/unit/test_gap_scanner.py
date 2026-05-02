@@ -113,6 +113,10 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(0, receipt["counts"]["tracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["untracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["decision_log_index_inventory_count"])
+            self.assertEqual(
+                0,
+                receipt["counts"]["agent_source_definition_violation_count"],
+            )
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
             self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
@@ -427,6 +431,82 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(
                 sha256_text(".pytest_cache/v/cache/nodeids\n"),
                 surface_digest["sha256"],
+            )
+
+    def test_scan_reports_agent_source_definition_violations(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "specs" / "schemas" / "build_request.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas" / "build_artifact.yaml").write_text(
+                "type: object\n",
+                encoding="utf-8",
+            )
+            (repo_root / "src" / "omoikane").mkdir(parents=True, exist_ok=True)
+            agents_root = repo_root / "agents" / "builders"
+            agents_root.mkdir(parents=True, exist_ok=True)
+            (agents_root / "codex-builder.policy.md").write_text(
+                "# Policy\n",
+                encoding="utf-8",
+            )
+            (agents_root / "broken-builder.yaml").write_text(
+                "name: broken-builder\n"
+                "role: builder\n"
+                "version: 1.0.0\n"
+                "trust_floor: 1.5\n"
+                "capabilities:\n"
+                "  - build\n"
+                "substrate_requirements:\n"
+                "  - any\n"
+                "input_schema_ref: specs/schemas/build_request.yaml\n"
+                "output_schema_ref: specs/schemas/build_artifact.yaml\n"
+                "prompt_or_policy_ref: agents/builders/codex-builder.policy.md\n"
+                "build_surface_refs:\n"
+                "  - src/omoikane\n"
+                "execution_policy_ref: agents/builders/codex-builder.policy.md\n"
+                "when_to_invoke: |\n"
+                "  Invoke for test builds.\n"
+                "when_not_to_invoke: |\n"
+                "  Do not invoke outside tests.\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+            hit = report["agent_source_definition_violation_hits"][0]
+
+            self.assertEqual(1, report["agent_source_definition_violation_count"])
+            self.assertEqual("agents/builders/broken-builder.yaml", hit["path"])
+            self.assertEqual("broken-builder", hit["agent_id"])
+            self.assertEqual("builder", hit["role"])
+            self.assertEqual(
+                "schema-bound-agent-source-definition-v1",
+                hit["agent_source_policy_id"],
+            )
+            self.assertEqual(1, hit["error_count"])
+            self.assertIn("trust_floor must be between 0 and 1", hit["line"])
+            self.assertFalse(hit["raw_agent_source_payload_stored"])
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"][
+                    "agent_source_definition_violation_count"
+                ],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "agent-source-definition"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+            self.assertTrue(
+                any(
+                    entry["path"] == "agents/builders/broken-builder.yaml"
+                    and entry["surface_pattern"] == "agents/**/*.yaml"
+                    for entry in report["scan_receipt"]["scan_surface_digests"]
+                )
             )
 
     def test_scan_ignores_non_generated_untracked_files(self) -> None:

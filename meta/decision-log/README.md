@@ -352,6 +352,7 @@ status: decided | superseded
 - [2026-05-01_parallel-codex-worker-identity-evidence.md](2026-05-01_parallel-codex-worker-identity-evidence.md)
 - [2026-05-01_parallel-codex-workspace-marker-diff-classifier.md](2026-05-01_parallel-codex-workspace-marker-diff-classifier.md)
 - [2026-05-01_parallel-codex-workspace-marker-hygiene.md](2026-05-01_parallel-codex-workspace-marker-hygiene.md)
+- [2026-05-02_gap-report-agent-source-definition-validation.md](2026-05-02_gap-report-agent-source-definition-validation.md)
 - [2026-05-02_gap-report-decision-log-index-inventory.md](2026-05-02_gap-report-decision-log-index-inventory.md)
 - [2026-05-02_gap-report-platform-cache-artifact-hygiene.md](2026-05-02_gap-report-platform-cache-artifact-hygiene.md)
 - [2026-05-02_gap-report-top-level-eval-inventory.md](2026-05-02_gap-report-top-level-eval-inventory.md)

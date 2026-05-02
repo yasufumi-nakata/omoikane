@@ -113,6 +113,10 @@ automation が前提にする repo-local `references/*.md` の欠落
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
 residual `future work` に加え、
+`agents/**/*.yaml` の Yaoyorozu agent source definition violation を
+`agent_source_definition_violation_hits` として拾い、
+raw agent source payload は保存せず、source path と policy violation summary だけを返す。
+さらに、
 `src/omoikane/**/*.py` の非抽象 runtime path に残る
 `raise NotImplementedError` も `implementation_stub_hits` として拾う。
 `*Backend._*` の抽象 backend hook は concrete backend subclass が実装するため除外する。
