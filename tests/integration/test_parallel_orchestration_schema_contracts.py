@@ -77,6 +77,10 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             result["yaoyorozu_bridge_receipt"],
         )
         self._assert_schema_valid(
+            "specs/schemas/parallel_codex_worker_result_receipt.schema",
+            result["invalid_yaoyorozu_bridge_receipt"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/parallel_codex_integration_batch_receipt.schema",
             result["batch_receipt"],
         )
@@ -100,7 +104,7 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             "specs/schemas/parallel_codex_post_commit_publication_receipt.schema",
             result["blocked_post_commit_publication_receipt"],
         )
-        self.assertEqual(13, len(result["schema_contracts"]))
+        self.assertEqual(14, len(result["schema_contracts"]))
         self.assertTrue(result["validation"]["ready_for_main_checkout"])
         self.assertTrue(result["validation"]["ready_worker_identity_evidence_bound"])
         self.assertTrue(result["validation"]["ready_workspace_marker_hygiene_clean"])
@@ -229,6 +233,29 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
         )
+        self.assertTrue(
+            result["validation"][
+                "yaoyorozu_bridge_upstream_dispatch_validation_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "yaoyorozu_bridge_upstream_dispatch_schema_validated"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["yaoyorozu_bridge_upstream_dispatch_validation_ok"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "yaoyorozu_bridge_upstream_dispatch_coverage_complete"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "yaoyorozu_bridge_upstream_dispatch_validation_error_free"
+            ]
+        )
         self.assertTrue(result["validation"]["yaoyorozu_bridge_patch_candidates_bound"])
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_worker_identity_evidence_bound"]
@@ -240,6 +267,22 @@ class ParallelOrchestrationSchemaContractTests(unittest.TestCase):
             result["validation"][
                 "yaoyorozu_bridge_raw_worker_identity_payload_redacted"
             ]
+        )
+        self.assertTrue(result["validation"]["invalid_yaoyorozu_bridge_receipt_ok"])
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_result_blocked"]
+        )
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_validation_digest_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_validation_rejected"]
+        )
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_coverage_rejected"]
+        )
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_validation_errors_bound"]
         )
         self.assertEqual(
             "parallel-codex-integration-batch-arbitration-v1",

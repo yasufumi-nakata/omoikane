@@ -27,6 +27,58 @@ def _verification_results() -> list[dict[str, object]]:
     ]
 
 
+def _yaoyorozu_dispatch_result(
+    *,
+    suffix: str,
+    target_path: str,
+) -> dict[str, object]:
+    return {
+        "unit_id": f"worker-dispatch-{suffix}",
+        "report": {
+            "patch_candidate_receipt": {
+                "kind": "yaoyorozu_worker_patch_candidate_receipt",
+                "receipt_ref": f"worker-patch://yaoyorozu-worker-patch-candidate-{suffix}",
+                "receipt_digest": suffix[0] * 64,
+                "status": "candidate-ready",
+                "patch_candidates": [
+                    {
+                        "target_path": target_path,
+                        "patch_descriptor": {"target_path": target_path},
+                        "candidate_digest": suffix[-1] * 64,
+                    }
+                ],
+            }
+        },
+    }
+
+
+def _yaoyorozu_dispatch_receipt(
+    results: list[dict[str, object]] | None = None,
+) -> dict[str, object]:
+    return {
+        "kind": "yaoyorozu_worker_dispatch_receipt",
+        "receipt_id": "yaoyorozu-dispatch-receipt-aaaaaaaaaaaa",
+        "dispatch_plan_ref": "dispatch://yaoyorozu-dispatch-bbbbbbbbbbbb",
+        "dispatch_plan_digest": "d" * 64,
+        "receipt_digest": "e" * 64,
+        "results": results
+        or [
+            _yaoyorozu_dispatch_result(
+                suffix="111111111111",
+                target_path="src/omoikane/agentic/yaoyorozu.py",
+            ),
+            _yaoyorozu_dispatch_result(
+                suffix="222222222222",
+                target_path="specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+            ),
+            _yaoyorozu_dispatch_result(
+                suffix="333333333333",
+                target_path="evals/agentic/yaoyorozu_local_worker_dispatch.yaml",
+            ),
+        ],
+    }
+
+
 class ParallelCodexOrchestrationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.service = ParallelCodexOrchestrationService()
@@ -812,38 +864,7 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         )
 
     def test_yaoyorozu_dispatch_receipt_bridges_to_parallel_ingestion(self) -> None:
-        patch_receipt_digest = "c" * 64
-        dispatch_receipt = {
-            "kind": "yaoyorozu_worker_dispatch_receipt",
-            "receipt_id": "yaoyorozu-dispatch-receipt-aaaaaaaaaaaa",
-            "dispatch_plan_digest": "d" * 64,
-            "receipt_digest": "e" * 64,
-            "results": [
-                {
-                    "report": {
-                        "patch_candidate_receipt": {
-                            "receipt_ref": (
-                                "worker-patch://"
-                                "yaoyorozu-worker-patch-candidate-bbbbbbbbbbbb"
-                            ),
-                            "receipt_digest": patch_receipt_digest,
-                            "patch_candidates": [
-                                {
-                                    "target_path": (
-                                        "src/omoikane/agentic/yaoyorozu.py"
-                                    ),
-                                    "patch_descriptor": {
-                                        "target_path": (
-                                            "src/omoikane/agentic/yaoyorozu.py"
-                                        )
-                                    },
-                                }
-                            ],
-                        }
-                    }
-                }
-            ],
-        }
+        dispatch_receipt = _yaoyorozu_dispatch_receipt()
 
         receipt = self.service.ingest_yaoyorozu_dispatch_receipt(
             dispatch_receipt=dispatch_receipt,
@@ -856,19 +877,73 @@ class ParallelCodexOrchestrationTests(unittest.TestCase):
         self.assertEqual("yaoyorozu-worker-dispatch", receipt["source_system"])
         self.assertEqual("accept-ready", receipt["integration_decision"])
         self.assertEqual(
-            ["src/omoikane/agentic/yaoyorozu.py"],
+            [
+                "src/omoikane/agentic/yaoyorozu.py",
+                "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema",
+                "evals/agentic/yaoyorozu_local_worker_dispatch.yaml",
+            ],
             receipt["changed_files"],
         )
         self.assertEqual(
-            [patch_receipt_digest],
+            ["1" * 64, "2" * 64, "3" * 64],
             receipt["upstream_patch_candidate_receipt_digests"],
         )
+        self.assertEqual(
+            "yaoyorozu-worker-dispatch-schema-coverage-validation-v1",
+            receipt["upstream_dispatch_validation_profile"],
+        )
+        self.assertTrue(receipt["upstream_dispatch_schema_validated"])
+        self.assertTrue(receipt["upstream_dispatch_validation_ok"])
+        self.assertTrue(receipt["upstream_dispatch_coverage_complete"])
+        self.assertEqual(3, receipt["upstream_dispatch_result_count"])
+        self.assertEqual(3, receipt["upstream_dispatch_patch_candidate_receipt_count"])
+        self.assertEqual(0, receipt["upstream_dispatch_validation_error_count"])
+        self.assertEqual([], receipt["upstream_dispatch_validation_errors"])
         self.assertTrue(receipt["worker_identity_evidence_bound"])
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["upstream_dispatch_validation_digest_bound"])
+        self.assertTrue(validation["upstream_dispatch_schema_validated"])
+        self.assertTrue(validation["upstream_dispatch_validation_ok"])
+        self.assertTrue(validation["upstream_dispatch_coverage_complete"])
+        self.assertTrue(validation["upstream_dispatch_validation_error_free"])
         self.assertTrue(validation["worker_identity_evidence_bound"])
         self.assertFalse(receipt["raw_upstream_payload_stored"])
         self.assertFalse(receipt["raw_worker_identity_payload_stored"])
+
+    def test_invalid_yaoyorozu_dispatch_receipt_is_blocked(self) -> None:
+        dispatch_receipt = _yaoyorozu_dispatch_receipt(
+            results=[
+                _yaoyorozu_dispatch_result(
+                    suffix="444444444444",
+                    target_path="src/omoikane/agentic/yaoyorozu.py",
+                ),
+            ],
+        )
+
+        receipt = self.service.ingest_yaoyorozu_dispatch_receipt(
+            dispatch_receipt=dispatch_receipt,
+            main_checkout_head=MAIN_HEAD,
+            worker_base_commit=MAIN_HEAD,
+            verification_results=_verification_results(),
+        )
+        validation = self.service.validate_worker_result_receipt(receipt)
+
+        self.assertEqual("yaoyorozu-worker-dispatch", receipt["source_system"])
+        self.assertEqual("blocked", receipt["integration_decision"])
+        self.assertFalse(receipt["upstream_dispatch_validation_ok"])
+        self.assertFalse(receipt["upstream_dispatch_coverage_complete"])
+        self.assertEqual(1, receipt["upstream_dispatch_result_count"])
+        self.assertIn(
+            "results must contain at least 3 worker reports",
+            receipt["upstream_dispatch_validation_errors"],
+        )
+        self.assertTrue(validation["ok"])
+        self.assertFalse(validation["ready_for_main_checkout"])
+        self.assertTrue(validation["upstream_dispatch_validation_digest_bound"])
+        self.assertFalse(validation["upstream_dispatch_validation_ok"])
+        self.assertFalse(validation["upstream_dispatch_coverage_complete"])
+        self.assertFalse(validation["upstream_dispatch_validation_error_free"])
 
     def test_integration_batch_orders_ready_receipts_and_quarantines_blocked(self) -> None:
         first_receipt = self.service.ingest_worker_result(

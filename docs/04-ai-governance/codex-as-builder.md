@@ -58,6 +58,12 @@ raw remote content / ancestry payload は保存しない。
 workspace-enacted marker-only payload は raw diff / raw segment payload を保存せずに
 diff digest または segment manifest digest、line counts、segment counts、
 classifier status へ縮約され、marker だけの worker result は blocked のまま保持される。
+Yaoyorozu worker dispatch 由来の bridge は upstream dispatch receipt を
+`yaoyorozu-worker-dispatch-schema-coverage-validation-v1` で検証し、3-4 件の
+worker result coverage、各 result の patch candidate receipt、target path、
+candidate digest、validation digest を `parallel_codex_worker_result_receipt` に束縛する。
+coverage 不足や patch candidate 欠落がある bridge result は raw dispatch payload を
+保存せず、schema-bound のまま blocked にする。
 複数の accept-ready receipt を main checkout に混ぜる前には
 `parallel_codex_integration_batch_receipt` で receipt set digest、digest/ref 順の
 ordered integration digest、blocked-receipt quarantine manifest digest、

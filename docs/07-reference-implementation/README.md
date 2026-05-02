@@ -958,6 +958,12 @@ blocked receipt は stale worker base commit を schema-bound に残しつつ
 dispatch receipt digest、dispatch plan digest、patch candidate receipt refs/digests、
 changed files を取り出し、`upstream_binding_digest` と derived `patch_digest` を持つ
 `source_system=yaoyorozu-worker-dispatch` receipt へ変換する。
+この bridge は `yaoyorozu-worker-dispatch-schema-coverage-validation-v1` で
+upstream dispatch の kind、receipt digest、dispatch plan digest、3-4 件の
+worker result coverage、各 result の patch candidate receipt、target path、
+candidate digest を検証し、その validation digest も `upstream_binding_digest` へ含める。
+coverage 不足や patch candidate 欠落がある dispatch は
+schema-bound のまま `integration_decision=blocked` にする。
 Yaoyorozu bridge receipt も同じ worker identity evidence に束縛される。
 raw dispatch payload、raw patch payload、raw worker identity payload は
 Parallel Codex 側へ保存しない。

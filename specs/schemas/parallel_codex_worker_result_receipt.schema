@@ -86,6 +86,15 @@ required:
   - upstream_receipt_digest
   - upstream_patch_candidate_receipt_refs
   - upstream_patch_candidate_receipt_digests
+  - upstream_dispatch_validation_profile
+  - upstream_dispatch_schema_validated
+  - upstream_dispatch_validation_ok
+  - upstream_dispatch_coverage_complete
+  - upstream_dispatch_result_count
+  - upstream_dispatch_patch_candidate_receipt_count
+  - upstream_dispatch_validation_error_count
+  - upstream_dispatch_validation_errors
+  - upstream_dispatch_validation_digest
   - upstream_binding_digest
   - worker_id
   - worker_role
@@ -348,6 +357,37 @@ properties:
     items:
       type: string
       pattern: "^[a-f0-9]{64}$"
+  upstream_dispatch_validation_profile:
+    type: string
+    enum:
+      - yaoyorozu-worker-dispatch-schema-coverage-validation-v1
+      - not-applicable
+  upstream_dispatch_schema_validated:
+    type: boolean
+  upstream_dispatch_validation_ok:
+    type: boolean
+  upstream_dispatch_coverage_complete:
+    type: boolean
+  upstream_dispatch_result_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  upstream_dispatch_patch_candidate_receipt_count:
+    type: integer
+    minimum: 0
+    maximum: 4
+  upstream_dispatch_validation_error_count:
+    type: integer
+    minimum: 0
+  upstream_dispatch_validation_errors:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  upstream_dispatch_validation_digest:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
   upstream_binding_digest:
     type: string
     pattern: "^[a-f0-9]{64}$"

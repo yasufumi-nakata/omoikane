@@ -66,8 +66,10 @@ hourly builder や broad automation が複数 Codex worker / subagent / 外部
 - raw payload や長い transcript は保存せず、ref / digest / bounded receipt に縮約する
 - `parallel-orchestration-demo --json` は ready worker result と stale worker result の
   両方を receipt 化し、stale / failed / blocked result を fail-closed にする
-- Yaoyorozu dispatch 由来の worker result も upstream receipt / patch candidate digest と
-  worker identity evidence の両方を持つ ingestion receipt へ変換する
+- Yaoyorozu dispatch 由来の worker result も upstream receipt / patch candidate digest、
+  dispatch schema / coverage validation digest、worker identity evidence を持つ ingestion
+  receipt へ変換し、3-4 件の worker result coverage と patch candidate coverage が
+  揃わない bridge receipt は blocked のまま保持する
 - integration batch receipt は ready worker と Yaoyorozu bridge receipt を
   conflict-free batch として `integration-ready` にし、overlap する ready receipt
   セットは conflict digest を束縛したまま `blocked` にする

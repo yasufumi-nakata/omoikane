@@ -5,7 +5,7 @@ summary: >
   verification result、base commit freshness、signed worker identity、remote
   branch / PR metadata、remote source revocation check、freshness window、
   signed provider timestamp、timestamp replay guard、remote source content identity、
-  remote source main-head ancestry を main checkout integration 前の digest-only receipt として
+  remote source main-head ancestry、Yaoyorozu upstream dispatch schema / coverage validation を main checkout integration 前の digest-only receipt として
   固定し、repo-local diff classifier または structured patch-segment manifest で検出した workspace-enacted marker-only result、
   stale worker result、unrelated ancestry result を fail-closed にすること
 checks:
@@ -70,8 +70,18 @@ expect:
   marker_only_raw_segment_payload_redacted: true
   yaoyorozu_bridge_ready_for_main_checkout: true
   yaoyorozu_bridge_upstream_binding_digest_bound: true
+  yaoyorozu_bridge_upstream_dispatch_validation_digest_bound: true
+  yaoyorozu_bridge_upstream_dispatch_schema_validated: true
+  yaoyorozu_bridge_upstream_dispatch_validation_ok: true
+  yaoyorozu_bridge_upstream_dispatch_coverage_complete: true
+  yaoyorozu_bridge_upstream_dispatch_validation_error_free: true
   yaoyorozu_bridge_patch_candidates_bound: true
   yaoyorozu_bridge_worker_identity_evidence_bound: true
+  invalid_yaoyorozu_bridge_result_blocked: true
+  invalid_yaoyorozu_bridge_validation_digest_bound: true
+  invalid_yaoyorozu_bridge_validation_rejected: true
+  invalid_yaoyorozu_bridge_coverage_rejected: true
+  invalid_yaoyorozu_bridge_validation_errors_bound: true
   ledger_bound: true
   raw_patch_payload_stored: false
   raw_upstream_payload_stored: false

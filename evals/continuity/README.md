@@ -148,9 +148,11 @@ verification manifest、worker base commit freshness、signed worker identity、
 repo-local workspace marker diff classifier または structured patch-segment
 manifest、remote branch / PR metadata、remote source revocation check、freshness
 window、signed provider timestamp、timestamp replay guard、remote source content
-identity、remote source main-head ancestry を main checkout integration 前の
+identity、remote source main-head ancestry、Yaoyorozu upstream dispatch schema /
+coverage validation を main checkout integration 前の
 schema-bound receipt として固定し、stale worker result、marker-only result、
-unrelated ancestry result を fail-closed にできるか。
+unrelated ancestry result、under-covered Yaoyorozu bridge result を fail-closed
+にできるか。
 
 ### Parallel Codex Integration Execution
 parallel-orchestration-demo が integration-ready batch receipt を source batch
@@ -198,6 +200,7 @@ commit finalization gate 未 ready execution を fail-closed にできるか。
 - `parallel_codex_post_commit_publication.yaml`
   - commit-finalized Parallel Codex handoff が pre-push origin/main freshness、push / remote-head verification、ls-remote output の observed head/ref digest、GitHub protected branch provider policy receipt、required verification checks、post-push status/check suite digest、status/check suite freshness digest、status/check suite signed provider timestamp / replay guard digest、raw provider / status check / status check freshness / status check timestamp payload 非保存まで束縛すること
 - `parallel_codex_result_ingestion.yaml`
+  - Yaoyorozu dispatch bridge が upstream dispatch result count / patch-candidate coverage / validation digest を束縛し、coverage 不足の bridge receipt を blocked にすること
 - `patch_generator_direct_contract.yaml`
 - `procedural_actuation_bridge.yaml`
 - `procedural_preview_contract.yaml`

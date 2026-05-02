@@ -130,6 +130,11 @@ PARALLEL_CODEX_POST_COMMIT_STATUS_CHECK_TIMESTAMP_REPLAYED_STATUS = "replayed"
 PARALLEL_CODEX_YAOYOROZU_BRIDGE_PROFILE = (
     "yaoyorozu-dispatch-to-parallel-codex-ingestion-v1"
 )
+PARALLEL_CODEX_YAOYOROZU_DISPATCH_VALIDATION_PROFILE = (
+    "yaoyorozu-worker-dispatch-schema-coverage-validation-v1"
+)
+PARALLEL_CODEX_YAOYOROZU_DISPATCH_MIN_RESULT_COUNT = 3
+PARALLEL_CODEX_YAOYOROZU_DISPATCH_MAX_RESULT_COUNT = 4
 PARALLEL_CODEX_INTEGRATION_POLICY_PROFILE = (
     "main-checkout-worker-result-ingestion-v1"
 )
@@ -600,6 +605,15 @@ class ParallelCodexOrchestrationService:
         upstream_receipt_digest: str = "",
         upstream_patch_candidate_receipt_refs: Sequence[str] = (),
         upstream_patch_candidate_receipt_digests: Sequence[str] = (),
+        upstream_dispatch_validation_profile: str = "",
+        upstream_dispatch_schema_validated: bool = False,
+        upstream_dispatch_validation_ok: bool = False,
+        upstream_dispatch_coverage_complete: bool = False,
+        upstream_dispatch_result_count: int = 0,
+        upstream_dispatch_patch_candidate_receipt_count: int = 0,
+        upstream_dispatch_validation_error_count: int = 0,
+        upstream_dispatch_validation_errors: Sequence[str] = (),
+        upstream_dispatch_validation_digest: str = "",
         remote_branch_ref: str = "",
         remote_pr_ref: str = "",
         remote_review_authority_ref: str = "",
@@ -675,6 +689,66 @@ class ParallelCodexOrchestrationService:
         normalized_upstream_digests = _dedupe_strings(
             upstream_patch_candidate_receipt_digests,
         )
+        normalized_dispatch_validation_profile = (
+            upstream_dispatch_validation_profile.strip()
+            or PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+        )
+        normalized_dispatch_validation_errors = _dedupe_strings(
+            upstream_dispatch_validation_errors,
+        )
+        normalized_dispatch_result_count = max(
+            0,
+            _coerce_int(upstream_dispatch_result_count),
+        )
+        normalized_dispatch_patch_candidate_receipt_count = max(
+            0,
+            _coerce_int(upstream_dispatch_patch_candidate_receipt_count),
+        )
+        normalized_dispatch_validation_error_count = max(
+            0,
+            _coerce_int(upstream_dispatch_validation_error_count),
+        )
+        normalized_dispatch_validation_digest = (
+            upstream_dispatch_validation_digest.strip()
+        )
+        if not _is_sha256(normalized_dispatch_validation_digest):
+            normalized_dispatch_validation_digest = (
+                self._upstream_dispatch_validation_digest(
+                    source_system=normalized_source_system,
+                    upstream_dispatch_validation_profile=(
+                        normalized_dispatch_validation_profile
+                    ),
+                    upstream_dispatch_schema_validated=(
+                        upstream_dispatch_schema_validated
+                    ),
+                    upstream_dispatch_validation_ok=(
+                        upstream_dispatch_validation_ok
+                    ),
+                    upstream_dispatch_coverage_complete=(
+                        upstream_dispatch_coverage_complete
+                    ),
+                    upstream_dispatch_result_count=(
+                        normalized_dispatch_result_count
+                    ),
+                    upstream_dispatch_patch_candidate_receipt_count=(
+                        normalized_dispatch_patch_candidate_receipt_count
+                    ),
+                    upstream_dispatch_validation_error_count=(
+                        normalized_dispatch_validation_error_count
+                    ),
+                    upstream_dispatch_validation_errors=(
+                        normalized_dispatch_validation_errors
+                    ),
+                    upstream_receipt_ref=upstream_receipt_ref,
+                    upstream_receipt_digest=upstream_receipt_digest,
+                    upstream_patch_candidate_receipt_refs=normalized_upstream_refs,
+                    upstream_patch_candidate_receipt_digests=(
+                        normalized_upstream_digests
+                    ),
+                )
+                if normalized_source_system == "yaoyorozu-worker-dispatch"
+                else ""
+            )
         normalized_verifications = self._normalize_verification_results(
             verification_results,
         )
@@ -814,12 +888,38 @@ class ParallelCodexOrchestrationService:
             "upstream_receipt_digest": upstream_receipt_digest,
             "upstream_patch_candidate_receipt_refs": normalized_upstream_refs,
             "upstream_patch_candidate_receipt_digests": normalized_upstream_digests,
+            "upstream_dispatch_validation_profile": (
+                normalized_dispatch_validation_profile
+            ),
+            "upstream_dispatch_schema_validated": (
+                upstream_dispatch_schema_validated
+            ),
+            "upstream_dispatch_validation_ok": upstream_dispatch_validation_ok,
+            "upstream_dispatch_coverage_complete": (
+                upstream_dispatch_coverage_complete
+            ),
+            "upstream_dispatch_result_count": normalized_dispatch_result_count,
+            "upstream_dispatch_patch_candidate_receipt_count": (
+                normalized_dispatch_patch_candidate_receipt_count
+            ),
+            "upstream_dispatch_validation_error_count": (
+                normalized_dispatch_validation_error_count
+            ),
+            "upstream_dispatch_validation_errors": (
+                normalized_dispatch_validation_errors
+            ),
+            "upstream_dispatch_validation_digest": (
+                normalized_dispatch_validation_digest
+            ),
             "upstream_binding_digest": self._upstream_binding_digest(
                 source_system=normalized_source_system,
                 upstream_receipt_ref=upstream_receipt_ref,
                 upstream_receipt_digest=upstream_receipt_digest,
                 upstream_patch_candidate_receipt_refs=normalized_upstream_refs,
                 upstream_patch_candidate_receipt_digests=normalized_upstream_digests,
+                upstream_dispatch_validation_digest=(
+                    normalized_dispatch_validation_digest
+                ),
                 changed_files=normalized_files,
             ),
             "worker_id": worker_id,
@@ -902,6 +1002,11 @@ class ParallelCodexOrchestrationService:
         patch_candidate_receipts = self._yaoyorozu_patch_candidate_receipts(
             dispatch_receipt,
         )
+        dispatch_validation = self._validate_yaoyorozu_dispatch_receipt(
+            dispatch_receipt=dispatch_receipt,
+            changed_files=changed_files,
+            patch_candidate_receipts=patch_candidate_receipts,
+        )
         upstream_refs = [
             str(receipt.get("receipt_ref", "")).strip()
             for receipt in patch_candidate_receipts
@@ -943,7 +1048,7 @@ class ParallelCodexOrchestrationService:
             worker_role="worker",
             worker_result_status=(
                 "completed"
-                if dispatch_receipt.get("kind") == "yaoyorozu_worker_dispatch_receipt"
+                if dispatch_validation["validation_ok"]
                 else "blocked"
             ),
             main_checkout_head=main_checkout_head,
@@ -958,6 +1063,29 @@ class ParallelCodexOrchestrationService:
             upstream_receipt_digest=upstream_receipt_digest,
             upstream_patch_candidate_receipt_refs=upstream_refs,
             upstream_patch_candidate_receipt_digests=upstream_digests,
+            upstream_dispatch_validation_profile=dispatch_validation[
+                "validation_profile"
+            ],
+            upstream_dispatch_schema_validated=dispatch_validation[
+                "schema_validated"
+            ],
+            upstream_dispatch_validation_ok=dispatch_validation["validation_ok"],
+            upstream_dispatch_coverage_complete=dispatch_validation[
+                "coverage_complete"
+            ],
+            upstream_dispatch_result_count=dispatch_validation["result_count"],
+            upstream_dispatch_patch_candidate_receipt_count=dispatch_validation[
+                "patch_candidate_receipt_count"
+            ],
+            upstream_dispatch_validation_error_count=dispatch_validation[
+                "validation_error_count"
+            ],
+            upstream_dispatch_validation_errors=dispatch_validation[
+                "validation_errors"
+            ],
+            upstream_dispatch_validation_digest=dispatch_validation[
+                "validation_digest"
+            ],
         )
 
     def plan_integration_batch(
@@ -3700,6 +3828,65 @@ class ParallelCodexOrchestrationService:
             receipt.get("verification_manifest_digest")
             == self._verification_manifest_digest(verification_results)
         )
+        upstream_dispatch_validation_errors = list(
+            receipt.get("upstream_dispatch_validation_errors", []),
+        )
+        upstream_dispatch_validation_digest_bound = (
+            (
+                receipt.get("source_system") != "yaoyorozu-worker-dispatch"
+                and receipt.get("upstream_dispatch_validation_profile")
+                == PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+                and receipt.get("upstream_dispatch_validation_digest") == ""
+            )
+            or (
+                receipt.get("source_system") == "yaoyorozu-worker-dispatch"
+                and receipt.get("upstream_dispatch_validation_digest")
+                == self._upstream_dispatch_validation_digest(
+                    source_system=str(receipt.get("source_system", "")),
+                    upstream_dispatch_validation_profile=str(
+                        receipt.get("upstream_dispatch_validation_profile", ""),
+                    ),
+                    upstream_dispatch_schema_validated=bool(
+                        receipt.get("upstream_dispatch_schema_validated", False),
+                    ),
+                    upstream_dispatch_validation_ok=bool(
+                        receipt.get("upstream_dispatch_validation_ok", False),
+                    ),
+                    upstream_dispatch_coverage_complete=bool(
+                        receipt.get("upstream_dispatch_coverage_complete", False),
+                    ),
+                    upstream_dispatch_result_count=_coerce_int(
+                        receipt.get("upstream_dispatch_result_count"),
+                    ),
+                    upstream_dispatch_patch_candidate_receipt_count=_coerce_int(
+                        receipt.get(
+                            "upstream_dispatch_patch_candidate_receipt_count",
+                        ),
+                    ),
+                    upstream_dispatch_validation_error_count=_coerce_int(
+                        receipt.get("upstream_dispatch_validation_error_count"),
+                    ),
+                    upstream_dispatch_validation_errors=(
+                        upstream_dispatch_validation_errors
+                    ),
+                    upstream_receipt_ref=str(
+                        receipt.get("upstream_receipt_ref", ""),
+                    ),
+                    upstream_receipt_digest=str(
+                        receipt.get("upstream_receipt_digest", ""),
+                    ),
+                    upstream_patch_candidate_receipt_refs=list(
+                        receipt.get("upstream_patch_candidate_receipt_refs", []),
+                    ),
+                    upstream_patch_candidate_receipt_digests=list(
+                        receipt.get(
+                            "upstream_patch_candidate_receipt_digests",
+                            [],
+                        ),
+                    ),
+                )
+            )
+        )
         remote_metadata_digest_bound = (
             receipt.get("remote_metadata_digest")
             == self._remote_metadata_digest(
@@ -4204,9 +4391,14 @@ class ParallelCodexOrchestrationService:
             upstream_patch_candidate_receipt_digests=list(
                 receipt.get("upstream_patch_candidate_receipt_digests", []),
             ),
+            upstream_dispatch_validation_digest=str(
+                receipt.get("upstream_dispatch_validation_digest", ""),
+            ),
             changed_files=changed_files,
         ):
             errors.append("upstream_binding_digest mismatch")
+        if not upstream_dispatch_validation_digest_bound:
+            errors.append("upstream_dispatch_validation_digest mismatch")
         if receipt.get("base_head_matches") != (
             receipt.get("main_checkout_head") == receipt.get("worker_base_commit")
         ):
@@ -4329,6 +4521,26 @@ class ParallelCodexOrchestrationService:
                     PARALLEL_CODEX_REMOTE_SOURCE_ANCESTRY_BOUND_STATUS,
                     PARALLEL_CODEX_REMOTE_SOURCE_REVOCATION_NOT_APPLICABLE_STATUS,
                 }
+            ),
+            "upstream_dispatch_validation_digest_bound": (
+                upstream_dispatch_validation_digest_bound
+            ),
+            "upstream_dispatch_schema_validated": (
+                receipt.get("upstream_dispatch_schema_validated") is True
+            ),
+            "upstream_dispatch_validation_ok": (
+                receipt.get("upstream_dispatch_validation_ok") is True
+            ),
+            "upstream_dispatch_coverage_complete": (
+                receipt.get("upstream_dispatch_coverage_complete") is True
+            ),
+            "upstream_dispatch_validation_error_free": (
+                _coerce_int(
+                    receipt.get("upstream_dispatch_validation_error_count"),
+                    -1,
+                )
+                == 0
+                and not upstream_dispatch_validation_errors
             ),
             "remote_source_base_commit_matches_worker": (
                 receipt.get("remote_source_base_commit", "")
@@ -7617,6 +7829,12 @@ class ParallelCodexOrchestrationService:
         upstream_patch_candidate_digests = list(
             receipt.get("upstream_patch_candidate_receipt_digests", []),
         )
+        upstream_patch_candidate_refs = list(
+            receipt.get("upstream_patch_candidate_receipt_refs", []),
+        )
+        upstream_dispatch_validation_errors = list(
+            receipt.get("upstream_dispatch_validation_errors", []),
+        )
         if source_system not in set(self._policy.accepted_source_systems):
             reasons.append("source_system must be an accepted worker result source")
         if source_system in {"direct-worker-result", PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM}:
@@ -7625,11 +7843,56 @@ class ParallelCodexOrchestrationService:
                     f"{source_system} results must not carry upstream receipt refs",
                 )
             if (
-                receipt.get("upstream_patch_candidate_receipt_refs")
+                upstream_patch_candidate_refs
                 or upstream_patch_candidate_digests
             ):
                 reasons.append(
                     f"{source_system} results must not carry upstream patch candidates"
+                )
+            if (
+                receipt.get("upstream_dispatch_validation_profile")
+                != PARALLEL_CODEX_REMOTE_METADATA_NOT_APPLICABLE_PROFILE
+            ):
+                reasons.append(
+                    f"{source_system} results must mark upstream dispatch validation not-applicable"
+                )
+            if receipt.get("upstream_dispatch_schema_validated") is not False:
+                reasons.append(
+                    f"{source_system} results must not mark upstream dispatch schema validated"
+                )
+            if receipt.get("upstream_dispatch_validation_ok") is not False:
+                reasons.append(
+                    f"{source_system} results must not mark upstream dispatch validation ok"
+                )
+            if receipt.get("upstream_dispatch_coverage_complete") is not False:
+                reasons.append(
+                    f"{source_system} results must not mark upstream dispatch coverage complete"
+                )
+            if _coerce_int(receipt.get("upstream_dispatch_result_count"), -1) != 0:
+                reasons.append(
+                    f"{source_system} results must not carry upstream dispatch result count"
+                )
+            if (
+                _coerce_int(
+                    receipt.get("upstream_dispatch_patch_candidate_receipt_count"),
+                    -1,
+                )
+                != 0
+            ):
+                reasons.append(
+                    f"{source_system} results must not carry upstream dispatch patch candidate count"
+                )
+            if (
+                _coerce_int(receipt.get("upstream_dispatch_validation_error_count"), -1)
+                != 0
+                or upstream_dispatch_validation_errors
+            ):
+                reasons.append(
+                    f"{source_system} results must not carry upstream dispatch validation errors"
+                )
+            if receipt.get("upstream_dispatch_validation_digest"):
+                reasons.append(
+                    f"{source_system} results must not carry upstream dispatch validation digest"
                 )
         if source_system == PARALLEL_CODEX_REMOTE_SOURCE_SYSTEM:
             if receipt.get("worker_role") != "external":
@@ -8290,6 +8553,108 @@ class ParallelCodexOrchestrationService:
                 reasons.append(
                     "yaoyorozu bridge requires patch candidate receipt refs"
                 )
+            if (
+                receipt.get("upstream_dispatch_validation_profile")
+                != PARALLEL_CODEX_YAOYOROZU_DISPATCH_VALIDATION_PROFILE
+            ):
+                reasons.append(
+                    "yaoyorozu bridge requires upstream dispatch validation profile"
+                )
+            if receipt.get("upstream_dispatch_schema_validated") is not True:
+                reasons.append(
+                    "yaoyorozu bridge requires upstream dispatch schema validation"
+                )
+            if receipt.get("upstream_dispatch_validation_ok") is not True:
+                reasons.append(
+                    "yaoyorozu bridge requires upstream dispatch validation ok"
+                )
+            if receipt.get("upstream_dispatch_coverage_complete") is not True:
+                reasons.append(
+                    "yaoyorozu bridge requires complete upstream dispatch coverage"
+                )
+            result_count = _coerce_int(
+                receipt.get("upstream_dispatch_result_count"),
+                -1,
+            )
+            if (
+                result_count
+                < PARALLEL_CODEX_YAOYOROZU_DISPATCH_MIN_RESULT_COUNT
+                or result_count
+                > PARALLEL_CODEX_YAOYOROZU_DISPATCH_MAX_RESULT_COUNT
+            ):
+                reasons.append(
+                    "yaoyorozu bridge requires 3 to 4 upstream dispatch results"
+                )
+            patch_candidate_count = _coerce_int(
+                receipt.get("upstream_dispatch_patch_candidate_receipt_count"),
+                -1,
+            )
+            if (
+                patch_candidate_count != result_count
+                or patch_candidate_count != len(upstream_patch_candidate_digests)
+                or patch_candidate_count != len(upstream_patch_candidate_refs)
+            ):
+                reasons.append(
+                    "yaoyorozu bridge requires one patch candidate receipt per upstream result"
+                )
+            if (
+                _coerce_int(receipt.get("upstream_dispatch_validation_error_count"), -1)
+                != len(upstream_dispatch_validation_errors)
+            ):
+                reasons.append(
+                    "upstream_dispatch_validation_error_count mismatch"
+                )
+            if upstream_dispatch_validation_errors:
+                reasons.append(
+                    "yaoyorozu bridge upstream dispatch validation errors must be empty"
+                )
+            expected_dispatch_validation_digest = (
+                self._upstream_dispatch_validation_digest(
+                    source_system=str(source_system),
+                    upstream_dispatch_validation_profile=str(
+                        receipt.get("upstream_dispatch_validation_profile", ""),
+                    ),
+                    upstream_dispatch_schema_validated=bool(
+                        receipt.get("upstream_dispatch_schema_validated", False),
+                    ),
+                    upstream_dispatch_validation_ok=bool(
+                        receipt.get("upstream_dispatch_validation_ok", False),
+                    ),
+                    upstream_dispatch_coverage_complete=bool(
+                        receipt.get("upstream_dispatch_coverage_complete", False),
+                    ),
+                    upstream_dispatch_result_count=result_count,
+                    upstream_dispatch_patch_candidate_receipt_count=(
+                        patch_candidate_count
+                    ),
+                    upstream_dispatch_validation_error_count=_coerce_int(
+                        receipt.get("upstream_dispatch_validation_error_count"),
+                        -1,
+                    ),
+                    upstream_dispatch_validation_errors=(
+                        upstream_dispatch_validation_errors
+                    ),
+                    upstream_receipt_ref=str(
+                        receipt.get("upstream_receipt_ref", ""),
+                    ),
+                    upstream_receipt_digest=str(upstream_receipt_digest or ""),
+                    upstream_patch_candidate_receipt_refs=(
+                        upstream_patch_candidate_refs
+                    ),
+                    upstream_patch_candidate_receipt_digests=(
+                        upstream_patch_candidate_digests
+                    ),
+                )
+            )
+            if not _is_sha256(receipt.get("upstream_dispatch_validation_digest")):
+                reasons.append(
+                    "upstream_dispatch_validation_digest must be sha256"
+                )
+            elif (
+                receipt.get("upstream_dispatch_validation_digest")
+                != expected_dispatch_validation_digest
+            ):
+                reasons.append("upstream_dispatch_validation_digest mismatch")
         if not _is_sha256(receipt.get("upstream_binding_digest")):
             reasons.append("upstream_binding_digest must be a sha256 hex digest")
         if receipt.get("raw_upstream_payload_stored") is not False:
@@ -9958,6 +10323,7 @@ class ParallelCodexOrchestrationService:
         upstream_receipt_digest: str,
         upstream_patch_candidate_receipt_refs: Sequence[str],
         upstream_patch_candidate_receipt_digests: Sequence[str],
+        upstream_dispatch_validation_digest: str = "",
         changed_files: Sequence[str],
     ) -> str:
         return sha256_text(
@@ -9972,10 +10338,236 @@ class ParallelCodexOrchestrationService:
                     "upstream_patch_candidate_receipt_digests": list(
                         upstream_patch_candidate_receipt_digests,
                     ),
+                    "upstream_dispatch_validation_digest": (
+                        upstream_dispatch_validation_digest
+                    ),
                     "changed_files": list(changed_files),
                 }
             )
         )
+
+    @staticmethod
+    def _upstream_dispatch_validation_digest(
+        *,
+        source_system: str,
+        upstream_dispatch_validation_profile: str,
+        upstream_dispatch_schema_validated: bool,
+        upstream_dispatch_validation_ok: bool,
+        upstream_dispatch_coverage_complete: bool,
+        upstream_dispatch_result_count: int,
+        upstream_dispatch_patch_candidate_receipt_count: int,
+        upstream_dispatch_validation_error_count: int,
+        upstream_dispatch_validation_errors: Sequence[str],
+        upstream_receipt_ref: str,
+        upstream_receipt_digest: str,
+        upstream_patch_candidate_receipt_refs: Sequence[str],
+        upstream_patch_candidate_receipt_digests: Sequence[str],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "source_system": source_system,
+                    "upstream_dispatch_validation_profile": (
+                        upstream_dispatch_validation_profile
+                    ),
+                    "upstream_dispatch_schema_validated": (
+                        upstream_dispatch_schema_validated
+                    ),
+                    "upstream_dispatch_validation_ok": (
+                        upstream_dispatch_validation_ok
+                    ),
+                    "upstream_dispatch_coverage_complete": (
+                        upstream_dispatch_coverage_complete
+                    ),
+                    "upstream_dispatch_result_count": (
+                        upstream_dispatch_result_count
+                    ),
+                    "upstream_dispatch_patch_candidate_receipt_count": (
+                        upstream_dispatch_patch_candidate_receipt_count
+                    ),
+                    "upstream_dispatch_validation_error_count": (
+                        upstream_dispatch_validation_error_count
+                    ),
+                    "upstream_dispatch_validation_errors": list(
+                        upstream_dispatch_validation_errors,
+                    ),
+                    "upstream_receipt_ref": upstream_receipt_ref,
+                    "upstream_receipt_digest": upstream_receipt_digest,
+                    "upstream_patch_candidate_receipt_refs": list(
+                        upstream_patch_candidate_receipt_refs,
+                    ),
+                    "upstream_patch_candidate_receipt_digests": list(
+                        upstream_patch_candidate_receipt_digests,
+                    ),
+                }
+            )
+        )
+
+    def _validate_yaoyorozu_dispatch_receipt(
+        self,
+        *,
+        dispatch_receipt: Mapping[str, Any],
+        changed_files: Sequence[str],
+        patch_candidate_receipts: Sequence[Mapping[str, Any]],
+    ) -> Dict[str, Any]:
+        errors: list[str] = []
+        if dispatch_receipt.get("kind") != "yaoyorozu_worker_dispatch_receipt":
+            errors.append("dispatch kind must be yaoyorozu_worker_dispatch_receipt")
+        receipt_id = str(dispatch_receipt.get("receipt_id", "")).strip()
+        if not receipt_id.startswith("yaoyorozu-dispatch-receipt-"):
+            errors.append("dispatch receipt_id must be yaoyorozu-dispatch-receipt")
+        if not _is_sha256(dispatch_receipt.get("receipt_digest")):
+            errors.append("dispatch receipt_digest must be sha256")
+        if not str(dispatch_receipt.get("dispatch_plan_ref", "")).startswith(
+            "dispatch://",
+        ):
+            errors.append("dispatch_plan_ref must use dispatch://")
+        if not _is_sha256(dispatch_receipt.get("dispatch_plan_digest")):
+            errors.append("dispatch_plan_digest must be sha256")
+
+        results = dispatch_receipt.get("results", [])
+        if not isinstance(results, list):
+            results = []
+            errors.append("results must be an array")
+        result_count = len(results)
+        if result_count < PARALLEL_CODEX_YAOYOROZU_DISPATCH_MIN_RESULT_COUNT:
+            errors.append("results must contain at least 3 worker reports")
+        if result_count > PARALLEL_CODEX_YAOYOROZU_DISPATCH_MAX_RESULT_COUNT:
+            errors.append("results must contain at most 4 worker reports")
+
+        patch_candidate_receipt_count = len(patch_candidate_receipts)
+        if patch_candidate_receipt_count != result_count:
+            errors.append("each result must carry one patch_candidate_receipt")
+        if not changed_files:
+            errors.append("dispatch must yield at least one changed file")
+
+        for index, result in enumerate(results, start=1):
+            if not isinstance(result, Mapping):
+                errors.append(f"result {index} must be an object")
+                continue
+            if not str(result.get("unit_id", "")).startswith("worker-dispatch-"):
+                errors.append(f"result {index} unit_id must be worker-dispatch")
+            report = result.get("report", {})
+            if not isinstance(report, Mapping):
+                errors.append(f"result {index} report must be an object")
+                continue
+            patch_candidate_receipt = report.get("patch_candidate_receipt", {})
+            if not isinstance(patch_candidate_receipt, Mapping):
+                errors.append(
+                    f"result {index} report must carry patch_candidate_receipt",
+                )
+                continue
+            if (
+                patch_candidate_receipt.get("kind")
+                != "yaoyorozu_worker_patch_candidate_receipt"
+            ):
+                errors.append(
+                    f"result {index} patch_candidate_receipt kind mismatch",
+                )
+            if not str(patch_candidate_receipt.get("receipt_ref", "")).startswith(
+                "worker-patch://",
+            ):
+                errors.append(
+                    f"result {index} patch_candidate receipt_ref must use worker-patch://",
+                )
+            if not _is_sha256(patch_candidate_receipt.get("receipt_digest")):
+                errors.append(
+                    f"result {index} patch_candidate receipt_digest must be sha256",
+                )
+            if patch_candidate_receipt.get("status") != "candidate-ready":
+                errors.append(
+                    f"result {index} patch_candidate status must be candidate-ready",
+                )
+            candidates = patch_candidate_receipt.get("patch_candidates", [])
+            if not isinstance(candidates, list) or not candidates:
+                errors.append(
+                    f"result {index} patch_candidate must include candidates",
+                )
+                continue
+            for candidate_index, candidate in enumerate(candidates, start=1):
+                if not isinstance(candidate, Mapping):
+                    errors.append(
+                        f"result {index} candidate {candidate_index} must be an object",
+                    )
+                    continue
+                target_path = str(candidate.get("target_path", "")).strip()
+                patch_descriptor = candidate.get("patch_descriptor", {})
+                descriptor_target_path = ""
+                if isinstance(patch_descriptor, Mapping):
+                    descriptor_target_path = str(
+                        patch_descriptor.get("target_path", ""),
+                    ).strip()
+                if not target_path:
+                    errors.append(
+                        f"result {index} candidate {candidate_index} target_path missing",
+                    )
+                if target_path and descriptor_target_path and target_path != descriptor_target_path:
+                    errors.append(
+                        f"result {index} candidate {candidate_index} target_path mismatch",
+                    )
+                if target_path and not _is_under_prefix(
+                    target_path,
+                    self._policy.allowed_workspace_prefixes,
+                ):
+                    errors.append(
+                        f"result {index} candidate {candidate_index} target_path outside allowed workspace",
+                    )
+                if not _is_sha256(candidate.get("candidate_digest")):
+                    errors.append(
+                        f"result {index} candidate {candidate_index} digest must be sha256",
+                    )
+
+        normalized_errors = _dedupe_strings(errors)
+        coverage_complete = (
+            not normalized_errors
+            and result_count >= PARALLEL_CODEX_YAOYOROZU_DISPATCH_MIN_RESULT_COUNT
+            and result_count <= PARALLEL_CODEX_YAOYOROZU_DISPATCH_MAX_RESULT_COUNT
+            and patch_candidate_receipt_count == result_count
+            and bool(changed_files)
+        )
+        validation_digest = self._upstream_dispatch_validation_digest(
+            source_system="yaoyorozu-worker-dispatch",
+            upstream_dispatch_validation_profile=(
+                PARALLEL_CODEX_YAOYOROZU_DISPATCH_VALIDATION_PROFILE
+            ),
+            upstream_dispatch_schema_validated=True,
+            upstream_dispatch_validation_ok=coverage_complete,
+            upstream_dispatch_coverage_complete=coverage_complete,
+            upstream_dispatch_result_count=result_count,
+            upstream_dispatch_patch_candidate_receipt_count=(
+                patch_candidate_receipt_count
+            ),
+            upstream_dispatch_validation_error_count=len(normalized_errors),
+            upstream_dispatch_validation_errors=normalized_errors,
+            upstream_receipt_ref=str(dispatch_receipt.get("receipt_ref", "")).strip()
+            or (
+                f"dispatch-receipt://{receipt_id}"
+                if receipt_id
+                else ""
+            ),
+            upstream_receipt_digest=str(
+                dispatch_receipt.get("receipt_digest", ""),
+            ).strip(),
+            upstream_patch_candidate_receipt_refs=[
+                str(receipt.get("receipt_ref", "")).strip()
+                for receipt in patch_candidate_receipts
+            ],
+            upstream_patch_candidate_receipt_digests=[
+                str(receipt.get("receipt_digest", "")).strip()
+                for receipt in patch_candidate_receipts
+            ],
+        )
+        return {
+            "validation_profile": PARALLEL_CODEX_YAOYOROZU_DISPATCH_VALIDATION_PROFILE,
+            "schema_validated": True,
+            "validation_ok": coverage_complete,
+            "coverage_complete": coverage_complete,
+            "result_count": result_count,
+            "patch_candidate_receipt_count": patch_candidate_receipt_count,
+            "validation_error_count": len(normalized_errors),
+            "validation_errors": normalized_errors,
+            "validation_digest": validation_digest,
+        }
 
     @staticmethod
     def _yaoyorozu_patch_candidate_receipts(

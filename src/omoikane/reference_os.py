@@ -1000,6 +1000,7 @@ class OmoikaneReferenceOS:
             "meta/decision-log/2026-05-02_parallel-codex-post-push-status-check-suite.md",
             "meta/decision-log/2026-05-02_parallel-codex-status-check-freshness.md",
             "meta/decision-log/2026-05-02_parallel-codex-status-check-suite-timestamp.md",
+            "meta/decision-log/2026-05-02_parallel-codex-yaoyorozu-dispatch-validation.md",
             "meta/decision-log/README.md",
             "references/parallel-codex-orchestration.md",
         ]
@@ -1142,48 +1143,68 @@ class OmoikaneReferenceOS:
                 "blocked as non-substantive."
             ),
         )
-        yaoyorozu_patch_receipt_digest = sha256_text(
-            canonical_json(
-                {
-                    "receipt_ref": "worker-patch://yaoyorozu-worker-patch-candidate-111111111111",
-                    "target_path": "src/omoikane/agentic/yaoyorozu.py",
-                    "candidate_digest": "c" * 64,
-                }
+        def _yaoyorozu_dispatch_result(
+            *,
+            suffix: str,
+            target_path: str,
+        ) -> Dict[str, Any]:
+            patch_receipt_ref = (
+                f"worker-patch://yaoyorozu-worker-patch-candidate-{suffix}"
             )
-        )
+            candidate_digest = suffix[-1] * 64
+            patch_receipt_digest = sha256_text(
+                canonical_json(
+                    {
+                        "receipt_ref": patch_receipt_ref,
+                        "target_path": target_path,
+                        "candidate_digest": candidate_digest,
+                    }
+                )
+            )
+            return {
+                "unit_id": f"worker-dispatch-{suffix}",
+                "report": {
+                    "patch_candidate_receipt": {
+                        "kind": "yaoyorozu_worker_patch_candidate_receipt",
+                        "receipt_ref": patch_receipt_ref,
+                        "receipt_digest": patch_receipt_digest,
+                        "status": "candidate-ready",
+                        "patch_candidates": [
+                            {
+                                "target_path": target_path,
+                                "patch_descriptor": {
+                                    "target_path": target_path,
+                                },
+                                "candidate_digest": candidate_digest,
+                            }
+                        ],
+                    }
+                },
+            }
+
+        yaoyorozu_dispatch_results = [
+            _yaoyorozu_dispatch_result(
+                suffix="111111111111",
+                target_path="src/omoikane/agentic/yaoyorozu.py",
+            ),
+            _yaoyorozu_dispatch_result(
+                suffix="222222222222",
+                target_path=(
+                    "specs/schemas/yaoyorozu_worker_dispatch_receipt.schema"
+                ),
+            ),
+            _yaoyorozu_dispatch_result(
+                suffix="333333333333",
+                target_path="evals/agentic/yaoyorozu_local_worker_dispatch.yaml",
+            ),
+        ]
         yaoyorozu_dispatch_receipt = {
             "kind": "yaoyorozu_worker_dispatch_receipt",
             "receipt_id": "yaoyorozu-dispatch-receipt-222222222222",
             "dispatch_plan_ref": "dispatch://yaoyorozu-dispatch-333333333333",
             "dispatch_plan_digest": "d" * 64,
             "receipt_digest": "e" * 64,
-            "results": [
-                {
-                    "unit_id": "worker-dispatch-444444444444",
-                    "report": {
-                        "patch_candidate_receipt": {
-                            "kind": "yaoyorozu_worker_patch_candidate_receipt",
-                            "receipt_ref": (
-                                "worker-patch://"
-                                "yaoyorozu-worker-patch-candidate-111111111111"
-                            ),
-                            "receipt_digest": yaoyorozu_patch_receipt_digest,
-                            "status": "candidate-ready",
-                            "patch_candidates": [
-                                {
-                                    "target_path": "src/omoikane/agentic/yaoyorozu.py",
-                                    "patch_descriptor": {
-                                        "target_path": (
-                                            "src/omoikane/agentic/yaoyorozu.py"
-                                        )
-                                    },
-                                    "candidate_digest": "c" * 64,
-                                }
-                            ],
-                        }
-                    },
-                }
-            ],
+            "results": yaoyorozu_dispatch_results,
         }
         yaoyorozu_bridge_receipt = (
             self.parallel_orchestration.ingest_yaoyorozu_dispatch_receipt(
@@ -1191,6 +1212,24 @@ class OmoikaneReferenceOS:
                 main_checkout_head=main_checkout_head,
                 worker_base_commit=main_checkout_head,
                 verification_results=verification_results,
+            )
+        )
+        invalid_yaoyorozu_dispatch_receipt = {
+            **yaoyorozu_dispatch_receipt,
+            "receipt_id": "yaoyorozu-dispatch-receipt-555555555555",
+            "receipt_digest": "5" * 64,
+            "results": [yaoyorozu_dispatch_results[0]],
+        }
+        invalid_yaoyorozu_bridge_receipt = (
+            self.parallel_orchestration.ingest_yaoyorozu_dispatch_receipt(
+                dispatch_receipt=invalid_yaoyorozu_dispatch_receipt,
+                main_checkout_head=main_checkout_head,
+                worker_base_commit=main_checkout_head,
+                verification_results=verification_results,
+                result_summary=(
+                    "Under-covered Yaoyorozu dispatch remains schema-bound "
+                    "but blocked before Parallel Codex integration."
+                ),
             )
         )
         batch_receipt = self.parallel_orchestration.plan_integration_batch(
@@ -1294,6 +1333,11 @@ class OmoikaneReferenceOS:
         yaoyorozu_bridge_validation = (
             self.parallel_orchestration.validate_worker_result_receipt(
                 yaoyorozu_bridge_receipt,
+            )
+        )
+        invalid_yaoyorozu_bridge_validation = (
+            self.parallel_orchestration.validate_worker_result_receipt(
+                invalid_yaoyorozu_bridge_receipt,
             )
         )
         batch_validation = (
@@ -1471,8 +1515,24 @@ class OmoikaneReferenceOS:
                 "yaoyorozu_bridge_upstream_binding_digest": (
                     yaoyorozu_bridge_receipt["upstream_binding_digest"]
                 ),
+                "yaoyorozu_bridge_upstream_dispatch_validation_digest": (
+                    yaoyorozu_bridge_receipt[
+                        "upstream_dispatch_validation_digest"
+                    ]
+                ),
                 "yaoyorozu_bridge_worker_identity_digest": (
                     yaoyorozu_bridge_receipt["worker_identity_digest"]
+                ),
+                "invalid_yaoyorozu_bridge_receipt_ref": (
+                    invalid_yaoyorozu_bridge_receipt["receipt_ref"]
+                ),
+                "invalid_yaoyorozu_bridge_receipt_digest": (
+                    invalid_yaoyorozu_bridge_receipt["receipt_digest"]
+                ),
+                "invalid_yaoyorozu_bridge_validation_digest": (
+                    invalid_yaoyorozu_bridge_receipt[
+                        "upstream_dispatch_validation_digest"
+                    ]
                 ),
                 "batch_receipt_ref": batch_receipt["receipt_ref"],
                 "batch_receipt_digest": batch_receipt["receipt_digest"],
@@ -1806,6 +1866,16 @@ class OmoikaneReferenceOS:
                 "contract_role": "yaoyorozu-dispatch-to-parallel-codex-ingestion",
             },
             {
+                "payload_path": "invalid_yaoyorozu_bridge_receipt",
+                "schema_path": (
+                    "specs/schemas/"
+                    "parallel_codex_worker_result_receipt.schema"
+                ),
+                "contract_role": (
+                    "yaoyorozu-dispatch-validation-blocked-ingestion"
+                ),
+            },
+            {
                 "payload_path": "batch_receipt",
                 "schema_path": (
                     "specs/schemas/"
@@ -1864,6 +1934,9 @@ class OmoikaneReferenceOS:
             "blocked_receipt": blocked_receipt,
             "marker_only_receipt": marker_only_receipt,
             "yaoyorozu_bridge_receipt": yaoyorozu_bridge_receipt,
+            "invalid_yaoyorozu_bridge_receipt": (
+                invalid_yaoyorozu_bridge_receipt
+            ),
             "batch_receipt": batch_receipt,
             "conflict_batch_receipt": conflict_batch_receipt,
             "execution_receipt": execution_receipt,
@@ -1884,6 +1957,7 @@ class OmoikaneReferenceOS:
                     and content_mismatch_validation["ok"]
                     and unrelated_ancestry_validation["ok"]
                     and yaoyorozu_bridge_validation["ok"]
+                    and invalid_yaoyorozu_bridge_validation["ok"]
                     and batch_validation["ok"]
                     and conflict_batch_validation["ok"]
                     and execution_validation["ok"]
@@ -1893,6 +1967,9 @@ class OmoikaneReferenceOS:
                     and ready_validation["ready_for_main_checkout"]
                     and remote_validation["ready_for_main_checkout"]
                     and yaoyorozu_bridge_validation["ready_for_main_checkout"]
+                    and not invalid_yaoyorozu_bridge_validation[
+                        "ready_for_main_checkout"
+                    ]
                     and not content_mismatch_validation["ready_for_main_checkout"]
                     and not unrelated_ancestry_validation["ready_for_main_checkout"]
                     and not blocked_validation["ready_for_main_checkout"]
@@ -2151,6 +2228,36 @@ class OmoikaneReferenceOS:
                     == "yaoyorozu-worker-dispatch"
                     and bool(yaoyorozu_bridge_receipt["upstream_binding_digest"])
                 ),
+                "yaoyorozu_bridge_upstream_dispatch_validation_digest_bound": (
+                    yaoyorozu_bridge_validation[
+                        "upstream_dispatch_validation_digest_bound"
+                    ]
+                    and bool(
+                        yaoyorozu_bridge_receipt[
+                            "upstream_dispatch_validation_digest"
+                        ]
+                    )
+                ),
+                "yaoyorozu_bridge_upstream_dispatch_schema_validated": (
+                    yaoyorozu_bridge_validation[
+                        "upstream_dispatch_schema_validated"
+                    ]
+                ),
+                "yaoyorozu_bridge_upstream_dispatch_validation_ok": (
+                    yaoyorozu_bridge_validation[
+                        "upstream_dispatch_validation_ok"
+                    ]
+                ),
+                "yaoyorozu_bridge_upstream_dispatch_coverage_complete": (
+                    yaoyorozu_bridge_validation[
+                        "upstream_dispatch_coverage_complete"
+                    ]
+                ),
+                "yaoyorozu_bridge_upstream_dispatch_validation_error_free": (
+                    yaoyorozu_bridge_validation[
+                        "upstream_dispatch_validation_error_free"
+                    ]
+                ),
                 "yaoyorozu_bridge_patch_candidates_bound": bool(
                     yaoyorozu_bridge_receipt[
                         "upstream_patch_candidate_receipt_digests"
@@ -2166,6 +2273,39 @@ class OmoikaneReferenceOS:
                     yaoyorozu_bridge_validation[
                         "raw_worker_identity_payload_redacted"
                     ]
+                ),
+                "invalid_yaoyorozu_bridge_receipt_ok": (
+                    invalid_yaoyorozu_bridge_validation["ok"]
+                ),
+                "invalid_yaoyorozu_bridge_result_blocked": (
+                    not invalid_yaoyorozu_bridge_validation[
+                        "ready_for_main_checkout"
+                    ]
+                ),
+                "invalid_yaoyorozu_bridge_validation_digest_bound": (
+                    invalid_yaoyorozu_bridge_validation[
+                        "upstream_dispatch_validation_digest_bound"
+                    ]
+                ),
+                "invalid_yaoyorozu_bridge_validation_rejected": (
+                    not invalid_yaoyorozu_bridge_validation[
+                        "upstream_dispatch_validation_ok"
+                    ]
+                ),
+                "invalid_yaoyorozu_bridge_coverage_rejected": (
+                    not invalid_yaoyorozu_bridge_validation[
+                        "upstream_dispatch_coverage_complete"
+                    ]
+                ),
+                "invalid_yaoyorozu_bridge_validation_errors_bound": (
+                    not invalid_yaoyorozu_bridge_validation[
+                        "upstream_dispatch_validation_error_free"
+                    ]
+                    and bool(
+                        invalid_yaoyorozu_bridge_receipt[
+                            "upstream_dispatch_validation_errors"
+                        ]
+                    )
                 ),
                 "batch_receipt_ok": batch_validation["ok"],
                 "batch_ready_for_integration": batch_validation[

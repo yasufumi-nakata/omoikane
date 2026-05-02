@@ -1028,9 +1028,31 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_ready_for_main_checkout"]
         )
+        self.assertTrue(
+            result["validation"][
+                "yaoyorozu_bridge_upstream_dispatch_validation_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["yaoyorozu_bridge_upstream_dispatch_validation_ok"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "yaoyorozu_bridge_upstream_dispatch_coverage_complete"
+            ]
+        )
         self.assertTrue(result["validation"]["yaoyorozu_bridge_patch_candidates_bound"])
         self.assertTrue(
             result["validation"]["yaoyorozu_bridge_worker_identity_evidence_bound"]
+        )
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_result_blocked"]
+        )
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_validation_rejected"]
+        )
+        self.assertTrue(
+            result["validation"]["invalid_yaoyorozu_bridge_coverage_rejected"]
         )
         self.assertTrue(result["validation"]["batch_receipt_ok"])
         self.assertTrue(result["validation"]["batch_ready_for_integration"])
@@ -1325,6 +1347,10 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(
             "yaoyorozu-worker-dispatch",
             result["yaoyorozu_bridge_receipt"]["source_system"],
+        )
+        self.assertEqual(
+            "blocked",
+            result["invalid_yaoyorozu_bridge_receipt"]["integration_decision"],
         )
         self.assertEqual("integration-ready", result["batch_receipt"]["batch_decision"])
         self.assertEqual("blocked", result["conflict_batch_receipt"]["batch_decision"])
