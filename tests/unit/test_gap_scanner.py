@@ -605,6 +605,42 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_top_level_eval_inventory_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "evals" / "README.md").write_text(
+                "# Evals\n\n- `continuity/ledger_integrity.yaml`\n",
+                encoding="utf-8",
+            )
+            continuity_root = repo_root / "evals" / "continuity"
+            continuity_root.mkdir(parents=True, exist_ok=True)
+            (continuity_root / "ledger_integrity.yaml").write_text(
+                "eval_id: ledger_integrity\n",
+                encoding="utf-8",
+            )
+            agentic_root = repo_root / "evals" / "agentic"
+            agentic_root.mkdir(parents=True, exist_ok=True)
+            (agentic_root / "council_guardian_veto.yaml").write_text(
+                "eval_id: council_guardian_veto\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            self.assertEqual(
+                "evals/README.md",
+                report["inventory_drift_hits"][0]["path"],
+            )
+            self.assertIn(
+                "agentic/council_guardian_veto.yaml",
+                report["inventory_drift_hits"][0]["line"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
+            )
+
     def test_scan_reports_uncataloged_implemented_spec_files(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

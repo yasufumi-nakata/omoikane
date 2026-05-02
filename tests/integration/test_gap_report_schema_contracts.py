@@ -136,6 +136,13 @@ class GapReportSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
+                entry["path"] == "evals/README.md"
+                and entry["surface_pattern"] == "evals/README.md"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+        self.assertTrue(
+            any(
                 entry["path"] == "git:tracked-worktree-diff"
                 and entry["surface_pattern"] == "git:tracked-worktree-diff"
                 for entry in receipt["scan_surface_digests"]

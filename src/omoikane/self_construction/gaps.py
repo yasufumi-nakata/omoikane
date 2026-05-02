@@ -103,6 +103,11 @@ CATALOG_COVERAGE_SPECS = (
     ("specs/interfaces", (".idl",)),
     ("specs/schemas", (".schema", ".yaml")),
 )
+TOP_LEVEL_EVAL_INVENTORY_SPEC = (
+    "evals/README.md",
+    "evals",
+    (".yaml", ".yml"),
+)
 EVAL_INVENTORY_GLOB = "evals/*/README.md"
 IMPLEMENTATION_STUB_GLOB = "src/omoikane/**/*.py"
 IMPLEMENTATION_STUB_ABSTRACT_CLASS_SUFFIXES = ("Backend",)
@@ -162,6 +167,7 @@ SCAN_RECEIPT_SURFACES = (
     "specs/catalog.yaml",
     "specs/interfaces/README.md",
     "specs/schemas/README.md",
+    "evals/README.md",
     "evals/*/README.md",
     "README.md",
     "docs/07-reference-implementation/README.md",
@@ -1002,7 +1008,11 @@ class GapScanner:
         return [readme_path.parent / candidate for candidate in GapScanner._extract_inventory_entries(readme_path)]
 
     @staticmethod
-    def _extract_inventory_entries(readme_path: Path) -> List[str]:
+    def _extract_inventory_entries(
+        readme_path: Path,
+        *,
+        allow_paths: bool = False,
+    ) -> List[str]:
         entries: List[str] = []
         for line in readme_path.read_text(encoding="utf-8").splitlines():
             stripped = line.strip()
@@ -1013,7 +1023,9 @@ class GapScanner:
             parts = stripped.split("`")
             for index in range(1, len(parts), 2):
                 candidate = parts[index].strip()
-                if not candidate or "/" in candidate:
+                if not candidate:
+                    continue
+                if "/" in candidate and not allow_paths:
                     continue
                 entries.append(candidate)
         return entries
@@ -1056,6 +1068,29 @@ class GapScanner:
     def _inventory_drift_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []
         inventory_specs = list(TRUTH_SOURCE_INVENTORY_SPECS)
+        top_level_eval_readme = repo_root / TOP_LEVEL_EVAL_INVENTORY_SPEC[0]
+        top_level_eval_root = repo_root / TOP_LEVEL_EVAL_INVENTORY_SPEC[1]
+        if top_level_eval_readme.exists() and top_level_eval_root.exists():
+            listed_eval_entries = set(
+                self._extract_inventory_entries(
+                    top_level_eval_readme,
+                    allow_paths=True,
+                )
+            )
+            actual_eval_entries = {
+                str(path.relative_to(top_level_eval_root))
+                for suffix in TOP_LEVEL_EVAL_INVENTORY_SPEC[2]
+                for path in top_level_eval_root.rglob(f"*{suffix}")
+                if path.is_file()
+            }
+            for missing_entry in sorted(actual_eval_entries - listed_eval_entries):
+                hits.append(
+                    {
+                        "path": TOP_LEVEL_EVAL_INVENTORY_SPEC[0],
+                        "line": f"`{missing_entry}` is implemented but missing from the top-level eval inventory",
+                    }
+                )
+
         for readme_path in sorted(repo_root.glob(EVAL_INVENTORY_GLOB)):
             relative_path = readme_path.relative_to(repo_root)
             inventory_specs.append(

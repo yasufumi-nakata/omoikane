@@ -3,9 +3,10 @@ $id: "https://omoikane.dev/specs/schemas/gap_report.schema"
 title: GapReport
 description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
-  including tracked worktree marker-residue checks, tracked/untracked generated artifact
-  hygiene checks for build output, caches, and platform metadata, and a digest-bound
-  scan receipt for automation gating.
+  including top-level eval inventory drift checks, tracked worktree marker-residue
+  checks, tracked/untracked generated artifact hygiene checks for build output,
+  caches, and platform metadata, and a digest-bound scan receipt for automation
+  gating.
 type: object
 additionalProperties: false
 required:

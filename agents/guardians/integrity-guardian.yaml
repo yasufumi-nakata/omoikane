@@ -59,6 +59,7 @@ capabilities:
   - catalog.inventory.attest
   - gap-report.required-references.attest
   - gap-report.reference-policy-sections.attest
+  - gap-report.top-level-eval-inventory.attest
   - gap-report.implementation-stub.attest
   - gap-report.worktree-marker-residue.attest
   - gap-report.tracked-generated-artifact.attest
@@ -133,6 +134,7 @@ oversight_scope_refs:
   - specs/schemas/sensory_loopback_calibration_refresh_state_guard.schema
   - docs/02-subsystems/agentic/yaoyorozu-roster.md
   - specs/schemas/gap_report.schema
+  - evals/README.md
   - specs/schemas/parallel_codex_worker_result_receipt.schema
   - specs/schemas/parallel_codex_integration_batch_receipt.schema
   - specs/schemas/parallel_codex_integration_execution_receipt.schema
