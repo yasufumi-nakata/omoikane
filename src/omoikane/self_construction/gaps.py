@@ -110,15 +110,40 @@ WORKTREE_DIFF_SCAN_SURFACE = "git:tracked-worktree-diff"
 WORKTREE_WORKSPACE_MARKER_PREFIX = "# workspace-enacted:"
 TRACKED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:tracked-generated-artifacts"
 UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:untracked-generated-artifacts"
-GENERATED_ARTIFACT_PREFIXES = (
+GENERATED_ARTIFACT_PATCH_PREFIXES = (
     "artifacts/",
+)
+GENERATED_ARTIFACT_PACKAGING_PREFIXES = (
     "build/",
     "dist/",
+)
+GENERATED_ARTIFACT_COVERAGE_PREFIXES = (
     "htmlcov/",
 )
-GENERATED_ARTIFACT_FILENAMES = (
+GENERATED_ARTIFACT_CACHE_PREFIXES = (
+    ".pytest_cache/",
+    ".mypy_cache/",
+    ".ruff_cache/",
+    ".tox/",
+    ".nox/",
+)
+GENERATED_ARTIFACT_PREFIXES = (
+    *GENERATED_ARTIFACT_PATCH_PREFIXES,
+    *GENERATED_ARTIFACT_PACKAGING_PREFIXES,
+    *GENERATED_ARTIFACT_COVERAGE_PREFIXES,
+    *GENERATED_ARTIFACT_CACHE_PREFIXES,
+)
+GENERATED_ARTIFACT_COVERAGE_FILENAMES = (
     ".coverage",
     "coverage.xml",
+)
+GENERATED_ARTIFACT_PLATFORM_FILENAMES = (
+    ".DS_Store",
+    "Thumbs.db",
+)
+GENERATED_ARTIFACT_FILENAMES = (
+    *GENERATED_ARTIFACT_COVERAGE_FILENAMES,
+    *GENERATED_ARTIFACT_PLATFORM_FILENAMES,
 )
 GENERATED_ARTIFACT_SUFFIXES = (
     ".patch",
@@ -695,7 +720,9 @@ class GapScanner:
 
     @staticmethod
     def _is_generated_artifact_path(path: str) -> bool:
-        normalized = path.strip().lstrip("./")
+        normalized = path.strip()
+        if normalized.startswith("./"):
+            normalized = normalized[2:]
         if not normalized:
             return False
         if normalized in GENERATED_ARTIFACT_FILENAMES:
@@ -781,16 +808,24 @@ class GapScanner:
 
     @staticmethod
     def _generated_artifact_class(path: str) -> str:
-        normalized = path.strip().lstrip("./")
-        if normalized in GENERATED_ARTIFACT_FILENAMES:
+        normalized = path.strip()
+        if normalized.startswith("./"):
+            normalized = normalized[2:]
+        if normalized in GENERATED_ARTIFACT_PLATFORM_FILENAMES:
+            return "platform-metadata-output"
+        if normalized in GENERATED_ARTIFACT_COVERAGE_FILENAMES:
             return "coverage-output"
-        if normalized.startswith("artifacts/") or normalized.endswith(".patch"):
+        if normalized.startswith(GENERATED_ARTIFACT_CACHE_PREFIXES):
+            return "test-or-analysis-cache"
+        if normalized.startswith(
+            GENERATED_ARTIFACT_PATCH_PREFIXES
+        ) or normalized.endswith(".patch"):
             return "patch-or-artifact-output"
-        if normalized.startswith(("build/", "dist/")) or any(
+        if normalized.startswith(GENERATED_ARTIFACT_PACKAGING_PREFIXES) or any(
             part.endswith(".egg-info") for part in normalized.split("/")
         ):
             return "packaging-output"
-        if normalized.startswith("htmlcov/"):
+        if normalized.startswith(GENERATED_ARTIFACT_COVERAGE_PREFIXES):
             return "coverage-output"
         if normalized.endswith(".pyc"):
             return "python-bytecode"

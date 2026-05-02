@@ -122,13 +122,15 @@ scan surface として扱い、dirty diff に残った workspace marker residue 
 さらに `git ls-files` 由来の追跡対象生成物を
 `git:tracked-generated-artifacts` の digest-bound scan surface として扱い、
 `artifacts/` / `build/` / `dist/` / `htmlcov/` / `.coverage` / `coverage.xml` /
-`*.patch` / `*.pyc` / `*.egg-info` に該当する path を
+`.pytest_cache/` / `.mypy_cache/` / `.ruff_cache/` / `.tox/` / `.nox/` /
+`.DS_Store` / `Thumbs.db` / `*.patch` / `*.pyc` / `*.egg-info` に該当する path を
 `tracked_generated_artifact_hits` として all-zero gate の外へ出す。
 raw artifact payload は読まず、path manifest digest だけを保持する。
 さらに `git ls-files --others --exclude-standard` 由来の未追跡生成物を
 `git:untracked-generated-artifacts` の digest-bound scan surface として扱い、
 `artifacts/` / `build/` / `dist/` / `htmlcov/` / `.coverage` / `coverage.xml` /
-`*.patch` / `*.pyc` / `*.egg-info` に該当する path を
+`.pytest_cache/` / `.mypy_cache/` / `.ruff_cache/` / `.tox/` / `.nox/` /
+`.DS_Store` / `Thumbs.db` / `*.patch` / `*.pyc` / `*.egg-info` に該当する path を
 `untracked_generated_artifact_hits` として all-zero gate の外へ出す。
 同じく raw artifact payload は読まず、path manifest digest だけを保持する。
 最新 decision log 日付に残る `residual gap` / `unresolved gap` の bullet も

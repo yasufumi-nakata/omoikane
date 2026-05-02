@@ -225,6 +225,14 @@ class GapScannerTests(unittest.TestCase):
             repo_root = Path(temp_dir)
             self._bootstrap_repo(repo_root)
             self._run_git(repo_root, "init")
+            empty_excludes = repo_root / ".git" / "info" / "empty-excludes"
+            empty_excludes.write_text("", encoding="utf-8")
+            self._run_git(
+                repo_root,
+                "config",
+                "core.excludesFile",
+                str(empty_excludes),
+            )
             self._run_git(repo_root, "add", ".")
             self._run_git(
                 repo_root,
@@ -332,6 +340,91 @@ class GapScannerTests(unittest.TestCase):
             )
             self.assertEqual(
                 sha256_text("build/gap-report.json\n"),
+                surface_digest["sha256"],
+            )
+
+    def test_scan_reports_untracked_platform_metadata_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap",
+            )
+            (repo_root / ".DS_Store").write_bytes(b"Finder metadata")
+
+            report = GapScanner().scan(repo_root)
+            hit = report["untracked_generated_artifact_hits"][0]
+
+            self.assertEqual(1, report["untracked_generated_artifact_count"])
+            self.assertEqual(".DS_Store", hit["path"])
+            self.assertEqual("platform-metadata-output", hit["artifact_class"])
+            self.assertEqual(
+                "untracked-generated-artifact",
+                hit["untracked_artifact_status"],
+            )
+            self.assertFalse(hit["raw_artifact_payload_stored"])
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:untracked-generated-artifacts"
+            )
+            self.assertEqual(sha256_text(".DS_Store\n"), surface_digest["sha256"])
+
+    def test_scan_reports_tracked_test_cache_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            empty_excludes = repo_root / ".git" / "info" / "empty-excludes"
+            empty_excludes.write_text("", encoding="utf-8")
+            self._run_git(
+                repo_root,
+                "config",
+                "core.excludesFile",
+                str(empty_excludes),
+            )
+            cache_path = repo_root / ".pytest_cache" / "v" / "cache" / "nodeids"
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            cache_path.write_text("[]\n", encoding="utf-8")
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap with cache artifact",
+            )
+
+            report = GapScanner().scan(repo_root)
+            hit = report["tracked_generated_artifact_hits"][0]
+
+            self.assertEqual(1, report["tracked_generated_artifact_count"])
+            self.assertEqual(".pytest_cache/v/cache/nodeids", hit["path"])
+            self.assertEqual("test-or-analysis-cache", hit["artifact_class"])
+            self.assertEqual(
+                "tracked-generated-artifact",
+                hit["tracked_artifact_status"],
+            )
+            self.assertFalse(hit["raw_artifact_payload_stored"])
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:tracked-generated-artifacts"
+            )
+            self.assertEqual(
+                sha256_text(".pytest_cache/v/cache/nodeids\n"),
                 surface_digest["sha256"],
             )
 

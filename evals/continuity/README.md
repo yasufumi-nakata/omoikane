@@ -137,10 +137,12 @@ workspace marker residue も `worktree_workspace_marker_hits` として
 all-zero gate の外へ出せるか。追跡対象生成物も
 `git:tracked-generated-artifacts` の path manifest digest と
 `tracked_generated_artifact_hits` により raw artifact payload なしで
-all-zero gate の外へ出せるか。未追跡生成物も
+all-zero gate の外へ出せるか。cache / platform metadata 生成物も同じ
+path manifest に含められるか。未追跡生成物も
 `git:untracked-generated-artifacts` の path manifest digest と
 `untracked_generated_artifact_hits` により raw artifact payload なしで
-all-zero gate の外へ出せるか。
+all-zero gate の外へ出せるか。cache / platform metadata 生成物も同じ
+path manifest に含められるか。
 
 ### Parallel Codex Result Ingestion
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、

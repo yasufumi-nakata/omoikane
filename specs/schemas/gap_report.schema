@@ -4,7 +4,8 @@ title: GapReport
 description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
   including tracked worktree marker-residue checks, tracked/untracked generated artifact
-  hygiene checks, and a digest-bound scan receipt for automation gating.
+  hygiene checks for build output, caches, and platform metadata, and a digest-bound
+  scan receipt for automation gating.
 type: object
 additionalProperties: false
 required:
@@ -493,6 +494,8 @@ $defs:
           - packaging-output
           - coverage-output
           - python-bytecode
+          - platform-metadata-output
+          - test-or-analysis-cache
           - generated-artifact
       untracked_artifact_status:
         const: untracked-generated-artifact

@@ -5,7 +5,8 @@ description: >
   gap-report が all-zero / non-zero 判定、prioritized task count、scan surface、
   report digest、各 truth-source の surface digest manifest、continuity ledger 用
   event ref / digest と実 ContinuityLedger append entry を public schema と digest-bound receipt に固定し、
-  automation gate の判定形を reviewer-facing に検証できること
+  build / cache / platform metadata 生成物の path manifest も含めて automation gate の判定形を
+  reviewer-facing に検証できること
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli gap-report --json
