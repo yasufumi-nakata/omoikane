@@ -700,6 +700,9 @@ priority-ranked patch candidate hint を添えた
 `yaoyorozu_execution_chain_binding` へ延長され、
 repo-local reviewer-facing builder execution chain を
 1 つの digest family として可視化することも確認する。
+この `yaoyorozu-demo` 内の live enactment / rollback witness は
+必要な patch target と eval ref だけを seed した一時 git fixture repo で実行し、
+reference runtime の main checkout には `workspace-enacted` residue を残さない。
 optional dispatch を要求した場合は
 `memory-edit-v1` が `runtime` / `contract-eval(eval+schema)` / `docs` へ、
 `fork-request-v1` が `runtime` / `schema` / `evidence-docs(docs+eval)` へ

@@ -238,6 +238,44 @@ def _capture_repo_targets(
     return snapshots
 
 
+@contextmanager
+def _builder_mutation_fixture_repo(paths: list[str]):
+    source_root = Path(__file__).resolve().parents[2]
+    with tempfile.TemporaryDirectory(prefix="omoikane-builder-mutation-test-") as temp_dir:
+        fixture_root = Path(temp_dir)
+        copied_paths: list[str] = []
+        for path in dict.fromkeys(paths):
+            source_path = source_root / path
+            if not source_path.exists():
+                continue
+            target_path = fixture_root / path
+            target_path.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(source_path, target_path)
+            copied_paths.append(path)
+
+        if not copied_paths:
+            raise RuntimeError("builder mutation fixture requires at least one copied path")
+
+        for argv in (
+            ["git", "init", "-q"],
+            ["git", "config", "user.name", "Codex Builder"],
+            ["git", "config", "user.email", "codex@example.invalid"],
+            ["git", "add", "."],
+            ["git", "commit", "-q", "-m", "baseline"],
+        ):
+            completed = subprocess.run(
+                argv,
+                cwd=fixture_root,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            if completed.returncode != 0:
+                raise RuntimeError(f"fixture command failed: {' '.join(argv)} :: {completed.stderr}")
+
+        yield fixture_root
+
+
 class DesignReaderServiceTests(unittest.TestCase):
     def test_scan_repo_delta_detects_modified_design_and_spec_refs(self) -> None:
         reader = DesignReaderService()
@@ -476,11 +514,18 @@ class DifferentialEvaluatorServiceTests(unittest.TestCase):
             must_pass=["evals/continuity/differential_eval_execution_binding.yaml"],
         )
         artifact = PatchGeneratorService().generate_patch_set(request)
+        fixture_paths = [
+            "evals/continuity/differential_eval_execution_binding.yaml",
+            *[str(patch["target_path"]) for patch in artifact["patches"]],
+        ]
+        fixture_repo = _builder_mutation_fixture_repo(fixture_paths)
+        repo_root = fixture_repo.__enter__()
+        self.addCleanup(fixture_repo.__exit__, None, None, None)
         enactment_session = LiveEnactmentService().execute(
             build_request=request,
             build_artifact=artifact,
             eval_refs=["evals/continuity/differential_eval_execution_binding.yaml"],
-            repo_root=Path(__file__).resolve().parents[2],
+            repo_root=repo_root,
             guardian_oversight_event=_live_enactment_oversight_event(
                 artifact_ref=f"artifact://{artifact['artifact_id']}"
             ),
@@ -687,13 +732,19 @@ class RollbackEngineServiceTests(unittest.TestCase):
 
     def test_execute_rollback_restores_pre_apply_snapshot_and_notifies_watchers(self) -> None:
         service = RollbackEngineService()
-        repo_root = Path(__file__).resolve().parents[2]
         request = _design_backed_request(
             target_subsystem="L5.RollbackEngine",
             request_id="build-l5-rollback-0001",
             must_pass=["evals/continuity/builder_live_enactment_execution.yaml"],
         )
         artifact = PatchGeneratorService().generate_patch_set(request)
+        fixture_paths = [
+            "evals/continuity/builder_live_enactment_execution.yaml",
+            *[str(patch["target_path"]) for patch in artifact["patches"]],
+        ]
+        fixture_repo = _builder_mutation_fixture_repo(fixture_paths)
+        repo_root = fixture_repo.__enter__()
+        self.addCleanup(fixture_repo.__exit__, None, None, None)
         baseline_snapshots = _capture_repo_targets(
             repo_root,
             [str(patch["target_path"]) for patch in artifact["patches"]],
@@ -853,13 +904,12 @@ class RollbackEngineServiceTests(unittest.TestCase):
             self.assertEqual(
                 baseline_text,
                 restored_text,
-                msg=f"rollback execution leaked into current checkout: {relative_path}",
+                msg=f"rollback execution leaked into fixture checkout: {relative_path}",
             )
 
 
 class LiveEnactmentServiceTests(unittest.TestCase):
     def test_execute_materializes_temp_workspace_and_runs_eval_commands(self) -> None:
-        repo_root = Path(__file__).resolve().parents[2]
         request = _design_backed_request(
             target_subsystem="L5.LiveEnactment",
             request_id="build-l5-live-0001",
@@ -869,6 +919,14 @@ class LiveEnactmentServiceTests(unittest.TestCase):
             ],
         )
         artifact = PatchGeneratorService().generate_patch_set(request)
+        fixture_paths = [
+            "evals/continuity/builder_live_enactment_execution.yaml",
+            "evals/continuity/builder_live_oversight_network.yaml",
+            *[str(patch["target_path"]) for patch in artifact["patches"]],
+        ]
+        fixture_repo = _builder_mutation_fixture_repo(fixture_paths)
+        repo_root = fixture_repo.__enter__()
+        self.addCleanup(fixture_repo.__exit__, None, None, None)
         baseline_snapshots = _capture_repo_targets(
             repo_root,
             [str(patch["target_path"]) for patch in artifact["patches"]],
@@ -900,7 +958,7 @@ class LiveEnactmentServiceTests(unittest.TestCase):
             self.assertEqual(
                 baseline_text,
                 restored_text,
-                msg=f"live enactment leaked into current checkout: {relative_path}",
+                msg=f"live enactment leaked into fixture checkout: {relative_path}",
             )
 
     def test_execute_blocks_without_network_attested_oversight_event(self) -> None:

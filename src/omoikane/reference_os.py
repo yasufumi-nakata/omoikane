@@ -444,6 +444,7 @@ class OmoikaneReferenceOS:
     ) -> Dict[str, Any]:
         build_request = build_request_binding["build_request"]
         build_artifact = self.patch_generator.generate_patch_set(build_request)
+        live_eval_refs = ["evals/continuity/builder_live_enactment_execution.yaml"]
         sandbox_apply_receipt = self.sandbox_apply.apply_artifact(
             build_request=build_request,
             build_artifact=build_artifact,
@@ -453,53 +454,62 @@ class OmoikaneReferenceOS:
             reviewer_namespace="yaoyorozu-execution-live",
             payload_ref=f"artifact://{build_artifact['artifact_id']}",
         )
-        live_enactment_session = self.live_enactment.execute(
-            build_request=build_request,
-            build_artifact=build_artifact,
-            eval_refs=["evals/continuity/builder_live_enactment_execution.yaml"],
-            repo_root=self.repo_root,
-            guardian_oversight_event=live_enactment_oversight_event,
-        )
-        live_enactment_validation = self.live_enactment.validate_session(live_enactment_session)
-        rollout_eval_reports = [
-            self.diff_evaluator.run_ab_eval(
-                eval_ref="evals/continuity/builder_staged_rollout_execution.yaml",
-                baseline_ref="runtime://baseline/current",
-                sandbox_ref=sandbox_apply_receipt["sandbox_snapshot_ref"],
-            ),
-            self.diff_evaluator.run_ab_eval(
-                eval_ref="evals/continuity/builder_rollback_execution.yaml",
-                baseline_ref="runtime://baseline/current",
-                sandbox_ref=f"mirage://{build_request['request_id']}/snapshot/rollback-breach",
-            ),
-        ]
-        rollout = self.diff_evaluator.classify_rollout(
-            outcomes=[report["outcome"] for report in rollout_eval_reports]
-        )
-        rollout_session = self.rollout_planner.execute_rollout(
-            build_request=build_request,
-            apply_receipt=sandbox_apply_receipt,
-            eval_reports=rollout_eval_reports,
-            decision=rollout["decision"],
-            guardian_gate_status=build_request["approval_context"]["guardian_gate"],
-        )
-        rollout_validation = self.rollout_planner.validate_session(rollout_session)
-        rollback_guardian_oversight_event = self._build_live_enactment_oversight_event(
-            reviewer_namespace="yaoyorozu-execution-rollback",
-            payload_ref=sandbox_apply_receipt["rollback_plan_ref"],
-        )
-        rollback_session = self.rollback_engine.execute_rollback(
-            build_request=build_request,
-            apply_receipt=sandbox_apply_receipt,
-            rollout_session=rollout_session,
-            live_enactment_session=live_enactment_session,
-            repo_root=self.repo_root,
-            trigger="eval-regression",
-            reason="Regression injected for Yaoyorozu execution-chain rollback witness.",
-            initiator="YaoyorozuRegistryService",
-            guardian_oversight_event=rollback_guardian_oversight_event,
-        )
-        rollback_validation = self.rollback_engine.validate_session(rollback_session)
+        patch_targets = [str(patch["target_path"]) for patch in build_artifact["patches"]]
+        with self._builder_execution_chain_demo_repo(
+            patch_targets=patch_targets,
+            eval_refs=live_eval_refs,
+        ) as execution_repo_root:
+            live_enactment_session = self.live_enactment.execute(
+                build_request=build_request,
+                build_artifact=build_artifact,
+                eval_refs=live_eval_refs,
+                repo_root=execution_repo_root,
+                guardian_oversight_event=live_enactment_oversight_event,
+            )
+            live_enactment_validation = self.live_enactment.validate_session(
+                live_enactment_session
+            )
+            rollout_eval_reports = [
+                self.diff_evaluator.run_ab_eval(
+                    eval_ref="evals/continuity/builder_staged_rollout_execution.yaml",
+                    baseline_ref="runtime://baseline/current",
+                    sandbox_ref=sandbox_apply_receipt["sandbox_snapshot_ref"],
+                ),
+                self.diff_evaluator.run_ab_eval(
+                    eval_ref="evals/continuity/builder_rollback_execution.yaml",
+                    baseline_ref="runtime://baseline/current",
+                    sandbox_ref=(
+                        f"mirage://{build_request['request_id']}/snapshot/rollback-breach"
+                    ),
+                ),
+            ]
+            rollout = self.diff_evaluator.classify_rollout(
+                outcomes=[report["outcome"] for report in rollout_eval_reports]
+            )
+            rollout_session = self.rollout_planner.execute_rollout(
+                build_request=build_request,
+                apply_receipt=sandbox_apply_receipt,
+                eval_reports=rollout_eval_reports,
+                decision=rollout["decision"],
+                guardian_gate_status=build_request["approval_context"]["guardian_gate"],
+            )
+            rollout_validation = self.rollout_planner.validate_session(rollout_session)
+            rollback_guardian_oversight_event = self._build_live_enactment_oversight_event(
+                reviewer_namespace="yaoyorozu-execution-rollback",
+                payload_ref=sandbox_apply_receipt["rollback_plan_ref"],
+            )
+            rollback_session = self.rollback_engine.execute_rollback(
+                build_request=build_request,
+                apply_receipt=sandbox_apply_receipt,
+                rollout_session=rollout_session,
+                live_enactment_session=live_enactment_session,
+                repo_root=execution_repo_root,
+                trigger="eval-regression",
+                reason="Regression injected for Yaoyorozu execution-chain rollback witness.",
+                initiator="YaoyorozuRegistryService",
+                guardian_oversight_event=rollback_guardian_oversight_event,
+            )
+            rollback_validation = self.rollback_engine.validate_session(rollback_session)
         execution_chain = self.yaoyorozu.bind_execution_chain(
             build_request_binding=build_request_binding,
             build_artifact=build_artifact,
@@ -526,6 +536,39 @@ class OmoikaneReferenceOS:
             "execution_chain": execution_chain,
             "execution_chain_validation": execution_chain_validation,
         }
+
+    @contextmanager
+    def _builder_execution_chain_demo_repo(
+        self,
+        *,
+        patch_targets: List[str],
+        eval_refs: List[str],
+    ):
+        with tempfile.TemporaryDirectory(prefix="omoikane-builder-execution-chain-") as temp_dir:
+            repo_root = Path(temp_dir)
+            refs = list(dict.fromkeys([*eval_refs, *patch_targets]))
+            copied_refs = []
+            for ref in refs:
+                source_path = self.repo_root / ref
+                if not source_path.exists():
+                    continue
+                target_path = repo_root / ref
+                target_path.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source_path, target_path)
+                copied_refs.append(ref)
+
+            if not copied_refs:
+                raise RuntimeError("builder execution chain demo repo requires copied refs")
+
+            self._run_repo_command(repo_root, ["git", "init", "-q"])
+            self._run_repo_command(repo_root, ["git", "config", "user.name", "Codex Builder"])
+            self._run_repo_command(
+                repo_root,
+                ["git", "config", "user.email", "codex@example.invalid"],
+            )
+            self._run_repo_command(repo_root, ["git", "add", "."])
+            self._run_repo_command(repo_root, ["git", "commit", "-q", "-m", "baseline"])
+            yield repo_root
 
     @contextmanager
     def _design_reader_demo_repo(
