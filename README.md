@@ -68,7 +68,7 @@ meta/                 ── 用語集・決定履歴
 
 ## すぐ動かせるもの
 
-- `python3 -m unittest discover -s tests -t .`
+- `PYTHONPATH=src python3 -m unittest discover -s tests -t .`
 - `PYTHONPATH=src python3 -m omoikane.cli demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli substrate-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json`
@@ -95,6 +95,26 @@ meta/                 ── 用語集・決定履歴
 - `PYTHONPATH=src python3 -m omoikane.cli builder-live-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli gap-report --json`
+
+### 動かした時に何が見えるか
+
+ここで「動かせる」と言っているものは、本番のマインドアップロード基盤ではなく、docs/specs/evals に書いた境界を reference runtime で確認するための小さな実行単位です。
+`--json` 付きの demo は標準出力へ JSON を返します。
+主に `policy_id`、`profile`、`status`、`validation.ok`、`receipt`、`ledger`、`digest`、`blocked` / `approved` のような値を見て、設計上の gate が期待どおり通るか、または止まるかを確認できます。
+
+| コマンド群 | 実行するとあるもの | 実行してもないもの |
+| --- | --- | --- |
+| `PYTHONPATH=src python3 -m unittest discover -s tests -t .` | reference runtime、CLI、schema、eval 連携の回帰テスト結果 | 実環境の起動、外部サービス接続、研究上の正しさの証明 |
+| `demo` | identity 作成、substrate allocation、ContinuityLedger、Council 承認、EthicsEnforcer veto の最小シナリオ | 意識・人格・同一性成立の主張 |
+| `substrate-demo` / `connectome-demo` | substrate allocation / attestation / migration と、L2 connectome snapshot の validation summary | 実ハードウェア移行、実神経データの取り込み |
+| `bdb-demo` / `biodata-transmitter-demo` / `collective-demo` | L6 interface の proxy contract、biosignal roundtrip、collective identity の bounded merge / recovery receipt | 生体データの実測、身体状態の医学的診断、集合人格成立の証明 |
+| `memory-edit-demo` / `memory-replication-demo` / `semantic-demo` / `procedural-demo` / `cognitive-demo` | MemoryCrystal、reversible memory edit、semantic / procedural projection、L3 reasoning failover の安全な代理シナリオ | 記憶の実改変、技能の実世界実行、汎用推論エンジン |
+| `cognitive-audit-governance-demo` / `council-demo` / `task-graph-demo` / `consensus-bus-demo` / `trust-demo` / `trust-transfer-demo` | Council、TaskGraph、ConsensusBus、TrustService、audit governance の policy / receipt / timeout / quorum 結果 | 人間監督の代替、法的承認、外部組織の実署名 |
+| `patch-generator-demo` / `diff-eval-demo` / `sandbox-demo` / `yaoyorozu-demo` / `builder-live-demo` / `rollback-demo` | Builder 系の patch plan、diff evaluation、sandbox freeze、worker dispatch、temp workspace 実行、rollback receipt | 現 checkout への無断永続変更、本番 worker 実行、秘密情報を含む長いログ保存 |
+| `gap-report --json` | open question、missing file、inventory drift、stub、生成物混入などの count と all-zero gate | 問題の自動解決、研究判断の代替 |
+
+大きな JSON が出る場合は、先頭の summary field と末尾の `validation` / `all_zero` を見れば十分です。
+`all_zero: true` は repo-local な監査項目が 0 件という意味であり、研究課題が解けたという意味ではありません。
 
 ## ライセンス
 

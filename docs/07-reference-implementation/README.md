@@ -90,7 +90,7 @@ PYTHONPATH=src python3 -m omoikane.cli rollback-demo --json
 PYTHONPATH=src python3 -m omoikane.cli parallel-orchestration-demo --json
 PYTHONPATH=src python3 -m omoikane.cli scheduler-demo --json
 PYTHONPATH=src python3 -m omoikane.cli gap-report --json
-python3 -m unittest discover -s tests -t .
+PYTHONPATH=src python3 -m unittest discover -s tests -t .
 ```
 
 `continuity-demo` は L1 ContinuityLedger の暫定 profile
