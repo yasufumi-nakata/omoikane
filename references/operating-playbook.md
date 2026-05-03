@@ -4,6 +4,8 @@ hourly builder や broad automation が repo 内 gap を埋める時の最小 ru
 thin prompt でも、次の順序は崩しません。
 日次または毎時の継続運用では [Daily Automation Direction](daily-automation-direction.md)
 を先に読み、進展が無い日の no-op を正常完了として扱います。
+GitHub Release / GitHub Packages の公開経路を触る場合は
+[GitHub Release and Package Runbook](github-release-package.md) も確認します。
 
 ## 1. Preflight
 

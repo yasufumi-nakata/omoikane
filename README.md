@@ -118,6 +118,14 @@ Researcher の evidence seed や調査補助メモは [agents/researchers/](agen
 | `gap-report --json` | open question、missing file、inventory drift、stub、生成物混入などの count と all-zero gate | 問題の自動解決、研究判断の代替 |
 
 大きな JSON が出る場合は、先頭の summary field と末尾の `validation` / `all_zero` を見れば十分です。
+
+## GitHub Release / Package
+
+GitHub 上の配布 surface は [GitHub Release and Package Runbook](references/github-release-package.md) に固定する。
+
+- `main` へ push すると `.github/workflows/package.yml` が wheel / sdist を workflow artifact として build し、GHCR に `main` / `sha-<short-sha>` image を publish する。
+- `v*.*.*` tag を push すると `.github/workflows/release.yml` が full test、release manifest、gap-report、wheel install smoke を通してから GitHub Release asset と GHCR release image を publish する。
+- Python wheel / sdist は GitHub Releases の添付 asset、GitHub Packages は `ghcr.io/yasufumi-nakata/omoikane` の container package として扱う。
 `all_zero: true` は repo-local な監査項目が 0 件という意味であり、研究課題が解けたという意味ではありません。
 
 ## ライセンス

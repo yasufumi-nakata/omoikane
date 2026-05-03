@@ -10,6 +10,7 @@ completion 宣言前に通す確認項目です。
 ## 追加確認
 
 - 変更 surface に対応する CLI demo があれば `--json` で 1 回確認する
+- release / package surface を変更した場合は `python3 -m pip wheel . -w <temp-dir> --no-deps` と Docker build 可否を確認する
 - diff を見直し、docs / schema / tests / decision log の naming drift が無いか確認する
 - new field を追加した場合は integration test で shape を押さえる
 

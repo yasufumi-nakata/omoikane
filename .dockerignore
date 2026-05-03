@@ -1,0 +1,14 @@
+.git
+.github
+.mypy_cache
+.pytest_cache
+__pycache__
+*.py[cod]
+.DS_Store
+.coverage
+.venv
+build
+dist
+*.egg-info
+.yaoyorozu-dependencies
+artifacts
