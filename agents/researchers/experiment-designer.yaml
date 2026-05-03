@@ -9,7 +9,7 @@ substrate_requirements: ['any']
 input_schema_ref: specs/schemas/research_evidence_request.schema
 output_schema_ref: specs/schemas/research_evidence_report.schema
 research_domain_refs:
-  - research/experiments/README.md
+  - agents/researchers/evidence/biosignal-transmitter-literature.md
   - docs/05-research-frontiers/README.md
 evidence_policy_ref: agents/researchers/consciousness-theorist.policy.md
 ethics_constraints:

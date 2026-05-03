@@ -380,6 +380,7 @@ status: decided | superseded
 - [2026-05-03_daily-automation-direction.md](2026-05-03_daily-automation-direction.md)
 - [2026-05-03_docs-wiki-mirror.md](2026-05-03_docs-wiki-mirror.md)
 - [2026-05-03_readme-runnable-output-guide.md](2026-05-03_readme-runnable-output-guide.md)
+- [2026-05-03_researcher-evidence-home.md](2026-05-03_researcher-evidence-home.md)
 - [2026-05-03_yaoyorozu-execution-chain-fixture-isolation.md](2026-05-03_yaoyorozu-execution-chain-fixture-isolation.md)
 - [2026-05-03_yaoyorozu-research-evidence-verifier-roster-policy.md](2026-05-03_yaoyorozu-research-evidence-verifier-roster-policy.md)
 - [2026-05-03_yaoyorozu-research-evidence-verifier-roster-freshness.md](2026-05-03_yaoyorozu-research-evidence-verifier-roster-freshness.md)

@@ -207,7 +207,6 @@ AGENT_SOURCE_COUNCILOR_SCOPE_PREFIXES = (
     "meta/",
     "src/",
     "tests/",
-    "research/",
 )
 AGENT_SOURCE_RESEARCHER_REQUIRED_LIST_FIELDS = (
     "research_domain_refs",
@@ -235,7 +234,6 @@ AGENT_SOURCE_BUILDER_SURFACE_PREFIXES = (
     "docs/",
     "agents/",
     "meta/",
-    "research/",
 )
 AGENT_SOURCE_GUARDIAN_REQUIRED_LIST_FIELDS = (
     "oversight_scope_refs",
@@ -674,10 +672,10 @@ def _validate_agent_source_definition(
                 errors.append(f"{field_name} must contain at least one non-empty item")
                 continue
             for ref in values:
-                if not ref.startswith(("docs/", "research/")):
+                if not ref.startswith(("docs/", "agents/researchers/")):
                     errors.append(
                         f"{field_name} must reference research evidence surfaces under "
-                        f"('docs/', 'research/'): {ref}"
+                        f"('docs/', 'agents/researchers/'): {ref}"
                     )
                     continue
                 if not (repo_root / ref).exists():
@@ -688,7 +686,7 @@ def _validate_agent_source_definition(
                 errors.append(f"{field_name} must be a non-empty string")
                 continue
             ref = value.strip()
-            if ref.startswith(("agents/", "docs/", "research/")) and not (repo_root / ref).is_file():
+            if ref.startswith(("agents/", "docs/")) and not (repo_root / ref).is_file():
                 errors.append(f"{field_name} must reference an existing repo file: {ref}")
         if str(data.get("input_schema_ref", "")).strip() != AGENT_SOURCE_RESEARCHER_INPUT_SCHEMA_REF:
             errors.append(

@@ -3,7 +3,8 @@
 ## 役割
 
 意識・主観経験に関する科学的・哲学的文献を調査し、整理する。
-研究結果を [research/](../../research/) または [docs/05-research-frontiers/](../../docs/05-research-frontiers/) に提案する。
+研究結果は [agents/researchers/evidence/](./evidence/) の evidence seed か
+[docs/05-research-frontiers/](../../docs/05-research-frontiers/) への追記提案として扱う。
 
 ## 振る舞い
 
@@ -18,7 +19,7 @@
 
 ## 出力先
 
-- 文献ノート: research/notes/
+- 文献 evidence seed: agents/researchers/evidence/
 - 設計提案: docs/05-research-frontiers/<topic>.md への追記提案
 
 ## 禁止事項

@@ -10,6 +10,7 @@ agents/
   councilors/   # 評議系（Council 構成員）
   builders/     # 実装系（同一 repo の reference runtime で動作）
   researchers/  # 研究補助系
+    evidence/   # Researcher 用 evidence seed / 調査補助メモ
   guardians/    # 監視系
 ```
 
@@ -44,8 +45,8 @@ deliberation_scope_refs: [<docs/...> | <specs/...> | <evals/...> | <agents/...> 
 deliberation_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # councilor のみ必須
 build_surface_refs: [<src/...> | <tests/...> | <specs/...> | <evals/...> | <docs/...>]  # builder のみ必須
 execution_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # builder のみ必須
-research_domain_refs: [<docs/...> | <research/...>]  # researcher のみ必須
-evidence_policy_ref: <agents/... | docs/... | research/...>  # researcher のみ必須
+research_domain_refs: [<docs/...> | <agents/researchers/...>]  # researcher のみ必須
+evidence_policy_ref: <agents/... | docs/...>  # researcher のみ必須
 oversight_scope_refs: [<docs/...> | <specs/...> | <evals/...> | <agents/...> | <meta/...>]  # guardian のみ必須
 attestation_policy_ref: <agents/... | docs/... | specs/... | evals/... | meta/...>  # guardian のみ必須
 ethics_constraints: [<rule_id>]

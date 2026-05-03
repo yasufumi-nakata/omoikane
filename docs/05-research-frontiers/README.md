@@ -47,7 +47,7 @@ frontier note を更新する。進展が無い日は no-op とし、未解決�
 - [collective-personhood.md](collective-personhood.md) ── Collective の人格
 - [memory-edit-ethics.md](memory-edit-ethics.md) ── 記憶編集の倫理境界
 
-## 研究ノートの書き方
+## Frontier ファイルの書き方
 
 各ファイルは以下の構造を持つ：
 

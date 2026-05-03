@@ -180,7 +180,7 @@ build_request:
 ```
 Claude (Council役) ── docs 整備
     │
-    ├──► Researcher Agent ── 文献調査・実験提案 (research/)
+    ├──► Researcher Agent ── 文献調査・実験提案 (agents/researchers/, docs/05-research-frontiers/)
     ├──► Codex (Builder)   ── reference runtime 実装 (src/, tests/, specs/, evals/, docs/, meta/decision-log/)
     ├──► Eval Agent        ── 評価コード生成 (evals/, docs/, meta/decision-log/)
     └──► Guardian          ── 倫理監査

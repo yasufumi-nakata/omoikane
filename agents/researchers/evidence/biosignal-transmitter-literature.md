@@ -8,10 +8,10 @@ related_topics:
   - docs/02-subsystems/interface/biodata-transmitter.md
 ---
 
-# 要約
+# Biosignal Transmitter Literature Seed
 
 OmoikaneOS の中心像を「生体データから体内状態 latent を作り、別の生体データを
-生成する transmitter」へ寄せるための文献 seed。
+生成する transmitter」へ寄せるための researcher evidence seed。
 
 ## 文献
 
@@ -26,14 +26,14 @@ OmoikaneOS の中心像を「生体データから体内状態 latent を作り�
 - Schneider, Lee, and Mathis (2023), Learnable latent embeddings for joint behavioural and neural analysis.
   https://doi.org/10.1038/s41586-023-06031-6
 
-# OmoikaneOS との関連
+## OmoikaneOS との関連
 
 - PhysioNet / NeuroKit2 は raw biosignal ではなく feature summary と reproducible processing vocabulary を固定する根拠になる。
 - DEAP は EEG と peripheral physiological signals を affect proxy へ接続する根拠になる。
 - interoceptive prediction は体内状態 latent を単なる embedding ではなく embodied state の中間表現として扱う根拠になる。
 - CEBRA は neural / behavioural data を latent に束ねる machine-learning 側の参照点になる。
 
-# mind-upload.com に送る矛盾
+## mind-upload.com に送る矛盾
 
 - biosignal 変換が成立しても qualia equivalence は証明されない。
 - thought target は attention pressure proxy までで、semantic thought content の復元とは分ける。

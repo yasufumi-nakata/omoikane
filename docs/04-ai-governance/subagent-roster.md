@@ -12,7 +12,7 @@
 | `ChangeAdvocate` | 「変える理由」を必ず述べる | Sonnet 級 | [agents/councilors/change-advocate.yaml](../../agents/councilors/change-advocate.yaml) |
 | `MemoryArchivist` | 決定履歴の維持 | Haiku 級 | [agents/councilors/memory-archivist.yaml](../../agents/councilors/memory-archivist.yaml) |
 
-## Researcher 系（research/ で活動）
+## Researcher 系（agents/researchers/ で活動）
 
 | 名前 | 担当 |
 |---|---|
@@ -91,7 +91,8 @@ Council handoff 前に確認できる。
 Researcher role は `research_evidence_request` / `research_evidence_report`
 として advisory-only request/report を返し、source digest、evidence digest、
 ledger entry ref/hash/payload ref に束縛されるが、raw research payload と
-decision authority は持たない。
+decision authority は持たない。Researcher の evidence seed や調査補助メモは
+`agents/researchers/evidence/` に置き、人間用の自由記述 research surface は持たない。
 convocation artifact は、registry entry 由来の `deliberation` / `oversight` /
 `build-surface` scope refs と policy ref を各 selection に再束縛し、
 `raw_role_scope_payload_stored=false` を明示するため、Council session 側だけを見ても

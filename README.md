@@ -50,12 +50,13 @@ specs/                ── 機械可読な仕様（Codex 入力用）
 agents/               ── 各サブエージェントの役割定義
 src/                  ── Reference runtime（安全な最小実装）
 tests/                ── Reference runtime の検証
-research/             ── 人間が書く研究ノート（自由記述）
 meta/                 ── 用語集・決定履歴
 ```
 
 最初に読むべきは [docs/00-philosophy/manifesto.md](docs/00-philosophy/manifesto.md) と [docs/01-architecture/overview.md](docs/01-architecture/overview.md)。
 何から研究を始めるべきかは [docs/05-research-frontiers/README.md](docs/05-research-frontiers/README.md) にある。
+Researcher の evidence seed や調査補助メモは [agents/researchers/](agents/researchers/) に置き、
+人間用の自由記述ノート surface は持たない。
 `docs/` 配下の Markdown は GitHub Wiki にも mirror する。
 正本はこの repository の `docs/` で、wiki は閲覧用の索引として扱い、
 更新時は `scripts/sync_docs_to_wiki.py --output-dir /path/to/omoikane.wiki` で再生成する。
