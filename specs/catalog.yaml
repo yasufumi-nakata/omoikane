@@ -1317,7 +1317,7 @@ entries:
       - evals/interface/sensory_loopback_public_schema_contract.yaml
       - tests/integration/test_interface_schema_contracts.py
       - reference-runtime
-    rationale: Required to serialize participant-specific BioData confidence, feature-window drift gate, fresh calibration refresh propagation, hardware timing latency drift gate distribution, and optional 3-4 participant weighted latency quorum with policy-authority digest and live verifier timeout-budget binding into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, refresh, timing, hardware adapter, weight-policy authority, verifier, or gate payload retention.
+    rationale: Required to serialize participant-specific BioData confidence, feature-window drift gate, fresh calibration refresh propagation, hardware timing latency drift gate distribution, optional 3-4 participant weighted latency quorum, and optional 5-8 participant federated latency quorum with policy-authority digest and live verifier timeout-budget binding into one shared sensory loopback arbitration binding without raw BioData, calibration, drift, refresh, timing, hardware adapter, weight-policy authority, verifier, or gate payload retention.
   - priority: P1
     kind: schema
     file: specs/schemas/sensory_loopback_latency_weight_policy_verifier_quorum.schema
@@ -1380,7 +1380,7 @@ entries:
       - reference-runtime
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, fresh calibration refresh propagation, hardware timing latency strict pass, weighted latency quorum policy-authority binding, binding digest evidence, and raw BioData/drift/refresh/timing/hardware/weight-policy/gate payload redaction before shared loopback arbitration accepts participant gates.
+    rationale: Protects participant BioData confidence gate coverage, feature-window series drift pass, fresh calibration refresh propagation, hardware timing latency strict pass, weighted and federated latency quorum policy-authority binding, binding digest evidence, and raw BioData/drift/refresh/timing/hardware/weight-policy/gate payload redaction before shared loopback arbitration accepts participant gates.
   - priority: P1
     kind: eval
     file: evals/interface/sensory_loopback_calibration_refresh_state_guard.yaml
@@ -1397,7 +1397,7 @@ entries:
       - tests/integration/test_interface_schema_contracts.py
       - agents/builders/eval-builder.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects the sensory-loopback public schema contract manifest that maps self-only and shared session, receipt, artifact-family, BioData arbitration binding, and weighted latency quorum binding payloads from the CLI demo to reviewer-facing public schemas.
+    rationale: Protects the sensory-loopback public schema contract manifest that maps self-only and shared session, receipt, artifact-family, BioData arbitration binding, weighted latency quorum binding, and federated latency quorum binding payloads from the CLI demo to reviewer-facing public schemas.
   - priority: P1
     kind: schema
     file: specs/schemas/collective_merge_session.schema

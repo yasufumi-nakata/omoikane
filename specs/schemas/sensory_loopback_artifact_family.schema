@@ -54,7 +54,7 @@ properties:
   participant_identity_ids:
     type: array
     minItems: 1
-    maxItems: 4
+    maxItems: 8
     uniqueItems: true
     items:
       type: string
@@ -195,7 +195,7 @@ properties:
         participant_identity_ids:
           type: array
           minItems: 1
-          maxItems: 4
+          maxItems: 8
           uniqueItems: true
           items:
             type: string

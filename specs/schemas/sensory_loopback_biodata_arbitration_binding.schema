@@ -98,7 +98,7 @@ properties:
   participant_identity_ids:
     type: array
     minItems: 2
-    maxItems: 4
+    maxItems: 8
     uniqueItems: true
     items:
       type: string
@@ -118,7 +118,7 @@ properties:
   participant_gate_bindings:
     type: array
     minItems: 2
-    maxItems: 4
+    maxItems: 8
     items:
       type: object
       additionalProperties: false
@@ -229,7 +229,7 @@ properties:
   participant_gate_count:
     type: integer
     minimum: 2
-    maximum: 4
+    maximum: 8
   participant_gate_digest_set:
     type: string
     minLength: 32
@@ -245,7 +245,7 @@ properties:
   participant_latency_bindings:
     type: array
     minItems: 2
-    maxItems: 4
+    maxItems: 8
     items:
       type: object
       additionalProperties: false
@@ -339,7 +339,7 @@ properties:
   participant_latency_gate_count:
     type: integer
     minimum: 2
-    maximum: 4
+    maximum: 8
   participant_latency_digest_set:
     type: string
     minLength: 32
@@ -348,6 +348,7 @@ properties:
     enum:
       - all-participant-latency-pass-v1
       - weighted-latency-quorum-v1
+      - federated-latency-quorum-v1
   latency_quorum_threshold:
     type: number
     exclusiveMinimum: 0
@@ -355,7 +356,7 @@ properties:
   participant_latency_weights:
     type: object
     minProperties: 2
-    maxProperties: 4
+    maxProperties: 8
     additionalProperties:
       type: number
       exclusiveMinimum: 0
@@ -417,7 +418,7 @@ properties:
     maximum: 1
   latency_quorum_failed_participant_ids:
     type: array
-    maxItems: 4
+    maxItems: 8
     uniqueItems: true
     items:
       type: string

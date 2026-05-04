@@ -1311,12 +1311,12 @@ Sensory Loopback 側で検証する。latency gate は
 `participant-hardware-timing-latency-drift-gate-v1` として baseline / observed latency の
 差を `12.0ms` cap で評価し、BioData drift threshold policy authority が bound の時は
 同じ authority ref / digest / source digest set を保持する。3-4 participant の
-shared field では `weighted-latency-quorum-v1` により、blocked timing gate を
-failed participant id として残したまま、passing participant weight が threshold を
-満たす場合だけ acceptance できる。participant weight と quorum 判定は
-`weighted-latency-quorum-authority-v1` の authority ref / digest / source digest set と、
-`weighted-latency-policy-live-verifier-quorum-v1` の fresh verifier quorum ref / digest /
-250ms request-timeout digest set と
+shared field では `weighted-latency-quorum-v1`、5-8 participant の shared field では
+`federated-latency-quorum-v1` により、blocked timing gate を failed participant id として
+残したまま、passing participant weight が threshold を満たす場合だけ acceptance できる。
+participant weight と quorum 判定は `weighted-latency-quorum-authority-v1` の authority
+ref / digest / source digest set と、`weighted-latency-policy-live-verifier-quorum-v1` の
+fresh verifier quorum ref / digest / 250ms request-timeout digest set と
 一緒に digest-only で束縛し、raw timing / hardware adapter / weight-policy authority /
 verifier response / verifier signature payload は保存しない。
 
@@ -1610,8 +1610,9 @@ participant ごとに同じ binding へ伝播し、
 participant ごとの hardware timing latency drift gate も同じ binding へ束縛し、
 shared arbitration が calibration / drift / refresh / timing / hardware adapter / gate payload を
 保存しないことを検証する。
-同じ sidecar path は 3 participant の `weighted-latency-quorum-v1` も返し、
-observer の latency gate が blocked でも self + peer の pass weight が threshold を満たす時だけ
+同じ sidecar path は 3 participant の `weighted-latency-quorum-v1` と
+5 participant の `federated-latency-quorum-v1` も返し、
+observer / witness の latency gate が blocked でも passing participant weight が threshold を満たす時だけ
 `latency_quorum_satisfied=true` とし、participant latency weight digest、
 weight policy authority digest、fresh verifier quorum digest、timeout-bound flag、quorum digest を public schema に通す。
 同じ weighted path は `participant-calibration-refresh-state-fail-closed-v1` guard も返し、
@@ -1621,7 +1622,7 @@ refresh state digest set、guard digest、revocation ref だけを保持して
 raw refresh / revocation payload を保存しない。
 さらに `sensory-loopback-public-schema-contract-v1` の `schema_contracts` manifest が
 self-only と shared loopback の session / receipt / artifact family / BioData arbitration binding payload、
-weighted latency quorum binding payload、timeout-bound weight policy verifier quorum payload、
+weighted / federated latency quorum binding payload、timeout-bound weight policy verifier quorum payload、
 calibration refresh state guard payload を
 `sensory_loopback_session.schema` /
 `sensory_loopback_receipt.schema` /

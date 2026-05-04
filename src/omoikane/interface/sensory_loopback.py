@@ -56,7 +56,7 @@ SENSORY_LOOPBACK_BODY_MAP_WEIGHTS = {
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_POLICY = "multi-scene-artifact-family-v1"
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_STORAGE_POLICY = "family-digest+scene-summary-ref-only"
 SENSORY_LOOPBACK_ARTIFACT_FAMILY_MAX_SCENES = 4
-SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS = 4
+SENSORY_LOOPBACK_SHARED_SPACE_MAX_PARTICIPANTS = 8
 SENSORY_LOOPBACK_SHARED_SPACE_MODES = {"self-only", "imc-shared", "collective-shared"}
 SENSORY_LOOPBACK_ARBITRATION_POLICY = "guardian-mediated-multi-self-loopback-v1"
 SENSORY_LOOPBACK_BIODATA_ARBITRATION_POLICY = (
@@ -86,6 +86,7 @@ SENSORY_LOOPBACK_PARTICIPANT_LATENCY_STORAGE_POLICY = (
 SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS = 12.0
 SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE = "all-participant-latency-pass-v1"
 SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE = "weighted-latency-quorum-v1"
+SENSORY_LOOPBACK_LATENCY_QUORUM_FEDERATED_PROFILE = "federated-latency-quorum-v1"
 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE = (
     "weighted-latency-quorum-authority-v1"
 )
@@ -96,6 +97,8 @@ SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_THRESHOLD = 2
 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_FRESHNESS_HOURS = 24
 SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_TIMEOUT_MS = 250
 SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS = 3
+SENSORY_LOOPBACK_WEIGHTED_LATENCY_MAX_PARTICIPANTS = 4
+SENSORY_LOOPBACK_FEDERATED_LATENCY_MIN_PARTICIPANTS = 5
 SENSORY_LOOPBACK_ALLOWED_ARBITRATION_STATUSES = {
     "self-exclusive",
     "shared-aligned",
@@ -196,6 +199,7 @@ class SensoryLoopbackService:
                 "latency_quorum_profiles": [
                     SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE,
                     SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE,
+                    SENSORY_LOOPBACK_LATENCY_QUORUM_FEDERATED_PROFILE,
                 ],
                 "latency_weight_policy_profile": (
                     SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE
@@ -217,6 +221,12 @@ class SensoryLoopbackService:
                 "requires_latency_weight_policy_verifier_timeout_budget": True,
                 "weighted_latency_min_participants": (
                     SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS
+                ),
+                "weighted_latency_max_participants": (
+                    SENSORY_LOOPBACK_WEIGHTED_LATENCY_MAX_PARTICIPANTS
+                ),
+                "federated_latency_min_participants": (
+                    SENSORY_LOOPBACK_FEDERATED_LATENCY_MIN_PARTICIPANTS
                 ),
                 "max_participant_latency_drift_ms": (
                     SENSORY_LOOPBACK_MAX_PARTICIPANT_LATENCY_DRIFT_MS
@@ -3898,12 +3908,12 @@ class SensoryLoopbackService:
                 "weight_policy_verifier_quorum_ref": "",
                 "weight_policy_verifier_quorum_digest": "",
                 "weight_policy_verifier_source_digest_set": "",
-            "weight_policy_verifier_status": "not-bound",
-            "weight_policy_verifier_freshness_status": "not-bound",
-            "weight_policy_verifier_bound": False,
-            "weight_policy_verifier_fresh": False,
-            "weight_policy_verifier_timeout_bound": False,
-        }
+                "weight_policy_verifier_status": "not-bound",
+                "weight_policy_verifier_freshness_status": "not-bound",
+                "weight_policy_verifier_bound": False,
+                "weight_policy_verifier_fresh": False,
+                "weight_policy_verifier_timeout_bound": False,
+            }
         if participant_latency_weights is None:
             raise ValueError("participant_latency_weights are required for weighted quorum")
         for field_name, field_value in (
@@ -3921,6 +3931,11 @@ class SensoryLoopbackService:
                 "weighted latency quorum requires at least "
                 f"{SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS} participants",
             )
+        quorum_profile_id = (
+            SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE
+            if len(participant_ids) <= SENSORY_LOOPBACK_WEIGHTED_LATENCY_MAX_PARTICIPANTS
+            else SENSORY_LOOPBACK_LATENCY_QUORUM_FEDERATED_PROFILE
+        )
         if latency_weight_policy_verifier_quorum is None:
             raise ValueError(
                 "weighted latency quorum requires latency_weight_policy_verifier_quorum",
@@ -3966,7 +3981,7 @@ class SensoryLoopbackService:
         if threshold <= 0:
             raise ValueError("latency_quorum_threshold must be greater than 0")
         return {
-            "profile_id": SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE,
+            "profile_id": quorum_profile_id,
             "threshold": threshold,
             "weights": weights,
             "weight_policy_profile": SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE,
@@ -4160,6 +4175,7 @@ class SensoryLoopbackService:
         if profile not in {
             SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE,
             SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE,
+            SENSORY_LOOPBACK_LATENCY_QUORUM_FEDERATED_PROFILE,
         }:
             errors.append("latency_quorum_profile must be a known profile")
             profile = SENSORY_LOOPBACK_LATENCY_QUORUM_STRICT_PROFILE
@@ -4199,6 +4215,18 @@ class SensoryLoopbackService:
             < SENSORY_LOOPBACK_WEIGHTED_LATENCY_MIN_PARTICIPANTS
         ):
             errors.append("weighted latency quorum requires at least 3 participants")
+        if (
+            profile == SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE
+            and len(participant_identity_ids)
+            > SENSORY_LOOPBACK_WEIGHTED_LATENCY_MAX_PARTICIPANTS
+        ):
+            errors.append("weighted latency quorum is limited to 4 participants")
+        if (
+            profile == SENSORY_LOOPBACK_LATENCY_QUORUM_FEDERATED_PROFILE
+            and len(participant_identity_ids)
+            < SENSORY_LOOPBACK_FEDERATED_LATENCY_MIN_PARTICIPANTS
+        ):
+            errors.append("federated latency quorum requires at least 5 participants")
 
         expected_weight_digest = self._participant_latency_weight_digest(
             str(profile),
@@ -4278,17 +4306,20 @@ class SensoryLoopbackService:
         if not isinstance(weight_policy_verifier_fresh, bool):
             errors.append("latency_weight_policy_verifier_fresh must be a boolean")
             weight_policy_verifier_fresh = False
-        if profile == SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE:
+        if profile in {
+            SENSORY_LOOPBACK_LATENCY_QUORUM_WEIGHTED_PROFILE,
+            SENSORY_LOOPBACK_LATENCY_QUORUM_FEDERATED_PROFILE,
+        }:
             if weight_policy_profile != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_PROFILE:
                 errors.append(
-                    "weighted latency quorum must bind latency weight policy profile",
+                    "non-strict latency quorum must bind latency weight policy profile",
                 )
             if weight_policy_status != "complete":
                 errors.append(
-                    "weighted latency quorum policy authority must be complete",
+                    "non-strict latency quorum policy authority must be complete",
                 )
             if weight_policy_bound is not True:
-                errors.append("weighted latency quorum policy authority must be bound")
+                errors.append("non-strict latency quorum policy authority must be bound")
             for field_name, field_value in (
                 ("latency_weight_policy_authority_ref", weight_policy_authority_ref),
                 (
@@ -4301,29 +4332,29 @@ class SensoryLoopbackService:
                 ),
             ):
                 if not field_value:
-                    errors.append(f"{field_name} must be bound for weighted quorum")
+                    errors.append(f"{field_name} must be bound for non-strict quorum")
             if (
                 weight_policy_verifier_profile
                 != SENSORY_LOOPBACK_LATENCY_WEIGHT_POLICY_VERIFIER_PROFILE
             ):
                 errors.append(
-                    "weighted latency quorum must bind live verifier quorum profile",
+                    "non-strict latency quorum must bind live verifier quorum profile",
                 )
             if weight_policy_verifier_status != "complete":
                 errors.append(
-                    "weighted latency quorum verifier quorum must be complete",
+                    "non-strict latency quorum verifier quorum must be complete",
                 )
             if weight_policy_verifier_freshness_status != "fresh":
                 errors.append(
-                    "weighted latency quorum verifier quorum must be fresh",
+                    "non-strict latency quorum verifier quorum must be fresh",
                 )
             if weight_policy_verifier_bound is not True:
-                errors.append("weighted latency quorum verifier quorum must be bound")
+                errors.append("non-strict latency quorum verifier quorum must be bound")
             if weight_policy_verifier_fresh is not True:
-                errors.append("weighted latency quorum verifier quorum must be fresh")
+                errors.append("non-strict latency quorum verifier quorum must be fresh")
             if weight_policy_verifier_timeout_bound is not True:
                 errors.append(
-                    "weighted latency quorum verifier timeout budget must be bound",
+                    "non-strict latency quorum verifier timeout budget must be bound",
                 )
             for field_name, field_value in (
                 (
@@ -4340,7 +4371,7 @@ class SensoryLoopbackService:
                 ),
             ):
                 if not field_value:
-                    errors.append(f"{field_name} must be bound for weighted quorum")
+                    errors.append(f"{field_name} must be bound for non-strict quorum")
             if weight_policy_verifier_source_digest_set != weight_policy_source_digest_set:
                 errors.append(
                     "latency_weight_policy_verifier_source_digest_set must match latency_weight_policy_source_digest_set",

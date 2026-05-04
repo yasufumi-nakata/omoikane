@@ -616,7 +616,7 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["public_schema_contract_bound"])
         schema_contracts = result["schema_contracts"]
-        self.assertEqual(13, len(schema_contracts))
+        self.assertEqual(16, len(schema_contracts))
         for contract in schema_contracts:
             self._assert_schema_valid(
                 contract["schema_path"],
@@ -679,6 +679,20 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertEqual(
             2,
             len(weighted["validation"]["calibration_refresh_failed_participant_ids"]),
+        )
+        federated = result["shared_loopback"]["federated_latency_quorum"]
+        self.assertTrue(federated["validation"]["ok"])
+        self.assertEqual(5, federated["validation"]["participant_count"])
+        self.assertEqual(
+            "federated-latency-quorum-v1",
+            federated["validation"]["latency_quorum_profile"],
+        )
+        self.assertTrue(federated["validation"]["latency_quorum_satisfied"])
+        self.assertFalse(federated["validation"]["all_latency_gates_passed"])
+        self.assertTrue(federated["validation"]["latency_quorum_digest_bound"])
+        self.assertTrue(federated["validation"]["latency_weight_policy_verifier_bound"])
+        self.assertTrue(
+            federated["validation"]["latency_weight_policy_verifier_timeout_bound"]
         )
 
 

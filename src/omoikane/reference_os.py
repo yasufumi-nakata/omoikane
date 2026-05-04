@@ -15405,6 +15405,14 @@ json.dump(response, sys.stdout)
             human_consent_proof="consent://sensory-loopback-observer-demo/v1",
             metadata={"display_name": "Weighted Loopback Observer"},
         )
+        scout = self.identity.create(
+            human_consent_proof="consent://sensory-loopback-scout-demo/v1",
+            metadata={"display_name": "Federated Loopback Scout"},
+        )
+        witness = self.identity.create(
+            human_consent_proof="consent://sensory-loopback-witness-demo/v1",
+            metadata={"display_name": "Federated Loopback Witness"},
+        )
         collective_identity = self.identity.create_collective(
             [identity.identity_id, peer.identity_id],
             consent_proof="consent://sensory-loopback-collective-demo/v1",
@@ -15692,6 +15700,160 @@ json.dump(response, sys.stdout)
                 ),
             )
         )
+        federated_participant_ids = [
+            identity.identity_id,
+            peer.identity_id,
+            observer.identity_id,
+            scout.identity_id,
+            witness.identity_id,
+        ]
+        federated_world_session = self.wms.create_session(
+            federated_participant_ids,
+            objects=[
+                "federated-shared-mirror",
+                "latency-federation-anchor",
+                "multi-presence-clock",
+            ],
+        )
+        federated_world_state = self.wms.snapshot(
+            federated_world_session["session_id"],
+        )
+        federated_session = self.sensory_loopback.open_session(
+            identity_id=identity.identity_id,
+            world_state_ref=f"wms://state/{federated_world_state['state_id']}",
+            body_anchor_ref="avatar://atrium/federated-body/core",
+            avatar_body_map_ref="avatar-body-map://atrium/federated-body/v1",
+            proprioceptive_calibration_ref="calibration://atrium/federated-body/v1",
+            participant_identity_ids=federated_participant_ids,
+            shared_imc_session_id="imc://atrium/federated-latency-quorum",
+            shared_collective_id="collective://atrium/federated-latency-field",
+        )
+        federated_scout_biodata_gate = self._build_sensory_loopback_biodata_gate(
+            scout.identity_id,
+            "scout",
+            heart_rate_shift=0.6,
+        )
+        federated_witness_biodata_gate = self._build_sensory_loopback_biodata_gate(
+            witness.identity_id,
+            "witness",
+            heart_rate_shift=1.8,
+        )
+        federated_scout_latency_gate = (
+            self.sensory_loopback.bind_participant_latency_drift_gate(
+                participant_identity_id=scout.identity_id,
+                hardware_adapter_ref="hardware-adapter://atrium/federated/scout-timing",
+                timing_evidence_ref="timing-evidence://atrium/federated/scout-frame-clock",
+                baseline_latency_ms=45.0,
+                observed_latency_ms=54.0,
+                threshold_policy_authority_ref=federated_scout_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_ref"],
+                threshold_policy_authority_digest=federated_scout_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_digest"],
+                threshold_policy_source_digest_set=federated_scout_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_source_digest_set"],
+            )
+        )
+        federated_witness_latency_gate = (
+            self.sensory_loopback.bind_participant_latency_drift_gate(
+                participant_identity_id=witness.identity_id,
+                hardware_adapter_ref="hardware-adapter://atrium/federated/witness-timing",
+                timing_evidence_ref=(
+                    "timing-evidence://atrium/federated/witness-frame-clock"
+                ),
+                baseline_latency_ms=45.0,
+                observed_latency_ms=74.0,
+                threshold_policy_authority_ref=federated_witness_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_ref"],
+                threshold_policy_authority_digest=federated_witness_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_authority_digest"],
+                threshold_policy_source_digest_set=federated_witness_biodata_gate[
+                    "confidence_gate"
+                ]["feature_window_series_threshold_policy_source_digest_set"],
+            )
+        )
+        federated_latency_policy_authority_ref = (
+            "latency-weight-policy-authority://atrium/federated/quorum"
+        )
+        federated_latency_weights = {
+            identity.identity_id: 0.25,
+            peer.identity_id: 0.25,
+            observer.identity_id: 0.20,
+            scout.identity_id: 0.15,
+            witness.identity_id: 0.15,
+        }
+        federated_latency_policy_source_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "policy_source": "atrium-federated-latency-quorum-demo",
+                    "participant_identity_ids": federated_participant_ids,
+                    "weights": federated_latency_weights,
+                    "threshold": 0.60,
+                }
+            )
+        )
+        federated_latency_policy_authority_digest = sha256_text(
+            canonical_json(
+                {
+                    "authority_ref": federated_latency_policy_authority_ref,
+                    "source_digest_set": federated_latency_policy_source_digest_set,
+                    "profile_id": "weighted-latency-quorum-authority-v1",
+                }
+            )
+        )
+        federated_latency_policy_verifier_quorum = (
+            self.sensory_loopback.bind_latency_weight_policy_verifier_quorum(
+                authority_ref=federated_latency_policy_authority_ref,
+                authority_digest=federated_latency_policy_authority_digest,
+                source_digest_set=federated_latency_policy_source_digest_set,
+                verifier_refs=[
+                    "latency-weight-policy-verifier://jp-13/federated-primary",
+                    "latency-weight-policy-verifier://sg-01/federated-backup",
+                ],
+                verifier_jurisdictions=["JP-13", "SG-01"],
+            )
+        )
+        federated_latency_quorum_binding = (
+            self.sensory_loopback.bind_participant_biodata_arbitration(
+                federated_session["session_id"],
+                participant_gate_receipts={
+                    identity.identity_id: shared_self_biodata_gate["confidence_gate"],
+                    peer.identity_id: shared_peer_biodata_gate["confidence_gate"],
+                    observer.identity_id: weighted_observer_biodata_gate[
+                        "confidence_gate"
+                    ],
+                    scout.identity_id: federated_scout_biodata_gate["confidence_gate"],
+                    witness.identity_id: federated_witness_biodata_gate[
+                        "confidence_gate"
+                    ],
+                },
+                participant_latency_drift_gates={
+                    identity.identity_id: shared_self_latency_gate,
+                    peer.identity_id: shared_peer_latency_gate,
+                    observer.identity_id: weighted_observer_latency_gate,
+                    scout.identity_id: federated_scout_latency_gate,
+                    witness.identity_id: federated_witness_latency_gate,
+                },
+                participant_latency_weights=federated_latency_weights,
+                latency_quorum_threshold=0.60,
+                latency_weight_policy_authority_ref=(
+                    federated_latency_policy_authority_ref
+                ),
+                latency_weight_policy_authority_digest=(
+                    federated_latency_policy_authority_digest
+                ),
+                latency_weight_policy_source_digest_set=(
+                    federated_latency_policy_source_digest_set
+                ),
+                latency_weight_policy_verifier_quorum=(
+                    federated_latency_policy_verifier_quorum
+                ),
+            )
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="sensory_loopback.biodata_arbitration.bound",
@@ -15879,6 +16041,22 @@ json.dump(response, sys.stdout)
                 weighted_latency_policy_verifier_quorum,
             )
         )
+        federated_final_session = self.sensory_loopback.snapshot(
+            federated_session["session_id"]
+        )
+        federated_session_validation = self.sensory_loopback.validate_session(
+            federated_final_session
+        )
+        federated_latency_quorum_validation = (
+            self.sensory_loopback.validate_participant_biodata_arbitration(
+                federated_latency_quorum_binding,
+            )
+        )
+        federated_latency_policy_verifier_quorum_validation = (
+            self.sensory_loopback.validate_latency_weight_policy_verifier_quorum(
+                federated_latency_policy_verifier_quorum,
+            )
+        )
         calibration_refresh_state_guard_validation = (
             self.sensory_loopback.validate_participant_calibration_refresh_state_guard(
                 calibration_refresh_state_guard,
@@ -15973,6 +16151,35 @@ json.dump(response, sys.stdout)
                 ),
                 "contract_role": (
                     "shared-loopback-calibration-refresh-state-fail-closed"
+                ),
+            },
+            {
+                "payload_path": "shared_loopback.federated_latency_quorum.session",
+                "schema_path": "specs/schemas/sensory_loopback_session.schema",
+                "contract_role": "shared-loopback-federated-latency-session",
+            },
+            {
+                "payload_path": (
+                    "shared_loopback.federated_latency_quorum."
+                    "biodata_arbitration_binding"
+                ),
+                "schema_path": (
+                    "specs/schemas/"
+                    "sensory_loopback_biodata_arbitration_binding.schema"
+                ),
+                "contract_role": "shared-loopback-federated-latency-quorum-binding",
+            },
+            {
+                "payload_path": (
+                    "shared_loopback.federated_latency_quorum."
+                    "latency_weight_policy_authority.verifier_quorum"
+                ),
+                "schema_path": (
+                    "specs/schemas/"
+                    "sensory_loopback_latency_weight_policy_verifier_quorum.schema"
+                ),
+                "contract_role": (
+                    "shared-loopback-federated-latency-policy-verifier-quorum"
                 ),
             },
         ]
@@ -16178,6 +16385,150 @@ json.dump(response, sys.stdout)
                         ),
                     },
                 },
+                "federated_latency_quorum": {
+                    "participants": {
+                        "scout": {
+                            "identity_id": scout.identity_id,
+                            "lineage_id": scout.lineage_id,
+                        },
+                        "witness": {
+                            "identity_id": witness.identity_id,
+                            "lineage_id": witness.lineage_id,
+                        },
+                    },
+                    "world_state": federated_world_state,
+                    "session": federated_final_session,
+                    "biodata_gate_artifacts": {
+                        "self": shared_self_biodata_gate,
+                        "peer": shared_peer_biodata_gate,
+                        "observer": weighted_observer_biodata_gate,
+                        "scout": federated_scout_biodata_gate,
+                        "witness": federated_witness_biodata_gate,
+                    },
+                    "participant_latency_drift_gates": {
+                        "self": shared_self_latency_gate,
+                        "peer": shared_peer_latency_gate,
+                        "observer": weighted_observer_latency_gate,
+                        "scout": federated_scout_latency_gate,
+                        "witness": federated_witness_latency_gate,
+                    },
+                    "biodata_arbitration_binding": federated_latency_quorum_binding,
+                    "latency_weight_policy_authority": {
+                        "authority_ref": federated_latency_policy_authority_ref,
+                        "authority_digest": federated_latency_policy_authority_digest,
+                        "source_digest_set": (
+                            federated_latency_policy_source_digest_set
+                        ),
+                        "verifier_quorum": federated_latency_policy_verifier_quorum,
+                    },
+                    "validation": {
+                        "ok": federated_session_validation["ok"]
+                        and federated_latency_quorum_validation["ok"]
+                        and federated_latency_policy_verifier_quorum_validation["ok"],
+                        "session_ok": federated_session_validation["ok"],
+                        "biodata_arbitration_ok": (
+                            federated_latency_quorum_validation["ok"]
+                        ),
+                        "participant_count": federated_session_validation[
+                            "participant_count"
+                        ],
+                        "latency_quorum_profile": (
+                            federated_latency_quorum_validation[
+                                "latency_quorum_profile"
+                            ]
+                        ),
+                        "latency_quorum_satisfied": (
+                            federated_latency_quorum_validation[
+                                "latency_quorum_satisfied"
+                            ]
+                        ),
+                        "all_latency_gates_passed": (
+                            federated_latency_quorum_validation[
+                                "all_latency_gates_passed"
+                            ]
+                        ),
+                        "latency_quorum_pass_weight": (
+                            federated_latency_quorum_validation[
+                                "latency_quorum_pass_weight"
+                            ]
+                        ),
+                        "latency_quorum_failed_participant_ids": (
+                            federated_latency_quorum_validation[
+                                "latency_quorum_failed_participant_ids"
+                            ]
+                        ),
+                        "participant_latency_weight_digest_bound": (
+                            federated_latency_quorum_validation[
+                                "participant_latency_weight_digest_bound"
+                            ]
+                        ),
+                        "latency_quorum_digest_bound": (
+                            federated_latency_quorum_validation[
+                                "latency_quorum_digest_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_bound": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_digest_bound": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_digest_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_status": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_status"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_bound": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_verifier_bound"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_fresh": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_verifier_fresh"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_status": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_verifier_status"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_freshness_status": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_verifier_freshness_status"
+                            ]
+                        ),
+                        "latency_weight_policy_verifier_timeout_bound": (
+                            federated_latency_quorum_validation[
+                                "latency_weight_policy_verifier_timeout_bound"
+                            ]
+                            and federated_latency_policy_verifier_quorum_validation[
+                                "request_timeout_budget_bound"
+                            ]
+                            and federated_latency_policy_verifier_quorum_validation[
+                                "request_timeout_digest_set_bound"
+                            ]
+                        ),
+                        "raw_latency_policy_payload_redacted": (
+                            federated_latency_quorum_binding[
+                                "raw_latency_weight_policy_payload_stored"
+                            ]
+                            is False
+                            and federated_latency_quorum_binding[
+                                "raw_latency_weight_policy_verifier_payload_stored"
+                            ]
+                            is False
+                            and federated_latency_quorum_binding[
+                                "raw_latency_weight_policy_verifier_response_payload_stored"
+                            ]
+                            is False
+                        ),
+                    },
+                },
                 "receipts": {
                     "aligned": shared_aligned,
                     "mediated": shared_mediated,
@@ -16192,6 +16543,9 @@ json.dump(response, sys.stdout)
                     and weighted_session_validation["ok"]
                     and weighted_latency_quorum_validation["ok"]
                     and weighted_latency_policy_verifier_quorum_validation["ok"]
+                    and federated_session_validation["ok"]
+                    and federated_latency_quorum_validation["ok"]
+                    and federated_latency_policy_verifier_quorum_validation["ok"]
                     and calibration_refresh_state_guard_validation["ok"],
                     "session_ok": shared_session_validation["ok"],
                     "aligned_ok": shared_aligned_validation["ok"],
@@ -16303,6 +16657,57 @@ json.dump(response, sys.stdout)
                         ]
                         == [observer.identity_id]
                     ),
+                    "federated_latency_quorum_ok": (
+                        federated_session_validation["ok"]
+                        and federated_latency_quorum_validation["ok"]
+                        and federated_latency_policy_verifier_quorum_validation["ok"]
+                    ),
+                    "federated_latency_quorum_satisfied": (
+                        federated_latency_quorum_validation[
+                            "latency_quorum_satisfied"
+                        ]
+                    ),
+                    "federated_latency_quorum_profile": (
+                        federated_latency_quorum_validation["latency_quorum_profile"]
+                        == "federated-latency-quorum-v1"
+                    ),
+                    "federated_latency_quorum_participant_count": (
+                        federated_session_validation["participant_count"] == 5
+                    ),
+                    "federated_latency_quorum_digest_bound": (
+                        federated_latency_quorum_validation[
+                            "participant_latency_weight_digest_bound"
+                        ]
+                        and federated_latency_quorum_validation[
+                            "latency_weight_policy_digest_bound"
+                        ]
+                        and federated_latency_quorum_validation[
+                            "latency_quorum_digest_bound"
+                        ]
+                    ),
+                    "federated_latency_policy_verifier_bound": (
+                        federated_latency_quorum_validation[
+                            "latency_weight_policy_verifier_bound"
+                        ]
+                        and federated_latency_quorum_validation[
+                            "latency_weight_policy_verifier_fresh"
+                        ]
+                        and federated_latency_quorum_validation[
+                            "latency_weight_policy_verifier_timeout_bound"
+                        ]
+                        and federated_latency_policy_verifier_quorum_validation[
+                            "request_timeout_budget_bound"
+                        ]
+                        and federated_latency_policy_verifier_quorum_validation[
+                            "request_timeout_digest_set_bound"
+                        ]
+                    ),
+                    "federated_latency_quorum_failed_participant_bound": (
+                        federated_latency_quorum_validation[
+                            "latency_quorum_failed_participant_ids"
+                        ]
+                        == [observer.identity_id, witness.identity_id]
+                    ),
                     "calibration_refresh_state_guard_ok": (
                         calibration_refresh_state_guard_validation["ok"]
                     ),
@@ -16365,6 +16770,9 @@ json.dump(response, sys.stdout)
                     and weighted_session_validation["ok"]
                     and weighted_latency_quorum_validation["ok"]
                     and weighted_latency_policy_verifier_quorum_validation["ok"]
+                    and federated_session_validation["ok"]
+                    and federated_latency_quorum_validation["ok"]
+                    and federated_latency_policy_verifier_quorum_validation["ok"]
                     and calibration_refresh_state_guard_validation["ok"]
                     and calibration_gate_validation["ok"],
                 "coherent_ok": coherent_validation["ok"],
@@ -16429,6 +16837,9 @@ json.dump(response, sys.stdout)
                 and weighted_session_validation["ok"]
                 and weighted_latency_quorum_validation["ok"]
                 and weighted_latency_policy_verifier_quorum_validation["ok"]
+                and federated_session_validation["ok"]
+                and federated_latency_quorum_validation["ok"]
+                and federated_latency_policy_verifier_quorum_validation["ok"]
                 and calibration_refresh_state_guard_validation["ok"],
                 "shared_loopback_collective_bound": shared_session_validation[
                     "shared_collective_bound"
@@ -16598,6 +17009,55 @@ json.dump(response, sys.stdout)
                     ]
                     == [observer.identity_id]
                 ),
+                "shared_loopback_federated_latency_quorum_ok": (
+                    federated_session_validation["ok"]
+                    and federated_latency_quorum_validation["ok"]
+                    and federated_latency_policy_verifier_quorum_validation["ok"]
+                ),
+                "shared_loopback_federated_latency_quorum_satisfied": (
+                    federated_latency_quorum_validation["latency_quorum_satisfied"]
+                ),
+                "shared_loopback_federated_latency_quorum_profile": (
+                    federated_latency_quorum_validation["latency_quorum_profile"]
+                    == "federated-latency-quorum-v1"
+                ),
+                "shared_loopback_federated_latency_quorum_participant_count": (
+                    federated_session_validation["participant_count"] == 5
+                ),
+                "shared_loopback_federated_latency_quorum_digest_bound": (
+                    federated_latency_quorum_validation[
+                        "participant_latency_weight_digest_bound"
+                    ]
+                    and federated_latency_quorum_validation[
+                        "latency_weight_policy_digest_bound"
+                    ]
+                    and federated_latency_quorum_validation[
+                        "latency_quorum_digest_bound"
+                    ]
+                ),
+                "shared_loopback_federated_latency_policy_verifier_bound": (
+                    federated_latency_quorum_validation[
+                        "latency_weight_policy_verifier_bound"
+                    ]
+                    and federated_latency_quorum_validation[
+                        "latency_weight_policy_verifier_fresh"
+                    ]
+                    and federated_latency_quorum_validation[
+                        "latency_weight_policy_verifier_timeout_bound"
+                    ]
+                    and federated_latency_policy_verifier_quorum_validation[
+                        "request_timeout_budget_bound"
+                    ]
+                    and federated_latency_policy_verifier_quorum_validation[
+                        "request_timeout_digest_set_bound"
+                    ]
+                ),
+                "shared_loopback_federated_latency_quorum_failed_participant_bound": (
+                    federated_latency_quorum_validation[
+                        "latency_quorum_failed_participant_ids"
+                    ]
+                    == [observer.identity_id, witness.identity_id]
+                ),
                 "shared_loopback_calibration_refresh_state_guard_ok": (
                     calibration_refresh_state_guard_validation["ok"]
                 ),
@@ -16625,7 +17085,7 @@ json.dump(response, sys.stdout)
                 "world_anchor_bound": final_session["world_state_ref"]
                 == f"wms://state/{world_state['state_id']}",
                 "public_schema_contract_profile": SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
-                "public_schema_contract_bound": len(schema_contracts) == 13
+                "public_schema_contract_bound": len(schema_contracts) == 16
                 and {contract["schema_path"] for contract in schema_contracts}
                 == {
                     "specs/schemas/sensory_loopback_session.schema",

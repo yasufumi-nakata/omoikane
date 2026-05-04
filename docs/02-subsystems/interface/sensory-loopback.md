@@ -34,6 +34,7 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
   blocked timing gate を failed participant として残し、passing participant weight が threshold を満たすかを
   `weighted-latency-quorum-authority-v1` の policy authority digest と
   `weighted-latency-policy-live-verifier-quorum-v1` の freshness / 250ms timeout-bound quorum と一緒に digest-only に確認する
+- 5-8 participant の shared field では `federated-latency-quorum-v1` に切り替え、同じ weight policy authority / live verifier quorum / timeout-bound digest を使って scale-out する
 
 ## Reference Runtime の固定 profile
 
@@ -61,7 +62,8 @@ bounded に返し、仮想空間での自己身体感覚を安定化する。
 | calibration_refresh_propagation_profile | `participant-calibration-refresh-propagation-v1` |
 | calibration_refresh_state_guard_profile | `participant-calibration-refresh-state-fail-closed-v1` |
 | participant_latency_drift_profile | `participant-hardware-timing-latency-drift-gate-v1` |
-| latency_quorum_profiles | `all-participant-latency-pass-v1 / weighted-latency-quorum-v1` |
+| max_participants | `8` |
+| latency_quorum_profiles | `all-participant-latency-pass-v1 / weighted-latency-quorum-v1 / federated-latency-quorum-v1` |
 | latency_weight_policy_profile | `weighted-latency-quorum-authority-v1` |
 | latency_weight_policy_verifier_profile | `weighted-latency-policy-live-verifier-quorum-v1` |
 | latency_weight_policy_verifier_quorum_threshold | `2` |
@@ -96,12 +98,12 @@ sensory_loopback.bind_participant_biodata_arbitration:
       <identity ref>: <biodata-calibration-confidence-gate-v1 receipt>
     participant_latency_drift_gates:
       <identity ref>: <participant-hardware-timing-latency-drift-gate-v1 receipt>
-    participant_latency_weights: <optional identity ref -> weight, 3-4 participants only>
+    participant_latency_weights: <optional identity ref -> weight, 3-8 participants only>
     latency_quorum_threshold: <optional float>
-    latency_weight_policy_authority_ref: <required for weighted quorum>
-    latency_weight_policy_authority_digest: <required for weighted quorum>
-    latency_weight_policy_source_digest_set: <required for weighted quorum>
-    latency_weight_policy_verifier_quorum: <required fresh verifier quorum for weighted quorum>
+    latency_weight_policy_authority_ref: <required for weighted/federated quorum>
+    latency_weight_policy_authority_digest: <required for weighted/federated quorum>
+    latency_weight_policy_source_digest_set: <required for weighted/federated quorum>
+    latency_weight_policy_verifier_quorum: <required fresh verifier quorum for weighted/federated quorum>
   output: sensory_loopback_biodata_arbitration_binding
 
 sensory_loopback.bind_latency_weight_policy_verifier_quorum:
@@ -191,7 +193,8 @@ shared session で BioData arbitration を使う場合、`participant_gate_recei
 `12.0ms` 以下で、BioData gate に threshold policy authority がある場合は同じ
 authority ref / digest を保持していなければならない。3-4 participant の shared field で
 `participant_latency_weights` と `latency_quorum_threshold` を渡す場合は
-`weighted-latency-quorum-v1` として扱い、passing participant weight が threshold 以上なら
+`weighted-latency-quorum-v1` として扱い、5-8 participant の shared field では
+`federated-latency-quorum-v1` として扱う。どちらも passing participant weight が threshold 以上なら
 blocked latency gate を `latency_quorum_failed_participant_ids` へ残したまま acceptance できる。
 この weighted path では `latency_weight_policy_authority_ref` /
 `latency_weight_policy_authority_digest` /
@@ -258,6 +261,8 @@ raw refresh / revocation payload は保存しない。
 - 同じ demo は 3 participant の weighted latency quorum も返し、observer の timing drift が
   blocked でも self + peer の passing weight が threshold を満たし、weight policy authority digest が
   bound かつ live verifier quorum が fresh で 250ms timeout-bound の場合だけ acceptance する
+- 同じ demo は 5 participant の federated latency quorum も返し、observer / witness の timing drift が
+  blocked でも self + peer + scout の passing weight が threshold を満たす場合だけ acceptance する
 - 同じ weighted path は peer の expired refresh と observer の revoked refresh を
   calibration refresh state guard で fail-closed に伝播し、delivery block、
   shared session hold、safe baseline requirement、revocation ref digest、raw refresh /
@@ -289,7 +294,7 @@ raw refresh / revocation payload は保存しない。
 ## 未解決
 
 - raw retinal/audio/haptic payload を actual capture pipeline へ接続する repo 外 adapter
-- 4 participant を超える shared sensory field で federated latency quorum へ拡張する scale-out
+- 8 participant を超える shared sensory field の実運用 scale-out と dynamic policy provider 接続
 
 ## 関連
 

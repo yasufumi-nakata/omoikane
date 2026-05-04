@@ -972,6 +972,134 @@ class SensoryLoopbackServiceTests(unittest.TestCase):
                 latency_quorum_threshold=0.75,
             )
 
+    def test_shared_biodata_arbitration_scales_to_federated_latency_quorum(self) -> None:
+        service = SensoryLoopbackService()
+        participants = [
+            "identity://loopback-primary",
+            "identity://loopback-peer",
+            "identity://loopback-observer",
+            "identity://loopback-scout",
+            "identity://loopback-witness",
+        ]
+        session = service.open_session(
+            identity_id=participants[0],
+            world_state_ref="wms://state/shared-federated-biodata",
+            body_anchor_ref="avatar://federated/core",
+            avatar_body_map_ref="avatar-body-map://federated/v1",
+            proprioceptive_calibration_ref="calibration://federated/v1",
+            participant_identity_ids=participants,
+            shared_imc_session_id="imc://shared/session-federated-biodata",
+            shared_collective_id="collective://shared/federated-biodata-field",
+        )
+        blocked_observer_gate = self._fake_participant_latency_drift_gate(
+            service,
+            participants[2],
+            "c-observer",
+            observed_latency_ms=70.0,
+        )
+        blocked_witness_gate = self._fake_participant_latency_drift_gate(
+            service,
+            participants[4],
+            "e-witness",
+            observed_latency_ms=74.0,
+        )
+        authority_ref = "latency-weight-policy-authority://unit/federated-weight-policy"
+        authority_digest = "7" * 64
+        source_digest_set = "6" * 64
+        binding = service.bind_participant_biodata_arbitration(
+            session["session_id"],
+            participant_gate_receipts={
+                participants[0]: self._fake_biodata_confidence_gate(
+                    participants[0],
+                    "a-self",
+                ),
+                participants[1]: self._fake_biodata_confidence_gate(
+                    participants[1],
+                    "b-peer",
+                ),
+                participants[2]: self._fake_biodata_confidence_gate(
+                    participants[2],
+                    "c-observer",
+                ),
+                participants[3]: self._fake_biodata_confidence_gate(
+                    participants[3],
+                    "d-scout",
+                ),
+                participants[4]: self._fake_biodata_confidence_gate(
+                    participants[4],
+                    "e-witness",
+                ),
+            },
+            participant_latency_drift_gates={
+                participants[0]: self._fake_participant_latency_drift_gate(
+                    service,
+                    participants[0],
+                    "a-self",
+                ),
+                participants[1]: self._fake_participant_latency_drift_gate(
+                    service,
+                    participants[1],
+                    "b-peer",
+                    observed_latency_ms=53.0,
+                ),
+                participants[2]: blocked_observer_gate,
+                participants[3]: self._fake_participant_latency_drift_gate(
+                    service,
+                    participants[3],
+                    "d-scout",
+                    observed_latency_ms=54.0,
+                ),
+                participants[4]: blocked_witness_gate,
+            },
+            participant_latency_weights={
+                participants[0]: 0.25,
+                participants[1]: 0.25,
+                participants[2]: 0.20,
+                participants[3]: 0.15,
+                participants[4]: 0.15,
+            },
+            latency_quorum_threshold=0.60,
+            latency_weight_policy_authority_ref=authority_ref,
+            latency_weight_policy_authority_digest=authority_digest,
+            latency_weight_policy_source_digest_set=source_digest_set,
+            latency_weight_policy_verifier_quorum=(
+                self._fake_latency_weight_policy_verifier_quorum(
+                    service,
+                    authority_ref=authority_ref,
+                    authority_digest=authority_digest,
+                    source_digest_set=source_digest_set,
+                )
+            ),
+        )
+        validation = service.validate_participant_biodata_arbitration(binding)
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual(
+            "federated-latency-quorum-v1",
+            validation["latency_quorum_profile"],
+        )
+        self.assertTrue(validation["latency_quorum_satisfied"])
+        self.assertEqual(0.65, validation["latency_quorum_pass_weight"])
+        self.assertEqual(
+            [participants[2], participants[4]],
+            validation["latency_quorum_failed_participant_ids"],
+        )
+        self.assertTrue(validation["latency_weight_policy_bound"])
+        self.assertTrue(validation["latency_weight_policy_verifier_bound"])
+        self.assertTrue(validation["latency_weight_policy_verifier_timeout_bound"])
+        self.assertTrue(validation["latency_quorum_digest_bound"])
+        self.assertFalse(binding["raw_latency_weight_policy_payload_stored"])
+        self.assertFalse(binding["raw_latency_weight_policy_verifier_payload_stored"])
+
+        tampered = deepcopy(binding)
+        tampered["latency_quorum_profile"] = "weighted-latency-quorum-v1"
+        tampered_validation = service.validate_participant_biodata_arbitration(tampered)
+        self.assertFalse(tampered_validation["ok"])
+        self.assertIn(
+            "weighted latency quorum is limited to 4 participants",
+            tampered_validation["errors"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

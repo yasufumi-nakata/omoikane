@@ -385,3 +385,4 @@ status: decided | superseded
 - [2026-05-03_yaoyorozu-execution-chain-fixture-isolation.md](2026-05-03_yaoyorozu-execution-chain-fixture-isolation.md)
 - [2026-05-03_yaoyorozu-research-evidence-verifier-roster-policy.md](2026-05-03_yaoyorozu-research-evidence-verifier-roster-policy.md)
 - [2026-05-03_yaoyorozu-research-evidence-verifier-roster-freshness.md](2026-05-03_yaoyorozu-research-evidence-verifier-roster-freshness.md)
+- [2026-05-04_sensory-loopback-federated-latency-quorum.md](2026-05-04_sensory-loopback-federated-latency-quorum.md)

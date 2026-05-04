@@ -942,6 +942,35 @@ class ReferenceRuntimeTests(unittest.TestCase):
                 "shared_loopback_weighted_latency_quorum_failed_participant_bound"
             ]
         )
+        self.assertTrue(result["validation"]["shared_loopback_federated_latency_quorum_ok"])
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_federated_latency_quorum_satisfied"
+            ]
+        )
+        self.assertTrue(
+            result["validation"]["shared_loopback_federated_latency_quorum_profile"]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_federated_latency_quorum_participant_count"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_federated_latency_quorum_digest_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_federated_latency_policy_verifier_bound"
+            ]
+        )
+        self.assertTrue(
+            result["validation"][
+                "shared_loopback_federated_latency_quorum_failed_participant_bound"
+            ]
+        )
         self.assertTrue(
             result["validation"]["shared_loopback_calibration_refresh_state_guard_ok"]
         )

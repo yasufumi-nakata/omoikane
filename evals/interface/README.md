@@ -133,7 +133,7 @@ qualia binding ref をまとめて確認する。
 
 ### Sensory Loopback Public Schema Contract
 `sensory-loopback-demo --json` が self-only と shared loopback の session /
-receipt / artifact family / weighted latency quorum binding / calibration refresh state guard payload を public schema contract manifest に列挙し、
+receipt / artifact family / weighted and federated latency quorum binding / calibration refresh state guard payload を public schema contract manifest に列挙し、
 integration test が各 payload を schema に直接通せることを確認する。
 
 ### Sensory Loopback BioData Arbitration
@@ -142,8 +142,8 @@ feature-window drift gate、fresh calibration refresh receipt、hardware timing 
 drift gate が digest-only binding に束縛され、threshold authority digest を共有しつつ
 raw BioData / drift / refresh / timing / hardware adapter / gate payload を
 保存しないことを確認する。3 participant path では
-weighted latency quorum が blocked timing gate を failed participant として残し、
-passing participant weight と quorum digest を public schema に束縛する。
+weighted latency quorum、5 participant path では federated latency quorum が blocked timing gate を
+failed participant として残し、passing participant weight と quorum digest を public schema に束縛する。
 
 ### Sensory Loopback Calibration Refresh State Guard
 shared loopback session の途中 refresh state recheck で expired / revoked refresh を

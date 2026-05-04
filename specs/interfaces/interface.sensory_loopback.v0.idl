@@ -84,7 +84,7 @@ operations:
           participant_identity_ids:
             type: array
             minItems: 1
-            maxItems: 4
+            maxItems: 8
             uniqueItems: true
             items:
               type: string
@@ -382,8 +382,8 @@ operations:
           participant_latency_weights:
             type: object
             minProperties: 3
-            maxProperties: 4
-            description: Optional weighted-latency-quorum-v1 participant weights. When omitted, all participant latency gates must pass.
+            maxProperties: 8
+            description: Optional weighted-latency-quorum-v1 participant weights for 3-4 participants or federated-latency-quorum-v1 participant weights for 5-8 participants. When omitted, all participant latency gates must pass.
             additionalProperties:
               type: number
               exclusiveMinimum: 0
@@ -394,7 +394,7 @@ operations:
             maximum: 1
           latency_weight_policy_authority_ref:
             type: string
-            description: Required authority reference when participant_latency_weights select weighted-latency-quorum-v1.
+            description: Required authority reference when participant_latency_weights select weighted-latency-quorum-v1 or federated-latency-quorum-v1.
           latency_weight_policy_authority_digest:
             type: string
             minLength: 32
@@ -405,7 +405,7 @@ operations:
             description: Digest set for the source policy evidence used to approve the participant latency weights.
           latency_weight_policy_verifier_quorum:
             schema_ref: sensory_loopback_latency_weight_policy_verifier_quorum
-            description: Required live verifier quorum receipt when participant_latency_weights select weighted-latency-quorum-v1.
+            description: Required live verifier quorum receipt when participant_latency_weights select weighted-latency-quorum-v1 or federated-latency-quorum-v1.
     output:
       schema_ref: sensory_loopback_biodata_arbitration_binding
     guarantees:
@@ -416,8 +416,9 @@ operations:
       - each participant gate must propagate a fresh calibration refresh receipt with a bound freshness window
       - without participant_latency_weights, each participant latency gate must pass the hardware timing drift threshold
       - with weighted-latency-quorum-v1 on 3-4 participants, blocked participant timing gates are allowed only when the passing participant weight meets latency_quorum_threshold
-      - weighted-latency-quorum-v1 also requires latency_weight_policy_authority_ref, latency_weight_policy_authority_digest, and latency_weight_policy_source_digest_set
-      - weighted-latency-quorum-v1 also requires a fresh weighted-latency-policy-live-verifier-quorum-v1 receipt bound to the same authority, source digest set, and 250ms request-timeout budget
+      - with federated-latency-quorum-v1 on 5-8 participants, the same digest-bound weight policy and verifier quorum are required before a blocked participant timing gate can be accepted
+      - non-strict latency quorum also requires latency_weight_policy_authority_ref, latency_weight_policy_authority_digest, and latency_weight_policy_source_digest_set
+      - non-strict latency quorum also requires a fresh weighted-latency-policy-live-verifier-quorum-v1 receipt bound to the same authority, source digest set, and 250ms request-timeout budget
       - every participant latency gate must share the BioData threshold policy authority digest when authority is bound
       - the output keeps only gate refs/digests, drift gate refs/digests, refresh refs/digests/source digest sets, threshold digests, timing gate digests, target gate-set digests, participant latency weights, weight-policy authority refs/digests, verifier quorum refs/digests, and latency quorum digests
       - raw BioData, calibration, drift, refresh, timing, hardware adapter, weight-policy authority, verifier, response, signature, and gate payloads remain redacted

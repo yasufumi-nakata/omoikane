@@ -5,7 +5,7 @@ description: >
   Sensory Loopback が collective-shared session で participant ごとの
   BioData calibration confidence gate、feature-window drift gate、fresh calibration refresh receipt を
   shared arbitration binding に digest-only で束縛し、hardware timing latency drift gate も
-  同じ participant set と threshold authority digest に結び、weighted latency quorum の
+  同じ participant set と threshold authority digest に結び、weighted / federated latency quorum の
   participant weights は policy-authority digest と fresh live verifier quorum、250ms request-timeout budget に束縛し、
   raw BioData / refresh / timing / weight-policy / verifier payload を保存しないこと
 inputs:
@@ -26,6 +26,12 @@ expected:
   shared_loopback_weighted_latency_policy_bound: true
   shared_loopback_weighted_latency_policy_verifier_bound: true
   shared_loopback_weighted_latency_policy_verifier_timeout_bound: true
+  shared_loopback_federated_latency_quorum_ok: true
+  shared_loopback_federated_latency_quorum_satisfied: true
+  shared_loopback_federated_latency_quorum_profile: true
+  shared_loopback_federated_latency_quorum_participant_count: true
+  shared_loopback_federated_latency_quorum_digest_bound: true
+  shared_loopback_federated_latency_policy_verifier_bound: true
 metric: boolean
 threshold: 1.0
 ethics_check: true

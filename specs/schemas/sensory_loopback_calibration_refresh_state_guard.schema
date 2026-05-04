@@ -59,7 +59,7 @@ properties:
   participant_identity_ids:
     type: array
     minItems: 2
-    maxItems: 4
+    maxItems: 8
     uniqueItems: true
     items:
       type: string
@@ -67,7 +67,7 @@ properties:
   participant_refresh_state_bindings:
     type: array
     minItems: 2
-    maxItems: 4
+    maxItems: 8
     items:
       type: object
       additionalProperties: false
@@ -126,13 +126,13 @@ properties:
   participant_refresh_state_count:
     type: integer
     minimum: 2
-    maximum: 4
+    maximum: 8
   participant_refresh_state_digest_set:
     type: string
     minLength: 32
   failed_participant_ids:
     type: array
-    maxItems: 4
+    maxItems: 8
     uniqueItems: true
     items:
       type: string
