@@ -50,6 +50,7 @@
 | 用語 | 意味 |
 |---|---|
 | **BDT** | BioData Transmitter |
+| **Survey EEG Fusion** | アンケート score summary digest と EEG feature-window digest を同じ analysis window に束縛する BDT receipt |
 | **BDB** | Biological-Digital Bridge |
 | **IMC** | Inter-Mind Channel |
 | **WMS** | World Model Sync |

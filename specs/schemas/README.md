@@ -39,6 +39,8 @@
   - BioData Transmitter の body-state latent、generated bundle、calibration confidence gate を L2/L3 の qualia surrogate / self-model advisory / perception・affect・attention handoff へ digest-only で束縛し、semantic thought・subjective equivalence・consciousness reproduction・identity replacement は主張しない
 - `biodata_signal_bundle.schema`
   - 既知 target は専用 proxy、未知 target は generic biosignal proxy として arbitrary modality key を許可し、各 signal に target family / catalog status / catalog digest を保持する
+- `biodata_survey_eeg_fusion_receipt.schema`
+  - アンケート score summary digest と EEG feature-window digest を同じ analysis window に束縛し、LLM-native / no-ML operator workflow ref、raw survey / EEG payload 非保持、診断・意識・同一性主張禁止を検証する
 - `biodata_transmitter_session.schema`
   - session-declared source / target modality を human biosignal catalog digest、family map、未カタログ modality policy に束縛する
 - `neuro_integration_app_registry_receipt.schema`

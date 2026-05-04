@@ -2033,6 +2033,13 @@ class DistributedTransportService:
         )
         client_fingerprint = self._certificate_fingerprint_from_pem_file(client_cert)
         tls_context = ssl.create_default_context(ssl.Purpose.SERVER_AUTH, cafile=ca_path)
+        if (
+            normalized_ca_ref == "cert://distributed-transport/authority-ca/v1"
+            and hasattr(ssl, "VERIFY_X509_STRICT")
+        ):
+            # The reference fixture is CA-pinned and hostname-checked, but its
+            # static demo certificates predate Python 3.14's strict AKI check.
+            tls_context.verify_flags &= ~ssl.VERIFY_X509_STRICT
         tls_context.load_cert_chain(client_cert, client_key)
 
         route_bindings: List[Dict[str, Any]] = []
@@ -2069,6 +2076,9 @@ class DistributedTransportService:
             handshake_started = time.monotonic()
             tls_socket = tls_context.wrap_socket(raw_socket, server_hostname=server_name)
             handshake_latency_ms = round((time.monotonic() - handshake_started) * 1000.0, 3)
+            peer_cert = tls_socket.getpeercert(binary_form=True)
+            cipher_suite = tls_socket.cipher()
+            tls_version = tls_socket.version()
             route_started = time.monotonic()
             request_bytes = f"GET {path} HTTP/1.1\r\nHost: {server_name}\r\nConnection: close\r\nAccept: application/json\r\n\r\n".encode(
                 "utf-8"
@@ -2090,9 +2100,6 @@ class DistributedTransportService:
                     break
                 response_bytes += chunk
             round_trip_latency_ms = round((time.monotonic() - route_started) * 1000.0, 3)
-            peer_cert = tls_socket.getpeercert(binary_form=True)
-            cipher_suite = tls_socket.cipher()
-            tls_version = tls_socket.version()
             tls_socket.close()
 
             http_status, payload = self._parse_http_json_response(response_bytes)

@@ -388,3 +388,4 @@ status: decided | superseded
 - [2026-05-04_gap-report-truth-source-residual-markers.md](2026-05-04_gap-report-truth-source-residual-markers.md)
 - [2026-05-04_sensory-loopback-federated-latency-quorum.md](2026-05-04_sensory-loopback-federated-latency-quorum.md)
 - [2026-05-05_neuro-integration-workbench.md](2026-05-05_neuro-integration-workbench.md)
+- [2026-05-05_biodata-survey-eeg-fusion.md](2026-05-05_biodata-survey-eeg-fusion.md)

@@ -27,6 +27,10 @@ BDT_MODALITY_POLICY_ID = "human-biosignal-open-modality-catalog-v1"
 BDT_HUMAN_BIOSIGNAL_SCOPE = "human-derived-sensor-feature-summary-only"
 BDT_MIND_STATE_BRIDGE_PROFILE_ID = "biodata-mind-state-bridge-v1"
 BDT_MIND_STATE_BRIDGE_CLAIM_CEILING = "body-state-surrogate-input-only"
+BDT_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
+BDT_SURVEY_EEG_FUSION_POLICY_ID = "digest-only-survey-eeg-feature-alignment-v1"
+BDT_SURVEY_EEG_OPERATOR_PROFILE_ID = "llm-native-no-ml-operator-playbook-v1"
+BDT_SURVEY_EEG_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 BDT_MIND_STATE_QUALIA_SURROGATE_PROFILE_ID = "biodata-to-qualia-surrogate-bridge-v1"
 BDT_MIND_STATE_BRIDGE_ALLOWED_CONSUMERS = (
     "l2-qualia-buffer",
@@ -475,6 +479,10 @@ class BioDataTransmitter:
             "mind_state_bridge_allowed_consumers": list(
                 BDT_MIND_STATE_BRIDGE_ALLOWED_CONSUMERS
             ),
+            "survey_eeg_fusion_profile_id": BDT_SURVEY_EEG_FUSION_PROFILE_ID,
+            "survey_eeg_fusion_policy_id": BDT_SURVEY_EEG_FUSION_POLICY_ID,
+            "survey_eeg_operator_profile_id": BDT_SURVEY_EEG_OPERATOR_PROFILE_ID,
+            "survey_eeg_claim_ceiling": BDT_SURVEY_EEG_CLAIM_CEILING,
             "source_modalities": list(DEFAULT_SOURCE_MODALITIES),
             "target_modalities": list(DEFAULT_TARGET_MODALITIES),
             "modality_policy": BDT_MODALITY_POLICY_ID,
@@ -709,6 +717,414 @@ class BioDataTransmitter:
             "raw_source_payload_stored": False,
             "subjective_equivalence_claimed": False,
             "semantic_thought_content_generated": False,
+        }
+
+    def bind_survey_eeg_window_fusion(
+        self,
+        session: Dict[str, Any],
+        adapter_receipt: Dict[str, Any],
+        latent_state: Dict[str, Any],
+        survey_instrument_manifest: Dict[str, Any],
+        survey_score_summary: Dict[str, Any],
+        alignment_evidence_refs: Sequence[str],
+        analysis_question: str,
+        operator_intent_ref: str,
+    ) -> Dict[str, Any]:
+        self._check_session_mapping(session)
+        self._validate_dataset_adapter_window_for_series(
+            session,
+            adapter_receipt,
+            latent_state,
+        )
+        self._require_non_empty_string(analysis_question, "analysis_question")
+        self._require_non_empty_string(operator_intent_ref, "operator_intent_ref")
+        observed_modalities = adapter_receipt.get("source_modalities_observed", [])
+        projections = latent_state.get("source_modality_projections", {})
+        eeg_projection = projections.get("eeg") if isinstance(projections, dict) else None
+        if "eeg" not in observed_modalities or not isinstance(eeg_projection, dict):
+            raise ValueError("survey EEG fusion requires an EEG feature window projection")
+
+        survey_manifest = self._normalize_survey_instrument_manifest(
+            survey_instrument_manifest
+        )
+        survey_scores = self._normalize_survey_score_summary(survey_score_summary)
+        evidence_refs = self._normalize_alignment_evidence_refs(alignment_evidence_refs)
+        survey_instrument_digest = sha256_text(canonical_json(survey_manifest))
+        survey_score_digest = sha256_text(canonical_json(survey_scores))
+        alignment_evidence_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_SURVEY_EEG_FUSION_PROFILE_ID,
+                    "alignment_evidence_refs": evidence_refs,
+                }
+            )
+        )
+        alignment_checks = self._build_survey_eeg_alignment_checks(
+            latent_state,
+            survey_scores,
+        )
+        average_alignment_score = round(
+            sum(float(check["alignment_score"]) for check in alignment_checks)
+            / len(alignment_checks),
+            3,
+        )
+        fusion_confidence = self._clamp(
+            0.4 * float(latent_state.get("interoceptive_confidence", 0.0))
+            + 0.3 * float(eeg_projection.get("projection_confidence", 0.0))
+            + 0.3 * average_alignment_score
+        )
+        eeg_axes = latent_state["physiological_axes"]
+        attention_score = float(
+            survey_scores.get("attention", {}).get(
+                "score",
+                sum(float(item["score"]) for item in survey_scores.values())
+                / len(survey_scores),
+            )
+        )
+        fatigue_score = float(survey_scores.get("fatigue", {}).get("score", 0.0))
+        fusion_axis_summary = {
+            "survey_axis_count": len(survey_scores),
+            "eeg_cortical_load_proxy": eeg_axes["neural"]["cortical_load_proxy"],
+            "eeg_alpha_suppression": eeg_axes["neural"]["alpha_suppression"],
+            "eeg_theta_beta_ratio": eeg_axes["neural"]["theta_beta_ratio"],
+            "survey_attention_proxy": round(attention_score, 3),
+            "survey_fatigue_proxy": round(fatigue_score, 3),
+            "survey_eeg_cognitive_load_proxy": round(
+                self._clamp(
+                    0.5 * float(eeg_axes["neural"]["cortical_load_proxy"])
+                    + 0.3 * fatigue_score
+                    + 0.2 * attention_score
+                ),
+                3,
+            ),
+            "fusion_confidence": fusion_confidence,
+        }
+        fused_window_digest = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": BDT_SURVEY_EEG_FUSION_PROFILE_ID,
+                    "dataset_adapter_receipt_digest": adapter_receipt[
+                        "adapter_receipt_digest"
+                    ],
+                    "latent_digest": latent_state["latent_digest"],
+                    "eeg_feature_digest": eeg_projection["feature_digest"],
+                    "survey_instrument_digest": survey_instrument_digest,
+                    "survey_score_digest": survey_score_digest,
+                    "alignment_evidence_digest_set": alignment_evidence_digest_set,
+                    "analysis_question": analysis_question.strip(),
+                }
+            )
+        )
+        receipt = {
+            "schema_version": BDT_SCHEMA_VERSION,
+            "fusion_ref": f"survey-eeg-fusion://biodata/{new_id('bdt-survey-eeg-fusion')}",
+            "created_at": utc_now_iso(),
+            "profile_id": BDT_SURVEY_EEG_FUSION_PROFILE_ID,
+            "session_id": session["session_id"],
+            "identity_id": session["identity_id"],
+            "dataset_ref": adapter_receipt["dataset_ref"],
+            "window_ref": adapter_receipt["window_ref"],
+            "dataset_adapter_ref": adapter_receipt["adapter_ref"],
+            "dataset_adapter_receipt_digest": adapter_receipt[
+                "adapter_receipt_digest"
+            ],
+            "latent_ref": latent_state["latent_ref"],
+            "latent_digest": latent_state["latent_digest"],
+            "source_feature_digest": latent_state["source_feature_digest"],
+            "eeg_feature_digest": eeg_projection["feature_digest"],
+            "eeg_feature_name_digest": eeg_projection["feature_name_digest"],
+            "eeg_projection_confidence": eeg_projection["projection_confidence"],
+            "survey_instrument_ref": survey_manifest["instrument_ref"],
+            "survey_administration_ref": survey_manifest["administration_ref"],
+            "survey_participant_ref": survey_manifest["participant_ref"],
+            "survey_language": survey_manifest["language"],
+            "survey_scale_refs": survey_manifest["scale_refs"],
+            "survey_instrument_digest": survey_instrument_digest,
+            "survey_score_digest": survey_score_digest,
+            "survey_score_axes": sorted(survey_scores),
+            "survey_score_summary": survey_scores,
+            "alignment_evidence_refs": evidence_refs,
+            "alignment_evidence_digest_set": alignment_evidence_digest_set,
+            "alignment_checks": alignment_checks,
+            "fusion_axis_summary": fusion_axis_summary,
+            "analysis_question": analysis_question.strip(),
+            "operator_intent_ref": operator_intent_ref.strip(),
+            "operator_profile_id": BDT_SURVEY_EEG_OPERATOR_PROFILE_ID,
+            "llm_native_workflow_ref": (
+                "workflow://biodata/survey-eeg/llm-native-no-ml-operator-v1"
+            ),
+            "no_ml_operator_summary_ref": (
+                "operator-guide://biodata/survey-eeg/plain-language-window-summary-v1"
+            ),
+            "fusion_policy_id": BDT_SURVEY_EEG_FUSION_POLICY_ID,
+            "claim_ceiling": BDT_SURVEY_EEG_CLAIM_CEILING,
+            "fused_window_digest": fused_window_digest,
+            "fusion_status": "bound",
+            "eeg_window_bound": True,
+            "survey_window_bound": True,
+            "operator_accessibility_bound": True,
+            "raw_survey_response_payload_stored": False,
+            "raw_eeg_samples_stored": False,
+            "raw_dataset_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_fusion_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+            "diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        receipt["fusion_receipt_digest"] = sha256_text(
+            canonical_json(self._survey_eeg_fusion_digest_payload(receipt))
+        )
+        return deepcopy(receipt)
+
+    def validate_survey_eeg_window_fusion(
+        self,
+        session: Dict[str, Any],
+        adapter_receipt: Dict[str, Any],
+        latent_state: Dict[str, Any],
+        fusion_receipt: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        self._check_session_mapping_for_errors(session, errors)
+        try:
+            self._validate_dataset_adapter_window_for_series(
+                session,
+                adapter_receipt,
+                latent_state,
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        if not isinstance(fusion_receipt, dict):
+            errors.append("fusion_receipt must be a mapping")
+            fusion_receipt = {}
+        self._check_non_empty_string(
+            fusion_receipt.get("fusion_ref"),
+            "fusion_receipt.fusion_ref",
+            errors,
+        )
+        if fusion_receipt.get("schema_version") != BDT_SCHEMA_VERSION:
+            errors.append("fusion_receipt.schema_version mismatch")
+        if fusion_receipt.get("profile_id") != BDT_SURVEY_EEG_FUSION_PROFILE_ID:
+            errors.append("fusion_receipt.profile_id mismatch")
+        if fusion_receipt.get("session_id") != session.get("session_id"):
+            errors.append("fusion_receipt.session_id must match session.session_id")
+        if fusion_receipt.get("identity_id") != session.get("identity_id"):
+            errors.append("fusion_receipt.identity_id must match session.identity_id")
+        for receipt_field, source_value in (
+            ("dataset_ref", adapter_receipt.get("dataset_ref")),
+            ("window_ref", adapter_receipt.get("window_ref")),
+            ("dataset_adapter_ref", adapter_receipt.get("adapter_ref")),
+            (
+                "dataset_adapter_receipt_digest",
+                adapter_receipt.get("adapter_receipt_digest"),
+            ),
+            ("latent_ref", latent_state.get("latent_ref")),
+            ("latent_digest", latent_state.get("latent_digest")),
+            ("source_feature_digest", latent_state.get("source_feature_digest")),
+        ):
+            if fusion_receipt.get(receipt_field) != source_value:
+                errors.append(f"fusion_receipt.{receipt_field} mismatch")
+
+        projections = latent_state.get("source_modality_projections", {})
+        eeg_projection = projections.get("eeg") if isinstance(projections, dict) else None
+        observed_modalities = adapter_receipt.get("source_modalities_observed", [])
+        eeg_window_bound = (
+            isinstance(eeg_projection, dict)
+            and "eeg" in observed_modalities
+            and fusion_receipt.get("eeg_feature_digest")
+            == eeg_projection.get("feature_digest")
+            and fusion_receipt.get("eeg_feature_name_digest")
+            == eeg_projection.get("feature_name_digest")
+            and fusion_receipt.get("eeg_projection_confidence")
+            == eeg_projection.get("projection_confidence")
+            and fusion_receipt.get("eeg_window_bound") is True
+        )
+        if not eeg_window_bound:
+            errors.append("fusion_receipt must bind the EEG feature window projection")
+
+        survey_manifest = {
+            "instrument_ref": fusion_receipt.get("survey_instrument_ref", ""),
+            "administration_ref": fusion_receipt.get("survey_administration_ref", ""),
+            "participant_ref": fusion_receipt.get("survey_participant_ref", ""),
+            "language": fusion_receipt.get("survey_language", ""),
+            "scale_refs": fusion_receipt.get("survey_scale_refs", {}),
+        }
+        normalized_manifest: Dict[str, Any] = {}
+        try:
+            normalized_manifest = self._normalize_survey_instrument_manifest(
+                survey_manifest
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        survey_scores: Dict[str, Dict[str, Any]] = {}
+        try:
+            survey_scores = self._normalize_survey_score_summary(
+                fusion_receipt.get("survey_score_summary", {})
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        expected_instrument_digest = (
+            sha256_text(canonical_json(normalized_manifest))
+            if normalized_manifest
+            else ""
+        )
+        expected_score_digest = (
+            sha256_text(canonical_json(survey_scores)) if survey_scores else ""
+        )
+        survey_window_bound = (
+            bool(expected_instrument_digest)
+            and bool(expected_score_digest)
+            and fusion_receipt.get("survey_instrument_digest")
+            == expected_instrument_digest
+            and fusion_receipt.get("survey_score_digest") == expected_score_digest
+            and fusion_receipt.get("survey_score_axes") == sorted(survey_scores)
+            and fusion_receipt.get("survey_window_bound") is True
+        )
+        if not survey_window_bound:
+            errors.append("fusion_receipt must bind normalized survey instrument and scores")
+        evidence_refs: List[str] = []
+        try:
+            evidence_refs = self._normalize_alignment_evidence_refs(
+                fusion_receipt.get("alignment_evidence_refs", [])
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        expected_alignment_digest = (
+            sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": BDT_SURVEY_EEG_FUSION_PROFILE_ID,
+                        "alignment_evidence_refs": evidence_refs,
+                    }
+                )
+            )
+            if evidence_refs
+            else ""
+        )
+        alignment_evidence_bound = (
+            bool(expected_alignment_digest)
+            and fusion_receipt.get("alignment_evidence_digest_set")
+            == expected_alignment_digest
+        )
+        if not alignment_evidence_bound:
+            errors.append("fusion_receipt.alignment_evidence_digest_set mismatch")
+        expected_checks = (
+            self._build_survey_eeg_alignment_checks(latent_state, survey_scores)
+            if survey_scores
+            else []
+        )
+        alignment_checks_bound = (
+            bool(expected_checks)
+            and fusion_receipt.get("alignment_checks") == expected_checks
+        )
+        if not alignment_checks_bound:
+            errors.append("fusion_receipt.alignment_checks mismatch")
+        expected_fused_window_digest = (
+            sha256_text(
+                canonical_json(
+                    {
+                        "profile_id": BDT_SURVEY_EEG_FUSION_PROFILE_ID,
+                        "dataset_adapter_receipt_digest": adapter_receipt.get(
+                            "adapter_receipt_digest"
+                        ),
+                        "latent_digest": latent_state.get("latent_digest"),
+                        "eeg_feature_digest": fusion_receipt.get(
+                            "eeg_feature_digest",
+                            "",
+                        ),
+                        "survey_instrument_digest": fusion_receipt.get(
+                            "survey_instrument_digest",
+                            "",
+                        ),
+                        "survey_score_digest": fusion_receipt.get(
+                            "survey_score_digest",
+                            "",
+                        ),
+                        "alignment_evidence_digest_set": fusion_receipt.get(
+                            "alignment_evidence_digest_set",
+                            "",
+                        ),
+                        "analysis_question": fusion_receipt.get(
+                            "analysis_question",
+                            "",
+                        ),
+                    }
+                )
+            )
+            if eeg_window_bound and survey_window_bound and alignment_evidence_bound
+            else ""
+        )
+        fused_window_digest_bound = (
+            bool(expected_fused_window_digest)
+            and fusion_receipt.get("fused_window_digest") == expected_fused_window_digest
+        )
+        if not fused_window_digest_bound:
+            errors.append("fusion_receipt.fused_window_digest mismatch")
+        expected_receipt_digest = sha256_text(
+            canonical_json(self._survey_eeg_fusion_digest_payload(fusion_receipt))
+        )
+        fusion_receipt_digest_bound = (
+            fusion_receipt.get("fusion_receipt_digest") == expected_receipt_digest
+        )
+        if not fusion_receipt_digest_bound:
+            errors.append("fusion_receipt.fusion_receipt_digest mismatch")
+        operator_accessibility_bound = (
+            fusion_receipt.get("operator_profile_id")
+            == BDT_SURVEY_EEG_OPERATOR_PROFILE_ID
+            and fusion_receipt.get("llm_native_workflow_ref")
+            == "workflow://biodata/survey-eeg/llm-native-no-ml-operator-v1"
+            and fusion_receipt.get("no_ml_operator_summary_ref")
+            == "operator-guide://biodata/survey-eeg/plain-language-window-summary-v1"
+            and fusion_receipt.get("operator_accessibility_bound") is True
+        )
+        if not operator_accessibility_bound:
+            errors.append("fusion_receipt must bind the LLM-native no-ML operator profile")
+        for field_name in (
+            "raw_survey_response_payload_stored",
+            "raw_eeg_samples_stored",
+            "raw_dataset_payload_stored",
+            "raw_latent_payload_stored",
+            "raw_fusion_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+            "diagnosis_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if fusion_receipt.get(field_name) is not False:
+                errors.append(f"fusion_receipt.{field_name} must be false")
+        if fusion_receipt.get("fusion_policy_id") != BDT_SURVEY_EEG_FUSION_POLICY_ID:
+            errors.append("fusion_receipt.fusion_policy_id mismatch")
+        if fusion_receipt.get("claim_ceiling") != BDT_SURVEY_EEG_CLAIM_CEILING:
+            errors.append("fusion_receipt.claim_ceiling mismatch")
+        if fusion_receipt.get("fusion_status") != "bound":
+            errors.append("fusion_receipt.fusion_status must be bound")
+
+        return {
+            "ok": not errors,
+            "errors": errors,
+            "profile_id": fusion_receipt.get("profile_id"),
+            "fusion_status": fusion_receipt.get("fusion_status"),
+            "person_bound": fusion_receipt.get("identity_id") == session.get("identity_id"),
+            "eeg_window_bound": eeg_window_bound,
+            "survey_window_bound": survey_window_bound,
+            "alignment_evidence_digest_bound": alignment_evidence_bound,
+            "alignment_checks_bound": alignment_checks_bound,
+            "fused_window_digest_bound": fused_window_digest_bound,
+            "fusion_receipt_digest_bound": fusion_receipt_digest_bound,
+            "operator_accessibility_bound": operator_accessibility_bound,
+            "raw_survey_response_payload_stored": False,
+            "raw_eeg_samples_stored": False,
+            "raw_dataset_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_fusion_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+            "diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
         }
 
     def build_feature_window_series_profile(
@@ -3894,6 +4310,128 @@ class BioDataTransmitter:
             normalized[modality_key] = normalized_features
         return normalized
 
+    def _normalize_survey_instrument_manifest(
+        self,
+        survey_instrument_manifest: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(survey_instrument_manifest, dict):
+            raise ValueError("survey_instrument_manifest must be a mapping")
+        normalized: Dict[str, Any] = {}
+        for field_name in (
+            "instrument_ref",
+            "administration_ref",
+            "participant_ref",
+            "language",
+        ):
+            value = survey_instrument_manifest.get(field_name)
+            self._require_non_empty_string(
+                value,
+                f"survey_instrument_manifest.{field_name}",
+            )
+            normalized[field_name] = str(value).strip()
+        scale_refs = survey_instrument_manifest.get("scale_refs")
+        if not isinstance(scale_refs, dict) or not scale_refs:
+            raise ValueError("survey_instrument_manifest.scale_refs must be a non-empty mapping")
+        normalized_scale_refs: Dict[str, str] = {}
+        for axis, ref in scale_refs.items():
+            axis_key = str(axis).strip().lower().replace(" ", "_").replace("-", "_")
+            self._require_non_empty_string(axis_key, "survey scale axis")
+            self._require_non_empty_string(
+                ref,
+                f"survey_instrument_manifest.scale_refs.{axis_key}",
+            )
+            normalized_scale_refs[axis_key] = str(ref).strip()
+        normalized["scale_refs"] = dict(sorted(normalized_scale_refs.items()))
+        return normalized
+
+    def _normalize_survey_score_summary(
+        self,
+        survey_score_summary: Dict[str, Any],
+    ) -> Dict[str, Dict[str, Any]]:
+        if not isinstance(survey_score_summary, dict) or len(survey_score_summary) < 2:
+            raise ValueError("survey_score_summary must contain at least two axes")
+        normalized: Dict[str, Dict[str, Any]] = {}
+        for axis, score_value in survey_score_summary.items():
+            axis_key = str(axis).strip().lower().replace(" ", "_").replace("-", "_")
+            self._require_non_empty_string(axis_key, "survey score axis")
+            if axis_key in normalized:
+                raise ValueError(f"duplicate normalized survey score axis: {axis_key}")
+            if isinstance(score_value, dict):
+                score = score_value.get("score")
+                source_ref = str(score_value.get("source_ref", "")).strip()
+            else:
+                score = score_value
+                source_ref = ""
+            if not isinstance(score, (int, float)) or isinstance(score, bool):
+                raise ValueError(f"normalized survey score for {axis_key} must be numeric")
+            score_float = float(score)
+            if score_float < 0.0 or score_float > 1.0:
+                raise ValueError(f"normalized survey score for {axis_key} must be between 0.0 and 1.0")
+            axis_payload = {
+                "axis": axis_key,
+                "score": round(score_float, 3),
+                "scale_min": 0.0,
+                "scale_max": 1.0,
+                "normalization_policy": "bounded-min-max-to-0-1-v1",
+            }
+            if source_ref:
+                axis_payload["source_ref"] = source_ref
+            normalized[axis_key] = axis_payload
+        return dict(sorted(normalized.items()))
+
+    def _normalize_alignment_evidence_refs(
+        self,
+        alignment_evidence_refs: Sequence[str],
+    ) -> List[str]:
+        if not isinstance(alignment_evidence_refs, (list, tuple)) or len(alignment_evidence_refs) < 2:
+            raise ValueError("alignment_evidence_refs must contain at least two refs")
+        refs: List[str] = []
+        for index, ref in enumerate(alignment_evidence_refs):
+            self._require_non_empty_string(ref, f"alignment_evidence_refs[{index}]")
+            cleaned = str(ref).strip()
+            if cleaned in refs:
+                raise ValueError("alignment_evidence_refs must be unique")
+            refs.append(cleaned)
+        return refs
+
+    def _build_survey_eeg_alignment_checks(
+        self,
+        latent_state: Dict[str, Any],
+        survey_scores: Dict[str, Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        axes = latent_state.get("physiological_axes", {})
+        neural = axes.get("neural", {}) if isinstance(axes, dict) else {}
+        autonomic = axes.get("autonomic", {}) if isinstance(axes, dict) else {}
+        affect = axes.get("affect", {}) if isinstance(axes, dict) else {}
+        thought = axes.get("thought", {}) if isinstance(axes, dict) else {}
+        proxy_map = {
+            "arousal": autonomic.get("arousal"),
+            "valence": affect.get("valence_proxy"),
+            "attention": thought.get("attention_pressure_proxy"),
+            "fatigue": neural.get("cortical_load_proxy"),
+        }
+        checks: List[Dict[str, Any]] = []
+        for axis in sorted(survey_scores):
+            if axis not in proxy_map or proxy_map[axis] is None:
+                continue
+            survey_score = float(survey_scores[axis]["score"])
+            eeg_proxy = float(proxy_map[axis])
+            absolute_delta = round(abs(survey_score - eeg_proxy), 3)
+            alignment_score = round(self._clamp(1.0 - absolute_delta), 3)
+            checks.append(
+                {
+                    "axis": axis,
+                    "survey_score": round(survey_score, 3),
+                    "eeg_proxy": round(eeg_proxy, 3),
+                    "absolute_delta": absolute_delta,
+                    "alignment_score": alignment_score,
+                    "status": "bounded" if absolute_delta <= 0.35 else "review",
+                }
+            )
+        if len(checks) < 2:
+            raise ValueError("survey EEG fusion requires at least two comparable survey axes")
+        return checks
+
     def _build_source_modality_projections(
         self,
         features: Dict[str, Dict[str, Any]],
@@ -4519,6 +5057,12 @@ class BioDataTransmitter:
     def _dataset_adapter_digest_payload(adapter_receipt: Dict[str, Any]) -> Dict[str, Any]:
         payload = dict(adapter_receipt)
         payload.pop("adapter_receipt_digest", None)
+        return payload
+
+    @staticmethod
+    def _survey_eeg_fusion_digest_payload(fusion_receipt: Dict[str, Any]) -> Dict[str, Any]:
+        payload = dict(fusion_receipt)
+        payload.pop("fusion_receipt_digest", None)
         return payload
 
     @staticmethod

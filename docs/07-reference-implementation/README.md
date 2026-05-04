@@ -1271,6 +1271,12 @@ participant ref、license ref、window ref、modality file refs の manifest dig
 feature-window digest、body-state latent ref / digest へ先に束縛される。
 adapter receipt は full session-declared source modality coverage を検証し、
 raw dataset payload、raw signal samples、raw feature-window payload は保存しない。
+day-1 の EEG feature digest とアンケート score summary digest は
+`biodata-survey-eeg-window-fusion-v1` により同じ window の analysis input として
+束縛される。receipt は survey instrument digest、survey score digest、alignment evidence
+digest set、bounded alignment checks、LLM-native no-ML operator workflow ref を返し、
+raw survey answers、raw EEG samples、diagnosis、semantic thought content、subjective
+equivalence、consciousness reproduction、identity replacement は保持または主張しない。
 さらに複数日の adapter receipt と body-state latent は
 `biodata-feature-window-series-profile-v1` により ordered longitudinal / circadian
 series へ束縛される。series profile は adapter receipt digest set、latent digest set、

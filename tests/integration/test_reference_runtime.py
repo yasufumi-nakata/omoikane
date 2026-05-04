@@ -104,6 +104,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dataset_adapter_latent_digest_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_required_modalities_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_fusion_ok"])
+        self.assertEqual("bound", result["validation"]["survey_eeg_fusion_status"])
+        self.assertTrue(result["validation"]["survey_eeg_eeg_window_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_survey_window_bound"])
+        self.assertTrue(
+            result["validation"]["survey_eeg_alignment_evidence_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["survey_eeg_alignment_checks_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_fused_window_digest_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_operator_accessibility_bound"])
         self.assertTrue(result["validation"]["feature_window_series_profile_ok"])
         self.assertTrue(result["validation"]["feature_window_series_digest_set_bound"])
         self.assertTrue(result["validation"]["feature_window_series_profile_digest_bound"])
@@ -129,6 +140,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(result["validation"]["raw_dataset_payload_stored"])
         self.assertFalse(result["validation"]["raw_signal_samples_stored"])
         self.assertFalse(result["validation"]["raw_feature_window_payload_stored"])
+        self.assertFalse(result["validation"]["raw_survey_response_payload_stored"])
+        self.assertFalse(result["validation"]["raw_eeg_samples_stored"])
+        self.assertFalse(result["validation"]["raw_survey_eeg_fusion_payload_stored"])
         self.assertFalse(result["validation"]["raw_series_payload_stored"])
         self.assertFalse(result["validation"]["raw_threshold_policy_payload_stored"])
         self.assertFalse(
@@ -237,6 +251,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-biodata-transmitter-dataset-adapter"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-biodata-transmitter-survey-eeg-fusion"
             ],
         )
         self.assertEqual(

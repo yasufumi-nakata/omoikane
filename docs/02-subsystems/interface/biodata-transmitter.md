@@ -29,6 +29,9 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 - complete な latent / generated bundle / calibration confidence gate は
   `biodata-mind-state-bridge-v1` で L2/L3 の surrogate / advisory handoff に束縛できるが、
   consciousness reproduction や identity replacement へ昇格させない
+- アンケートなどの self-report は raw answer ではなく normalized score summary digest として
+  EEG feature window / body-state latent に束縛し、LLM-native かつ非 ML 利用者向けの
+  bounded analysis receipt にする
 
 ## Reference Runtime v0
 
@@ -40,21 +43,23 @@ OmoikaneOS の名称と目標はそのまま維持する。中心像だけを
 2. external dataset manifest と feature-window summary を digest-only adapter receipt に束縛する
 3. external clock / sleep diary / wearable evidence で circadian phase refs を digest-only verifier receipt に束縛する
 4. 複数日の adapter receipt と body-state latent を longitudinal / circadian feature-window series profile に束縛する
-5. EEG/ECG/PPG/EDA/respiration に加え、EMG、体温、血圧、SpO2、瞳孔、音声、加速度、血糖、fNIRS などの features から body-state latent を作る
-6. latent digest に束縛した ECG/PPG/respiration/EEG/EDA/affect/thought proxy と、血圧、SpO2、瞳孔、音声、血糖、fMRI BOLD、未カタログ human biosensor などの generic biosignal proxy を生成する
-7. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
+5. day-1 の EEG feature digest とアンケート score summary digest を
+   `biodata-survey-eeg-window-fusion-v1` に束縛し、非 ML 利用者向け LLM workflow ref を返す
+6. EEG/ECG/PPG/EDA/respiration に加え、EMG、体温、血圧、SpO2、瞳孔、音声、加速度、血糖、fNIRS などの features から body-state latent を作る
+7. latent digest に束縛した ECG/PPG/respiration/EEG/EDA/affect/thought proxy と、血圧、SpO2、瞳孔、音声、血糖、fMRI BOLD、未カタログ human biosensor などの generic biosignal proxy を生成する
+8. literature-backed intermediate、mind-upload.com conflict sink、raw payload redaction、
    semantic thought content 非生成を検証する
-8. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
-9. drift threshold policy を clinical reviewer / jurisdiction policy / Guardian authority refs へ digest-only に束縛する
-10. feature-window series の axis drift を authority-bound threshold receipt に束縛し、calibration confidence gate へ渡す
-11. current drift gate、self consent、Guardian review、freshness window を calibration refresh receipt へ digest-only に束縛する
-12. calibration profile、feature-window drift gate、calibration refresh receipt を identity confirmation / sensory loopback の confidence gate へ
+9. 2 日分の body-state latent digest を束ねた person-bound calibration profile を作る
+10. drift threshold policy を clinical reviewer / jurisdiction policy / Guardian authority refs へ digest-only に束縛する
+11. feature-window series の axis drift を authority-bound threshold receipt に束縛し、calibration confidence gate へ渡す
+12. current drift gate、self consent、Guardian review、freshness window を calibration refresh receipt へ digest-only に束縛する
+13. calibration profile、feature-window drift gate、calibration refresh receipt を identity confirmation / sensory loopback の confidence gate へ
     digest-only receipt として束縛する
-13. body-state latent、generated bundle、calibration confidence gate を
+14. body-state latent、generated bundle、calibration confidence gate を
     `biodata-mind-state-bridge-v1` へ束縛し、QualiaBuffer surrogate、SelfModel advisory、
     L3 perception / affect / attention handoff refs へ digest-only に渡す
-14. ContinuityLedger に session / dataset adapter / circadian phase verifier / feature-window series / threshold policy authority / drift gate / calibration refresh / latent / generated bundle / conflict sink / calibration gate / mind-state bridge を残す
-15. shared sensory loopback へ渡す場合は participant ごとの confidence gate と drift gate digest を
+15. ContinuityLedger に session / dataset adapter / survey EEG fusion / circadian phase verifier / feature-window series / threshold policy authority / drift gate / calibration refresh / latent / generated bundle / conflict sink / calibration gate / mind-state bridge を残す
+16. shared sensory loopback へ渡す場合は participant ごとの confidence gate と drift gate digest を
     Sensory Loopback 側の arbitration binding へ配布し、raw BioData / drift / gate payload は渡さない
 
 ## 中間表現
@@ -136,6 +141,22 @@ runtime が解決しない論点は `mind-upload.com` ref へ逃がす。
 15. **calibration refresh** ── calibration を再利用する時は current drift gate、self consent、Guardian review、1-90 日 freshness window を refresh receipt に束縛し、raw refresh payload は保存しない
 16. **shared loopback arbitration** ── shared sensory loopback へ分配する時は participant ごとの confidence gate digest、drift gate digest、threshold digest だけを渡し、raw BioData payload を arbitration に渡さない
 17. **mind-state bridge ceiling** ── L2/L3 へ渡す時は body-state latent、generated bundle、confidence gate の digest と claim ceiling だけを渡し、semantic thought、subjective equivalence、consciousness reproduction、identity replacement は主張しない
+18. **survey+EEG fusion ceiling** ── アンケートは normalized score summary digest のみを EEG feature digest と同じ window に束縛し、diagnosis、semantic thought、subjective equivalence、consciousness reproduction、identity replacement は主張しない
+
+## Survey + EEG fusion
+
+`biodata-survey-eeg-window-fusion-v1` は、EEG feature window とアンケート score summary を
+同じ `window_ref` 上の analysis input として束縛する receipt である。入力は
+dataset adapter receipt、body-state latent、EEG projection digest、survey instrument digest、
+survey score digest、同一 window / consent / clock sync の alignment evidence refs に限定する。
+raw survey answer、raw EEG sample、raw latent payload、raw fusion payload は保持しない。
+
+この receipt は `digest-only-survey-eeg-feature-alignment-v1` を policy とし、arousal、
+valence、attention、fatigue のうち比較可能な axis だけを bounded alignment check にする。
+出力は「アンケートと EEG の対応を読むための input」であり、診断、感情断定、思考内容復元、
+主観同一性の証明ではない。非 ML 利用者や coding agent が同じ artifact を扱えるように、
+`llm-native-no-ml-operator-playbook-v1`、plain-language operator summary ref、
+analysis question を receipt に束縛する。
 
 ## 個人内 calibration
 

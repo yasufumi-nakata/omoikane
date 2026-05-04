@@ -16,6 +16,7 @@ imports:
   biodata_calibration_confidence_gate: ../schemas/biodata_calibration_confidence_gate.schema
   biodata_calibration_refresh_receipt: ../schemas/biodata_calibration_refresh_receipt.schema
   biodata_dataset_adapter_receipt: ../schemas/biodata_dataset_adapter_receipt.schema
+  biodata_survey_eeg_fusion_receipt: ../schemas/biodata_survey_eeg_fusion_receipt.schema
   biodata_circadian_phase_verifier_receipt: ../schemas/biodata_circadian_phase_verifier_receipt.schema
   biodata_feature_window_series_profile: ../schemas/biodata_feature_window_series_profile.schema
   biodata_feature_window_series_drift_gate: ../schemas/biodata_feature_window_series_drift_gate.schema
@@ -129,6 +130,74 @@ operations:
       - source_feature_digest and latent_digest must match the generated body-state latent
       - full confidence-gate readiness requires all session-declared source modality feature-window coverage
       - raw dataset payload, raw signal samples, and raw feature-window payload storage must remain false
+  bind_survey_eeg_window_fusion:
+    summary: Bind one self-report survey score summary to an EEG feature window and body-state latent for bounded LLM-native analysis.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - session
+          - adapter_receipt
+          - latent_state
+          - survey_instrument_manifest
+          - survey_score_summary
+          - alignment_evidence_refs
+          - analysis_question
+          - operator_intent_ref
+        properties:
+          session:
+            schema_ref: biodata_transmitter_session
+          adapter_receipt:
+            schema_ref: biodata_dataset_adapter_receipt
+          latent_state:
+            schema_ref: biodata_body_state_latent
+          survey_instrument_manifest:
+            type: object
+            required:
+              - instrument_ref
+              - administration_ref
+              - participant_ref
+              - language
+              - scale_refs
+            properties:
+              instrument_ref:
+                type: string
+                minLength: 1
+              administration_ref:
+                type: string
+                minLength: 1
+              participant_ref:
+                type: string
+                minLength: 1
+              language:
+                type: string
+                minLength: 2
+              scale_refs:
+                type: object
+                minProperties: 1
+          survey_score_summary:
+            type: object
+            minProperties: 2
+          alignment_evidence_refs:
+            type: array
+            minItems: 2
+            uniqueItems: true
+            items:
+              type: string
+              minLength: 1
+          analysis_question:
+            type: string
+            minLength: 1
+          operator_intent_ref:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: biodata_survey_eeg_fusion_receipt
+    guarantees:
+      - adapter receipt, EEG feature digest, latent digest, survey instrument digest, survey score digest, and alignment evidence digest set must be bound into one fused_window_digest
+      - survey scores must be normalized score summaries; raw survey answers and raw EEG samples must not be stored
+      - output must bind llm-native-no-ml-operator-playbook-v1 so non-ML operators can consume a plain-language workflow artifact
+      - claim ceiling must remain survey-eeg-correlation-input-only with no diagnosis, thought-content, consciousness, or identity-replacement claim
   bind_circadian_phase_verifier:
     summary: Bind circadian phase refs to external clock, sleep diary, and wearable evidence before series use.
     input:

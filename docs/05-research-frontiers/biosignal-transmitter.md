@@ -42,6 +42,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - 2026-05-05 時点で `interface.neuro_integration_workbench.v0` を追加し、
   questionnaire + EEG を seed pair、fMRI BOLD と brain organoid を expansion lane とする
   multi-application workspace を reference runtime にした。
+- reference runtime は `biodata-survey-eeg-window-fusion-v1` により、アンケート score
+  summary digest と EEG feature-window digest を同じ analysis window に束縛し、非 ML
+  利用者向け LLM workflow ref を持つ bounded receipt として検証する。
 
 ## ブロッキング要因
 
@@ -56,6 +59,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   clinical diagnosis、意識再現、本人同一性置換の証拠にはならない。
 - 脳オルガノイドは in-vitro neural tissue context であって、対象者本人の body-state latent や
   mind-state proof と同一視しない。
+- self-report と EEG feature の alignment は測定条件、質問文、文化・言語、状態依存性に強く
+  影響されるため、runtime では診断や感情断定ではなく score summary と EEG proxy の
+  bounded alignment check に留める。
 
 ## 暫定運用方針
 
@@ -72,6 +78,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
   raw phase verifier payload を保存しない
 - 個人内 calibration は複数日の body-state latent digest set と day refs を
   `multi-day-personal-biodata-calibration-v1` に束縛し、raw source / latent / calibration payload は保存しない
+- アンケートは raw answer ではなく normalized score summary digest として
+  `biodata-survey-eeg-window-fusion-v1` に入れ、EEG feature digest、window alignment evidence、
+  LLM-native no-ML operator profile に束縛する
 - calibration は `biodata-calibration-confidence-gate-v1` として identity confirmation /
   sensory loopback に渡せるが、confidence input に留め、本人同一性や主観同一性の証明にはしない
 - sensory loopback 側では `biodata-calibration-gated-drift-threshold-v1` として

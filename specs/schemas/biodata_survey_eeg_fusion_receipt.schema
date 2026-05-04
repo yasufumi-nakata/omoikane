@@ -1,0 +1,304 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/biodata_survey_eeg_fusion_receipt.schema"
+title: BioDataSurveyEEGFusionReceipt
+description: >
+  Digest-only receipt that binds one self-report survey score summary to an EEG
+  feature window and BioData body-state latent for bounded, LLM-native analysis
+  without storing raw survey responses or EEG samples.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - fusion_ref
+  - created_at
+  - profile_id
+  - session_id
+  - identity_id
+  - dataset_ref
+  - window_ref
+  - dataset_adapter_ref
+  - dataset_adapter_receipt_digest
+  - latent_ref
+  - latent_digest
+  - source_feature_digest
+  - eeg_feature_digest
+  - eeg_feature_name_digest
+  - eeg_projection_confidence
+  - survey_instrument_ref
+  - survey_administration_ref
+  - survey_participant_ref
+  - survey_language
+  - survey_scale_refs
+  - survey_instrument_digest
+  - survey_score_digest
+  - survey_score_axes
+  - survey_score_summary
+  - alignment_evidence_refs
+  - alignment_evidence_digest_set
+  - alignment_checks
+  - fusion_axis_summary
+  - analysis_question
+  - operator_intent_ref
+  - operator_profile_id
+  - llm_native_workflow_ref
+  - no_ml_operator_summary_ref
+  - fusion_policy_id
+  - claim_ceiling
+  - fused_window_digest
+  - fusion_status
+  - eeg_window_bound
+  - survey_window_bound
+  - operator_accessibility_bound
+  - raw_survey_response_payload_stored
+  - raw_eeg_samples_stored
+  - raw_dataset_payload_stored
+  - raw_latent_payload_stored
+  - raw_fusion_payload_stored
+  - subjective_equivalence_claimed
+  - semantic_thought_content_generated
+  - diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - fusion_receipt_digest
+properties:
+  schema_version:
+    const: "1.0"
+  fusion_ref:
+    type: string
+    pattern: "^survey-eeg-fusion://biodata/bdt-survey-eeg-fusion-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: biodata-survey-eeg-window-fusion-v1
+  session_id:
+    type: string
+    minLength: 8
+  identity_id:
+    type: string
+    minLength: 1
+  dataset_ref:
+    type: string
+    minLength: 1
+  window_ref:
+    type: string
+    minLength: 1
+  dataset_adapter_ref:
+    type: string
+    pattern: "^dataset-adapter://biodata/bdt-dataset-adapter-[a-f0-9]{12}$"
+  dataset_adapter_receipt_digest:
+    $ref: "#/$defs/sha256"
+  latent_ref:
+    type: string
+    pattern: "^latent://body-state/body-latent-[a-f0-9]{12}$"
+  latent_digest:
+    $ref: "#/$defs/sha256"
+  source_feature_digest:
+    $ref: "#/$defs/sha256"
+  eeg_feature_digest:
+    $ref: "#/$defs/sha256"
+  eeg_feature_name_digest:
+    $ref: "#/$defs/sha256"
+  eeg_projection_confidence:
+    type: number
+    minimum: 0
+    maximum: 1
+  survey_instrument_ref:
+    type: string
+    minLength: 1
+  survey_administration_ref:
+    type: string
+    minLength: 1
+  survey_participant_ref:
+    type: string
+    minLength: 1
+  survey_language:
+    type: string
+    minLength: 2
+  survey_scale_refs:
+    type: object
+    minProperties: 1
+    propertyNames:
+      $ref: "#/$defs/axis_name"
+    additionalProperties:
+      type: string
+      minLength: 1
+  survey_instrument_digest:
+    $ref: "#/$defs/sha256"
+  survey_score_digest:
+    $ref: "#/$defs/sha256"
+  survey_score_axes:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/axis_name"
+  survey_score_summary:
+    type: object
+    minProperties: 2
+    propertyNames:
+      $ref: "#/$defs/axis_name"
+    additionalProperties:
+      type: object
+      additionalProperties: false
+      required:
+        - axis
+        - score
+        - scale_min
+        - scale_max
+        - normalization_policy
+      properties:
+        axis:
+          $ref: "#/$defs/axis_name"
+        score:
+          type: number
+          minimum: 0
+          maximum: 1
+        scale_min:
+          type: number
+        scale_max:
+          type: number
+        normalization_policy:
+          const: bounded-min-max-to-0-1-v1
+        source_ref:
+          type: string
+          minLength: 1
+  alignment_evidence_refs:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  alignment_evidence_digest_set:
+    $ref: "#/$defs/sha256"
+  alignment_checks:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - axis
+        - survey_score
+        - eeg_proxy
+        - absolute_delta
+        - alignment_score
+        - status
+      properties:
+        axis:
+          enum: [arousal, attention, fatigue, valence]
+        survey_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        eeg_proxy:
+          type: number
+          minimum: 0
+        absolute_delta:
+          type: number
+          minimum: 0
+        alignment_score:
+          type: number
+          minimum: 0
+          maximum: 1
+        status:
+          enum: [bounded, review]
+  fusion_axis_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - survey_axis_count
+      - eeg_cortical_load_proxy
+      - eeg_alpha_suppression
+      - eeg_theta_beta_ratio
+      - survey_attention_proxy
+      - survey_fatigue_proxy
+      - survey_eeg_cognitive_load_proxy
+      - fusion_confidence
+    properties:
+      survey_axis_count:
+        type: integer
+        minimum: 2
+      eeg_cortical_load_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      eeg_alpha_suppression:
+        type: number
+        minimum: 0
+        maximum: 1
+      eeg_theta_beta_ratio:
+        type: number
+        minimum: 0
+      survey_attention_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      survey_fatigue_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      survey_eeg_cognitive_load_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      fusion_confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+  analysis_question:
+    type: string
+    minLength: 1
+  operator_intent_ref:
+    type: string
+    minLength: 1
+  operator_profile_id:
+    const: llm-native-no-ml-operator-playbook-v1
+  llm_native_workflow_ref:
+    const: workflow://biodata/survey-eeg/llm-native-no-ml-operator-v1
+  no_ml_operator_summary_ref:
+    const: operator-guide://biodata/survey-eeg/plain-language-window-summary-v1
+  fusion_policy_id:
+    const: digest-only-survey-eeg-feature-alignment-v1
+  claim_ceiling:
+    const: survey-eeg-correlation-input-only
+  fused_window_digest:
+    $ref: "#/$defs/sha256"
+  fusion_status:
+    const: bound
+  eeg_window_bound:
+    const: true
+  survey_window_bound:
+    const: true
+  operator_accessibility_bound:
+    const: true
+  raw_survey_response_payload_stored:
+    const: false
+  raw_eeg_samples_stored:
+    const: false
+  raw_dataset_payload_stored:
+    const: false
+  raw_latent_payload_stored:
+    const: false
+  raw_fusion_payload_stored:
+    const: false
+  subjective_equivalence_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  fusion_receipt_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  axis_name:
+    type: string
+    pattern: "^[a-z][a-z0-9_]{0,63}$"
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

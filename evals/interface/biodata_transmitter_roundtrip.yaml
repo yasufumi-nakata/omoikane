@@ -28,6 +28,15 @@ expected:
   dataset_adapter_latent_digest_bound: true
   dataset_adapter_required_modalities_bound: true
   dataset_adapter_receipt_digest_bound: true
+  survey_eeg_fusion_ok: true
+  survey_eeg_fusion_status: bound
+  survey_eeg_eeg_window_bound: true
+  survey_eeg_survey_window_bound: true
+  survey_eeg_alignment_evidence_digest_bound: true
+  survey_eeg_alignment_checks_bound: true
+  survey_eeg_fused_window_digest_bound: true
+  survey_eeg_fusion_receipt_digest_bound: true
+  survey_eeg_operator_accessibility_bound: true
   feature_window_series_profile_ok: true
   feature_window_series_digest_set_bound: true
   feature_window_series_profile_digest_bound: true
@@ -101,6 +110,9 @@ expected:
   raw_dataset_payload_stored: false
   raw_signal_samples_stored: false
   raw_feature_window_payload_stored: false
+  raw_survey_response_payload_stored: false
+  raw_eeg_samples_stored: false
+  raw_survey_eeg_fusion_payload_stored: false
   raw_latent_payload_stored: false
   raw_phase_verifier_payload_stored: false
   raw_series_payload_stored: false

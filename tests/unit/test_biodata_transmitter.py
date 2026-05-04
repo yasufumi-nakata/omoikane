@@ -285,6 +285,120 @@ class BioDataTransmitterTests(unittest.TestCase):
                 context_label="missing-manifest-ref",
             )
 
+    def test_binds_survey_score_summary_to_eeg_feature_window(self) -> None:
+        transmitter = BioDataTransmitter()
+        session = transmitter.open_session(
+            "identity-bdt-survey-eeg",
+            source_modalities=["eeg"],
+            target_modalities=["eeg", "affect", "thought"],
+        )
+        dataset_manifest = {
+            "dataset_ref": "dataset://unit/survey-eeg-window",
+            "participant_ref": "participant://unit/survey-eeg-self",
+            "license_ref": "license://unit/redacted-survey-eeg-summary",
+            "window_ref": "window://unit/survey-eeg/day-1",
+            "modality_file_refs": {
+                "eeg": "dataset-file://unit/survey-eeg/eeg-window-summary",
+            },
+        }
+        adapted = transmitter.adapt_dataset_feature_window(
+            session["session_id"],
+            dataset_manifest=dataset_manifest,
+            window_feature_summaries={
+                "eeg": {"alpha_power": 0.39, "theta_power": 0.28, "beta_power": 0.34},
+            },
+            context_label="survey-eeg-unit-window",
+        )
+
+        fusion = transmitter.bind_survey_eeg_window_fusion(
+            session,
+            adapted["adapter_receipt"],
+            adapted["latent_state"],
+            survey_instrument_manifest={
+                "instrument_ref": "survey://unit/affect-attention-v1",
+                "administration_ref": "survey-admin://unit/day-1",
+                "participant_ref": "participant://unit/survey-eeg-self",
+                "language": "ja-JP",
+                "scale_refs": {
+                    "valence": "scale://unit/valence",
+                    "arousal": "scale://unit/arousal",
+                    "attention": "scale://unit/attention",
+                    "fatigue": "scale://unit/fatigue",
+                },
+            },
+            survey_score_summary={
+                "valence": 0.57,
+                "arousal": 0.61,
+                "attention": 0.66,
+                "fatigue": 0.26,
+            },
+            alignment_evidence_refs=[
+                "alignment://unit/survey-eeg/same-window",
+                "consent://unit/survey-eeg/fusion",
+            ],
+            analysis_question="bounded survey and EEG attention-window analysis",
+            operator_intent_ref="operator-intent://unit/no-ml-survey-eeg",
+        )
+        validation = transmitter.validate_survey_eeg_window_fusion(
+            session,
+            adapted["adapter_receipt"],
+            adapted["latent_state"],
+            fusion,
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertEqual("bound", validation["fusion_status"])
+        self.assertTrue(validation["eeg_window_bound"])
+        self.assertTrue(validation["survey_window_bound"])
+        self.assertTrue(validation["alignment_evidence_digest_bound"])
+        self.assertTrue(validation["alignment_checks_bound"])
+        self.assertTrue(validation["fused_window_digest_bound"])
+        self.assertTrue(validation["fusion_receipt_digest_bound"])
+        self.assertTrue(validation["operator_accessibility_bound"])
+        self.assertEqual(
+            "survey-eeg-correlation-input-only",
+            fusion["claim_ceiling"],
+        )
+        self.assertFalse(fusion["raw_survey_response_payload_stored"])
+        self.assertFalse(fusion["raw_eeg_samples_stored"])
+        self.assertFalse(fusion["diagnosis_claimed"])
+        self.assertFalse(fusion["semantic_thought_content_generated"])
+
+        tampered = deepcopy(fusion)
+        tampered["survey_score_digest"] = "0" * 64
+        self.assertFalse(
+            transmitter.validate_survey_eeg_window_fusion(
+                session,
+                adapted["adapter_receipt"],
+                adapted["latent_state"],
+                tampered,
+            )["ok"]
+        )
+
+        with self.assertRaisesRegex(ValueError, "requires at least two comparable"):
+            transmitter.bind_survey_eeg_window_fusion(
+                session,
+                adapted["adapter_receipt"],
+                adapted["latent_state"],
+                survey_instrument_manifest={
+                    "instrument_ref": "survey://unit/non-comparable-v1",
+                    "administration_ref": "survey-admin://unit/non-comparable",
+                    "participant_ref": "participant://unit/survey-eeg-self",
+                    "language": "ja-JP",
+                    "scale_refs": {"sleep_quality": "scale://unit/sleep"},
+                },
+                survey_score_summary={
+                    "sleep_quality": 0.7,
+                    "motivation": 0.5,
+                },
+                alignment_evidence_refs=[
+                    "alignment://unit/non-comparable",
+                    "consent://unit/non-comparable",
+                ],
+                analysis_question="non-comparable survey axes",
+                operator_intent_ref="operator-intent://unit/non-comparable",
+            )
+
     def test_builds_feature_window_series_profile_from_adapter_receipts(self) -> None:
         transmitter = BioDataTransmitter()
         session = transmitter.open_session("identity-bdt-feature-series")

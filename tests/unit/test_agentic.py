@@ -656,6 +656,8 @@ class DistributedTransportServiceTests(unittest.TestCase):
         ssl_context.verify_mode = ssl.CERT_REQUIRED
         ssl_context.load_cert_chain(server_cert_path, server_key_path)
         ssl_context.load_verify_locations(cafile=ca_cert_path)
+        if hasattr(ssl, "VERIFY_X509_STRICT"):
+            ssl_context.verify_flags &= ~ssl.VERIFY_X509_STRICT
         server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()

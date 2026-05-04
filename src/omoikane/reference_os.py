@@ -3620,6 +3620,8 @@ class OmoikaneReferenceOS:
             ssl_context.verify_mode = ssl.CERT_REQUIRED
             ssl_context.load_cert_chain(server_cert_path, server_key_path)
             ssl_context.load_verify_locations(cafile=ca_cert_path)
+            if hasattr(ssl, "VERIFY_X509_STRICT"):
+                ssl_context.verify_flags &= ~ssl.VERIFY_X509_STRICT
             server.socket = ssl_context.wrap_socket(server.socket, server_side=True)
             thread = threading.Thread(target=server.serve_forever, daemon=True)
             thread.start()
@@ -9947,6 +9949,42 @@ json.dump(response, sys.stdout)
         )
         dataset_adapter_receipt = adapted_window["adapter_receipt"]
         latent_state = adapted_window["latent_state"]
+        survey_instrument_manifest = {
+            "instrument_ref": "survey://biodata-transmitter-demo/self-report-window-v1",
+            "administration_ref": "survey-admin://biodata-transmitter-demo/day-1/quiet-review",
+            "participant_ref": dataset_manifest["participant_ref"],
+            "language": "ja-JP",
+            "scale_refs": {
+                "valence": "scale://survey/affect-valence-0-1",
+                "arousal": "scale://survey/affect-arousal-0-1",
+                "attention": "scale://survey/sustained-attention-0-1",
+                "fatigue": "scale://survey/fatigue-0-1",
+            },
+        }
+        survey_eeg_fusion = self.biodata_transmitter.bind_survey_eeg_window_fusion(
+            session,
+            dataset_adapter_receipt,
+            latent_state,
+            survey_instrument_manifest=survey_instrument_manifest,
+            survey_score_summary={
+                "valence": 0.58,
+                "arousal": 0.62,
+                "attention": 0.68,
+                "fatigue": 0.24,
+            },
+            alignment_evidence_refs=[
+                "alignment://biodata-transmitter-demo/day-1/eeg-survey-same-window",
+                "consent://biodata-transmitter-demo/survey-eeg-fusion",
+                "clock://biodata-transmitter-demo/lab-clock/window-sync",
+            ],
+            analysis_question=(
+                "EEG band summary and self-report survey scores are aligned for "
+                "bounded affect and attention-window analysis"
+            ),
+            operator_intent_ref=(
+                "operator-intent://biodata-transmitter-demo/non-ml-survey-eeg-summary"
+            ),
+        )
         day_two_dataset_manifest = {
             "dataset_ref": "dataset://physionet-compatible/demo-biodata-window",
             "participant_ref": "participant://biodata-transmitter-demo/identity-1",
@@ -10206,6 +10244,14 @@ json.dump(response, sys.stdout)
             latent_state,
             dataset_adapter_receipt,
         )
+        survey_eeg_fusion_validation = (
+            self.biodata_transmitter.validate_survey_eeg_window_fusion(
+                session,
+                dataset_adapter_receipt,
+                latent_state,
+                survey_eeg_fusion,
+            )
+        )
         feature_window_series_validation = (
             self.biodata_transmitter.validate_feature_window_series_profile(
                 session,
@@ -10257,6 +10303,7 @@ json.dump(response, sys.stdout)
             and calibration_validation["ok"]
             and confidence_gate_validation["ok"]
             and dataset_adapter_validation["ok"]
+            and survey_eeg_fusion_validation["ok"]
             and feature_window_series_validation["ok"]
             and circadian_phase_verifier_validation["ok"]
             and feature_window_series_drift_gate_validation["ok"]
@@ -10293,6 +10340,31 @@ json.dump(response, sys.stdout)
         )
         validation["dataset_adapter_receipt_digest_bound"] = (
             dataset_adapter_validation["adapter_receipt_digest_bound"]
+        )
+        validation["survey_eeg_fusion_ok"] = survey_eeg_fusion_validation["ok"]
+        validation["survey_eeg_fusion_status"] = survey_eeg_fusion_validation[
+            "fusion_status"
+        ]
+        validation["survey_eeg_eeg_window_bound"] = survey_eeg_fusion_validation[
+            "eeg_window_bound"
+        ]
+        validation["survey_eeg_survey_window_bound"] = survey_eeg_fusion_validation[
+            "survey_window_bound"
+        ]
+        validation["survey_eeg_alignment_evidence_digest_bound"] = (
+            survey_eeg_fusion_validation["alignment_evidence_digest_bound"]
+        )
+        validation["survey_eeg_alignment_checks_bound"] = (
+            survey_eeg_fusion_validation["alignment_checks_bound"]
+        )
+        validation["survey_eeg_fused_window_digest_bound"] = (
+            survey_eeg_fusion_validation["fused_window_digest_bound"]
+        )
+        validation["survey_eeg_fusion_receipt_digest_bound"] = (
+            survey_eeg_fusion_validation["fusion_receipt_digest_bound"]
+        )
+        validation["survey_eeg_operator_accessibility_bound"] = (
+            survey_eeg_fusion_validation["operator_accessibility_bound"]
         )
         validation["feature_window_series_profile_ok"] = (
             feature_window_series_validation["ok"]
@@ -10427,6 +10499,15 @@ json.dump(response, sys.stdout)
         validation["raw_feature_window_payload_stored"] = dataset_adapter_validation[
             "raw_feature_window_payload_stored"
         ]
+        validation["raw_survey_response_payload_stored"] = (
+            survey_eeg_fusion_validation["raw_survey_response_payload_stored"]
+        )
+        validation["raw_eeg_samples_stored"] = survey_eeg_fusion_validation[
+            "raw_eeg_samples_stored"
+        ]
+        validation["raw_survey_eeg_fusion_payload_stored"] = (
+            survey_eeg_fusion_validation["raw_fusion_payload_stored"]
+        )
         validation["raw_series_payload_stored"] = feature_window_series_validation[
             "raw_series_payload_stored"
         ]
@@ -10616,6 +10697,45 @@ json.dump(response, sys.stdout)
             },
             actor="BioDataTransmitter",
             category="interface-biodata-transmitter-dataset-adapter",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="biodata_transmitter.survey_eeg_window_fusion_bound",
+            payload={
+                "fusion_ref": survey_eeg_fusion["fusion_ref"],
+                "fusion_receipt_digest": survey_eeg_fusion[
+                    "fusion_receipt_digest"
+                ],
+                "fused_window_digest": survey_eeg_fusion["fused_window_digest"],
+                "dataset_adapter_receipt_digest": survey_eeg_fusion[
+                    "dataset_adapter_receipt_digest"
+                ],
+                "latent_digest": survey_eeg_fusion["latent_digest"],
+                "eeg_feature_digest": survey_eeg_fusion["eeg_feature_digest"],
+                "survey_instrument_digest": survey_eeg_fusion[
+                    "survey_instrument_digest"
+                ],
+                "survey_score_digest": survey_eeg_fusion["survey_score_digest"],
+                "alignment_evidence_digest_set": survey_eeg_fusion[
+                    "alignment_evidence_digest_set"
+                ],
+                "operator_profile_id": survey_eeg_fusion["operator_profile_id"],
+                "claim_ceiling": survey_eeg_fusion["claim_ceiling"],
+                "raw_survey_response_payload_stored": survey_eeg_fusion[
+                    "raw_survey_response_payload_stored"
+                ],
+                "raw_eeg_samples_stored": survey_eeg_fusion[
+                    "raw_eeg_samples_stored"
+                ],
+                "raw_fusion_payload_stored": survey_eeg_fusion[
+                    "raw_fusion_payload_stored"
+                ],
+            },
+            actor="BioDataTransmitter",
+            category="interface-biodata-transmitter-survey-eeg-fusion",
             layer="L6",
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
@@ -10973,6 +11093,8 @@ json.dump(response, sys.stdout)
                 dataset_adapter_receipt,
                 day_two_dataset_adapter_receipt,
             ],
+            "survey_instrument_manifest": survey_instrument_manifest,
+            "survey_eeg_fusion": survey_eeg_fusion,
             "circadian_phase_verifier": circadian_phase_verifier,
             "feature_window_series_profile": feature_window_series_profile,
             "drift_threshold_policy_authority": drift_threshold_policy_authority,

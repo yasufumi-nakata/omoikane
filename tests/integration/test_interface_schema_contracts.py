@@ -66,6 +66,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/biodata_dataset_adapter_receipt.schema",
             result["dataset_adapter_receipt"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/biodata_survey_eeg_fusion_receipt.schema",
+            result["survey_eeg_fusion"],
+        )
         for receipt in result["dataset_adapter_receipts"]:
             self._assert_schema_valid(
                 "specs/schemas/biodata_dataset_adapter_receipt.schema",
@@ -127,6 +131,17 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["dataset_adapter_ok"])
         self.assertTrue(result["validation"]["dataset_manifest_digest_bound"])
         self.assertTrue(result["validation"]["dataset_adapter_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_fusion_ok"])
+        self.assertEqual("bound", result["validation"]["survey_eeg_fusion_status"])
+        self.assertTrue(result["validation"]["survey_eeg_eeg_window_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_survey_window_bound"])
+        self.assertTrue(
+            result["validation"]["survey_eeg_alignment_evidence_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["survey_eeg_alignment_checks_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_fused_window_digest_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_digest_bound"])
+        self.assertTrue(result["validation"]["survey_eeg_operator_accessibility_bound"])
         self.assertTrue(result["validation"]["feature_window_series_profile_ok"])
         self.assertTrue(result["validation"]["feature_window_series_digest_set_bound"])
         self.assertTrue(result["validation"]["feature_window_series_profile_digest_bound"])

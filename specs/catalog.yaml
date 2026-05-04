@@ -2346,6 +2346,16 @@ entries:
     rationale: Required to bind session-declared external BioData dataset feature windows to BioData body-state latents with manifest digest, feature-window digest, latent digest, full modality coverage, and raw sample redaction.
   - priority: P1
     kind: schema
+    file: specs/schemas/biodata_survey_eeg_fusion_receipt.schema
+    consumers:
+      - specs/interfaces/interface.biodata_transmitter.v0.idl
+      - docs/02-subsystems/interface/biodata-transmitter.md
+      - reference-runtime
+      - evals/interface/biodata_transmitter_roundtrip.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind questionnaire score summaries and EEG feature windows into one digest-only analysis receipt for LLM-native and non-ML operators without raw survey answers, raw EEG samples, diagnosis, consciousness, or identity replacement claims.
+  - priority: P1
+    kind: schema
     file: specs/schemas/biodata_circadian_phase_verifier_receipt.schema
     consumers:
       - specs/interfaces/interface.biodata_transmitter.v0.idl
