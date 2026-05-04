@@ -13,6 +13,7 @@ NIW_SOURCE_BUNDLE_PROFILE_ID = "neuro-cross-modal-source-bundle-v1"
 NIW_WORKSPACE_PROFILE_ID = "llm-native-neuroscience-workspace-v1"
 NIW_ANALYSIS_PROFILE_ID = "survey-eeg-neurodata-fusion-analysis-v1"
 NIW_OPERATOR_GUIDE_PROFILE_ID = "llm-native-non-ml-operator-guide-v1"
+NIW_REPLACEMENT_PLAN_PROFILE_ID = "neuro-application-replacement-plan-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -21,6 +22,7 @@ NIW_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/neurodata-integration
 NIW_SOURCE_STORAGE_POLICY = "feature-digest+analysis-axis-summary-only"
 NIW_WORKSPACE_STORAGE_POLICY = "app-receipt-digest+source-bundle-digest-only"
 NIW_GUIDE_POLICY = "plain-language-cards+agent-task-templates-v1"
+NIW_REPLACEMENT_PLAN_POLICY = "app-digest+source-family-lane-coverage-only"
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
 NIW_REQUIRED_REPLACEMENT_LANES = (
@@ -105,6 +107,7 @@ class NeuroIntegrationWorkbench:
             "workspace_profile_id": NIW_WORKSPACE_PROFILE_ID,
             "analysis_profile_id": NIW_ANALYSIS_PROFILE_ID,
             "operator_guide_profile_id": NIW_OPERATOR_GUIDE_PROFILE_ID,
+            "replacement_plan_profile_id": NIW_REPLACEMENT_PLAN_PROFILE_ID,
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
@@ -117,6 +120,7 @@ class NeuroIntegrationWorkbench:
             "source_storage_policy": NIW_SOURCE_STORAGE_POLICY,
             "workspace_storage_policy": NIW_WORKSPACE_STORAGE_POLICY,
             "operator_guide_policy": NIW_GUIDE_POLICY,
+            "replacement_plan_policy": NIW_REPLACEMENT_PLAN_POLICY,
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -503,6 +507,108 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(guide)
 
+    def build_application_replacement_plan(
+        self,
+        app_receipts: Sequence[Dict[str, Any]],
+        source_bundle: Dict[str, Any],
+        workspace: Dict[str, Any],
+        operator_guide: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        apps = [self._check_app_receipt(app_receipt) for app_receipt in app_receipts]
+        if not apps:
+            raise ValueError("app_receipts must not be empty")
+        self._check_source_bundle(source_bundle)
+        self._check_workspace(workspace)
+        self._check_operator_guide(operator_guide)
+        if workspace["source_bundle_digest"] != source_bundle["source_bundle_digest"]:
+            raise ValueError("workspace.source_bundle_digest must match source bundle")
+        if operator_guide["workspace_digest"] != workspace["workspace_digest"]:
+            raise ValueError("operator_guide.workspace_digest must match workspace")
+
+        source_types = list(source_bundle["source_types"])
+        source_families = dict(source_bundle["source_families"])
+        app_digests = [app["app_digest"] for app in apps]
+        app_refs = [app["app_ref"] for app in apps]
+        lane_coverage = self._build_lane_coverage(apps, source_types)
+        source_type_coverage = self._build_source_type_coverage(apps, source_types)
+        all_required_lanes_bound = all(item["bound"] for item in lane_coverage)
+        source_type_lane_coverage_bound = all(
+            item["covered"] for item in source_type_coverage
+        )
+        plan = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "replacement_plan_ref": (
+                f"replacement-plan://neuro-integration/{new_id('niw-replacement-plan')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_REPLACEMENT_PLAN_PROFILE_ID,
+            "workspace_ref": workspace["workspace_ref"],
+            "workspace_digest": workspace["workspace_digest"],
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "operator_guide_ref": operator_guide["guide_ref"],
+            "operator_guide_digest": operator_guide["guide_digest"],
+            "app_refs": app_refs,
+            "app_digests": app_digests,
+            "source_types": source_types,
+            "source_families": source_families,
+            "required_replacement_lanes": list(NIW_REQUIRED_REPLACEMENT_LANES),
+            "lane_coverage": lane_coverage,
+            "source_type_coverage": source_type_coverage,
+            "coverage_summary": {
+                "app_count": len(apps),
+                "source_type_count": len(source_types),
+                "source_family_count": len(set(source_families.values())),
+                "required_replacement_lane_count": len(NIW_REQUIRED_REPLACEMENT_LANES),
+                "covered_replacement_lane_count": sum(
+                    1 for item in lane_coverage if item["bound"]
+                ),
+                "covered_source_type_count": sum(
+                    1 for item in source_type_coverage if item["covered"]
+                ),
+            },
+            "all_required_lanes_bound": all_required_lanes_bound,
+            "source_type_lane_coverage_bound": source_type_lane_coverage_bound,
+            "replacement_plan_bound": (
+                all_required_lanes_bound
+                and source_type_lane_coverage_bound
+                and workspace["replacement_lanes_bound"]
+            ),
+            "llm_native_workflow_bound": workspace["llm_native_workflow_bound"],
+            "beginner_operator_supported": workspace["beginner_operator_supported"],
+            "coding_agent_ready": workspace["coding_agent_ready"],
+            "operator_handoffs": [
+                {
+                    "target_actor": "non-ml-operator",
+                    "guide_ref": operator_guide["guide_ref"],
+                    "guide_digest": operator_guide["guide_digest"],
+                    "handoff_policy": "plain-language-card-review",
+                    "requires_ml_expertise": False,
+                },
+                {
+                    "target_actor": "coding-agent",
+                    "guide_ref": operator_guide["guide_ref"],
+                    "guide_digest": operator_guide["guide_digest"],
+                    "handoff_policy": "schema-bound-task-template",
+                    "requires_ml_expertise": False,
+                },
+            ],
+            "storage_policy": NIW_REPLACEMENT_PLAN_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_app_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "raw_operator_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        plan["replacement_plan_digest"] = sha256_text(
+            canonical_json(self._replacement_plan_digest_payload(plan))
+        )
+        return deepcopy(plan)
+
     def validate_integration_bundle(
         self,
         app_receipts: Sequence[Dict[str, Any]],
@@ -510,6 +616,7 @@ class NeuroIntegrationWorkbench:
         workspace: Dict[str, Any],
         analysis: Dict[str, Any],
         operator_guide: Dict[str, Any],
+        replacement_plan: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -534,6 +641,11 @@ class NeuroIntegrationWorkbench:
             self._check_operator_guide(operator_guide)
         except ValueError as exc:
             errors.append(str(exc))
+        if replacement_plan is not None:
+            try:
+                self._check_replacement_plan(replacement_plan)
+            except ValueError as exc:
+                errors.append(str(exc))
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -606,6 +718,38 @@ class NeuroIntegrationWorkbench:
             and artifact.get("identity_replacement_claimed") is False
             for artifact in (source_bundle, workspace, analysis, operator_guide)
         )
+        replacement_plan_checks: Dict[str, bool] = {}
+        if replacement_plan is not None:
+            replacement_plan_digest_bound = (
+                replacement_plan.get("replacement_plan_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._replacement_plan_digest_payload(replacement_plan)
+                    )
+                )
+            )
+            app_digest_set = [app["app_digest"] for app in normalized_apps]
+            replacement_plan_checks = {
+                "replacement_plan_digest_bound": replacement_plan_digest_bound,
+                "application_replacement_plan_bound": (
+                    replacement_plan.get("replacement_plan_bound") is True
+                    and replacement_plan.get("workspace_digest")
+                    == workspace.get("workspace_digest")
+                    and replacement_plan.get("source_bundle_digest")
+                    == source_bundle.get("source_bundle_digest")
+                    and replacement_plan.get("operator_guide_digest")
+                    == operator_guide.get("guide_digest")
+                    and replacement_plan.get("app_digests") == app_digest_set
+                ),
+                "source_type_lane_coverage_bound": (
+                    replacement_plan.get("source_type_lane_coverage_bound") is True
+                ),
+                "replacement_plan_payload_redacted": all(
+                    replacement_plan.get(field_name) is False
+                    for field_name in replacement_plan
+                    if field_name.startswith("raw_")
+                ),
+            }
 
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
@@ -624,6 +768,7 @@ class NeuroIntegrationWorkbench:
             "claim_ceiling_bound": claim_ceiling_bound,
             "raw_payload_redacted": raw_payload_redacted,
             "no_diagnosis_or_identity_claim": no_diagnosis_or_identity_claim,
+            **replacement_plan_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -637,6 +782,14 @@ class NeuroIntegrationWorkbench:
             "upstream_receipt_count": source_bundle.get("upstream_receipt_count", 0),
             "app_count": len(app_receipts),
             "replacement_lane_count": len(workspace.get("replacement_lanes", [])),
+            "covered_source_type_count": (
+                replacement_plan.get("coverage_summary", {}).get(
+                    "covered_source_type_count",
+                    0,
+                )
+                if replacement_plan is not None
+                else 0
+            ),
             "claim_ceiling": NIW_CLAIM_CEILING,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -727,6 +880,82 @@ class NeuroIntegrationWorkbench:
             "raw_payload_stored": False,
         }
         return binding
+
+    def _build_lane_coverage(
+        self,
+        apps: Sequence[Dict[str, Any]],
+        source_types: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        lane_coverage: List[Dict[str, Any]] = []
+        for lane in NIW_REQUIRED_REPLACEMENT_LANES:
+            lane_apps = [app for app in apps if lane in app["replacement_lanes"]]
+            supported_source_types = sorted(
+                {
+                    source_type
+                    for app in lane_apps
+                    for source_type in app["supported_source_types"]
+                    if source_type in source_types
+                }
+            )
+            missing_source_types = [
+                source_type
+                for source_type in source_types
+                if source_type not in supported_source_types
+            ]
+            lane_coverage.append(
+                {
+                    "replacement_lane": lane,
+                    "app_refs": [app["app_ref"] for app in lane_apps],
+                    "app_digests": [app["app_digest"] for app in lane_apps],
+                    "source_types_covered": supported_source_types,
+                    "source_families_covered": sorted(
+                        {self._source_family(source_type) for source_type in supported_source_types}
+                    ),
+                    "missing_source_types": missing_source_types,
+                    "operator_skill_floors": sorted(
+                        {app["operator_skill_floor"] for app in lane_apps}
+                    ),
+                    "llm_native_app_count": sum(1 for app in lane_apps if app["llm_native"]),
+                    "beginner_safe_app_count": sum(
+                        1 for app in lane_apps if app["beginner_safe_mode"]
+                    ),
+                    "bound": bool(lane_apps) and not missing_source_types,
+                }
+            )
+        return lane_coverage
+
+    def _build_source_type_coverage(
+        self,
+        apps: Sequence[Dict[str, Any]],
+        source_types: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        coverage: List[Dict[str, Any]] = []
+        for source_type in source_types:
+            lane_refs: Dict[str, List[str]] = {}
+            lane_digests: Dict[str, List[str]] = {}
+            missing_lanes: List[str] = []
+            for lane in NIW_REQUIRED_REPLACEMENT_LANES:
+                lane_apps = [
+                    app
+                    for app in apps
+                    if lane in app["replacement_lanes"]
+                    and source_type in app["supported_source_types"]
+                ]
+                lane_refs[lane] = [app["app_ref"] for app in lane_apps]
+                lane_digests[lane] = [app["app_digest"] for app in lane_apps]
+                if not lane_apps:
+                    missing_lanes.append(lane)
+            coverage.append(
+                {
+                    "source_type": source_type,
+                    "source_family": self._source_family(source_type),
+                    "lane_app_refs": lane_refs,
+                    "lane_app_digests": lane_digests,
+                    "missing_lanes": missing_lanes,
+                    "covered": not missing_lanes,
+                }
+            )
+        return coverage
 
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(source_manifest, dict):
@@ -981,6 +1210,23 @@ class NeuroIntegrationWorkbench:
         if guide.get("guide_digest") != expected_digest:
             raise ValueError("operator_guide.guide_digest mismatch")
 
+    def _check_replacement_plan(self, plan: Dict[str, Any]) -> None:
+        if not isinstance(plan, dict):
+            raise ValueError("replacement_plan must be a mapping")
+        if plan.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("replacement_plan.schema_version mismatch")
+        if plan.get("profile_id") != NIW_REPLACEMENT_PLAN_PROFILE_ID:
+            raise ValueError("replacement_plan.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._replacement_plan_digest_payload(plan))
+        )
+        if plan.get("replacement_plan_digest") != expected_digest:
+            raise ValueError("replacement_plan.replacement_plan_digest mismatch")
+        if plan.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("replacement_plan.claim_ceiling mismatch")
+        if plan.get("storage_policy") != NIW_REPLACEMENT_PLAN_POLICY:
+            raise ValueError("replacement_plan.storage_policy mismatch")
+
     def _normalize_operator_profile(self, operator_profile: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(operator_profile, dict):
             raise ValueError("operator_profile must be a mapping")
@@ -1163,4 +1409,25 @@ class NeuroIntegrationWorkbench:
             "cards": guide.get("cards"),
             "agent_task_templates": guide.get("agent_task_templates"),
             "claim_ceiling": guide.get("claim_ceiling"),
+        }
+
+    def _replacement_plan_digest_payload(self, plan: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "profile_id": plan.get("profile_id"),
+            "workspace_digest": plan.get("workspace_digest"),
+            "source_bundle_digest": plan.get("source_bundle_digest"),
+            "operator_guide_digest": plan.get("operator_guide_digest"),
+            "app_digests": plan.get("app_digests"),
+            "source_types": plan.get("source_types"),
+            "source_families": plan.get("source_families"),
+            "required_replacement_lanes": plan.get("required_replacement_lanes"),
+            "lane_coverage": plan.get("lane_coverage"),
+            "source_type_coverage": plan.get("source_type_coverage"),
+            "coverage_summary": plan.get("coverage_summary"),
+            "replacement_plan_bound": plan.get("replacement_plan_bound"),
+            "llm_native_workflow_bound": plan.get("llm_native_workflow_bound"),
+            "beginner_operator_supported": plan.get("beginner_operator_supported"),
+            "coding_agent_ready": plan.get("coding_agent_ready"),
+            "operator_handoffs": plan.get("operator_handoffs"),
+            "claim_ceiling": plan.get("claim_ceiling"),
         }

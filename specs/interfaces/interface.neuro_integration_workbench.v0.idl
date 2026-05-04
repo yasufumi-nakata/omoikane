@@ -15,6 +15,7 @@ imports:
   neuro_integration_workspace: ../schemas/neuro_integration_workspace.schema
   neuro_integration_analysis_receipt: ../schemas/neuro_integration_analysis_receipt.schema
   neuro_integration_operator_guide: ../schemas/neuro_integration_operator_guide.schema
+  neuro_integration_application_replacement_plan: ../schemas/neuro_integration_application_replacement_plan.schema
 operations:
   register_application:
     summary: Register one measurement, analysis, curation, operator-copilot, or agent-automation app as a replaceable workbench lane.
@@ -169,8 +170,37 @@ operations:
       - coding-agent templates must stay schema-bound and digest-only
       - guide_digest must bind cards, templates, workspace digest, analysis digest, and claim ceiling
       - raw instruction and analysis payload storage must remain false
+  build_application_replacement_plan:
+    summary: Emit a digest-only plan proving each bound source type is covered by measurement, analysis, curation, operator-copilot, and agent-automation lanes.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - app_receipts
+          - source_bundle
+          - workspace
+          - operator_guide
+        properties:
+          app_receipts:
+            type: array
+            minItems: 1
+            items:
+              schema_ref: neuro_integration_app_registry_receipt
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          workspace:
+            schema_ref: neuro_integration_workspace
+          operator_guide:
+            schema_ref: neuro_integration_operator_guide
+    output:
+      schema_ref: neuro_integration_application_replacement_plan
+    guarantees:
+      - every source type in the current source bundle must be covered by all required replacement lanes
+      - the plan must bind app digests, source bundle digest, workspace digest, and operator guide digest
+      - non-ML operator and coding-agent handoffs must be explicit and require no ML expertise
+      - raw application, source, and operator payload storage must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, and operator-guide digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, and optional replacement-plan digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -194,6 +224,8 @@ operations:
             schema_ref: neuro_integration_analysis_receipt
           operator_guide:
             schema_ref: neuro_integration_operator_guide
+          replacement_plan:
+            schema_ref: neuro_integration_application_replacement_plan
     output:
       inline_schema:
         type: object
@@ -204,6 +236,8 @@ operations:
           - llm_native_workflow_bound
           - beginner_operator_supported
           - coding_agent_ready
+          - application_replacement_plan_bound
+          - source_type_lane_coverage_bound
           - survey_eeg_fusion_receipt_bound
           - upstream_receipt_payload_redacted
           - claim_ceiling_bound
@@ -222,6 +256,10 @@ operations:
             type: boolean
           coding_agent_ready:
             type: boolean
+          application_replacement_plan_bound:
+            type: boolean
+          source_type_lane_coverage_bound:
+            type: boolean
           survey_eeg_fusion_receipt_bound:
             type: boolean
           upstream_receipt_payload_redacted:
@@ -237,3 +275,5 @@ events:
     payload_schema: neuro_integration_source_bundle
   - name: neuro_integration_workbench.survey_eeg_fusion.bound
     payload_schema: neuro_integration_analysis_receipt
+  - name: neuro_integration_workbench.application_replacement_plan.bound
+    payload_schema: neuro_integration_application_replacement_plan

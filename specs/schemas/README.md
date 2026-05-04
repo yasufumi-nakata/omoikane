@@ -53,6 +53,8 @@
   - アンケート distress / attention proxy と EEG cortical load / alpha suppression proxy の bounded feature alignment と expansion lane を保持し、診断・意識・同一性 claim を禁止する
 - `neuro_integration_operator_guide.schema`
   - plain-language cards と coding-agent task templates を同じ guide digest に束縛し、非 ML 専門家でも安全な workflow を使えるようにする
+- `neuro_integration_application_replacement_plan.schema`
+  - source bundle 内の各 source type が measurement / analysis / data-curation / operator-copilot / agent-automation の全 lane で app digest に覆われていることを検証する
 - `build_artifact.yaml`
 - `build_request.yaml`
 - `builder_live_enactment_session.schema`

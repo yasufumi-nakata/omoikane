@@ -56,19 +56,19 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             workbench.register_application(
                 "Analyze",
                 "analysis",
-                ["questionnaire", "eeg", "fmri_bold"],
+                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
                 ["analysis"],
             ),
             workbench.register_application(
                 "Curate",
                 "data-curation",
-                ["questionnaire", "eeg", "brain_organoid"],
+                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
                 ["data-curation"],
             ),
             workbench.register_application(
                 "Guide",
                 "operator-copilot",
-                ["questionnaire", "eeg"],
+                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
                 ["operator-copilot"],
             ),
             workbench.register_application(
@@ -160,6 +160,12 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         )
         analysis = workbench.build_survey_eeg_fusion(workspace, source_bundle)
         guide = workbench.build_operator_guide(workspace, analysis)
+        replacement_plan = workbench.build_application_replacement_plan(
+            apps,
+            source_bundle,
+            workspace,
+            guide,
+        )
         return {
             "workbench": workbench,
             "apps": apps,
@@ -167,6 +173,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "workspace": workspace,
             "analysis": analysis,
             "guide": guide,
+            "replacement_plan": replacement_plan,
         }
 
     def test_binds_survey_eeg_seed_and_expansion_modalities(self) -> None:
@@ -177,6 +184,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["workspace"],
             artifacts["analysis"],
             artifacts["guide"],
+            artifacts["replacement_plan"],
         )
 
         self.assertTrue(validation["ok"])
@@ -186,6 +194,9 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["llm_native_workflow_bound"])
         self.assertTrue(validation["beginner_operator_supported"])
         self.assertTrue(validation["coding_agent_ready"])
+        self.assertTrue(validation["application_replacement_plan_bound"])
+        self.assertTrue(validation["source_type_lane_coverage_bound"])
+        self.assertTrue(validation["replacement_plan_payload_redacted"])
         self.assertTrue(validation["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(validation["upstream_receipt_payload_redacted"])
         self.assertTrue(validation["claim_ceiling_bound"])
@@ -201,6 +212,11 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertIn("brain_organoid", artifacts["source_bundle"]["source_types"])
         self.assertEqual(1, artifacts["source_bundle"]["upstream_receipt_count"])
         self.assertTrue(artifacts["analysis"]["upstream_fusion_binding"]["bound"])
+        self.assertTrue(artifacts["replacement_plan"]["replacement_plan_bound"])
+        self.assertEqual(
+            4,
+            artifacts["replacement_plan"]["coverage_summary"]["covered_source_type_count"],
+        )
         self.assertEqual(
             "biodata-survey-eeg-fusion",
             artifacts["analysis"]["upstream_fusion_binding"]["receipt_role"],
@@ -220,6 +236,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             tampered_workspace,
             artifacts["analysis"],
             artifacts["guide"],
+            artifacts["replacement_plan"],
         )
 
         self.assertFalse(validation["ok"])

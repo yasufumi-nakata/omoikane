@@ -425,6 +425,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["llm_native_workflow_bound"])
         self.assertTrue(result["validation"]["beginner_operator_supported"])
         self.assertTrue(result["validation"]["coding_agent_ready"])
+        self.assertTrue(result["validation"]["application_replacement_plan_bound"])
+        self.assertTrue(result["validation"]["source_type_lane_coverage_bound"])
+        self.assertTrue(result["validation"]["replacement_plan_payload_redacted"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
@@ -435,6 +438,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("fmri_bold", result["source_bundle"]["source_types"])
         self.assertIn("brain_organoid", result["source_bundle"]["source_types"])
         self.assertTrue(result["analysis"]["upstream_fusion_binding"]["bound"])
+        self.assertTrue(result["replacement_plan"]["replacement_plan_bound"])
 
     def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:
         stdout = io.StringIO()

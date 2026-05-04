@@ -2509,6 +2509,16 @@ entries:
       - evals/interface/neuro_integration_workbench.yaml
     rationale: Required to expose plain-language cards and coding-agent task templates for non-ML operators without raw instruction or analysis payload storage.
   - priority: P1
+    kind: schema
+    file: specs/schemas/neuro_integration_application_replacement_plan.schema
+    consumers:
+      - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+      - docs/02-subsystems/interface/neuro-integration-workbench.md
+      - reference-runtime
+      - evals/interface/neuro_integration_workbench.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to prove each source type in the current neuro integration source bundle is covered by measurement, analysis, data-curation, operator-copilot, and agent-automation application digests before claiming application replacement readiness.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.neuro_integration_workbench.v0.idl
     consumers:

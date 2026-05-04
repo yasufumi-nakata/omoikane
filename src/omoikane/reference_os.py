@@ -11133,7 +11133,12 @@ json.dump(response, sys.stdout)
         analysis_app = self.neuro_integration_workbench.register_application(
             app_name="Survey EEG Fusion Studio",
             app_kind="analysis",
-            supported_source_types=["questionnaire", "eeg", "fmri_bold"],
+            supported_source_types=[
+                "questionnaire",
+                "eeg",
+                "fmri_bold",
+                "brain_organoid",
+            ],
             workflow_roles=["analysis"],
             operator_skill_floor="non_ml_operator",
         )
@@ -11332,12 +11337,21 @@ json.dump(response, sys.stdout)
             workspace,
             analysis,
         )
+        replacement_plan = (
+            self.neuro_integration_workbench.build_application_replacement_plan(
+                app_receipts,
+                source_bundle,
+                workspace,
+                operator_guide,
+            )
+        )
         validation = self.neuro_integration_workbench.validate_integration_bundle(
             app_receipts,
             source_bundle,
             workspace,
             analysis,
             operator_guide,
+            replacement_plan,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11468,6 +11482,40 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.application_replacement_plan.bound",
+            payload={
+                "replacement_plan_ref": replacement_plan["replacement_plan_ref"],
+                "replacement_plan_digest": replacement_plan[
+                    "replacement_plan_digest"
+                ],
+                "workspace_digest": replacement_plan["workspace_digest"],
+                "source_bundle_digest": replacement_plan["source_bundle_digest"],
+                "operator_guide_digest": replacement_plan["operator_guide_digest"],
+                "replacement_plan_bound": replacement_plan[
+                    "replacement_plan_bound"
+                ],
+                "source_type_lane_coverage_bound": replacement_plan[
+                    "source_type_lane_coverage_bound"
+                ],
+                "covered_source_type_count": replacement_plan["coverage_summary"][
+                    "covered_source_type_count"
+                ],
+                "claim_ceiling": replacement_plan["claim_ceiling"],
+                "raw_app_payload_stored": replacement_plan[
+                    "raw_app_payload_stored"
+                ],
+                "raw_source_payload_stored": replacement_plan[
+                    "raw_source_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-replacement-plan",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -11481,6 +11529,7 @@ json.dump(response, sys.stdout)
             "workspace": workspace,
             "analysis": analysis,
             "operator_guide": operator_guide,
+            "replacement_plan": replacement_plan,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -11512,6 +11561,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "operator_guide",
                     "schema_path": "specs/schemas/neuro_integration_operator_guide.schema",
                     "contract_role": "llm-native-operator-guide",
+                },
+                {
+                    "payload_path": "replacement_plan",
+                    "schema_path": "specs/schemas/neuro_integration_application_replacement_plan.schema",
+                    "contract_role": "neuro-integration-application-replacement-plan",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

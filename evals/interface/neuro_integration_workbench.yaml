@@ -25,6 +25,11 @@ expected:
   expansion_modalities_bound: true
   replacement_lanes_bound: true
   replacement_lane_count: 5
+  application_replacement_plan_bound: true
+  replacement_plan_digest_bound: true
+  source_type_lane_coverage_bound: true
+  covered_source_type_count: 4
+  replacement_plan_payload_redacted: true
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

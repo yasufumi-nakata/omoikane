@@ -1,0 +1,315 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_application_replacement_plan.schema"
+title: NeuroIntegrationApplicationReplacementPlan
+description: >
+  Digest-only plan that proves registered measurement, analysis, data-curation,
+  operator-copilot, and agent-automation applications cover every source type
+  currently bound in a Neuro Integration Workbench workspace.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - replacement_plan_ref
+  - created_at
+  - profile_id
+  - workspace_ref
+  - workspace_digest
+  - source_bundle_ref
+  - source_bundle_digest
+  - operator_guide_ref
+  - operator_guide_digest
+  - app_refs
+  - app_digests
+  - source_types
+  - source_families
+  - required_replacement_lanes
+  - lane_coverage
+  - source_type_coverage
+  - coverage_summary
+  - all_required_lanes_bound
+  - source_type_lane_coverage_bound
+  - replacement_plan_bound
+  - llm_native_workflow_bound
+  - beginner_operator_supported
+  - coding_agent_ready
+  - operator_handoffs
+  - storage_policy
+  - claim_ceiling
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_app_payload_stored
+  - raw_source_payload_stored
+  - raw_operator_payload_stored
+  - clinical_diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - replacement_plan_digest
+properties:
+  schema_version:
+    const: "1.0"
+  replacement_plan_ref:
+    type: string
+    pattern: "^replacement-plan://neuro-integration/niw-replacement-plan-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: neuro-application-replacement-plan-v1
+  workspace_ref:
+    type: string
+    minLength: 1
+  workspace_digest:
+    $ref: "#/$defs/sha256"
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+  operator_guide_ref:
+    type: string
+    minLength: 1
+  operator_guide_digest:
+    $ref: "#/$defs/sha256"
+  app_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  app_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  source_types:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  source_families:
+    type: object
+    minProperties: 2
+    additionalProperties:
+      type: string
+      minLength: 1
+  required_replacement_lanes:
+    const:
+      - measurement
+      - analysis
+      - data-curation
+      - operator-copilot
+      - agent-automation
+  lane_coverage:
+    type: array
+    minItems: 5
+    items:
+      $ref: "#/$defs/lane_coverage"
+  source_type_coverage:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/source_type_coverage"
+  coverage_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - app_count
+      - source_type_count
+      - source_family_count
+      - required_replacement_lane_count
+      - covered_replacement_lane_count
+      - covered_source_type_count
+    properties:
+      app_count:
+        type: integer
+        minimum: 1
+      source_type_count:
+        type: integer
+        minimum: 2
+      source_family_count:
+        type: integer
+        minimum: 1
+      required_replacement_lane_count:
+        const: 5
+      covered_replacement_lane_count:
+        const: 5
+      covered_source_type_count:
+        type: integer
+        minimum: 2
+  all_required_lanes_bound:
+    const: true
+  source_type_lane_coverage_bound:
+    const: true
+  replacement_plan_bound:
+    const: true
+  llm_native_workflow_bound:
+    const: true
+  beginner_operator_supported:
+    const: true
+  coding_agent_ready:
+    const: true
+  operator_handoffs:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - target_actor
+        - guide_ref
+        - guide_digest
+        - handoff_policy
+        - requires_ml_expertise
+      properties:
+        target_actor:
+          type: string
+          minLength: 1
+        guide_ref:
+          type: string
+          minLength: 1
+        guide_digest:
+          $ref: "#/$defs/sha256"
+        handoff_policy:
+          type: string
+          minLength: 1
+        requires_ml_expertise:
+          const: false
+  storage_policy:
+    const: app-digest+source-family-lane-coverage-only
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/neurodata-integration
+  raw_app_payload_stored:
+    const: false
+  raw_source_payload_stored:
+    const: false
+  raw_operator_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  replacement_plan_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  replacement_lane:
+    enum:
+      - measurement
+      - analysis
+      - data-curation
+      - operator-copilot
+      - agent-automation
+  lane_coverage:
+    type: object
+    additionalProperties: false
+    required:
+      - replacement_lane
+      - app_refs
+      - app_digests
+      - source_types_covered
+      - source_families_covered
+      - missing_source_types
+      - operator_skill_floors
+      - llm_native_app_count
+      - beginner_safe_app_count
+      - bound
+    properties:
+      replacement_lane:
+        $ref: "#/$defs/replacement_lane"
+      app_refs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      app_digests:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/sha256"
+      source_types_covered:
+        type: array
+        minItems: 2
+        items:
+          $ref: "#/$defs/source_type"
+      source_families_covered:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      missing_source_types:
+        const: []
+      operator_skill_floors:
+        type: array
+        minItems: 1
+        items:
+          enum:
+            - non_ml_operator
+            - coding_agent
+            - analyst
+            - researcher
+      llm_native_app_count:
+        type: integer
+        minimum: 1
+      beginner_safe_app_count:
+        type: integer
+        minimum: 0
+      bound:
+        const: true
+  source_type_coverage:
+    type: object
+    additionalProperties: false
+    required:
+      - source_type
+      - source_family
+      - lane_app_refs
+      - lane_app_digests
+      - missing_lanes
+      - covered
+    properties:
+      source_type:
+        $ref: "#/$defs/source_type"
+      source_family:
+        type: string
+        minLength: 1
+      lane_app_refs:
+        type: object
+        propertyNames:
+          $ref: "#/$defs/replacement_lane"
+        additionalProperties:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+      lane_app_digests:
+        type: object
+        propertyNames:
+          $ref: "#/$defs/replacement_lane"
+        additionalProperties:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/$defs/sha256"
+      missing_lanes:
+        const: []
+      covered:
+        const: true

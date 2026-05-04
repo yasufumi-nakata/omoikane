@@ -92,6 +92,8 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - `interface.neuro_integration_workbench.v0` は measurement / analysis / data-curation /
   operator-copilot / agent-automation の 5 replacement lane を持つが、claim ceiling は
   `feature-alignment-and-analysis-plan-only` のままにする
+- replacement plan receipt は、現在 source bundle に入っている各 source type が 5 lane
+  すべてで app digest に覆われることだけを検証し、未知 source の科学的妥当性は別途研究課題として扱う
 - Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
   BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない
