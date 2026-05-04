@@ -9,7 +9,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ## 境界
 
-- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 perception/reasoning/affect/attention/volition/imagination/language/metacognition failover、L6 BDB の bounded viability contract を扱う
+- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 perception/reasoning/affect/attention/volition/imagination/language/metacognition failover、L6 BDB / BioData Transmitter / Neuro Integration Workbench の bounded viability contract を扱う
 - EthicsEnforcer と ContinuityLedger の不可侵性は reference runtime でも守る
 - Qualia / SelfModel は代理表現に留め、「意識の実装」とは主張しない
 - 外部サービス依存は避け、標準ライブラリで再現可能にする
@@ -53,6 +53,7 @@ PYTHONPATH=src python3 -m omoikane.cli energy-budget-subsidy-demo --json
 PYTHONPATH=src python3 -m omoikane.cli energy-budget-fabric-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json
+PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
@@ -162,6 +163,17 @@ receipt に `continuity_ledger_entry_ref` / `continuity_ledger_entry_hash` /
 `continuity_ledger_payload_ref` / `continuity_ledger_signature_roles=[self, guardian]`
 を返す。
 raw continuity event payload は保存しない。
+
+`neuro-integration-demo` は L6 Neuro Integration Workbench の reference contract
+(`interface.neuro_integration_workbench.v0`) を JSON で可視化し、questionnaire と EEG を
+seed pair として束縛したうえで、fMRI BOLD と brain organoid feature summary を
+expansion lane として同じ source bundle に追加する。measurement / analysis /
+data-curation / operator-copilot / agent-automation の 5 replacement lane を
+workspace digest に束縛し、非 ML 専門家向け plain-language cards と coding agent 向け
+task template を同じ operator guide に入れる。claim ceiling は
+`feature-alignment-and-analysis-plan-only` で、raw questionnaire / EEG /
+neuroimaging / organoid / analysis payload、clinical diagnosis、
+consciousness reproduction、identity replacement は保持または主張しない。
 
 
 `identity-demo` は L1 IdentityRegistry の reference contract

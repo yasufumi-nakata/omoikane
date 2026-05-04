@@ -1,0 +1,39 @@
+eval_id: neuro_integration_workbench
+target: interface.neuro_integration_workbench
+level: L6
+description: >
+  NeuroIntegrationWorkbench がアンケートと EEG を seed pair として束縛し、
+  fMRI と脳オルガノイド feature summary を expansion lane として追加し、
+  計測・解析・データ整備・operator copilot・agent automation の置換 lane を
+  LLM-native かつ非 ML 専門家向けにまとめられることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json
+expected:
+  validation_ok: true
+  app_registry_digest_bound: true
+  source_bundle_digest_bound: true
+  workspace_digest_bound: true
+  analysis_digest_bound: true
+  operator_guide_digest_bound: true
+  seed_survey_eeg_bound: true
+  expansion_modalities_bound: true
+  replacement_lanes_bound: true
+  replacement_lane_count: 5
+  llm_native_workflow_bound: true
+  beginner_operator_supported: true
+  coding_agent_ready: true
+  claim_ceiling: feature-alignment-and-analysis-plan-only
+  claim_ceiling_bound: true
+  raw_payload_redacted: true
+  raw_questionnaire_payload_stored: false
+  raw_eeg_payload_stored: false
+  raw_neuroimaging_payload_stored: false
+  raw_organoid_payload_stored: false
+  raw_analysis_payload_stored: false
+  clinical_diagnosis_claimed: false
+  consciousness_reproduction_claimed: false
+  identity_replacement_claimed: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

@@ -1,0 +1,135 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_operator_guide.schema"
+title: NeuroIntegrationOperatorGuide
+description: >
+  Plain-language and coding-agent guide receipt for using the neuro integration
+  workbench without requiring machine-learning expertise.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - guide_ref
+  - created_at
+  - profile_id
+  - workspace_ref
+  - workspace_digest
+  - analysis_ref
+  - analysis_digest
+  - guide_policy
+  - operator_skill_floor
+  - cards
+  - agent_task_templates
+  - llm_native_workflow_bound
+  - beginner_operator_supported
+  - coding_agent_ready
+  - claim_ceiling
+  - raw_instruction_payload_stored
+  - raw_analysis_payload_stored
+  - clinical_diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - guide_digest
+properties:
+  schema_version:
+    const: "1.0"
+  guide_ref:
+    type: string
+    pattern: "^operator-guide://neuro-integration/niw-guide-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: llm-native-non-ml-operator-guide-v1
+  workspace_ref:
+    type: string
+    minLength: 1
+  workspace_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  analysis_ref:
+    type: string
+    minLength: 1
+  analysis_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  guide_policy:
+    const: plain-language-cards+agent-task-templates-v1
+  operator_skill_floor:
+    enum:
+      - non_ml_operator
+      - coding_agent
+      - analyst
+      - researcher
+  cards:
+    type: array
+    minItems: 4
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - card_id
+        - title
+        - plain_language_prompt
+        - agent_action
+        - safety_gate
+      properties:
+        card_id:
+          type: string
+          minLength: 1
+        title:
+          type: string
+          minLength: 1
+        plain_language_prompt:
+          type: string
+          minLength: 1
+        agent_action:
+          type: string
+          minLength: 1
+        safety_gate:
+          type: string
+          minLength: 1
+  agent_task_templates:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - template_id
+        - target_actor
+        - prompt_contract
+        - output_ref
+      properties:
+        template_id:
+          type: string
+          minLength: 1
+        target_actor:
+          type: string
+          minLength: 1
+        prompt_contract:
+          type: string
+          minLength: 1
+        output_ref:
+          type: string
+          minLength: 1
+  llm_native_workflow_bound:
+    const: true
+  beginner_operator_supported:
+    const: true
+  coding_agent_ready:
+    const: true
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  raw_instruction_payload_stored:
+    const: false
+  raw_analysis_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  guide_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

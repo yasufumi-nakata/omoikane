@@ -1,0 +1,213 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_analysis_receipt.schema"
+title: NeuroIntegrationAnalysisReceipt
+description: >
+  Digest-only analysis receipt for integrating questionnaire and EEG feature
+  summaries while attaching fMRI and brain organoid summaries as bounded
+  expansion lanes.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - analysis_ref
+  - created_at
+  - profile_id
+  - workspace_ref
+  - workspace_digest
+  - source_bundle_ref
+  - source_bundle_digest
+  - identity_id
+  - seed_pair
+  - derived_axes
+  - planned_analyses
+  - expansion_lanes
+  - seed_survey_eeg_bound
+  - expansion_modalities_bound
+  - claim_ceiling
+  - storage_policy
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_questionnaire_payload_stored
+  - raw_eeg_payload_stored
+  - raw_neuroimaging_payload_stored
+  - raw_organoid_payload_stored
+  - raw_analysis_payload_stored
+  - clinical_diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - seed_pair_digest
+  - analysis_digest
+properties:
+  schema_version:
+    const: "1.0"
+  analysis_ref:
+    type: string
+    pattern: "^analysis://neuro-integration/niw-analysis-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: survey-eeg-neurodata-fusion-analysis-v1
+  workspace_ref:
+    type: string
+    minLength: 1
+  workspace_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  identity_id:
+    type: string
+    minLength: 1
+  seed_pair:
+    type: object
+    additionalProperties: false
+    required:
+      - questionnaire_source_ref
+      - eeg_source_ref
+      - questionnaire_feature_digest
+      - eeg_feature_digest
+    properties:
+      questionnaire_source_ref:
+        type: string
+        minLength: 1
+      eeg_source_ref:
+        type: string
+        minLength: 1
+      questionnaire_feature_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      eeg_feature_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+  derived_axes:
+    type: object
+    additionalProperties: false
+    required:
+      - self_report_distress_proxy
+      - self_report_attention_difficulty_proxy
+      - eeg_cortical_load_proxy
+      - eeg_alpha_suppression_proxy
+      - survey_eeg_distress_alignment
+      - survey_eeg_attention_alignment
+      - joint_analysis_readiness
+    properties:
+      self_report_distress_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      self_report_attention_difficulty_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      eeg_cortical_load_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      eeg_alpha_suppression_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      survey_eeg_distress_alignment:
+        type: number
+        minimum: 0
+        maximum: 1
+      survey_eeg_attention_alignment:
+        type: number
+        minimum: 0
+        maximum: 1
+      joint_analysis_readiness:
+        type: number
+        minimum: 0
+        maximum: 1
+  planned_analyses:
+    type: array
+    minItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - analysis_id
+        - plain_language_goal
+        - agent_action
+        - requires_ml_expertise
+      properties:
+        analysis_id:
+          type: string
+          minLength: 1
+        plain_language_goal:
+          type: string
+          minLength: 1
+        agent_action:
+          type: string
+          minLength: 1
+        requires_ml_expertise:
+          type: boolean
+  expansion_lanes:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - source_type
+        - source_family
+        - integration_role
+        - source_digest
+        - bound
+      properties:
+        source_type:
+          enum:
+            - fmri_bold
+            - brain_organoid
+        source_family:
+          type: string
+          minLength: 1
+        integration_role:
+          type: string
+          minLength: 1
+        source_digest:
+          type: string
+        bound:
+          type: boolean
+  seed_survey_eeg_bound:
+    const: true
+  expansion_modalities_bound:
+    const: true
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  storage_policy:
+    const: cross-modal-feature-digest+axis-summary-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/neurodata-integration
+  raw_questionnaire_payload_stored:
+    const: false
+  raw_eeg_payload_stored:
+    const: false
+  raw_neuroimaging_payload_stored:
+    const: false
+  raw_organoid_payload_stored:
+    const: false
+  raw_analysis_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  seed_pair_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  analysis_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

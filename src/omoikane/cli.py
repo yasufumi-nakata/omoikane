@@ -55,6 +55,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     biodata_transmitter_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    neuro_integration_parser = subparsers.add_parser(
+        "neuro-integration-demo",
+        help="Run the L6 multi-application questionnaire, EEG, fMRI, and organoid integration scenario",
+    )
+    neuro_integration_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     imc_parser = subparsers.add_parser(
         "imc-demo",
         help="Run the L6 Inter-Mind Channel handshake, disclosure, and disconnect scenario",
@@ -498,6 +504,10 @@ def main() -> None:
 
     if args.command == "biodata-transmitter-demo":
         _print_result(runtime.run_biodata_transmitter_demo(), args.json)
+        return
+
+    if args.command == "neuro-integration-demo":
+        _print_result(runtime.run_neuro_integration_workbench_demo(), args.json)
         return
 
     if args.command == "imc-demo":

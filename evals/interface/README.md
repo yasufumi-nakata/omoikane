@@ -18,6 +18,13 @@ calibration refresh receipt の freshness window、
 BioData mind-state bridge の L2/L3 digest-only handoff と no-consciousness claim ceiling、
 raw payload redaction、semantic thought content 非生成を確認する。
 
+### Neuro Integration Workbench
+questionnaire と EEG を seed pair として source bundle に束縛し、fMRI BOLD と
+brain organoid feature summary を expansion lane として加え、measurement /
+analysis / data-curation / operator-copilot / agent-automation の置換 lane、
+LLM-native workflow、非 ML 専門家向け guide、raw payload redaction、
+no diagnosis / no consciousness / no identity replacement claim ceiling を確認する。
+
 ### IMC Disclosure Floor
 peer attestation、forward secrecy、narrow disclosure floor、
 sealed-field redaction、summary+digest-only audit、
@@ -154,6 +161,7 @@ revocation ref、guard digest、raw refresh / revocation payload redaction を�
 
 - `bdb_fail_safe_reversibility.yaml`
 - `biodata_transmitter_roundtrip.yaml`
+- `neuro_integration_workbench.yaml`
 - `collective_dissolution_receipt.yaml`
 - `collective_merge_reversibility.yaml`
 - `collective_recovery_capture_export_binding.yaml`

@@ -26,6 +26,7 @@
 - `interface.collective.v0.idl`
 - `interface.ewa.v0.idl`
 - `interface.imc.v0.idl`
+- `interface.neuro_integration_workbench.v0.idl`
 - `interface.sensory_loopback.v0.idl`
 - `interface.wms.v0.idl`
 - `kernel.broker.v0.idl`

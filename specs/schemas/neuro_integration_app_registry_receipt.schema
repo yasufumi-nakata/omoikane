@@ -1,0 +1,103 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_app_registry_receipt.schema"
+title: NeuroIntegrationAppRegistryReceipt
+description: >
+  Digest-bound registry receipt for one measurement, analysis, curation,
+  operator-copilot, or agent-automation application that can be replaced by the
+  LLM-native neuro integration workbench.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - app_ref
+  - registered_at
+  - profile_id
+  - app_name
+  - app_kind
+  - supported_source_types
+  - supported_source_families
+  - workflow_roles
+  - replacement_lanes
+  - operator_skill_floor
+  - llm_native
+  - beginner_safe_mode
+  - raw_app_payload_stored
+  - raw_credential_payload_stored
+  - app_digest
+properties:
+  schema_version:
+    const: "1.0"
+  app_ref:
+    type: string
+    pattern: "^app://neuro-integration/niw-app-[a-f0-9]{12}$"
+  registered_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: neuro-biodata-multi-application-registry-v1
+  app_name:
+    type: string
+    minLength: 1
+  app_kind:
+    enum:
+      - measurement
+      - analysis
+      - data-curation
+      - visualization
+      - operator-copilot
+      - agent-automation
+  supported_source_types:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  supported_source_families:
+    type: object
+    minProperties: 1
+    additionalProperties:
+      type: string
+      minLength: 1
+  workflow_roles:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      enum:
+        - measurement
+        - analysis
+        - data-curation
+        - operator-copilot
+        - agent-automation
+  replacement_lanes:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      enum:
+        - measurement
+        - analysis
+        - data-curation
+        - operator-copilot
+        - agent-automation
+  operator_skill_floor:
+    enum:
+      - non_ml_operator
+      - coding_agent
+      - analyst
+      - researcher
+  llm_native:
+    type: boolean
+  beginner_safe_mode:
+    type: boolean
+  raw_app_payload_stored:
+    const: false
+  raw_credential_payload_stored:
+    const: false
+  app_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+$defs:
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"

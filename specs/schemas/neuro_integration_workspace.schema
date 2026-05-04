@@ -1,0 +1,150 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_workspace.schema"
+title: NeuroIntegrationWorkspace
+description: >
+  LLM-native workspace receipt that binds registered neuroscience applications,
+  a cross-modal source bundle, replacement lanes, and a plain-language operator
+  profile without storing raw application or source payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - workspace_ref
+  - created_at
+  - profile_id
+  - identity_id
+  - analysis_goal
+  - operator_profile
+  - app_refs
+  - app_digests
+  - source_bundle_ref
+  - source_bundle_digest
+  - source_types
+  - replacement_lanes
+  - required_replacement_lanes
+  - replacement_lanes_bound
+  - llm_native_workflow_bound
+  - beginner_operator_supported
+  - coding_agent_ready
+  - storage_policy
+  - claim_ceiling
+  - raw_app_payload_stored
+  - raw_source_payload_stored
+  - raw_analysis_payload_stored
+  - clinical_diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - workspace_digest
+properties:
+  schema_version:
+    const: "1.0"
+  workspace_ref:
+    type: string
+    pattern: "^workspace://neuro-integration/niw-workspace-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: llm-native-neuroscience-workspace-v1
+  identity_id:
+    type: string
+    minLength: 1
+  analysis_goal:
+    type: string
+    minLength: 1
+  operator_profile:
+    type: object
+    additionalProperties: false
+    required:
+      - skill_level
+      - prefers_plain_language
+      - llm_assistive_mode
+      - can_write_code
+    properties:
+      skill_level:
+        enum:
+          - non_ml_operator
+          - coding_agent
+          - analyst
+          - researcher
+      prefers_plain_language:
+        type: boolean
+      llm_assistive_mode:
+        type: boolean
+      can_write_code:
+        type: boolean
+  app_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  app_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      pattern: "^[a-f0-9]{64}$"
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_types:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  replacement_lanes:
+    type: array
+    minItems: 5
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/replacement_lane"
+  required_replacement_lanes:
+    const:
+      - measurement
+      - analysis
+      - data-curation
+      - operator-copilot
+      - agent-automation
+  replacement_lanes_bound:
+    const: true
+  llm_native_workflow_bound:
+    const: true
+  beginner_operator_supported:
+    const: true
+  coding_agent_ready:
+    const: true
+  storage_policy:
+    const: app-receipt-digest+source-bundle-digest-only
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  raw_app_payload_stored:
+    const: false
+  raw_source_payload_stored:
+    const: false
+  raw_analysis_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  workspace_digest:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+$defs:
+  replacement_lane:
+    enum:
+      - measurement
+      - analysis
+      - data-curation
+      - operator-copilot
+      - agent-automation

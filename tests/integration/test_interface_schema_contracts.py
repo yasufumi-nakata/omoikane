@@ -200,6 +200,49 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["validation"]["raw_phase_verifier_payload_stored"])
         self.assertFalse(result["validation"]["raw_series_payload_stored"])
 
+    def test_neuro_integration_demo_matches_public_schemas(self) -> None:
+        result = self.runtime.run_neuro_integration_workbench_demo()
+
+        for receipt in result["app_receipts"]:
+            self._assert_schema_valid(
+                "specs/schemas/neuro_integration_app_registry_receipt.schema",
+                receipt,
+            )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_source_bundle.schema",
+            result["source_bundle"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_workspace.schema",
+            result["workspace"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_analysis_receipt.schema",
+            result["analysis"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_operator_guide.schema",
+            result["operator_guide"],
+        )
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["app_registry_digest_bound"])
+        self.assertTrue(result["validation"]["source_bundle_digest_bound"])
+        self.assertTrue(result["validation"]["workspace_digest_bound"])
+        self.assertTrue(result["validation"]["analysis_digest_bound"])
+        self.assertTrue(result["validation"]["operator_guide_digest_bound"])
+        self.assertTrue(result["validation"]["seed_survey_eeg_bound"])
+        self.assertTrue(result["validation"]["expansion_modalities_bound"])
+        self.assertTrue(result["validation"]["replacement_lanes_bound"])
+        self.assertTrue(result["validation"]["llm_native_workflow_bound"])
+        self.assertTrue(result["validation"]["beginner_operator_supported"])
+        self.assertTrue(result["validation"]["coding_agent_ready"])
+        self.assertTrue(result["validation"]["claim_ceiling_bound"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertTrue(result["validation"]["no_diagnosis_or_identity_claim"])
+        self.assertFalse(result["validation"]["clinical_diagnosis_claimed"])
+        self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
+        self.assertFalse(result["validation"]["identity_replacement_claimed"])
+
     def test_wms_demo_states_and_reconcile_match_public_schemas(self) -> None:
         result = self.runtime.run_wms_demo()
 

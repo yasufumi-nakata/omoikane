@@ -41,6 +41,16 @@
   - 既知 target は専用 proxy、未知 target は generic biosignal proxy として arbitrary modality key を許可し、各 signal に target family / catalog status / catalog digest を保持する
 - `biodata_transmitter_session.schema`
   - session-declared source / target modality を human biosignal catalog digest、family map、未カタログ modality policy に束縛する
+- `neuro_integration_app_registry_receipt.schema`
+  - 計測・解析・データ整備・operator copilot・agent automation の置換 lane を app digest と operator skill floor に束縛する
+- `neuro_integration_source_bundle.schema`
+  - questionnaire + EEG を seed pair として束縛し、fMRI / 脳オルガノイド / future biological source を raw payload 無しの expansion lane として保持する
+- `neuro_integration_workspace.schema`
+  - app digest set、source bundle digest、非 ML operator profile、LLM-native workflow、置換 lane coverage、claim ceiling を workspace digest に束縛する
+- `neuro_integration_analysis_receipt.schema`
+  - アンケート distress / attention proxy と EEG cortical load / alpha suppression proxy の bounded feature alignment と expansion lane を保持し、診断・意識・同一性 claim を禁止する
+- `neuro_integration_operator_guide.schema`
+  - plain-language cards と coding-agent task templates を同じ guide digest に束縛し、非 ML 専門家でも安全な workflow を使えるようにする
 - `build_artifact.yaml`
 - `build_request.yaml`
 - `builder_live_enactment_session.schema`

@@ -97,6 +97,7 @@ from .interface.imc import (
     IMC_MERGE_THOUGHT_WINDOW_POLICY_VERIFIER_REFS,
     InterMindChannel,
 )
+from .interface.neuro_integration_workbench import NeuroIntegrationWorkbench
 from .interface.sensory_loopback import (
     SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
     SensoryLoopbackService,
@@ -252,6 +253,7 @@ class OmoikaneReferenceOS:
         )
         self.bdb = BiologicalDigitalBridge()
         self.biodata_transmitter = BioDataTransmitter()
+        self.neuro_integration_workbench = NeuroIntegrationWorkbench()
         self.ewa = ExternalWorldAgentController(self.ethics)
         self.imc = InterMindChannel()
         self.collective = CollectiveIdentityService()
@@ -10983,6 +10985,291 @@ json.dump(response, sys.stdout)
             "mind_state_bridge": mind_state_bridge,
             "generated_bundle": generated_bundle,
             "validation": validation,
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_neuro_integration_workbench_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://neuro-integration-workbench-demo/v1",
+            metadata={"display_name": "Neuro Integration Workbench Sandbox"},
+        )
+        measurement_app = self.neuro_integration_workbench.register_application(
+            app_name="Unified BioMeasure",
+            app_kind="measurement",
+            supported_source_types=[
+                "questionnaire",
+                "eeg",
+                "fmri_bold",
+                "brain_organoid",
+                "biosensor",
+            ],
+            workflow_roles=["measurement"],
+            operator_skill_floor="non_ml_operator",
+        )
+        analysis_app = self.neuro_integration_workbench.register_application(
+            app_name="Survey EEG Fusion Studio",
+            app_kind="analysis",
+            supported_source_types=["questionnaire", "eeg", "fmri_bold"],
+            workflow_roles=["analysis"],
+            operator_skill_floor="non_ml_operator",
+        )
+        curation_app = self.neuro_integration_workbench.register_application(
+            app_name="Digest Curation Ledger",
+            app_kind="data-curation",
+            supported_source_types=[
+                "questionnaire",
+                "eeg",
+                "fmri_bold",
+                "brain_organoid",
+                "behavioral_task",
+            ],
+            workflow_roles=["data-curation"],
+            operator_skill_floor="non_ml_operator",
+        )
+        copilot_app = self.neuro_integration_workbench.register_application(
+            app_name="Plain Language Neuro Copilot",
+            app_kind="operator-copilot",
+            supported_source_types=["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+            workflow_roles=["operator-copilot"],
+            operator_skill_floor="non_ml_operator",
+        )
+        agent_app = self.neuro_integration_workbench.register_application(
+            app_name="Coding Agent Analysis Runner",
+            app_kind="agent-automation",
+            supported_source_types=["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+            workflow_roles=["agent-automation"],
+            operator_skill_floor="coding_agent",
+        )
+        app_receipts = [
+            measurement_app,
+            analysis_app,
+            curation_app,
+            copilot_app,
+            agent_app,
+        ]
+        source_bundle = self.neuro_integration_workbench.bind_source_bundle(
+            identity.identity_id,
+            source_manifests=[
+                {
+                    "source_type": "questionnaire",
+                    "source_ref": "source://neuro-workbench/questionnaire/day-1",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "consent_ref": "consent://neuro-workbench/questionnaire-redacted",
+                    "license_ref": "license://neuro-workbench/local-consent-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/questionnaire/day-1",
+                    "feature_summary": {
+                        "stress_score": 0.62,
+                        "anxiety_score": 0.58,
+                        "fatigue_score": 0.53,
+                        "attention_difficulty_score": 0.66,
+                        "sleep_quality_score": 0.48,
+                        "mood_valence_score": 0.44,
+                        "instrument": "bounded-self-report-demo",
+                    },
+                },
+                {
+                    "source_type": "eeg",
+                    "source_ref": "source://neuro-workbench/eeg/resting-window",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "consent_ref": "consent://neuro-workbench/eeg-redacted",
+                    "license_ref": "license://neuro-workbench/local-consent-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/eeg/resting-window",
+                    "feature_summary": {
+                        "alpha_power": 0.37,
+                        "theta_power": 0.31,
+                        "beta_power": 0.35,
+                        "artifact_rate": 0.08,
+                        "channel_count": 32.0,
+                    },
+                },
+                {
+                    "source_type": "fmri_bold",
+                    "source_ref": "source://neuro-workbench/fmri/task-window",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "consent_ref": "consent://neuro-workbench/fmri-redacted",
+                    "license_ref": "license://neuro-workbench/local-consent-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/fmri/task-window",
+                    "feature_summary": {
+                        "bold_percent_change": 0.41,
+                        "network_coupling": 0.57,
+                        "roi_count": 12.0,
+                    },
+                },
+                {
+                    "source_type": "brain_organoid",
+                    "source_ref": "source://neuro-workbench/organoid/culture-7",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/organoid-model",
+                    "consent_ref": "consent://neuro-workbench/organoid-provenance",
+                    "license_ref": "license://neuro-workbench/provenance-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/organoid/culture-7",
+                    "feature_summary": {
+                        "network_burst_rate": 0.46,
+                        "synchrony_index": 0.52,
+                        "viability_score": 0.91,
+                        "culture_day": 42.0,
+                    },
+                },
+            ],
+        )
+        workspace = self.neuro_integration_workbench.open_workspace(
+            identity_id=identity.identity_id,
+            app_receipts=app_receipts,
+            source_bundle=source_bundle,
+            analysis_goal=(
+                "Integrate questionnaire and EEG first, then attach fMRI and "
+                "brain organoid feature summaries under one LLM-native workflow."
+            ),
+            operator_profile={
+                "skill_level": "non_ml_operator",
+                "prefers_plain_language": True,
+                "llm_assistive_mode": True,
+                "can_write_code": False,
+            },
+        )
+        analysis = self.neuro_integration_workbench.build_survey_eeg_fusion(
+            workspace,
+            source_bundle,
+        )
+        operator_guide = self.neuro_integration_workbench.build_operator_guide(
+            workspace,
+            analysis,
+        )
+        validation = self.neuro_integration_workbench.validate_integration_bundle(
+            app_receipts,
+            source_bundle,
+            workspace,
+            analysis,
+            operator_guide,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.source_bundle.bound",
+            payload={
+                "source_bundle_ref": source_bundle["source_bundle_ref"],
+                "source_bundle_digest": source_bundle["source_bundle_digest"],
+                "source_types": source_bundle["source_types"],
+                "seed_survey_eeg_bound": source_bundle["seed_survey_eeg_bound"],
+                "expansion_modalities_bound": source_bundle[
+                    "expansion_modalities_bound"
+                ],
+                "raw_source_payload_stored": source_bundle["raw_source_payload_stored"],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.workspace.opened",
+            payload={
+                "workspace_ref": workspace["workspace_ref"],
+                "workspace_digest": workspace["workspace_digest"],
+                "app_digests": workspace["app_digests"],
+                "replacement_lanes": workspace["replacement_lanes"],
+                "llm_native_workflow_bound": workspace["llm_native_workflow_bound"],
+                "beginner_operator_supported": workspace[
+                    "beginner_operator_supported"
+                ],
+                "claim_ceiling": workspace["claim_ceiling"],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.survey_eeg_fusion.bound",
+            payload={
+                "analysis_ref": analysis["analysis_ref"],
+                "analysis_digest": analysis["analysis_digest"],
+                "seed_pair_digest": analysis["seed_pair_digest"],
+                "survey_eeg_distress_alignment": analysis["derived_axes"][
+                    "survey_eeg_distress_alignment"
+                ],
+                "survey_eeg_attention_alignment": analysis["derived_axes"][
+                    "survey_eeg_attention_alignment"
+                ],
+                "joint_analysis_readiness": analysis["derived_axes"][
+                    "joint_analysis_readiness"
+                ],
+                "claim_ceiling": analysis["claim_ceiling"],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-analysis",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.operator_guide.bound",
+            payload={
+                "guide_ref": operator_guide["guide_ref"],
+                "guide_digest": operator_guide["guide_digest"],
+                "guide_policy": operator_guide["guide_policy"],
+                "llm_native_workflow_bound": operator_guide[
+                    "llm_native_workflow_bound"
+                ],
+                "beginner_operator_supported": operator_guide[
+                    "beginner_operator_supported"
+                ],
+                "coding_agent_ready": operator_guide["coding_agent_ready"],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-guide",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.neuro_integration_workbench.reference_profile(),
+            "app_receipts": app_receipts,
+            "source_bundle": source_bundle,
+            "workspace": workspace,
+            "analysis": analysis,
+            "operator_guide": operator_guide,
+            "validation": validation,
+            "schema_contracts": [
+                {
+                    "payload_path": "app_receipts[]",
+                    "schema_path": "specs/schemas/neuro_integration_app_registry_receipt.schema",
+                    "contract_role": "neuro-integration-app-registry",
+                },
+                {
+                    "payload_path": "source_bundle",
+                    "schema_path": "specs/schemas/neuro_integration_source_bundle.schema",
+                    "contract_role": "neuro-integration-source-bundle",
+                },
+                {
+                    "payload_path": "workspace",
+                    "schema_path": "specs/schemas/neuro_integration_workspace.schema",
+                    "contract_role": "neuro-integration-workspace",
+                },
+                {
+                    "payload_path": "analysis",
+                    "schema_path": "specs/schemas/neuro_integration_analysis_receipt.schema",
+                    "contract_role": "survey-eeg-fusion-analysis",
+                },
+                {
+                    "payload_path": "operator_guide",
+                    "schema_path": "specs/schemas/neuro_integration_operator_guide.schema",
+                    "contract_role": "llm-native-operator-guide",
+                },
+            ],
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
             "ledger_verification": self.ledger.verify(),

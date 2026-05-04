@@ -1,7 +1,7 @@
 ---
 status: in-progress
 priority: T0
-last_revisit: 2026-05-03
+last_revisit: 2026-05-05
 researcher: yasufumi
 ---
 
@@ -39,6 +39,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   alias target、uncatalogued fallback policy、raw payload 非保持を machine-checkable にした。
 - demo は EEG/ECG/PPG/EDA/呼吸に加えて EMG、体温、血圧、SpO2、瞳孔、音声、
   加速度、血糖、fNIRS、fMRI BOLD、未カタログ human biosensor の roundtrip を検証する。
+- 2026-05-05 時点で `interface.neuro_integration_workbench.v0` を追加し、
+  questionnaire + EEG を seed pair、fMRI BOLD と brain organoid を expansion lane とする
+  multi-application workspace を reference runtime にした。
 
 ## ブロッキング要因
 
@@ -49,6 +52,10 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   discrete emotion label は過剰主張になりやすい。
 - EEG / ECG / EDA / respiration のサンプリング条件、センサ位置、個人差、病態は
   latent の比較可能性を壊し得る。
+- アンケートと EEG の feature alignment は、自己報告と神経電気 proxy の関係を見るだけであり、
+  clinical diagnosis、意識再現、本人同一性置換の証拠にはならない。
+- 脳オルガノイドは in-vitro neural tissue context であって、対象者本人の body-state latent や
+  mind-state proof と同一視しない。
 
 ## 暫定運用方針
 
@@ -70,6 +77,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - sensory loopback 側では `biodata-calibration-gated-drift-threshold-v1` として
   body-map drift threshold の最大 `0.04` の補助補正だけに使い、Guardian hold /
   body-map calibration / stabilization は置き換えない
+- `interface.neuro_integration_workbench.v0` は measurement / analysis / data-curation /
+  operator-copilot / agent-automation の 5 replacement lane を持つが、claim ceiling は
+  `feature-alignment-and-analysis-plan-only` のままにする
 - thought は semantic content を生成しない
 - qualia equivalence と thought content の飛躍は
   `https://mind-upload.com/frontiers/biosignal-transmitter` の conflict sink ref に束縛する

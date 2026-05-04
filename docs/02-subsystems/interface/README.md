@@ -14,6 +14,17 @@
   で literature-backed intermediate、dataset adapter、circadian phase verifier、
   target biosignal generation、raw payload redaction、conflict sink binding をまとめて検証する
 
+### Neuro Integration Workbench (NIW)
+- アンケートと EEG を seed pair として、fMRI BOLD、脳オルガノイド、biosensor、
+  behavioral task、omics、future biological source を同じ source bundle に追加する
+- 計測アプリ、解析アプリ、データ整備アプリ、operator copilot、coding-agent automation を
+  LLM-native workspace の置換 lane として束縛する
+- 非 ML 専門家向け plain-language guide と coding agent 向け task template を同じ receipt に入れる
+- fMRI と脳オルガノイドは expansion context であり、意識再現や本人同一性の証明にはしない
+- reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
+  で questionnaire+EEG fusion、expansion modality binding、replacement lane coverage、
+  raw payload redaction、claim ceiling をまとめて検証する
+
 ### Biological-Digital Bridge (BDB)
 - BCI（脳-コンピュータ・インタフェース）
 - 神経インタフェース
@@ -106,6 +117,7 @@ if shared_reality.state_hash != local_belief.state_hash:
 - [bdb-protocol.md](bdb-protocol.md)
 - [collective-identity.md](collective-identity.md)
 - [imc-protocol.md](imc-protocol.md)
+- [neuro-integration-workbench.md](neuro-integration-workbench.md)
 - [sensory-loopback.md](sensory-loopback.md)
 - [wms-spec.md](wms-spec.md)
 - [ewa-safety.md](ewa-safety.md)

@@ -395,6 +395,29 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual(2, result["feature_window_series_profile"]["window_count"])
         self.assertEqual("bound", result["calibration_confidence_gate"]["confidence_gate_status"])
 
+    def test_neuro_integration_demo_emits_multi_app_workbench(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "neuro-integration-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["seed_survey_eeg_bound"])
+        self.assertTrue(result["validation"]["replacement_lanes_bound"])
+        self.assertTrue(result["validation"]["llm_native_workflow_bound"])
+        self.assertTrue(result["validation"]["beginner_operator_supported"])
+        self.assertTrue(result["validation"]["coding_agent_ready"])
+        self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
+        self.assertFalse(result["validation"]["identity_replacement_claimed"])
+        self.assertIn("questionnaire", result["source_bundle"]["source_types"])
+        self.assertIn("eeg", result["source_bundle"]["source_types"])
+        self.assertIn("fmri_bold", result["source_bundle"]["source_types"])
+        self.assertIn("brain_organoid", result["source_bundle"]["source_types"])
+
     def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:
         stdout = io.StringIO()
 

@@ -1,0 +1,227 @@
+idl_version: 1
+kind: service
+namespace: interface.neuro_integration_workbench.v0
+service: NeuroIntegrationWorkbenchService
+summary: >
+  Canonical L6 contract for an LLM-native multi-application workbench that
+  starts with questionnaire plus EEG feature integration and can attach fMRI,
+  brain organoid, biosensor, behavioral, omics, and future biological data
+  sources without claiming diagnosis, consciousness reproduction, or identity
+  replacement.
+imports:
+  neuro_integration_app_registry_receipt: ../schemas/neuro_integration_app_registry_receipt.schema
+  neuro_integration_source_bundle: ../schemas/neuro_integration_source_bundle.schema
+  neuro_integration_workspace: ../schemas/neuro_integration_workspace.schema
+  neuro_integration_analysis_receipt: ../schemas/neuro_integration_analysis_receipt.schema
+  neuro_integration_operator_guide: ../schemas/neuro_integration_operator_guide.schema
+operations:
+  register_application:
+    summary: Register one measurement, analysis, curation, operator-copilot, or agent-automation app as a replaceable workbench lane.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - app_name
+          - app_kind
+          - supported_source_types
+          - workflow_roles
+        properties:
+          app_name:
+            type: string
+            minLength: 1
+          app_kind:
+            enum: [measurement, analysis, data-curation, visualization, operator-copilot, agent-automation]
+          supported_source_types:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+          workflow_roles:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              enum: [measurement, analysis, data-curation, operator-copilot, agent-automation]
+          operator_skill_floor:
+            enum: [non_ml_operator, coding_agent, analyst, researcher]
+          llm_native:
+            type: boolean
+    output:
+      schema_ref: neuro_integration_app_registry_receipt
+    guarantees:
+      - application replacement lanes must be digest-bound by app_digest
+      - measurement, analysis, data-curation, operator-copilot, and agent-automation lanes must be representable
+      - non-ML operators and coding agents must both have explicit operator-skill floor metadata
+      - raw application and credential payload storage must remain false
+  bind_source_bundle:
+    summary: Bind questionnaire, EEG, and optional fMRI / organoid / future biological feature summaries into one digest-only source bundle.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - source_manifests
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          source_manifests:
+            type: array
+            minItems: 2
+            items:
+              type: object
+              required:
+                - source_type
+                - source_ref
+                - app_ref
+                - participant_ref
+                - consent_ref
+                - license_ref
+                - feature_summary_ref
+                - feature_summary
+    output:
+      schema_ref: neuro_integration_source_bundle
+    guarantees:
+      - questionnaire and EEG must be present before the seed analysis can pass
+      - fMRI and brain organoid sources must be expansion context, not identity proof
+      - every source must bind consent, license, app, participant, and feature digest refs
+      - raw questionnaire, EEG, neuroimaging, organoid, and source payload storage must remain false
+      - consciousness reproduction and identity replacement claims must remain false
+  open_workspace:
+    summary: Open one LLM-native workspace tying application receipts, source bundle, operator profile, and replacement lanes.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - app_receipts
+          - source_bundle
+          - analysis_goal
+          - operator_profile
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          app_receipts:
+            type: array
+            minItems: 1
+            items:
+              schema_ref: neuro_integration_app_registry_receipt
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          analysis_goal:
+            type: string
+            minLength: 1
+          operator_profile:
+            type: object
+    output:
+      schema_ref: neuro_integration_workspace
+    guarantees:
+      - workspace_digest must bind app digests, source bundle digest, operator profile, and claim ceiling
+      - all replacement lanes must be covered before the workbench can claim multi-application replacement readiness
+      - LLM-native workflow and beginner operator support must be explicit
+      - raw app, source, and analysis payload storage must remain false
+  build_survey_eeg_fusion:
+    summary: Derive bounded questionnaire-plus-EEG feature alignment axes while carrying fMRI and organoid expansion lanes.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - workspace
+          - source_bundle
+        properties:
+          workspace:
+            schema_ref: neuro_integration_workspace
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+    output:
+      schema_ref: neuro_integration_analysis_receipt
+    guarantees:
+      - seed_pair_digest must bind questionnaire and EEG feature digests
+      - derived axes must remain feature-alignment and analysis-plan proxies
+      - fMRI and organoid lanes must stay expansion context with the same claim ceiling
+      - clinical diagnosis, consciousness reproduction, and identity replacement claims must remain false
+  build_operator_guide:
+    summary: Emit plain-language cards and coding-agent task templates for non-ML operators and LLM-native automation.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - workspace
+          - analysis
+        properties:
+          workspace:
+            schema_ref: neuro_integration_workspace
+          analysis:
+            schema_ref: neuro_integration_analysis_receipt
+    output:
+      schema_ref: neuro_integration_operator_guide
+    guarantees:
+      - plain-language cards must explain safe actions without requiring ML expertise
+      - coding-agent templates must stay schema-bound and digest-only
+      - guide_digest must bind cards, templates, workspace digest, analysis digest, and claim ceiling
+      - raw instruction and analysis payload storage must remain false
+  validate_integration_bundle:
+    summary: Verify app, source, workspace, analysis, and operator-guide digest binding and claim ceilings.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - app_receipts
+          - source_bundle
+          - workspace
+          - analysis
+          - operator_guide
+        properties:
+          app_receipts:
+            type: array
+            minItems: 1
+            items:
+              schema_ref: neuro_integration_app_registry_receipt
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          workspace:
+            schema_ref: neuro_integration_workspace
+          analysis:
+            schema_ref: neuro_integration_analysis_receipt
+          operator_guide:
+            schema_ref: neuro_integration_operator_guide
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - seed_survey_eeg_bound
+          - replacement_lanes_bound
+          - llm_native_workflow_bound
+          - beginner_operator_supported
+          - coding_agent_ready
+          - claim_ceiling_bound
+          - raw_payload_redacted
+          - no_diagnosis_or_identity_claim
+        properties:
+          ok:
+            type: boolean
+          seed_survey_eeg_bound:
+            type: boolean
+          replacement_lanes_bound:
+            type: boolean
+          llm_native_workflow_bound:
+            type: boolean
+          beginner_operator_supported:
+            type: boolean
+          coding_agent_ready:
+            type: boolean
+          claim_ceiling_bound:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+          no_diagnosis_or_identity_claim:
+            type: boolean
+events:
+  - name: neuro_integration_workbench.source_bundle.bound
+    payload_schema: neuro_integration_source_bundle
+  - name: neuro_integration_workbench.survey_eeg_fusion.bound
+    payload_schema: neuro_integration_analysis_receipt

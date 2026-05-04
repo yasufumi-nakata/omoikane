@@ -256,9 +256,23 @@ confidence gate digest、feature-window drift gate digest、threshold digest、
 target gate-set digest だけを束ね、raw BioData / calibration / drift / gate payload を
 共有 arbitration へ渡さない。
 
+## Neuro Integration Workbench との関係
+
+`interface.neuro_integration_workbench.v0` は、BDT の「任意 BioData を
+body-state latent へ束ねる」境界より一段上で、計測アプリ、解析アプリ、
+データ整備、operator copilot、agent automation を 1 つの LLM-native workspace へ
+束ねる。Workbench は questionnaire と EEG を最初の seed pair として扱い、
+fMRI BOLD と脳オルガノイドは expansion lane に置く。
+
+この Workbench は BDT の mind-state bridge と同じく claim ceiling を持つ。
+アンケート、EEG、fMRI、脳オルガノイドを同じ分析面に置いても、
+clinical diagnosis、consciousness reproduction、identity replacement は
+reference runtime fact にしない。
+
 ## 関連
 
 - [bdb-protocol.md](bdb-protocol.md)
+- [neuro-integration-workbench.md](neuro-integration-workbench.md)
 - [sensory-loopback.md](sensory-loopback.md)
 - [../mind-substrate/qualia-buffer.md](../mind-substrate/qualia-buffer.md)
 - [../../05-research-frontiers/biosignal-transmitter.md](../../05-research-frontiers/biosignal-transmitter.md)

@@ -276,6 +276,53 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ],
         )
 
+    def test_neuro_integration_demo_reports_llm_native_multi_app_workbench(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_neuro_integration_workbench_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(5, result["validation"]["app_count"])
+        self.assertEqual(4, result["validation"]["source_count"])
+        self.assertTrue(result["validation"]["seed_survey_eeg_bound"])
+        self.assertTrue(result["validation"]["expansion_modalities_bound"])
+        self.assertTrue(result["validation"]["replacement_lanes_bound"])
+        self.assertTrue(result["validation"]["llm_native_workflow_bound"])
+        self.assertTrue(result["validation"]["beginner_operator_supported"])
+        self.assertTrue(result["validation"]["coding_agent_ready"])
+        self.assertTrue(result["validation"]["claim_ceiling_bound"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertTrue(result["validation"]["no_diagnosis_or_identity_claim"])
+        self.assertEqual(
+            "feature-alignment-and-analysis-plan-only",
+            result["workspace"]["claim_ceiling"],
+        )
+        self.assertIn("questionnaire", result["source_bundle"]["source_types"])
+        self.assertIn("eeg", result["source_bundle"]["source_types"])
+        self.assertIn("fmri_bold", result["source_bundle"]["source_types"])
+        self.assertIn("brain_organoid", result["source_bundle"]["source_types"])
+        self.assertFalse(result["analysis"]["clinical_diagnosis_claimed"])
+        self.assertFalse(result["analysis"]["consciousness_reproduction_claimed"])
+        self.assertFalse(result["analysis"]["identity_replacement_claimed"])
+        self.assertEqual(
+            2,
+            result["ledger_verification"]["category_counts"][
+                "interface-neuro-integration-workbench"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-neuro-integration-workbench-analysis"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-neuro-integration-workbench-guide"
+            ],
+        )
+
     def test_imc_demo_reports_disclosure_floor_and_disconnect(self) -> None:
         runtime = OmoikaneReferenceOS()
 
