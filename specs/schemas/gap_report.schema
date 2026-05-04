@@ -6,8 +6,8 @@ description: >
   including top-level eval inventory drift checks, tracked worktree marker-residue
   checks, tracked/untracked generated artifact hygiene checks for build output,
   caches, and platform metadata, decision-log README index inventory checks,
-  agent source definition validation, and a digest-bound scan receipt for
-  automation gating.
+  agent source definition validation, truth-source residual marker checks, and
+  a digest-bound scan receipt for automation gating.
 type: object
 additionalProperties: false
 required:

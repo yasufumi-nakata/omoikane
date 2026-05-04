@@ -911,6 +911,53 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "future-work" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_truth_source_japanese_residual_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            reference_readme = repo_root / "docs" / "07-reference-implementation" / "README.md"
+            reference_readme.parent.mkdir(parents=True, exist_ok=True)
+            reference_readme.write_text(
+                "# Reference Implementation\n\n"
+                "## 今後広げる面\n\n"
+                "- automation による未実装ギャップの継続充填\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["future_work_hit_count"])
+            self.assertEqual(
+                "docs/07-reference-implementation/README.md",
+                report["future_work_hits"][0]["path"],
+            )
+            self.assertIn("未実装ギャップ", report["future_work_hits"][0]["line"])
+            self.assertTrue(
+                any(task["kind"] == "future-work" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_ignores_closed_japanese_residual_inventory_notes(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "specs" / "interfaces" / "README.md").write_text(
+                "# Interfaces\n\n"
+                "## 次段階\n\n"
+                "- inventory backlog は解消済みです。\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "schemas" / "README.md").write_text(
+                "# Schemas\n\n"
+                "## 次段階\n\n"
+                "- 現時点で catalog 上の immediate schema backlog はありません。\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["future_work_hit_count"])
+            self.assertEqual([], report["future_work_hits"])
+
     def test_scan_reports_non_abstract_not_implemented_runtime_stubs(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

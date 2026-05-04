@@ -2,12 +2,12 @@ idl_version: 1
 kind: service
 namespace: selfctor.gap_report.v0
 service: GapReportService
-summary: Emit a schema-bound self-construction gap report with top-level eval inventory drift checks, decision-log README index checks, agent source definition validation, tracked worktree marker-residue checks, tracked/untracked generated artifact hygiene checks for build output, caches, and platform metadata, and a digest-bound scan receipt for automation gates.
+summary: Emit a schema-bound self-construction gap report with top-level eval inventory drift checks, decision-log README index checks, agent source definition validation, truth-source residual marker checks, tracked worktree marker-residue checks, tracked/untracked generated artifact hygiene checks for build output, caches, and platform metadata, and a digest-bound scan receipt for automation gates.
 imports:
   gap_report: ../schemas/gap_report.schema
 operations:
   scan_repo:
-    summary: Scan one repository root for open questions, required automation references, top-level and per-surface inventory drift, decision-log README index drift, catalog coverage gaps, residual future work, agent source definition violations, runtime stubs, tracked worktree workspace marker residue, tracked/untracked build/cache/platform generated artifacts, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
+    summary: Scan one repository root for open questions, required automation references, top-level and per-surface inventory drift, decision-log README index drift, catalog coverage gaps, truth-source residual markers, agent source definition violations, runtime stubs, tracked worktree workspace marker residue, tracked/untracked build/cache/platform generated artifacts, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
     input:
       inline_schema:
         type: object
@@ -36,6 +36,7 @@ operations:
       - tracked worktree diff is digest-bound as git:tracked-worktree-diff and any added workspace-enacted marker residue is reported as worktree_workspace_marker_hits before all-zero completion
       - tracked generated artifact paths, including build output, caches, coverage output, bytecode, packaging output, patch artifacts, and platform metadata, are digest-bound as git:tracked-generated-artifacts and reported as tracked_generated_artifact_hits without reading raw artifact payloads
       - untracked generated artifact paths, including build output, caches, coverage output, bytecode, packaging output, patch artifacts, and platform metadata, are digest-bound as git:untracked-generated-artifacts and reported as untracked_generated_artifact_hits without reading raw artifact payloads
+      - truth-source residual marker rules cover English and Japanese implementation-backlog wording before all-zero completion while closed backlog statements remain ignored
       - latest decision-log residual and frontier chains must respect closes_next_gaps frontmatter
 events:
   selfctor.gap_report.scanned:

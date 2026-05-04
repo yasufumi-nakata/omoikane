@@ -104,6 +104,20 @@ TRUTH_SOURCE_FUTURE_WORK_GLOBS = (
 FUTURE_WORK_IGNORED_SNIPPETS = (
     "deferred surface",
     "deferred surfaces",
+    "no immediate",
+    "no backlog",
+    "解消済み",
+    "ありません",
+    "なし",
+)
+TRUTH_SOURCE_RESIDUAL_MARKERS = (
+    "future work",
+    "residual gap",
+    "unresolved gap",
+    "今後広げる面",
+    "未実装",
+    "未対応",
+    "残差",
 )
 TRUTH_SOURCE_INVENTORY_SPECS = (
     ("specs/interfaces/README.md", "specs/interfaces", (".idl",)),
@@ -1306,7 +1320,10 @@ class GapScanner:
                     continue
                 if not stripped.startswith("- "):
                     continue
-                if "future work" not in lowered:
+                if not any(
+                    marker in lowered or marker in stripped
+                    for marker in TRUTH_SOURCE_RESIDUAL_MARKERS
+                ):
                     continue
                 if any(snippet in lowered for snippet in FUTURE_WORK_IGNORED_SNIPPETS):
                     continue

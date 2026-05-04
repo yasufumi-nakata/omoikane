@@ -112,7 +112,7 @@ automation が前提にする repo-local `references/*.md` の欠落
 `specs/catalog.yaml` entries に未登録の catalog coverage gap、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
-residual `future work` に加え、
+`future work`、日本語の実装 backlog marker、残差 marker に加え、
 `agents/**/*.yaml` の Yaoyorozu agent source definition violation を
 `agent_source_definition_violation_hits` として拾い、
 raw agent source payload は保存せず、source path と policy violation summary だけを返す。
@@ -1644,6 +1644,6 @@ project branding の英字表記を `Omoikane` に固定し、
 サンドボックス自我の formal name を `Mirage Self` に固定しつつ、
 runtime 実装上は `SandboxSentinel` alias を内部 detail としてのみ許容することを確認する。
 
-## 今後広げる面
+## 継続監視
 
-- automation による未実装ギャップの継続充填
+- automation は gap-report と truth source を監視し、repo 内で deterministic に閉じられる項目が出た時だけ runtime / schema / eval / CLI / tests を同期する。
