@@ -11,6 +11,24 @@ from omoikane.cli import main
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def test_demo_emits_reference_scenario_json(self) -> None:
+        stdout = io.StringIO()
+
+        with patch("sys.argv", ["omoikane", "demo", "--json"]), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["identity"]["identity_id"].startswith("id-"))
+        self.assertEqual(result["identity"]["identity_id"], result["identity"]["lineage_id"])
+        self.assertEqual("classical_silicon", result["substrate"]["allocation"]["substrate"])
+        self.assertTrue(result["qualia"]["monotonic"])
+        self.assertTrue(result["ledger_verification"]["ok"])
+        self.assertEqual("Approval", result["safe_patch"]["ethics"]["status"])
+        self.assertEqual("approved", result["safe_patch"]["council"]["outcome"])
+        self.assertEqual("Veto", result["blocked_patch"]["ethics"]["status"])
+        self.assertIsNone(result["blocked_patch"]["council"])
+        self.assertEqual("Veto", result["failed_fork_decision"]["status"])
+
     def test_gap_report_emits_reference_ready_json(self) -> None:
         stdout = io.StringIO()
         repo_root = Path(__file__).resolve().parents[2]
