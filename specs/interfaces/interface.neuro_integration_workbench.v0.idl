@@ -9,6 +9,7 @@ summary: >
   sources without claiming diagnosis, consciousness reproduction, or identity
   replacement.
 imports:
+  biodata_survey_eeg_fusion_receipt: ../schemas/biodata_survey_eeg_fusion_receipt.schema
   neuro_integration_app_registry_receipt: ../schemas/neuro_integration_app_registry_receipt.schema
   neuro_integration_source_bundle: ../schemas/neuro_integration_source_bundle.schema
   neuro_integration_workspace: ../schemas/neuro_integration_workspace.schema
@@ -81,10 +82,15 @@ operations:
                 - license_ref
                 - feature_summary_ref
                 - feature_summary
+          upstream_receipts:
+            type: array
+            items:
+              schema_ref: biodata_survey_eeg_fusion_receipt
     output:
       schema_ref: neuro_integration_source_bundle
     guarantees:
       - questionnaire and EEG must be present before the seed analysis can pass
+      - BioData survey+EEG fusion receipts must be carried as digest-only upstream bindings
       - fMRI and brain organoid sources must be expansion context, not identity proof
       - every source must bind consent, license, app, participant, and feature digest refs
       - raw questionnaire, EEG, neuroimaging, organoid, and source payload storage must remain false
@@ -198,6 +204,8 @@ operations:
           - llm_native_workflow_bound
           - beginner_operator_supported
           - coding_agent_ready
+          - survey_eeg_fusion_receipt_bound
+          - upstream_receipt_payload_redacted
           - claim_ceiling_bound
           - raw_payload_redacted
           - no_diagnosis_or_identity_claim
@@ -213,6 +221,10 @@ operations:
           beginner_operator_supported:
             type: boolean
           coding_agent_ready:
+            type: boolean
+          survey_eeg_fusion_receipt_bound:
+            type: boolean
+          upstream_receipt_payload_redacted:
             type: boolean
           claim_ceiling_bound:
             type: boolean

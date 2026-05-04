@@ -218,6 +218,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
     def test_neuro_integration_demo_matches_public_schemas(self) -> None:
         result = self.runtime.run_neuro_integration_workbench_demo()
 
+        self._assert_schema_valid(
+            "specs/schemas/biodata_survey_eeg_fusion_receipt.schema",
+            result["biodata_survey_eeg_fusion"],
+        )
         for receipt in result["app_receipts"]:
             self._assert_schema_valid(
                 "specs/schemas/neuro_integration_app_registry_receipt.schema",
@@ -251,6 +255,9 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["llm_native_workflow_bound"])
         self.assertTrue(result["validation"]["beginner_operator_supported"])
         self.assertTrue(result["validation"]["coding_agent_ready"])
+        self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
+        self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
+        self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
         self.assertTrue(result["validation"]["claim_ceiling_bound"])
         self.assertTrue(result["validation"]["raw_payload_redacted"])
         self.assertTrue(result["validation"]["no_diagnosis_or_identity_claim"])

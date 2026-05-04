@@ -166,7 +166,8 @@ raw continuity event payload は保存しない。
 
 `neuro-integration-demo` は L6 Neuro Integration Workbench の reference contract
 (`interface.neuro_integration_workbench.v0`) を JSON で可視化し、questionnaire と EEG を
-seed pair として束縛したうえで、fMRI BOLD と brain organoid feature summary を
+seed pair として束縛したうえで、BioData Transmitter の Survey EEG Fusion receipt digest
+を upstream binding として受け取り、fMRI BOLD と brain organoid feature summary を
 expansion lane として同じ source bundle に追加する。measurement / analysis /
 data-curation / operator-copilot / agent-automation の 5 replacement lane を
 workspace digest に束縛し、非 ML 専門家向け plain-language cards と coding agent 向け

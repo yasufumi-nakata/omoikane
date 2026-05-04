@@ -18,6 +18,7 @@ required:
   - source_bundle_digest
   - identity_id
   - seed_pair
+  - upstream_fusion_binding
   - derived_axes
   - planned_analyses
   - expansion_lanes
@@ -84,6 +85,65 @@ properties:
       eeg_feature_digest:
         type: string
         pattern: "^[a-f0-9]{64}$"
+  upstream_fusion_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - bound
+      - receipt_role
+      - profile_id
+      - fusion_ref
+      - fusion_receipt_digest
+      - fused_window_digest
+      - fusion_axis_summary_digest
+      - fusion_confidence
+      - bound_source_types
+      - fusion_status
+      - operator_accessibility_bound
+      - claim_ceiling
+      - raw_payload_stored
+    properties:
+      bound:
+        type: boolean
+      receipt_role:
+        const: biodata-survey-eeg-fusion
+      profile_id:
+        const: biodata-survey-eeg-window-fusion-v1
+      fusion_ref:
+        type: string
+      fusion_receipt_digest:
+        anyOf:
+          - type: string
+            pattern: "^[a-f0-9]{64}$"
+          - const: ""
+      fused_window_digest:
+        anyOf:
+          - type: string
+            pattern: "^[a-f0-9]{64}$"
+          - const: ""
+      fusion_axis_summary_digest:
+        anyOf:
+          - type: string
+            pattern: "^[a-f0-9]{64}$"
+          - const: ""
+      fusion_confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+      bound_source_types:
+        const:
+          - questionnaire
+          - eeg
+      fusion_status:
+        enum:
+          - bound
+          - not-bound
+      operator_accessibility_bound:
+        type: boolean
+      claim_ceiling:
+        const: survey-eeg-correlation-input-only
+      raw_payload_stored:
+        const: false
   derived_axes:
     type: object
     additionalProperties: false
@@ -126,7 +186,7 @@ properties:
         maximum: 1
   planned_analyses:
     type: array
-    minItems: 3
+    minItems: 4
     items:
       type: object
       additionalProperties: false

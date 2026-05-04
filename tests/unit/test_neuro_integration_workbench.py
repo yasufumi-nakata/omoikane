@@ -7,6 +7,43 @@ from omoikane.interface.neuro_integration_workbench import NeuroIntegrationWorkb
 
 
 class NeuroIntegrationWorkbenchTests(unittest.TestCase):
+    def _build_upstream_fusion_receipt(self, identity_id: str) -> dict:
+        return {
+            "profile_id": "biodata-survey-eeg-window-fusion-v1",
+            "identity_id": identity_id,
+            "fusion_ref": "survey-eeg-fusion://biodata/bdt-survey-eeg-fusion-111111111111",
+            "fusion_receipt_digest": "a" * 64,
+            "fused_window_digest": "b" * 64,
+            "dataset_adapter_receipt_digest": "c" * 64,
+            "latent_digest": "d" * 64,
+            "source_feature_digest": "e" * 64,
+            "eeg_feature_digest": "f" * 64,
+            "survey_score_digest": "1" * 64,
+            "fusion_axis_summary": {
+                "survey_axis_count": 4,
+                "eeg_cortical_load_proxy": 0.42,
+                "eeg_alpha_suppression": 0.6,
+                "eeg_theta_beta_ratio": 0.86,
+                "survey_attention_proxy": 0.66,
+                "survey_fatigue_proxy": 0.26,
+                "survey_eeg_cognitive_load_proxy": 0.52,
+                "fusion_confidence": 0.71,
+            },
+            "fusion_status": "bound",
+            "operator_accessibility_bound": True,
+            "claim_ceiling": "survey-eeg-correlation-input-only",
+            "raw_survey_response_payload_stored": False,
+            "raw_eeg_samples_stored": False,
+            "raw_dataset_payload_stored": False,
+            "raw_latent_payload_stored": False,
+            "raw_fusion_payload_stored": False,
+            "subjective_equivalence_claimed": False,
+            "semantic_thought_content_generated": False,
+            "diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+
     def _build_demo_artifacts(self) -> dict:
         workbench = NeuroIntegrationWorkbench()
         apps = [
@@ -105,6 +142,9 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
                     },
                 },
             ],
+            upstream_receipts=[
+                self._build_upstream_fusion_receipt("identity://neuro-unit")
+            ],
         )
         workspace = workbench.open_workspace(
             "identity://neuro-unit",
@@ -146,6 +186,8 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["llm_native_workflow_bound"])
         self.assertTrue(validation["beginner_operator_supported"])
         self.assertTrue(validation["coding_agent_ready"])
+        self.assertTrue(validation["survey_eeg_fusion_receipt_bound"])
+        self.assertTrue(validation["upstream_receipt_payload_redacted"])
         self.assertTrue(validation["claim_ceiling_bound"])
         self.assertTrue(validation["raw_payload_redacted"])
         self.assertTrue(validation["no_diagnosis_or_identity_claim"])
@@ -157,6 +199,12 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertIn("eeg", artifacts["source_bundle"]["source_types"])
         self.assertIn("fmri_bold", artifacts["source_bundle"]["source_types"])
         self.assertIn("brain_organoid", artifacts["source_bundle"]["source_types"])
+        self.assertEqual(1, artifacts["source_bundle"]["upstream_receipt_count"])
+        self.assertTrue(artifacts["analysis"]["upstream_fusion_binding"]["bound"])
+        self.assertEqual(
+            "biodata-survey-eeg-fusion",
+            artifacts["analysis"]["upstream_fusion_binding"]["receipt_role"],
+        )
         self.assertFalse(artifacts["analysis"]["raw_questionnaire_payload_stored"])
         self.assertFalse(artifacts["analysis"]["consciousness_reproduction_claimed"])
         self.assertFalse(artifacts["analysis"]["identity_replacement_claimed"])

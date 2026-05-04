@@ -11171,6 +11171,75 @@ json.dump(response, sys.stdout)
             copilot_app,
             agent_app,
         ]
+        biodata_session = self.biodata_transmitter.open_session(
+            identity.identity_id,
+            source_modalities=["eeg"],
+            target_modalities=["eeg", "affect", "thought"],
+        )
+        biodata_dataset_manifest = {
+            "dataset_ref": "dataset://neuro-workbench/biodata-survey-eeg-window",
+            "participant_ref": "participant://neuro-workbench/self",
+            "license_ref": "license://neuro-workbench/local-consent-only",
+            "window_ref": "window://neuro-workbench/day-1/survey-eeg-seed",
+            "modality_file_refs": {
+                "eeg": "dataset-file://neuro-workbench/eeg/resting-window",
+            },
+        }
+        biodata_adapted_window = self.biodata_transmitter.adapt_dataset_feature_window(
+            biodata_session["session_id"],
+            dataset_manifest=biodata_dataset_manifest,
+            window_feature_summaries={
+                "eeg": {
+                    "alpha_power": 0.37,
+                    "theta_power": 0.31,
+                    "beta_power": 0.35,
+                    "artifact_rate": 0.08,
+                },
+            },
+            context_label="neuro-workbench-survey-eeg-seed",
+        )
+        biodata_survey_eeg_fusion = (
+            self.biodata_transmitter.bind_survey_eeg_window_fusion(
+                biodata_session,
+                biodata_adapted_window["adapter_receipt"],
+                biodata_adapted_window["latent_state"],
+                survey_instrument_manifest={
+                    "instrument_ref": "survey://neuro-workbench/self-report-window-v1",
+                    "administration_ref": "survey-admin://neuro-workbench/day-1",
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "language": "ja-JP",
+                    "scale_refs": {
+                        "valence": "scale://neuro-workbench/valence",
+                        "arousal": "scale://neuro-workbench/arousal",
+                        "attention": "scale://neuro-workbench/attention",
+                        "fatigue": "scale://neuro-workbench/fatigue",
+                    },
+                },
+                survey_score_summary={
+                    "valence": 0.56,
+                    "arousal": 0.61,
+                    "attention": 0.66,
+                    "fatigue": 0.53,
+                },
+                alignment_evidence_refs=[
+                    "alignment://neuro-workbench/day-1/eeg-survey-same-window",
+                    "consent://neuro-workbench/survey-eeg-fusion",
+                ],
+                analysis_question=(
+                    "BioData survey and EEG feature window is the upstream seed "
+                    "for neuro integration analysis"
+                ),
+                operator_intent_ref="operator-intent://neuro-workbench/non-ml-seed",
+            )
+        )
+        biodata_survey_eeg_validation = (
+            self.biodata_transmitter.validate_survey_eeg_window_fusion(
+                biodata_session,
+                biodata_adapted_window["adapter_receipt"],
+                biodata_adapted_window["latent_state"],
+                biodata_survey_eeg_fusion,
+            )
+        )
         source_bundle = self.neuro_integration_workbench.bind_source_bundle(
             identity.identity_id,
             source_manifests=[
@@ -11238,6 +11307,7 @@ json.dump(response, sys.stdout)
                     },
                 },
             ],
+            upstream_receipts=[biodata_survey_eeg_fusion],
         )
         workspace = self.neuro_integration_workbench.open_workspace(
             identity_id=identity.identity_id,
@@ -11269,6 +11339,42 @@ json.dump(response, sys.stdout)
             analysis,
             operator_guide,
         )
+        validation["biodata_survey_eeg_fusion_ok"] = (
+            biodata_survey_eeg_validation["ok"]
+        )
+        validation["biodata_survey_eeg_fusion_receipt_digest_bound"] = (
+            biodata_survey_eeg_validation["fusion_receipt_digest_bound"]
+        )
+        validation["biodata_survey_eeg_operator_accessibility_bound"] = (
+            biodata_survey_eeg_validation["operator_accessibility_bound"]
+        )
+        validation["ok"] = validation["ok"] and biodata_survey_eeg_validation["ok"]
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.upstream_survey_eeg_fusion.bound",
+            payload={
+                "fusion_ref": biodata_survey_eeg_fusion["fusion_ref"],
+                "fusion_receipt_digest": biodata_survey_eeg_fusion[
+                    "fusion_receipt_digest"
+                ],
+                "fused_window_digest": biodata_survey_eeg_fusion[
+                    "fused_window_digest"
+                ],
+                "fusion_status": biodata_survey_eeg_fusion["fusion_status"],
+                "operator_accessibility_bound": biodata_survey_eeg_fusion[
+                    "operator_accessibility_bound"
+                ],
+                "claim_ceiling": biodata_survey_eeg_fusion["claim_ceiling"],
+                "raw_fusion_payload_stored": biodata_survey_eeg_fusion[
+                    "raw_fusion_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-upstream",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="neuro_integration_workbench.source_bundle.bound",
@@ -11277,6 +11383,12 @@ json.dump(response, sys.stdout)
                 "source_bundle_digest": source_bundle["source_bundle_digest"],
                 "source_types": source_bundle["source_types"],
                 "seed_survey_eeg_bound": source_bundle["seed_survey_eeg_bound"],
+                "survey_eeg_fusion_receipt_bound": source_bundle[
+                    "survey_eeg_fusion_receipt_bound"
+                ],
+                "upstream_receipt_digest_set": source_bundle[
+                    "upstream_receipt_digest_set"
+                ],
                 "expansion_modalities_bound": source_bundle[
                     "expansion_modalities_bound"
                 ],
@@ -11315,6 +11427,9 @@ json.dump(response, sys.stdout)
                 "analysis_ref": analysis["analysis_ref"],
                 "analysis_digest": analysis["analysis_digest"],
                 "seed_pair_digest": analysis["seed_pair_digest"],
+                "upstream_fusion_receipt_digest": analysis[
+                    "upstream_fusion_binding"
+                ]["fusion_receipt_digest"],
                 "survey_eeg_distress_alignment": analysis["derived_axes"][
                     "survey_eeg_distress_alignment"
                 ],
@@ -11360,6 +11475,8 @@ json.dump(response, sys.stdout)
             },
             "profile": self.neuro_integration_workbench.reference_profile(),
             "app_receipts": app_receipts,
+            "biodata_survey_eeg_fusion": biodata_survey_eeg_fusion,
+            "biodata_survey_eeg_validation": biodata_survey_eeg_validation,
             "source_bundle": source_bundle,
             "workspace": workspace,
             "analysis": analysis,
@@ -11370,6 +11487,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "app_receipts[]",
                     "schema_path": "specs/schemas/neuro_integration_app_registry_receipt.schema",
                     "contract_role": "neuro-integration-app-registry",
+                },
+                {
+                    "payload_path": "biodata_survey_eeg_fusion",
+                    "schema_path": "specs/schemas/biodata_survey_eeg_fusion_receipt.schema",
+                    "contract_role": "upstream-biodata-survey-eeg-fusion",
                 },
                 {
                     "payload_path": "source_bundle",

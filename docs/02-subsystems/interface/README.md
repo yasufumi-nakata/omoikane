@@ -17,12 +17,14 @@
 ### Neuro Integration Workbench (NIW)
 - アンケートと EEG を seed pair として、fMRI BOLD、脳オルガノイド、biosensor、
   behavioral task、omics、future biological source を同じ source bundle に追加する
+- BDT の Survey EEG Fusion receipt を upstream digest として受け取り、NIW の source bundle /
+  analysis receipt に再束縛する
 - 計測アプリ、解析アプリ、データ整備アプリ、operator copilot、coding-agent automation を
   LLM-native workspace の置換 lane として束縛する
 - 非 ML 専門家向け plain-language guide と coding agent 向け task template を同じ receipt に入れる
 - fMRI と脳オルガノイドは expansion context であり、意識再現や本人同一性の証明にはしない
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
-  で questionnaire+EEG fusion、expansion modality binding、replacement lane coverage、
+  で BDT Survey EEG Fusion receipt binding、expansion modality binding、replacement lane coverage、
   raw payload redaction、claim ceiling をまとめて検証する
 
 ### Biological-Digital Bridge (BDB)

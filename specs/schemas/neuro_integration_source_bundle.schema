@@ -20,6 +20,10 @@ required:
   - source_digest_set
   - seed_sources_required
   - seed_survey_eeg_bound
+  - upstream_receipt_count
+  - upstream_receipt_digest_set
+  - upstream_receipt_bindings
+  - survey_eeg_fusion_receipt_bound
   - expansion_source_types_present
   - expansion_modalities_bound
   - storage_policy
@@ -76,6 +80,20 @@ properties:
       - eeg
   seed_survey_eeg_bound:
     const: true
+  upstream_receipt_count:
+    type: integer
+    minimum: 0
+  upstream_receipt_digest_set:
+    anyOf:
+      - type: string
+        pattern: "^[a-f0-9]{64}$"
+      - const: ""
+  upstream_receipt_bindings:
+    type: array
+    items:
+      $ref: "#/$defs/upstream_receipt_binding"
+  survey_eeg_fusion_receipt_bound:
+    type: boolean
   expansion_source_types_present:
     type: array
     minItems: 1
@@ -186,5 +204,74 @@ $defs:
           minLength: 1
       storage_policy:
         const: feature-digest+analysis-axis-summary-only
+      raw_payload_stored:
+        const: false
+  upstream_receipt_binding:
+    type: object
+    additionalProperties: false
+    required:
+      - receipt_role
+      - profile_id
+      - fusion_ref
+      - fusion_receipt_digest
+      - fused_window_digest
+      - dataset_adapter_receipt_digest
+      - latent_digest
+      - source_feature_digest
+      - eeg_feature_digest
+      - survey_score_digest
+      - fusion_axis_summary_digest
+      - fusion_confidence
+      - bound_source_types
+      - fusion_status
+      - operator_accessibility_bound
+      - claim_ceiling
+      - raw_payload_stored
+    properties:
+      receipt_role:
+        const: biodata-survey-eeg-fusion
+      profile_id:
+        const: biodata-survey-eeg-window-fusion-v1
+      fusion_ref:
+        type: string
+        minLength: 1
+      fusion_receipt_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      fused_window_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      dataset_adapter_receipt_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      latent_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      source_feature_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      eeg_feature_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      survey_score_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      fusion_axis_summary_digest:
+        type: string
+        pattern: "^[a-f0-9]{64}$"
+      fusion_confidence:
+        type: number
+        minimum: 0
+        maximum: 1
+      bound_source_types:
+        const:
+          - questionnaire
+          - eeg
+      fusion_status:
+        const: bound
+      operator_accessibility_bound:
+        const: true
+      claim_ceiling:
+        const: survey-eeg-correlation-input-only
       raw_payload_stored:
         const: false

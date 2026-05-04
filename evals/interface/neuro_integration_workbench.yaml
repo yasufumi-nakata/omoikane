@@ -17,6 +17,11 @@ expected:
   analysis_digest_bound: true
   operator_guide_digest_bound: true
   seed_survey_eeg_bound: true
+  biodata_survey_eeg_fusion_ok: true
+  biodata_survey_eeg_fusion_receipt_digest_bound: true
+  survey_eeg_fusion_receipt_bound: true
+  upstream_receipt_count: 1
+  upstream_receipt_payload_redacted: true
   expansion_modalities_bound: true
   replacement_lanes_bound: true
   replacement_lane_count: 5

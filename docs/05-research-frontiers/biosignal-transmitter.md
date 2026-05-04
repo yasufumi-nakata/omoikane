@@ -45,6 +45,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - reference runtime は `biodata-survey-eeg-window-fusion-v1` により、アンケート score
   summary digest と EEG feature-window digest を同じ analysis window に束縛し、非 ML
   利用者向け LLM workflow ref を持つ bounded receipt として検証する。
+- Neuro Integration Workbench はこの Survey EEG Fusion receipt を upstream digest として
+  source bundle / analysis receipt に束縛し、BioData 側の bounded receipt を multi-application
+  workspace の seed にできる。
 
 ## ブロッキング要因
 
@@ -89,6 +92,8 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - `interface.neuro_integration_workbench.v0` は measurement / analysis / data-curation /
   operator-copilot / agent-automation の 5 replacement lane を持つが、claim ceiling は
   `feature-alignment-and-analysis-plan-only` のままにする
+- Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
+  BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない
 - qualia equivalence と thought content の飛躍は
   `https://mind-upload.com/frontiers/biosignal-transmitter` の conflict sink ref に束縛する

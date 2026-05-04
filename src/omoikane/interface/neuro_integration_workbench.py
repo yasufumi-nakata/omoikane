@@ -13,6 +13,9 @@ NIW_SOURCE_BUNDLE_PROFILE_ID = "neuro-cross-modal-source-bundle-v1"
 NIW_WORKSPACE_PROFILE_ID = "llm-native-neuroscience-workspace-v1"
 NIW_ANALYSIS_PROFILE_ID = "survey-eeg-neurodata-fusion-analysis-v1"
 NIW_OPERATOR_GUIDE_PROFILE_ID = "llm-native-non-ml-operator-guide-v1"
+NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
+NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
+NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
 NIW_CLAIM_CEILING = "feature-alignment-and-analysis-plan-only"
 NIW_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/neurodata-integration"
 NIW_SOURCE_STORAGE_POLICY = "feature-digest+analysis-axis-summary-only"
@@ -102,6 +105,9 @@ class NeuroIntegrationWorkbench:
             "workspace_profile_id": NIW_WORKSPACE_PROFILE_ID,
             "analysis_profile_id": NIW_ANALYSIS_PROFILE_ID,
             "operator_guide_profile_id": NIW_OPERATOR_GUIDE_PROFILE_ID,
+            "biodata_survey_eeg_fusion_profile_id": (
+                NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
+            ),
             "seed_source_types": list(NIW_SEED_SOURCE_TYPES),
             "expansion_source_types": list(NIW_EXPANSION_SOURCE_TYPES),
             "source_families": dict(NIW_SOURCE_FAMILIES),
@@ -174,6 +180,7 @@ class NeuroIntegrationWorkbench:
         self,
         identity_id: str,
         source_manifests: Sequence[Dict[str, Any]],
+        upstream_receipts: Sequence[Dict[str, Any]] | None = None,
     ) -> Dict[str, Any]:
         self._require_non_empty_string(identity_id, "identity_id")
         if len(source_manifests) < 2:
@@ -186,6 +193,17 @@ class NeuroIntegrationWorkbench:
         source_types = [source["source_type"] for source in sources]
         if not all(source_type in source_types for source_type in NIW_SEED_SOURCE_TYPES):
             raise ValueError("source_manifests must include questionnaire and eeg")
+        upstream_receipt_bindings = [
+            self._normalize_upstream_receipt(receipt, identity_id)
+            for receipt in (upstream_receipts or [])
+        ]
+        survey_eeg_fusion_receipt_bound = any(
+            binding["receipt_role"] == NIW_BIODATA_FUSION_BINDING_ROLE
+            for binding in upstream_receipt_bindings
+        )
+        upstream_receipt_digest_set = self._upstream_receipt_digest_set(
+            upstream_receipt_bindings
+        )
         source_digest_set = sha256_text(
             canonical_json(
                 {
@@ -213,6 +231,10 @@ class NeuroIntegrationWorkbench:
             "source_digest_set": source_digest_set,
             "seed_sources_required": list(NIW_SEED_SOURCE_TYPES),
             "seed_survey_eeg_bound": True,
+            "upstream_receipt_count": len(upstream_receipt_bindings),
+            "upstream_receipt_digest_set": upstream_receipt_digest_set,
+            "upstream_receipt_bindings": upstream_receipt_bindings,
+            "survey_eeg_fusion_receipt_bound": survey_eeg_fusion_receipt_bound,
             "expansion_source_types_present": expansion_source_types_present,
             "expansion_modalities_bound": bool(expansion_source_types_present),
             "storage_policy": NIW_SOURCE_STORAGE_POLICY,
@@ -324,6 +346,7 @@ class NeuroIntegrationWorkbench:
             (distress_alignment + attention_alignment + min(1.0, theta_beta_ratio / 3.0)) / 3.0
         )
         expansion_lanes = self._build_expansion_lanes(source_bundle)
+        upstream_fusion_binding = self._build_upstream_fusion_binding(source_bundle)
         analysis = {
             "schema_version": NIW_SCHEMA_VERSION,
             "analysis_ref": f"analysis://neuro-integration/{new_id('niw-analysis')}",
@@ -340,6 +363,7 @@ class NeuroIntegrationWorkbench:
                 "questionnaire_feature_digest": survey["feature_digest"],
                 "eeg_feature_digest": eeg["feature_digest"],
             },
+            "upstream_fusion_binding": upstream_fusion_binding,
             "derived_axes": {
                 "self_report_distress_proxy": distress,
                 "self_report_attention_difficulty_proxy": attention,
@@ -354,6 +378,12 @@ class NeuroIntegrationWorkbench:
                     "analysis_id": "quality-control",
                     "plain_language_goal": "Check whether each source can be trusted before modeling.",
                     "agent_action": "summarize missingness, artifact burden, and digest coverage",
+                    "requires_ml_expertise": False,
+                },
+                {
+                    "analysis_id": "biodata-fusion-receipt-reconciliation",
+                    "plain_language_goal": "Check that the BioData survey plus EEG fusion receipt is bound before using the workbench analysis.",
+                    "agent_action": "compare upstream fusion receipt digest, fused window digest, and source-bundle digest",
                     "requires_ml_expertise": False,
                 },
                 {
@@ -406,7 +436,7 @@ class NeuroIntegrationWorkbench:
             {
                 "card_id": "import-sources",
                 "title": "Import approved summaries",
-                "plain_language_prompt": "Use questionnaire and EEG summaries first, then add fMRI or organoid summaries when available.",
+                "plain_language_prompt": "Use questionnaire and EEG summaries plus the BioData fusion receipt first, then add fMRI or organoid summaries when available.",
                 "agent_action": "bind_source_bundle",
                 "safety_gate": "do-not-store-raw-payloads",
             },
@@ -546,6 +576,24 @@ class NeuroIntegrationWorkbench:
             artifact.get("claim_ceiling") == NIW_CLAIM_CEILING
             for artifact in (workspace, analysis, operator_guide)
         )
+        upstream_receipt_bindings = source_bundle.get("upstream_receipt_bindings", [])
+        upstream_receipt_digests = {
+            binding.get("fusion_receipt_digest")
+            for binding in upstream_receipt_bindings
+            if isinstance(binding, dict)
+        }
+        upstream_fusion_binding = analysis.get("upstream_fusion_binding", {})
+        survey_eeg_fusion_receipt_bound = (
+            source_bundle.get("survey_eeg_fusion_receipt_bound") is True
+            and isinstance(upstream_fusion_binding, dict)
+            and upstream_fusion_binding.get("bound") is True
+            and upstream_fusion_binding.get("fusion_receipt_digest")
+            in upstream_receipt_digests
+        )
+        upstream_receipt_payload_redacted = all(
+            isinstance(binding, dict) and binding.get("raw_payload_stored") is False
+            for binding in upstream_receipt_bindings
+        )
         raw_payload_redacted = all(
             artifact.get(field_name) is False
             for artifact in (source_bundle, workspace, analysis, operator_guide)
@@ -571,6 +619,8 @@ class NeuroIntegrationWorkbench:
             "llm_native_workflow_bound": llm_native_workflow_bound,
             "beginner_operator_supported": beginner_operator_supported,
             "coding_agent_ready": coding_agent_ready,
+            "survey_eeg_fusion_receipt_bound": survey_eeg_fusion_receipt_bound,
+            "upstream_receipt_payload_redacted": upstream_receipt_payload_redacted,
             "claim_ceiling_bound": claim_ceiling_bound,
             "raw_payload_redacted": raw_payload_redacted,
             "no_diagnosis_or_identity_claim": no_diagnosis_or_identity_claim,
@@ -584,6 +634,7 @@ class NeuroIntegrationWorkbench:
             "errors": errors,
             **checks,
             "source_count": source_bundle.get("source_count", 0),
+            "upstream_receipt_count": source_bundle.get("upstream_receipt_count", 0),
             "app_count": len(app_receipts),
             "replacement_lane_count": len(workspace.get("replacement_lanes", [])),
             "claim_ceiling": NIW_CLAIM_CEILING,
@@ -596,6 +647,86 @@ class NeuroIntegrationWorkbench:
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
+
+    def _normalize_upstream_receipt(
+        self,
+        receipt: Dict[str, Any],
+        identity_id: str,
+    ) -> Dict[str, Any]:
+        if not isinstance(receipt, dict):
+            raise ValueError("upstream_receipt must be a mapping")
+        if receipt.get("profile_id") != NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID:
+            raise ValueError("upstream_receipt.profile_id is not supported")
+        if receipt.get("identity_id") != identity_id:
+            raise ValueError("upstream_receipt.identity_id must match identity_id")
+        if receipt.get("fusion_status") != "bound":
+            raise ValueError("upstream_receipt.fusion_status must be bound")
+        if receipt.get("claim_ceiling") != NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING:
+            raise ValueError("upstream_receipt.claim_ceiling mismatch")
+        if receipt.get("operator_accessibility_bound") is not True:
+            raise ValueError("upstream_receipt.operator_accessibility_bound must be true")
+        for field_name in (
+            "raw_survey_response_payload_stored",
+            "raw_eeg_samples_stored",
+            "raw_dataset_payload_stored",
+            "raw_latent_payload_stored",
+            "raw_fusion_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+            "diagnosis_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if receipt.get(field_name) is not False:
+                raise ValueError(f"upstream_receipt.{field_name} must be false")
+        self._require_non_empty_string(receipt.get("fusion_ref"), "upstream_receipt.fusion_ref")
+        axis_summary = receipt.get("fusion_axis_summary")
+        if not isinstance(axis_summary, dict) or not axis_summary:
+            raise ValueError("upstream_receipt.fusion_axis_summary must be non-empty")
+        fusion_confidence = axis_summary.get("fusion_confidence")
+        if not isinstance(fusion_confidence, (int, float)):
+            raise ValueError("upstream_receipt.fusion_axis_summary.fusion_confidence must be numeric")
+        binding = {
+            "receipt_role": NIW_BIODATA_FUSION_BINDING_ROLE,
+            "profile_id": NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID,
+            "fusion_ref": str(receipt["fusion_ref"]),
+            "fusion_receipt_digest": self._require_sha256_digest(
+                receipt.get("fusion_receipt_digest"),
+                "upstream_receipt.fusion_receipt_digest",
+            ),
+            "fused_window_digest": self._require_sha256_digest(
+                receipt.get("fused_window_digest"),
+                "upstream_receipt.fused_window_digest",
+            ),
+            "dataset_adapter_receipt_digest": self._require_sha256_digest(
+                receipt.get("dataset_adapter_receipt_digest"),
+                "upstream_receipt.dataset_adapter_receipt_digest",
+            ),
+            "latent_digest": self._require_sha256_digest(
+                receipt.get("latent_digest"),
+                "upstream_receipt.latent_digest",
+            ),
+            "source_feature_digest": self._require_sha256_digest(
+                receipt.get("source_feature_digest"),
+                "upstream_receipt.source_feature_digest",
+            ),
+            "eeg_feature_digest": self._require_sha256_digest(
+                receipt.get("eeg_feature_digest"),
+                "upstream_receipt.eeg_feature_digest",
+            ),
+            "survey_score_digest": self._require_sha256_digest(
+                receipt.get("survey_score_digest"),
+                "upstream_receipt.survey_score_digest",
+            ),
+            "fusion_axis_summary_digest": sha256_text(canonical_json(axis_summary)),
+            "fusion_confidence": self._round_score(float(fusion_confidence)),
+            "bound_source_types": list(NIW_SEED_SOURCE_TYPES),
+            "fusion_status": "bound",
+            "operator_accessibility_bound": True,
+            "claim_ceiling": NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING,
+            "raw_payload_stored": False,
+        }
+        return binding
 
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(source_manifest, dict):
@@ -731,6 +862,50 @@ class NeuroIntegrationWorkbench:
             )
         return lanes
 
+    def _build_upstream_fusion_binding(
+        self,
+        source_bundle: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        for binding in source_bundle.get("upstream_receipt_bindings", []):
+            if binding.get("receipt_role") == NIW_BIODATA_FUSION_BINDING_ROLE:
+                return {
+                    "bound": True,
+                    "receipt_role": binding["receipt_role"],
+                    "profile_id": binding["profile_id"],
+                    "fusion_ref": binding["fusion_ref"],
+                    "fusion_receipt_digest": binding["fusion_receipt_digest"],
+                    "fused_window_digest": binding["fused_window_digest"],
+                    "fusion_axis_summary_digest": binding[
+                        "fusion_axis_summary_digest"
+                    ],
+                    "fusion_confidence": binding["fusion_confidence"],
+                    "bound_source_types": list(binding["bound_source_types"]),
+                    "fusion_status": binding["fusion_status"],
+                    "operator_accessibility_bound": binding[
+                        "operator_accessibility_bound"
+                    ],
+                    "claim_ceiling": binding["claim_ceiling"],
+                    "raw_payload_stored": False,
+                }
+        return self._empty_upstream_fusion_binding()
+
+    def _empty_upstream_fusion_binding(self) -> Dict[str, Any]:
+        return {
+            "bound": False,
+            "receipt_role": NIW_BIODATA_FUSION_BINDING_ROLE,
+            "profile_id": NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID,
+            "fusion_ref": "",
+            "fusion_receipt_digest": "",
+            "fused_window_digest": "",
+            "fusion_axis_summary_digest": "",
+            "fusion_confidence": 0.0,
+            "bound_source_types": list(NIW_SEED_SOURCE_TYPES),
+            "fusion_status": "not-bound",
+            "operator_accessibility_bound": False,
+            "claim_ceiling": NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING,
+            "raw_payload_stored": False,
+        }
+
     def _check_app_receipt(self, app_receipt: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(app_receipt, dict):
             raise ValueError("app_receipt must be a mapping")
@@ -755,6 +930,23 @@ class NeuroIntegrationWorkbench:
         )
         if source_bundle.get("source_bundle_digest") != expected_digest:
             raise ValueError("source_bundle.source_bundle_digest mismatch")
+        bindings = source_bundle.get("upstream_receipt_bindings")
+        if not isinstance(bindings, list):
+            raise ValueError("source_bundle.upstream_receipt_bindings must be a list")
+        if any(not isinstance(binding, dict) for binding in bindings):
+            raise ValueError("source_bundle.upstream_receipt_bindings must contain mappings")
+        if source_bundle.get("upstream_receipt_count") != len(bindings):
+            raise ValueError("source_bundle.upstream_receipt_count mismatch")
+        expected_upstream_digest_set = self._upstream_receipt_digest_set(bindings)
+        if source_bundle.get("upstream_receipt_digest_set") != expected_upstream_digest_set:
+            raise ValueError("source_bundle.upstream_receipt_digest_set mismatch")
+        expected_fusion_bound = any(
+            binding.get("receipt_role") == NIW_BIODATA_FUSION_BINDING_ROLE
+            for binding in bindings
+            if isinstance(binding, dict)
+        )
+        if source_bundle.get("survey_eeg_fusion_receipt_bound") != expected_fusion_bound:
+            raise ValueError("source_bundle.survey_eeg_fusion_receipt_bound mismatch")
 
     def _check_workspace(self, workspace: Dict[str, Any]) -> None:
         if not isinstance(workspace, dict):
@@ -868,6 +1060,41 @@ class NeuroIntegrationWorkbench:
         if not isinstance(value, str) or not value.strip():
             raise ValueError(f"{field_name} must be a non-empty string")
 
+    def _require_sha256_digest(self, value: Any, field_name: str) -> str:
+        self._require_non_empty_string(value, field_name)
+        digest = str(value)
+        if len(digest) != 64 or any(ch not in "0123456789abcdef" for ch in digest):
+            raise ValueError(f"{field_name} must be a sha256 hex digest")
+        return digest
+
+    def _upstream_receipt_digest_set(
+        self,
+        upstream_receipt_bindings: Sequence[Dict[str, Any]],
+    ) -> str:
+        if not upstream_receipt_bindings:
+            return ""
+        digest_items = [
+            {
+                "receipt_role": binding.get("receipt_role"),
+                "profile_id": binding.get("profile_id"),
+                "fusion_receipt_digest": binding.get("fusion_receipt_digest"),
+                "fused_window_digest": binding.get("fused_window_digest"),
+                "fusion_axis_summary_digest": binding.get(
+                    "fusion_axis_summary_digest"
+                ),
+            }
+            for binding in upstream_receipt_bindings
+        ]
+        digest_items.sort(key=lambda item: str(item.get("fusion_receipt_digest", "")))
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_SOURCE_BUNDLE_PROFILE_ID,
+                    "upstream_receipt_bindings": digest_items,
+                }
+            )
+        )
+
     def _app_digest_payload(self, app_receipt: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "profile_id": app_receipt.get("profile_id"),
@@ -888,6 +1115,12 @@ class NeuroIntegrationWorkbench:
             "source_types": source_bundle.get("source_types"),
             "source_digest_set": source_bundle.get("source_digest_set"),
             "seed_survey_eeg_bound": source_bundle.get("seed_survey_eeg_bound"),
+            "upstream_receipt_digest_set": source_bundle.get(
+                "upstream_receipt_digest_set"
+            ),
+            "survey_eeg_fusion_receipt_bound": source_bundle.get(
+                "survey_eeg_fusion_receipt_bound"
+            ),
             "expansion_source_types_present": source_bundle.get(
                 "expansion_source_types_present"
             ),
@@ -914,6 +1147,7 @@ class NeuroIntegrationWorkbench:
             "workspace_digest": analysis.get("workspace_digest"),
             "source_bundle_digest": analysis.get("source_bundle_digest"),
             "seed_pair_digest": analysis.get("seed_pair_digest"),
+            "upstream_fusion_binding": analysis.get("upstream_fusion_binding"),
             "derived_axes": analysis.get("derived_axes"),
             "expansion_lanes": analysis.get("expansion_lanes"),
             "claim_ceiling": analysis.get("claim_ceiling"),
