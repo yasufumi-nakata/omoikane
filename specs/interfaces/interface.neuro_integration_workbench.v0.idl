@@ -19,6 +19,7 @@ imports:
   neuro_integration_application_connector_bundle: ../schemas/neuro_integration_application_connector_bundle.schema
   neuro_integration_collection_protocol: ../schemas/neuro_integration_collection_protocol.schema
   neuro_integration_collection_run: ../schemas/neuro_integration_collection_run.schema
+  neuro_integration_measurement_quality_gate: ../schemas/neuro_integration_measurement_quality_gate.schema
   neuro_integration_cross_modal_analysis_plan: ../schemas/neuro_integration_cross_modal_analysis_plan.schema
   neuro_integration_cross_modal_analysis_run: ../schemas/neuro_integration_cross_modal_analysis_run.schema
 operations:
@@ -330,6 +331,76 @@ operations:
       - operator and coding-agent review readiness must be explicit and require no ML expertise
       - raw source, collection, connector, and result payload storage must remain false
       - diagnosis, consciousness reproduction, and identity replacement claims must remain false
+  bind_measurement_quality_gate:
+    summary: Bind collection run results to calibration, artifact/QC, consent freshness, operator review, and quality authority refs before analysis planning.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - collection_run
+          - quality_manifests
+        properties:
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          collection_run:
+            schema_ref: neuro_integration_collection_run
+          quality_manifests:
+            type: array
+            minItems: 1
+            items:
+              type: object
+              required:
+                - source_type
+                - calibration_ref
+                - artifact_qc_ref
+                - consent_freshness_ref
+                - operator_review_ref
+                - quality_authority_ref
+              properties:
+                source_type:
+                  type: string
+                  pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+                calibration_ref:
+                  type: string
+                  minLength: 1
+                artifact_qc_ref:
+                  type: string
+                  minLength: 1
+                consent_freshness_ref:
+                  type: string
+                  minLength: 1
+                operator_review_ref:
+                  type: string
+                  minLength: 1
+                quality_authority_ref:
+                  type: string
+                  minLength: 1
+                calibration_score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                artifact_acceptance_score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                consent_freshness_score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+                sampling_completeness_score:
+                  type: number
+                  minimum: 0
+                  maximum: 1
+    output:
+      schema_ref: neuro_integration_measurement_quality_gate
+    guarantees:
+      - every source in the collection run must have one bounded measurement quality item
+      - questionnaire and EEG quality gates must be bound before downstream analysis claims pass
+      - calibration, artifact/QC, consent freshness, operator review, and quality authority refs must be digest-only
+      - operator and coding-agent review readiness must remain explicit and require no ML expertise
+      - raw source, quality, calibration, artifact, and consent payload storage must remain false
+      - diagnosis, consciousness reproduction, and identity replacement claims must remain false
   build_cross_modal_analysis_plan:
     summary: Emit a digest-only plan for every current source-type pair so questionnaire, EEG, fMRI, organoid, and future biological summaries can be analyzed through bounded recipes.
     input:
@@ -386,7 +457,7 @@ operations:
       - raw source, analysis, connector, and result payload storage must remain false
       - diagnosis, consciousness reproduction, and identity replacement claims must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional cross-modal analysis-plan, and optional cross-modal analysis-run digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, and optional cross-modal analysis-run digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -418,6 +489,8 @@ operations:
             schema_ref: neuro_integration_collection_protocol
           collection_run:
             schema_ref: neuro_integration_collection_run
+          measurement_quality_gate:
+            schema_ref: neuro_integration_measurement_quality_gate
           cross_modal_analysis_plan:
             schema_ref: neuro_integration_cross_modal_analysis_plan
           cross_modal_analysis_run:
@@ -445,6 +518,10 @@ operations:
           - collection_run_digest_bound
           - collection_results_bound
           - collection_result_payload_redacted
+          - measurement_quality_gate_bound
+          - measurement_quality_gate_digest_bound
+          - measurement_quality_items_bound
+          - measurement_quality_payload_redacted
           - survey_eeg_fusion_receipt_bound
           - upstream_receipt_payload_redacted
           - connector_bundle_digest_bound
@@ -499,6 +576,14 @@ operations:
             type: boolean
           collection_result_payload_redacted:
             type: boolean
+          measurement_quality_gate_bound:
+            type: boolean
+          measurement_quality_gate_digest_bound:
+            type: boolean
+          measurement_quality_items_bound:
+            type: boolean
+          measurement_quality_payload_redacted:
+            type: boolean
           survey_eeg_fusion_receipt_bound:
             type: boolean
           upstream_receipt_payload_redacted:
@@ -538,6 +623,9 @@ operations:
           collection_result_count:
             type: integer
             minimum: 0
+          measurement_quality_item_count:
+            type: integer
+            minimum: 0
           analysis_pair_count:
             type: integer
             minimum: 0
@@ -557,6 +645,8 @@ events:
     payload_schema: neuro_integration_collection_protocol
   - name: neuro_integration_workbench.collection_run.bound
     payload_schema: neuro_integration_collection_run
+  - name: neuro_integration_workbench.measurement_quality_gate.bound
+    payload_schema: neuro_integration_measurement_quality_gate
   - name: neuro_integration_workbench.cross_modal_analysis_plan.bound
     payload_schema: neuro_integration_cross_modal_analysis_plan
   - name: neuro_integration_workbench.cross_modal_analysis_run.bound

@@ -329,6 +329,11 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["collection_results_bound"])
         self.assertTrue(result["validation"]["collection_result_payload_redacted"])
         self.assertEqual(4, result["validation"]["collection_result_count"])
+        self.assertTrue(result["validation"]["measurement_quality_gate_bound"])
+        self.assertTrue(result["validation"]["measurement_quality_gate_digest_bound"])
+        self.assertTrue(result["validation"]["measurement_quality_items_bound"])
+        self.assertTrue(result["validation"]["measurement_quality_payload_redacted"])
+        self.assertEqual(4, result["validation"]["measurement_quality_item_count"])
         self.assertTrue(result["validation"]["cross_modal_analysis_plan_bound"])
         self.assertTrue(result["validation"]["cross_modal_analysis_plan_digest_bound"])
         self.assertTrue(result["validation"]["cross_modal_source_pair_coverage_bound"])
@@ -359,6 +364,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["connector_bundle"]["connector_bundle_bound"])
         self.assertTrue(result["collection_protocol"]["collection_protocol_bound"])
         self.assertTrue(result["collection_run"]["collection_run_bound"])
+        self.assertTrue(
+            result["measurement_quality_gate"]["measurement_quality_gate_bound"]
+        )
         self.assertTrue(
             result["cross_modal_analysis_plan"]["cross_modal_analysis_plan_bound"]
         )
@@ -397,6 +405,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-neuro-integration-workbench-collection-run"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-neuro-integration-workbench-quality-gate"
             ],
         )
         self.assertEqual(

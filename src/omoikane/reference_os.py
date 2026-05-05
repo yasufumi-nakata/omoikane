@@ -11435,6 +11435,42 @@ json.dump(response, sys.stdout)
                 collection_protocol,
             )
         )
+        measurement_quality_gate = (
+            self.neuro_integration_workbench.bind_measurement_quality_gate(
+                source_bundle,
+                collection_run,
+                quality_manifests=[
+                    {
+                        "source_type": source_type,
+                        "calibration_ref": (
+                            "calibration://neuro-workbench/"
+                            f"{source_type}/digest-only-v1"
+                        ),
+                        "artifact_qc_ref": (
+                            "artifact-qc://neuro-workbench/"
+                            f"{source_type}/bounded-review-v1"
+                        ),
+                        "consent_freshness_ref": (
+                            "consent-freshness://neuro-workbench/"
+                            f"{source_type}/current"
+                        ),
+                        "operator_review_ref": (
+                            "operator-review://neuro-workbench/"
+                            f"{source_type}/quality-gate"
+                        ),
+                        "quality_authority_ref": (
+                            "quality-authority://neuro-workbench/"
+                            f"{source_type}/guardian-reviewed"
+                        ),
+                        "calibration_score": 0.92,
+                        "artifact_acceptance_score": 0.91,
+                        "consent_freshness_score": 0.96,
+                        "sampling_completeness_score": 0.9,
+                    }
+                    for source_type in source_bundle["source_types"]
+                ],
+            )
+        )
         cross_modal_analysis_plan = (
             self.neuro_integration_workbench.build_cross_modal_analysis_plan(
                 source_bundle,
@@ -11463,6 +11499,7 @@ json.dump(response, sys.stdout)
             cross_modal_analysis_run,
             collection_protocol=collection_protocol,
             collection_run=collection_run,
+            measurement_quality_gate=measurement_quality_gate,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11756,6 +11793,51 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.measurement_quality_gate.bound",
+            payload={
+                "measurement_quality_gate_ref": measurement_quality_gate[
+                    "measurement_quality_gate_ref"
+                ],
+                "measurement_quality_gate_digest": measurement_quality_gate[
+                    "measurement_quality_gate_digest"
+                ],
+                "source_bundle_digest": measurement_quality_gate[
+                    "source_bundle_digest"
+                ],
+                "collection_run_digest": measurement_quality_gate[
+                    "collection_run_digest"
+                ],
+                "quality_item_digest_set": measurement_quality_gate[
+                    "quality_item_digest_set"
+                ],
+                "quality_item_count": measurement_quality_gate[
+                    "quality_item_count"
+                ],
+                "all_quality_items_bound": measurement_quality_gate[
+                    "all_quality_items_bound"
+                ],
+                "seed_survey_eeg_quality_bound": measurement_quality_gate[
+                    "seed_survey_eeg_quality_bound"
+                ],
+                "expansion_quality_bound": measurement_quality_gate[
+                    "expansion_quality_bound"
+                ],
+                "measurement_quality_gate_bound": measurement_quality_gate[
+                    "measurement_quality_gate_bound"
+                ],
+                "claim_ceiling": measurement_quality_gate["claim_ceiling"],
+                "raw_quality_payload_stored": measurement_quality_gate[
+                    "raw_quality_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-quality-gate",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="neuro_integration_workbench.cross_modal_analysis_plan.bound",
             payload={
                 "cross_modal_analysis_plan_ref": cross_modal_analysis_plan[
@@ -11854,6 +11936,7 @@ json.dump(response, sys.stdout)
             "connector_bundle": connector_bundle,
             "collection_protocol": collection_protocol,
             "collection_run": collection_run,
+            "measurement_quality_gate": measurement_quality_gate,
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
             "validation": validation,
@@ -11907,6 +11990,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "collection_run",
                     "schema_path": "specs/schemas/neuro_integration_collection_run.schema",
                     "contract_role": "neuro-integration-collection-run",
+                },
+                {
+                    "payload_path": "measurement_quality_gate",
+                    "schema_path": "specs/schemas/neuro_integration_measurement_quality_gate.schema",
+                    "contract_role": "neuro-integration-measurement-quality-gate",
                 },
                 {
                     "payload_path": "cross_modal_analysis_plan",

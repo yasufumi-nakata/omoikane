@@ -393,6 +393,7 @@ status: decided | superseded
 - [2026-05-05_neuro-integration-application-connector-bundle.md](2026-05-05_neuro-integration-application-connector-bundle.md)
 - [2026-05-05_neuro-integration-collection-protocol.md](2026-05-05_neuro-integration-collection-protocol.md)
 - [2026-05-05_neuro-integration-collection-run.md](2026-05-05_neuro-integration-collection-run.md)
+- [2026-05-05_neuro-integration-measurement-quality-gate.md](2026-05-05_neuro-integration-measurement-quality-gate.md)
 - [2026-05-05_observation-integration-workbench.md](2026-05-05_observation-integration-workbench.md)
 - [2026-05-05_observation-measurement-analysis-catalog.md](2026-05-05_observation-measurement-analysis-catalog.md)
 - [2026-05-05_observation-integration-analysis-run.md](2026-05-05_observation-integration-analysis-run.md)

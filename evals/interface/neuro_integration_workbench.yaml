@@ -46,6 +46,11 @@ expected:
   collection_results_bound: true
   collection_result_payload_redacted: true
   collection_result_count: 4
+  measurement_quality_gate_bound: true
+  measurement_quality_gate_digest_bound: true
+  measurement_quality_items_bound: true
+  measurement_quality_payload_redacted: true
+  measurement_quality_item_count: 4
   cross_modal_analysis_plan_bound: true
   cross_modal_analysis_plan_digest_bound: true
   cross_modal_source_pair_coverage_bound: true

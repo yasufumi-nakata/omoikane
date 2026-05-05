@@ -18,6 +18,7 @@ NIW_CONNECTOR_PROFILE_ID = "neuro-application-connector-v1"
 NIW_CONNECTOR_BUNDLE_PROFILE_ID = "neuro-application-connector-bundle-v1"
 NIW_COLLECTION_PROTOCOL_PROFILE_ID = "neuro-collection-protocol-v1"
 NIW_COLLECTION_RUN_PROFILE_ID = "neuro-collection-run-v1"
+NIW_MEASUREMENT_QUALITY_GATE_PROFILE_ID = "neuro-measurement-quality-gate-v1"
 NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID = "neuro-cross-modal-analysis-plan-v1"
 NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID = "neuro-cross-modal-analysis-run-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
@@ -35,6 +36,9 @@ NIW_COLLECTION_PROTOCOL_POLICY = (
 )
 NIW_COLLECTION_RUN_POLICY = (
     "collection-step-digest+bounded-quality-summary+operator-review-only"
+)
+NIW_MEASUREMENT_QUALITY_GATE_POLICY = (
+    "collection-result-digest+calibration-artifact-consent-quality-gate-only"
 )
 NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY = (
     "source-pair-feature-digest+connector-ref-analysis-plan-only"
@@ -153,6 +157,9 @@ class NeuroIntegrationWorkbench:
             "connector_bundle_profile_id": NIW_CONNECTOR_BUNDLE_PROFILE_ID,
             "collection_protocol_profile_id": NIW_COLLECTION_PROTOCOL_PROFILE_ID,
             "collection_run_profile_id": NIW_COLLECTION_RUN_PROFILE_ID,
+            "measurement_quality_gate_profile_id": (
+                NIW_MEASUREMENT_QUALITY_GATE_PROFILE_ID
+            ),
             "cross_modal_analysis_plan_profile_id": (
                 NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID
             ),
@@ -175,6 +182,9 @@ class NeuroIntegrationWorkbench:
             "connector_bundle_policy": NIW_CONNECTOR_BUNDLE_POLICY,
             "collection_protocol_policy": NIW_COLLECTION_PROTOCOL_POLICY,
             "collection_run_policy": NIW_COLLECTION_RUN_POLICY,
+            "measurement_quality_gate_policy": (
+                NIW_MEASUREMENT_QUALITY_GATE_POLICY
+            ),
             "cross_modal_analysis_plan_policy": (
                 NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY
             ),
@@ -1164,6 +1174,163 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(run)
 
+    def bind_measurement_quality_gate(
+        self,
+        source_bundle: Dict[str, Any],
+        collection_run: Dict[str, Any],
+        quality_manifests: Sequence[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        self._check_source_bundle(source_bundle)
+        self._check_collection_run(collection_run)
+        if collection_run["source_bundle_digest"] != source_bundle[
+            "source_bundle_digest"
+        ]:
+            raise ValueError("collection_run.source_bundle_digest must match source bundle")
+        if not quality_manifests:
+            raise ValueError("quality_manifests must not be empty")
+        manifests = [
+            self._normalize_quality_manifest(manifest)
+            for manifest in quality_manifests
+        ]
+        manifest_by_source = {manifest["source_type"]: manifest for manifest in manifests}
+        missing_source_types = [
+            source_type
+            for source_type in source_bundle["source_types"]
+            if source_type not in manifest_by_source
+        ]
+        if missing_source_types:
+            raise ValueError("quality_manifests must cover every source type")
+        results_by_source = {
+            result["source_type"]: result
+            for result in collection_run["collection_results"]
+        }
+        quality_items = [
+            self._build_quality_item(
+                source,
+                results_by_source[source["source_type"]],
+                manifest_by_source[source["source_type"]],
+            )
+            for source in source_bundle["sources"]
+        ]
+        item_digests = [item["quality_item_digest"] for item in quality_items]
+        item_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_MEASUREMENT_QUALITY_GATE_PROFILE_ID,
+                    "collection_run_digest": collection_run[
+                        "collection_run_digest"
+                    ],
+                    "quality_item_digests": item_digests,
+                }
+            )
+        )
+        all_quality_items_bound = (
+            len(quality_items) == source_bundle["source_count"]
+            and all(item["quality_item_bound"] for item in quality_items)
+        )
+        seed_quality_bound = all(
+            any(
+                item["source_type"] == source_type and item["quality_item_bound"]
+                for item in quality_items
+            )
+            for source_type in NIW_SEED_SOURCE_TYPES
+        )
+        expansion_quality_bound = all(
+            any(
+                item["source_type"] == source_type and item["quality_item_bound"]
+                for item in quality_items
+            )
+            for source_type in source_bundle["expansion_source_types_present"]
+        )
+        summary = {
+            "quality_item_count": len(quality_items),
+            "bounded_quality_item_count": sum(
+                1 for item in quality_items if item["quality_item_bound"]
+            ),
+            "average_measurement_quality_score": self._round_score(
+                sum(
+                    item["quality_axis_summary"][
+                        "measurement_quality_score"
+                    ]
+                    for item in quality_items
+                )
+                / max(len(quality_items), 1)
+            ),
+            "max_measurement_risk_proxy": self._round_score(
+                max(
+                    (
+                        item["quality_axis_summary"][
+                            "measurement_risk_proxy"
+                        ]
+                        for item in quality_items
+                    ),
+                    default=0.0,
+                )
+            ),
+        }
+        gate = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "measurement_quality_gate_ref": (
+                "quality-gate://neuro-integration/"
+                f"{new_id('niw-quality-gate')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_MEASUREMENT_QUALITY_GATE_PROFILE_ID,
+            "identity_id": source_bundle["identity_id"],
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "collection_run_ref": collection_run["collection_run_ref"],
+            "collection_run_digest": collection_run["collection_run_digest"],
+            "source_types": list(source_bundle["source_types"]),
+            "source_type_count": len(source_bundle["source_types"]),
+            "quality_item_count": len(quality_items),
+            "quality_items": quality_items,
+            "quality_item_digests": item_digests,
+            "quality_item_digest_set": item_digest_set,
+            "all_quality_items_bound": all_quality_items_bound,
+            "seed_survey_eeg_quality_bound": seed_quality_bound,
+            "expansion_quality_bound": expansion_quality_bound,
+            "calibration_refs_bound": all(
+                bool(item["calibration_ref"]) for item in quality_items
+            ),
+            "artifact_qc_refs_bound": all(
+                bool(item["artifact_qc_ref"]) for item in quality_items
+            ),
+            "consent_freshness_bound": all(
+                item["consent_freshness_score"] >= 0.8
+                for item in quality_items
+            ),
+            "operator_review_ready": collection_run["operator_review_ready"]
+            and all_quality_items_bound,
+            "coding_agent_review_ready": collection_run[
+                "coding_agent_review_ready"
+            ]
+            and all_quality_items_bound,
+            "quality_summary": summary,
+            "measurement_quality_gate_bound": (
+                collection_run["collection_run_bound"]
+                and all_quality_items_bound
+                and seed_quality_bound
+                and expansion_quality_bound
+            ),
+            "storage_policy": NIW_MEASUREMENT_QUALITY_GATE_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_source_payload_stored": False,
+            "raw_quality_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "raw_artifact_payload_stored": False,
+            "raw_consent_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        gate["measurement_quality_gate_digest"] = sha256_text(
+            canonical_json(self._measurement_quality_gate_digest_payload(gate))
+        )
+        return deepcopy(gate)
+
     def execute_cross_modal_analysis_plan(
         self,
         source_bundle: Dict[str, Any],
@@ -1305,6 +1472,7 @@ class NeuroIntegrationWorkbench:
         cross_modal_analysis_run: Dict[str, Any] | None = None,
         collection_protocol: Dict[str, Any] | None = None,
         collection_run: Dict[str, Any] | None = None,
+        measurement_quality_gate: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -1369,6 +1537,13 @@ class NeuroIntegrationWorkbench:
                 errors.append(str(exc))
             if collection_protocol is None:
                 errors.append("collection_run requires collection_protocol")
+        if measurement_quality_gate is not None:
+            try:
+                self._check_measurement_quality_gate(measurement_quality_gate)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if collection_run is None:
+                errors.append("measurement_quality_gate requires collection_run")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -1592,6 +1767,49 @@ class NeuroIntegrationWorkbench:
                     self._collection_run_payload_redacted(collection_run)
                 ),
             }
+        measurement_quality_gate_checks: Dict[str, bool] = {}
+        if measurement_quality_gate is not None:
+            measurement_quality_gate_digest_bound = (
+                measurement_quality_gate.get("measurement_quality_gate_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._measurement_quality_gate_digest_payload(
+                            measurement_quality_gate
+                        )
+                    )
+                )
+            )
+            expected_collection_run_digest = (
+                collection_run.get("collection_run_digest")
+                if collection_run is not None
+                else ""
+            )
+            measurement_quality_gate_checks = {
+                "measurement_quality_gate_digest_bound": (
+                    measurement_quality_gate_digest_bound
+                ),
+                "measurement_quality_gate_bound": (
+                    measurement_quality_gate.get(
+                        "measurement_quality_gate_bound"
+                    )
+                    is True
+                    and measurement_quality_gate.get("source_bundle_digest")
+                    == source_bundle.get("source_bundle_digest")
+                    and measurement_quality_gate.get("collection_run_digest")
+                    == expected_collection_run_digest
+                ),
+                "measurement_quality_items_bound": (
+                    measurement_quality_gate.get("all_quality_items_bound")
+                    is True
+                    and measurement_quality_gate.get("quality_item_count")
+                    == source_bundle.get("source_count")
+                ),
+                "measurement_quality_payload_redacted": (
+                    self._measurement_quality_gate_payload_redacted(
+                        measurement_quality_gate
+                    )
+                ),
+            }
         cross_modal_plan_checks: Dict[str, bool] = {}
         if cross_modal_analysis_plan is not None:
             cross_modal_analysis_plan_digest_bound = (
@@ -1722,6 +1940,7 @@ class NeuroIntegrationWorkbench:
             **connector_bundle_checks,
             **collection_protocol_checks,
             **collection_run_checks,
+            **measurement_quality_gate_checks,
             **cross_modal_plan_checks,
             **cross_modal_run_checks,
         }
@@ -1758,6 +1977,11 @@ class NeuroIntegrationWorkbench:
             "collection_result_count": (
                 collection_run.get("result_count", 0)
                 if collection_run is not None
+                else 0
+            ),
+            "measurement_quality_item_count": (
+                measurement_quality_gate.get("quality_item_count", 0)
+                if measurement_quality_gate is not None
                 else 0
             ),
             "analysis_pair_count": (
@@ -2512,6 +2736,167 @@ class NeuroIntegrationWorkbench:
             "collection_risk_proxy": self._round_score(1.0 - quality_score),
         }
 
+    def _normalize_quality_manifest(
+        self,
+        manifest: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        if not isinstance(manifest, dict):
+            raise ValueError("quality_manifest must be a mapping")
+        source_type = self._normalize_source_type(
+            manifest.get("source_type"),
+            "source_type",
+        )
+        for field_name in (
+            "calibration_ref",
+            "artifact_qc_ref",
+            "consent_freshness_ref",
+            "operator_review_ref",
+            "quality_authority_ref",
+        ):
+            self._require_non_empty_string(manifest.get(field_name), field_name)
+        calibration_score = self._bounded_feature(
+            manifest,
+            "calibration_score",
+            1.0,
+        )
+        artifact_acceptance_score = self._bounded_feature(
+            manifest,
+            "artifact_acceptance_score",
+            1.0,
+        )
+        consent_freshness_score = self._bounded_feature(
+            manifest,
+            "consent_freshness_score",
+            1.0,
+        )
+        sampling_completeness_score = self._bounded_feature(
+            manifest,
+            "sampling_completeness_score",
+            1.0,
+        )
+        return {
+            "source_type": source_type,
+            "calibration_ref": str(manifest["calibration_ref"]),
+            "artifact_qc_ref": str(manifest["artifact_qc_ref"]),
+            "consent_freshness_ref": str(manifest["consent_freshness_ref"]),
+            "operator_review_ref": str(manifest["operator_review_ref"]),
+            "quality_authority_ref": str(manifest["quality_authority_ref"]),
+            "calibration_score": calibration_score,
+            "artifact_acceptance_score": artifact_acceptance_score,
+            "consent_freshness_score": consent_freshness_score,
+            "sampling_completeness_score": sampling_completeness_score,
+            "raw_quality_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "raw_artifact_payload_stored": False,
+            "raw_consent_payload_stored": False,
+        }
+
+    def _build_quality_item(
+        self,
+        source: Dict[str, Any],
+        collection_result: Dict[str, Any],
+        manifest: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        collection_quality_score = collection_result["collection_quality_summary"][
+            "bounded_quality_score"
+        ]
+        measurement_quality_score = self._round_score(
+            (
+                collection_quality_score
+                + manifest["calibration_score"]
+                + manifest["artifact_acceptance_score"]
+                + manifest["consent_freshness_score"]
+                + manifest["sampling_completeness_score"]
+            )
+            / 5.0
+        )
+        quality_axis_summary = {
+            "collection_quality_score": collection_quality_score,
+            "calibration_score": manifest["calibration_score"],
+            "artifact_acceptance_score": manifest["artifact_acceptance_score"],
+            "consent_freshness_score": manifest["consent_freshness_score"],
+            "sampling_completeness_score": manifest["sampling_completeness_score"],
+            "measurement_quality_score": measurement_quality_score,
+            "measurement_risk_proxy": self._round_score(
+                1.0 - measurement_quality_score
+            ),
+        }
+        item_bound = (
+            collection_result["collection_result_bound"]
+            and measurement_quality_score >= 0.75
+            and manifest["calibration_score"] >= 0.8
+            and manifest["artifact_acceptance_score"] >= 0.8
+            and manifest["consent_freshness_score"] >= 0.8
+        )
+        item = {
+            "quality_item_ref": (
+                "quality-item://neuro-integration/"
+                f"{new_id('niw-quality-item')}"
+            ),
+            "source_type": source["source_type"],
+            "source_family": source["source_family"],
+            "source_ref": source["source_ref"],
+            "feature_summary_ref": source["feature_summary_ref"],
+            "feature_digest": source["feature_digest"],
+            "collection_result_ref": collection_result["collection_result_ref"],
+            "collection_result_digest": collection_result[
+                "collection_result_digest"
+            ],
+            "collection_window_ref": collection_result["collection_window_ref"],
+            "measurement_connector_refs": list(
+                collection_result["measurement_connector_refs"]
+            ),
+            "measurement_connector_digests": list(
+                collection_result["measurement_connector_digests"]
+            ),
+            "calibration_ref": manifest["calibration_ref"],
+            "artifact_qc_ref": manifest["artifact_qc_ref"],
+            "consent_freshness_ref": manifest["consent_freshness_ref"],
+            "operator_review_ref": manifest["operator_review_ref"],
+            "quality_authority_ref": manifest["quality_authority_ref"],
+            "calibration_score": manifest["calibration_score"],
+            "artifact_acceptance_score": manifest["artifact_acceptance_score"],
+            "consent_freshness_score": manifest["consent_freshness_score"],
+            "sampling_completeness_score": manifest[
+                "sampling_completeness_score"
+            ],
+            "quality_axis_summary": quality_axis_summary,
+            "quality_gate_status": self._quality_gate_status(
+                source["source_type"]
+            ),
+            "operator_summary": self._quality_gate_operator_summary(
+                source["source_type"],
+                measurement_quality_score,
+                quality_axis_summary["measurement_risk_proxy"],
+            ),
+            "agent_next_action": self._quality_gate_next_action(
+                source["source_type"]
+            ),
+            "evidence_refs": [
+                collection_result["collection_result_ref"],
+                manifest["calibration_ref"],
+                manifest["artifact_qc_ref"],
+                manifest["consent_freshness_ref"],
+                manifest["operator_review_ref"],
+                manifest["quality_authority_ref"],
+            ],
+            "requires_ml_expertise": False,
+            "quality_item_bound": item_bound,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_source_payload_stored": False,
+            "raw_quality_payload_stored": False,
+            "raw_calibration_payload_stored": False,
+            "raw_artifact_payload_stored": False,
+            "raw_consent_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        item["quality_item_digest"] = sha256_text(
+            canonical_json(self._quality_item_digest_payload(item))
+        )
+        return item
+
     def _collection_method_id(self, source_type: str) -> str:
         return {
             "questionnaire": "self-report-questionnaire-feature-window",
@@ -2578,6 +2963,43 @@ class NeuroIntegrationWorkbench:
             "fmri_bold": "review_fmri_collection_motion_context",
             "brain_organoid": "review_organoid_collection_boundary",
         }.get(source_type, "review_generic_biodata_collection_quality")
+
+    def _quality_gate_status(self, source_type: str) -> str:
+        return {
+            "questionnaire": "seed-questionnaire-quality-gate-bound",
+            "eeg": "seed-eeg-quality-gate-bound",
+            "fmri_bold": "neuroimaging-quality-context-bound",
+            "brain_organoid": "in-vitro-quality-context-bound",
+        }.get(source_type, "generic-biodata-quality-gate-bound")
+
+    def _quality_gate_operator_summary(
+        self,
+        source_type: str,
+        quality_score: float,
+        risk_proxy: float,
+    ) -> str:
+        if source_type == "questionnaire":
+            label = "Questionnaire measurement quality"
+        elif source_type == "eeg":
+            label = "EEG measurement quality"
+        elif source_type == "fmri_bold":
+            label = "fMRI measurement quality"
+        elif source_type == "brain_organoid":
+            label = "Organoid context quality"
+        else:
+            label = "Biological measurement quality"
+        return (
+            f"{label} is gated at {quality_score:.3f}; "
+            f"risk proxy {risk_proxy:.3f} must remain review context."
+        )
+
+    def _quality_gate_next_action(self, source_type: str) -> str:
+        return {
+            "questionnaire": "review_questionnaire_consent_and_scale_quality_refs",
+            "eeg": "review_eeg_calibration_artifact_and_consent_refs",
+            "fmri_bold": "review_fmri_motion_calibration_and_consent_refs",
+            "brain_organoid": "review_organoid_provenance_quality_boundary",
+        }.get(source_type, "review_generic_biodata_quality_refs")
 
     def _axis_mean(self, axes: Dict[str, Any]) -> float:
         values = [float(value) for value in axes.values() if isinstance(value, (int, float))]
@@ -3067,6 +3489,73 @@ class NeuroIntegrationWorkbench:
         if run.get("result_digest_set") != expected_result_digest_set:
             raise ValueError("collection_run.result_digest_set mismatch")
 
+    def _check_measurement_quality_gate(self, gate: Dict[str, Any]) -> None:
+        if not isinstance(gate, dict):
+            raise ValueError("measurement_quality_gate must be a mapping")
+        if gate.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("measurement_quality_gate.schema_version mismatch")
+        if gate.get("profile_id") != NIW_MEASUREMENT_QUALITY_GATE_PROFILE_ID:
+            raise ValueError("measurement_quality_gate.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._measurement_quality_gate_digest_payload(gate))
+        )
+        if gate.get("measurement_quality_gate_digest") != expected_digest:
+            raise ValueError(
+                "measurement_quality_gate.measurement_quality_gate_digest mismatch"
+            )
+        if gate.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("measurement_quality_gate.claim_ceiling mismatch")
+        if gate.get("storage_policy") != NIW_MEASUREMENT_QUALITY_GATE_POLICY:
+            raise ValueError("measurement_quality_gate.storage_policy mismatch")
+        items = gate.get("quality_items")
+        if not isinstance(items, list) or not items:
+            raise ValueError(
+                "measurement_quality_gate.quality_items must be a non-empty list"
+            )
+        if gate.get("quality_item_count") != len(items):
+            raise ValueError(
+                "measurement_quality_gate.quality_item_count must match items"
+            )
+        item_digests = []
+        for item in items:
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+            ):
+                if item.get(field_name) is not False:
+                    raise ValueError(f"quality_item.{field_name} must be false")
+            expected_item_digest = sha256_text(
+                canonical_json(self._quality_item_digest_payload(item))
+            )
+            if item.get("quality_item_digest") != expected_item_digest:
+                raise ValueError("quality_item.quality_item_digest mismatch")
+            item_digests.append(expected_item_digest)
+        if gate.get("quality_item_digests") != item_digests:
+            raise ValueError(
+                "measurement_quality_gate.quality_item_digests mismatch"
+            )
+        expected_item_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_MEASUREMENT_QUALITY_GATE_PROFILE_ID,
+                    "collection_run_digest": gate.get("collection_run_digest"),
+                    "quality_item_digests": item_digests,
+                }
+            )
+        )
+        if gate.get("quality_item_digest_set") != expected_item_digest_set:
+            raise ValueError(
+                "measurement_quality_gate.quality_item_digest_set mismatch"
+            )
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if gate.get(field_name) is not False:
+                raise ValueError(f"measurement_quality_gate.{field_name} must be false")
+
     def _check_cross_modal_analysis_plan(self, plan: Dict[str, Any]) -> None:
         if not isinstance(plan, dict):
             raise ValueError("cross_modal_analysis_plan must be a mapping")
@@ -3352,6 +3841,24 @@ class NeuroIntegrationWorkbench:
         )
         return run_raw_flags and result_raw_flags
 
+    def _measurement_quality_gate_payload_redacted(
+        self,
+        gate: Dict[str, Any],
+    ) -> bool:
+        gate_raw_flags = all(
+            gate.get(field_name) is False
+            for field_name in gate
+            if field_name.startswith("raw_")
+        )
+        item_raw_flags = all(
+            item.get(field_name) is False
+            for item in gate.get("quality_items", [])
+            if isinstance(item, dict)
+            for field_name in item
+            if field_name.startswith("raw_")
+        )
+        return gate_raw_flags and item_raw_flags
+
     def _cross_modal_analysis_payload_redacted(self, plan: Dict[str, Any]) -> bool:
         plan_raw_flags = all(
             plan.get(field_name) is False
@@ -3535,6 +4042,41 @@ class NeuroIntegrationWorkbench:
             "claim_ceiling": result.get("claim_ceiling"),
         }
 
+    def _quality_item_digest_payload(
+        self,
+        item: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "source_type": item.get("source_type"),
+            "source_family": item.get("source_family"),
+            "source_ref": item.get("source_ref"),
+            "feature_summary_ref": item.get("feature_summary_ref"),
+            "feature_digest": item.get("feature_digest"),
+            "collection_result_digest": item.get(
+                "collection_result_digest"
+            ),
+            "collection_window_ref": item.get("collection_window_ref"),
+            "measurement_connector_refs": item.get(
+                "measurement_connector_refs"
+            ),
+            "measurement_connector_digests": item.get(
+                "measurement_connector_digests"
+            ),
+            "calibration_ref": item.get("calibration_ref"),
+            "artifact_qc_ref": item.get("artifact_qc_ref"),
+            "consent_freshness_ref": item.get("consent_freshness_ref"),
+            "operator_review_ref": item.get("operator_review_ref"),
+            "quality_authority_ref": item.get("quality_authority_ref"),
+            "quality_axis_summary": item.get("quality_axis_summary"),
+            "quality_gate_status": item.get("quality_gate_status"),
+            "operator_summary": item.get("operator_summary"),
+            "agent_next_action": item.get("agent_next_action"),
+            "evidence_refs": item.get("evidence_refs"),
+            "requires_ml_expertise": item.get("requires_ml_expertise"),
+            "quality_item_bound": item.get("quality_item_bound"),
+            "claim_ceiling": item.get("claim_ceiling"),
+        }
+
     def _source_bundle_digest_payload(self, source_bundle: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "profile_id": source_bundle.get("profile_id"),
@@ -3705,6 +4247,37 @@ class NeuroIntegrationWorkbench:
             "collection_summary": run.get("collection_summary"),
             "collection_run_bound": run.get("collection_run_bound"),
             "claim_ceiling": run.get("claim_ceiling"),
+        }
+
+    def _measurement_quality_gate_digest_payload(
+        self,
+        gate: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": gate.get("profile_id"),
+            "identity_id": gate.get("identity_id"),
+            "source_bundle_digest": gate.get("source_bundle_digest"),
+            "collection_run_digest": gate.get("collection_run_digest"),
+            "source_types": gate.get("source_types"),
+            "source_type_count": gate.get("source_type_count"),
+            "quality_item_count": gate.get("quality_item_count"),
+            "quality_item_digest_set": gate.get("quality_item_digest_set"),
+            "all_quality_items_bound": gate.get("all_quality_items_bound"),
+            "seed_survey_eeg_quality_bound": gate.get(
+                "seed_survey_eeg_quality_bound"
+            ),
+            "expansion_quality_bound": gate.get("expansion_quality_bound"),
+            "calibration_refs_bound": gate.get("calibration_refs_bound"),
+            "artifact_qc_refs_bound": gate.get("artifact_qc_refs_bound"),
+            "consent_freshness_bound": gate.get("consent_freshness_bound"),
+            "operator_review_ready": gate.get("operator_review_ready"),
+            "coding_agent_review_ready": gate.get("coding_agent_review_ready"),
+            "quality_summary": gate.get("quality_summary"),
+            "measurement_quality_gate_bound": gate.get(
+                "measurement_quality_gate_bound"
+            ),
+            "storage_policy": gate.get("storage_policy"),
+            "claim_ceiling": gate.get("claim_ceiling"),
         }
 
     def _cross_modal_analysis_plan_digest_payload(

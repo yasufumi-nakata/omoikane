@@ -28,6 +28,8 @@
   refs に束縛する collection protocol を analysis plan より前に固定する
 - collection protocol の各 step から bounded collection result summary と review readiness を
   collection run receipt に束縛する
+- collection run result を calibration / artifact QC / consent freshness / operator review /
+  quality authority refs に束縛する measurement quality gate を設ける
 - 現在の source type 全ペアに bounded analysis recipe と connector support を割り当てる
   cross-modal analysis plan を束縛する
 - cross-modal analysis plan の全 pair から bounded result summary を生成し、operator /
@@ -37,8 +39,8 @@
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
   で BDT Survey EEG Fusion receipt binding、expansion modality binding、replacement lane coverage、
   source-type lane coverage、connector bundle binding、collection protocol binding、
-  collection run binding、cross-modal analysis pair coverage、bounded result summary binding、
-  raw payload redaction、claim ceiling をまとめて検証する
+  collection run binding、measurement quality gate binding、cross-modal analysis pair coverage、
+  bounded result summary binding、raw payload redaction、claim ceiling をまとめて検証する
 
 ### Observation Integration Workbench (OIW)
 - 人類が取得・計測してきた source を、human biodata、neuroscience、clinical health、

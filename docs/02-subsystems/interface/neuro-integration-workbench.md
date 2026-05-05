@@ -24,13 +24,15 @@ reference runtime surface」を作ることである。これは mind uploading 
   束縛する collection protocol receipt を作り、収集面を analysis plan より前に固定する
 - collection protocol の各 step から bounded collection result summary を生成し、
   operator / coding-agent review readiness を collection run receipt に束縛する
+- collection run result を calibration、artifact/QC、consent freshness、operator review、
+  quality authority refs に measurement quality gate として束縛する
 - source bundle 内の全 source-type pair に bounded analysis recipe を割り当て、
   questionnaire + EEG seed から fMRI / 脳オルガノイド等へ cross-modal analysis を広げる
 - cross-modal analysis plan の全 pair について bounded result summary と operator /
   coding-agent review readiness を digest-only run receipt に束縛する
 - 非 ML 専門家向けの plain-language cards と coding agent 向け task template を同じ guide receipt に入れる
 - raw questionnaire / EEG / neuroimaging / organoid / analysis / connector / credential /
-  endpoint / collection / collection-result payload は保存しない
+  endpoint / collection / collection-result / quality / calibration / artifact / consent payload は保存しない
 - claim ceiling は `feature-alignment-and-analysis-plan-only` に固定する
 
 ## Reference Runtime v0
@@ -54,12 +56,14 @@ reference runtime surface」を作ることである。これは mind uploading 
     collection protocol として束縛する
 12. collection protocol の各 step から bounded quality / risk summary を collection run
     receipt として束縛する
-13. 現在の source type 全ペアに survey+EEG alignment、EEG+fMRI context、
+13. collection run result を calibration、artifact/QC、consent freshness、operator review、
+    quality authority refs に measurement quality gate として束縛する
+14. 現在の source type 全ペアに survey+EEG alignment、EEG+fMRI context、
     organoid context、generic feature-summary screen の bounded recipe を割り当てる
-14. 各 pair の bounded result summary を生成し、operator と coding agent の review-ready
+15. 各 pair の bounded result summary を生成し、operator と coding agent の review-ready
     receipt として束縛する
-15. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
-    replacement plan、connector bundle、collection protocol、collection run、
+16. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
+    replacement plan、connector bundle、collection protocol、collection run、quality gate、
     cross-modal analysis plan、analysis run を記録する
 
 ## 不変条件
@@ -73,10 +77,11 @@ reference runtime surface」を作ることである。これは mind uploading 
 7. **connector coverage** ── 実アプリ置換用 connector は endpoint / credential / permission / data contract / LLM tool ref だけを保持し、各 source type を 5 lane すべてで覆う
 8. **collection protocol coverage** ── 現在束縛された各 source は consent ref、feature digest、measurement connector ref、collection window ref を持つ
 9. **collection run summaries** ── collection run は step digest、quality summary、risk proxy、review readiness に限り、live device quality certification には昇格しない
-10. **cross-modal pair coverage** ── 現在の source type 全ペアは bounded recipe と 5 lane connector support を持つ
-11. **bounded result summaries** ── result は pair digest と bounded axis summary に限り、診断や因果推論には昇格しない
-12. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw plan / raw result payload を保存しない
-13. **claim ceiling** ── clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
+10. **measurement quality gate** ── calibration / artifact QC / consent freshness は refs と bounded scores に限り、医療グレード QC には昇格しない
+11. **cross-modal pair coverage** ── 現在の source type 全ペアは bounded recipe と 5 lane connector support を持つ
+12. **bounded result summaries** ── result は pair digest と bounded axis summary に限り、診断や因果推論には昇格しない
+13. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw quality / raw plan / raw result payload を保存しない
+14. **claim ceiling** ── clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
 
 ## 関連
 

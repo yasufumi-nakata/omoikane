@@ -248,6 +248,31 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             connector_bundle,
             collection_protocol,
         )
+        measurement_quality_gate = workbench.bind_measurement_quality_gate(
+            source_bundle,
+            collection_run,
+            [
+                {
+                    "source_type": source_type,
+                    "calibration_ref": f"calibration://unit/{source_type}",
+                    "artifact_qc_ref": f"artifact-qc://unit/{source_type}",
+                    "consent_freshness_ref": (
+                        f"consent-freshness://unit/{source_type}"
+                    ),
+                    "operator_review_ref": (
+                        f"operator-review://unit/{source_type}/quality"
+                    ),
+                    "quality_authority_ref": (
+                        f"quality-authority://unit/{source_type}"
+                    ),
+                    "calibration_score": 0.93,
+                    "artifact_acceptance_score": 0.91,
+                    "consent_freshness_score": 0.96,
+                    "sampling_completeness_score": 0.9,
+                }
+                for source_type in source_bundle["source_types"]
+            ],
+        )
         cross_modal_analysis_plan = workbench.build_cross_modal_analysis_plan(
             source_bundle,
             analysis,
@@ -271,6 +296,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "connector_bundle": connector_bundle,
             "collection_protocol": collection_protocol,
             "collection_run": collection_run,
+            "measurement_quality_gate": measurement_quality_gate,
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
         }
@@ -289,6 +315,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["cross_modal_analysis_run"],
             collection_protocol=artifacts["collection_protocol"],
             collection_run=artifacts["collection_run"],
+            measurement_quality_gate=artifacts["measurement_quality_gate"],
         )
 
         self.assertTrue(validation["ok"])
@@ -314,6 +341,10 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["collection_run_digest_bound"])
         self.assertTrue(validation["collection_results_bound"])
         self.assertTrue(validation["collection_result_payload_redacted"])
+        self.assertTrue(validation["measurement_quality_gate_bound"])
+        self.assertTrue(validation["measurement_quality_gate_digest_bound"])
+        self.assertTrue(validation["measurement_quality_items_bound"])
+        self.assertTrue(validation["measurement_quality_payload_redacted"])
         self.assertTrue(validation["cross_modal_analysis_plan_bound"])
         self.assertTrue(validation["cross_modal_analysis_plan_digest_bound"])
         self.assertTrue(validation["cross_modal_source_pair_coverage_bound"])
@@ -346,6 +377,16 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(artifacts["collection_run"]["collection_run_bound"])
         self.assertEqual(4, artifacts["collection_run"]["result_count"])
         self.assertEqual(4, validation["collection_result_count"])
+        self.assertTrue(
+            artifacts["measurement_quality_gate"][
+                "measurement_quality_gate_bound"
+            ]
+        )
+        self.assertEqual(
+            4,
+            artifacts["measurement_quality_gate"]["quality_item_count"],
+        )
+        self.assertEqual(4, validation["measurement_quality_item_count"])
         self.assertTrue(
             artifacts["cross_modal_analysis_plan"][
                 "cross_modal_analysis_plan_bound"
@@ -393,6 +434,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["cross_modal_analysis_run"],
             collection_protocol=artifacts["collection_protocol"],
             collection_run=artifacts["collection_run"],
+            measurement_quality_gate=artifacts["measurement_quality_gate"],
         )
 
         self.assertFalse(validation["ok"])
@@ -506,6 +548,30 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "collection_run.result_digests mismatch",
+            validation["errors"],
+        )
+
+    def test_tampered_measurement_quality_item_digest_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_gate = deepcopy(artifacts["measurement_quality_gate"])
+        tampered_gate["quality_item_digests"][0] = "0" * 64
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            collection_protocol=artifacts["collection_protocol"],
+            collection_run=artifacts["collection_run"],
+            measurement_quality_gate=tampered_gate,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "measurement_quality_gate.quality_item_digests mismatch",
             validation["errors"],
         )
 

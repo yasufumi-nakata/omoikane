@@ -260,6 +260,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             result["collection_run"],
         )
         self._assert_schema_valid(
+            "specs/schemas/neuro_integration_measurement_quality_gate.schema",
+            result["measurement_quality_gate"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/neuro_integration_cross_modal_analysis_plan.schema",
             result["cross_modal_analysis_plan"],
         )
@@ -295,6 +299,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["collection_run_digest_bound"])
         self.assertTrue(result["validation"]["collection_results_bound"])
         self.assertTrue(result["validation"]["collection_result_payload_redacted"])
+        self.assertTrue(result["validation"]["measurement_quality_gate_bound"])
+        self.assertTrue(result["validation"]["measurement_quality_gate_digest_bound"])
+        self.assertTrue(result["validation"]["measurement_quality_items_bound"])
+        self.assertTrue(result["validation"]["measurement_quality_payload_redacted"])
         self.assertTrue(result["validation"]["cross_modal_analysis_plan_bound"])
         self.assertTrue(result["validation"]["cross_modal_analysis_plan_digest_bound"])
         self.assertTrue(result["validation"]["cross_modal_source_pair_coverage_bound"])
