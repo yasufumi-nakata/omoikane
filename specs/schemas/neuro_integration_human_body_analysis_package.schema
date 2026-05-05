@@ -1,0 +1,589 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_human_body_analysis_package.schema"
+title: NeuroIntegrationHumanBodyAnalysisPackage
+description: >
+  Digest-only package that binds the BioData human biosignal catalog to
+  Neuro Integration Workbench analysis capabilities, operator UI artifacts, and
+  cross-environment release targets without storing raw biosignal payloads or
+  claiming diagnosis, consciousness reproduction, identity replacement, or
+  upload readiness.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - human_body_analysis_package_ref
+  - created_at
+  - profile_id
+  - package_policy
+  - source_onboarding_catalog_ref
+  - source_onboarding_catalog_digest
+  - human_biosignal_catalog_ref
+  - human_biosignal_catalog_digest
+  - human_biosignal_scope
+  - human_body_family_count
+  - human_body_modality_count
+  - known_modality_count
+  - analysis_capabilities
+  - analysis_capability_count
+  - analysis_capability_digests
+  - analysis_capability_digest_set
+  - operator_ui
+  - operator_ui_card_count
+  - release_package
+  - package_target_count
+  - environment_target_count
+  - human_biosignal_catalog_bound
+  - source_onboarding_catalog_bound
+  - all_biosignal_families_cataloged
+  - all_known_modalities_cataloged
+  - analysis_capabilities_bound
+  - operator_ui_bound
+  - release_package_bound
+  - package_targets_bound
+  - environment_matrix_bound
+  - storage_policy
+  - operator_ui_policy
+  - claim_ceiling
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_catalog_payload_stored
+  - raw_biosignal_payload_stored
+  - raw_analysis_payload_stored
+  - raw_operator_ui_payload_stored
+  - raw_release_payload_stored
+  - clinical_diagnosis_claimed
+  - semantic_thought_content_generated
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - upload_readiness_claimed
+  - payload_redacted
+  - no_identity_or_upload_claim
+  - human_body_analysis_package_bound
+  - human_body_analysis_package_digest
+properties:
+  schema_version:
+    const: "1.0"
+  human_body_analysis_package_ref:
+    type: string
+    pattern: "^human-body-analysis-package://neuro-integration/niw-human-body-analysis-package-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: human-body-data-analysis-package-v1
+  package_policy:
+    const: human-biosignal-catalog+operator-ui+release-package-only
+  source_onboarding_catalog_ref:
+    type: string
+    minLength: 1
+  source_onboarding_catalog_digest:
+    $ref: "#/$defs/sha256"
+  human_biosignal_catalog_ref:
+    type: string
+    minLength: 1
+  human_biosignal_catalog_digest:
+    $ref: "#/$defs/sha256"
+  human_biosignal_scope:
+    const: human-derived-sensor-feature-summary-only
+  human_body_family_count:
+    type: integer
+    minimum: 20
+  human_body_modality_count:
+    type: integer
+    minimum: 90
+  known_modality_count:
+    type: integer
+    minimum: 90
+  analysis_capabilities:
+    type: array
+    minItems: 20
+    items:
+      $ref: "#/$defs/analysis_capability"
+  analysis_capability_count:
+    type: integer
+    minimum: 20
+  analysis_capability_digests:
+    type: array
+    minItems: 20
+    items:
+      $ref: "#/$defs/sha256"
+  analysis_capability_digest_set:
+    $ref: "#/$defs/sha256"
+  operator_ui:
+    $ref: "#/$defs/operator_ui"
+  operator_ui_card_count:
+    type: integer
+    minimum: 20
+  release_package:
+    $ref: "#/$defs/release_package"
+  package_target_count:
+    const: 5
+  environment_target_count:
+    const: 8
+  human_biosignal_catalog_bound:
+    const: true
+  source_onboarding_catalog_bound:
+    const: true
+  all_biosignal_families_cataloged:
+    const: true
+  all_known_modalities_cataloged:
+    const: true
+  analysis_capabilities_bound:
+    const: true
+  operator_ui_bound:
+    const: true
+  release_package_bound:
+    const: true
+  package_targets_bound:
+    const: true
+  environment_matrix_bound:
+    const: true
+  storage_policy:
+    const: family-modality-digest+operator-card+release-check-only
+  operator_ui_policy:
+    const: family-tabs+workflow-cards+disabled-claim-only
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/neurodata-integration
+  raw_catalog_payload_stored:
+    const: false
+  raw_biosignal_payload_stored:
+    const: false
+  raw_analysis_payload_stored:
+    const: false
+  raw_operator_ui_payload_stored:
+    const: false
+  raw_release_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  upload_readiness_claimed:
+    const: false
+  payload_redacted:
+    const: true
+  no_identity_or_upload_claim:
+    const: true
+  human_body_analysis_package_bound:
+    const: true
+  human_body_analysis_package_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  optional_sha256:
+    type: string
+    pattern: "^$|^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  analysis_capability:
+    type: object
+    additionalProperties: false
+    required:
+      - capability_ref
+      - family_id
+      - family_label
+      - modality_count
+      - supported_modalities
+      - supported_modalities_digest
+      - analysis_lanes
+      - analysis_recipe_id
+      - operator_summary
+      - operator_ui_tab_id
+      - safe_next_action
+      - storage_policy
+      - claim_ceiling
+      - raw_biosignal_payload_stored
+      - raw_analysis_payload_stored
+      - clinical_diagnosis_claimed
+      - semantic_thought_content_generated
+      - consciousness_reproduction_claimed
+      - identity_replacement_claimed
+      - upload_readiness_claimed
+      - capability_bound
+      - capability_digest
+    properties:
+      capability_ref:
+        type: string
+        pattern: "^analysis-capability://neuro-integration/niw-human-body-capability-[a-f0-9]{12}$"
+      family_id:
+        $ref: "#/$defs/source_type"
+      family_label:
+        type: string
+        minLength: 1
+      modality_count:
+        type: integer
+        minimum: 1
+      supported_modalities:
+        type: array
+        minItems: 1
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/source_type"
+      supported_modalities_digest:
+        $ref: "#/$defs/sha256"
+      analysis_lanes:
+        const:
+          - catalog-review
+          - feature-summary-ingest
+          - quality-gate
+          - cross-modal-analysis
+          - operator-review
+      analysis_recipe_id:
+        type: string
+        minLength: 1
+      operator_summary:
+        type: string
+        minLength: 1
+      operator_ui_tab_id:
+        type: string
+        pattern: "^human-body-tab-[a-z0-9-]+$"
+      safe_next_action:
+        type: string
+        minLength: 1
+      storage_policy:
+        const: family-modality-digest+operator-card+release-check-only
+      claim_ceiling:
+        const: feature-alignment-and-analysis-plan-only
+      raw_biosignal_payload_stored:
+        const: false
+      raw_analysis_payload_stored:
+        const: false
+      clinical_diagnosis_claimed:
+        const: false
+      semantic_thought_content_generated:
+        const: false
+      consciousness_reproduction_claimed:
+        const: false
+      identity_replacement_claimed:
+        const: false
+      upload_readiness_claimed:
+        const: false
+      capability_bound:
+        const: true
+      capability_digest:
+        $ref: "#/$defs/sha256"
+  operator_ui:
+    type: object
+    additionalProperties: false
+    required:
+      - profile_id
+      - operator_ui_policy
+      - source_onboarding_operator_ui_policy
+      - tabs
+      - tab_count
+      - cards
+      - operator_ui_card_count
+      - workflow_steps
+      - workflow_step_count
+      - status_badges
+      - summary
+      - operator_ui_cards_bound
+      - operator_ui_workflow_bound
+      - operator_ui_bound
+      - raw_payload_displayed
+      - operator_ui_digest
+    properties:
+      profile_id:
+        const: human-body-analysis-operator-ui-v1
+      operator_ui_policy:
+        const: family-tabs+workflow-cards+disabled-claim-only
+      source_onboarding_operator_ui_policy:
+        const: operator-status-card+safe-next-action+disabled-claim-only
+      tabs:
+        type: array
+        minItems: 21
+        items:
+          $ref: "#/$defs/operator_tab"
+      tab_count:
+        type: integer
+        minimum: 21
+      cards:
+        type: array
+        minItems: 20
+        items:
+          $ref: "#/$defs/operator_card"
+      operator_ui_card_count:
+        type: integer
+        minimum: 20
+      workflow_steps:
+        type: array
+        minItems: 5
+        items:
+          $ref: "#/$defs/workflow_step"
+      workflow_step_count:
+        const: 5
+      status_badges:
+        type: object
+        minProperties: 3
+        additionalProperties:
+          type: string
+      summary:
+        type: object
+        additionalProperties: false
+        required:
+          - family_card_count
+          - workflow_step_count
+          - disabled_claim_count
+          - raw_payload_displayed
+        properties:
+          family_card_count:
+            type: integer
+            minimum: 20
+          workflow_step_count:
+            const: 5
+          disabled_claim_count:
+            const: 5
+          raw_payload_displayed:
+            const: false
+      operator_ui_cards_bound:
+        const: true
+      operator_ui_workflow_bound:
+        const: true
+      operator_ui_bound:
+        const: true
+      raw_payload_displayed:
+        const: false
+      operator_ui_digest:
+        $ref: "#/$defs/sha256"
+  operator_tab:
+    type: object
+    additionalProperties: false
+    required: [tab_id, label, card_refs, raw_payload_displayed]
+    properties:
+      tab_id:
+        type: string
+        minLength: 1
+      label:
+        type: string
+        minLength: 1
+      card_refs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      raw_payload_displayed:
+        const: false
+  operator_card:
+    type: object
+    additionalProperties: false
+    required:
+      - card_id
+      - family_id
+      - primary_label
+      - secondary_label
+      - status_badge
+      - analysis_recipe_id
+      - safe_next_action
+      - operator_control
+      - agent_control
+      - risk_banner
+      - disabled_claims
+      - raw_payload_displayed
+      - operator_ui_card_bound
+    properties:
+      card_id:
+        pattern: "^human-body-family-card-[a-z0-9-]+$"
+      family_id:
+        $ref: "#/$defs/source_type"
+      primary_label:
+        type: string
+        minLength: 1
+      secondary_label:
+        type: string
+        minLength: 1
+      status_badge:
+        const: Catalog bound
+      analysis_recipe_id:
+        type: string
+        minLength: 1
+      safe_next_action:
+        type: string
+        minLength: 1
+      operator_control:
+        const: review-human-body-family-card
+      agent_control:
+        type: string
+        minLength: 1
+      risk_banner:
+        const: feature-summary-only-no-diagnosis-identity-or-upload
+      disabled_claims:
+        const:
+          - clinical_diagnosis
+          - semantic_thought_content
+          - consciousness_reproduction
+          - identity_replacement
+          - upload_readiness
+      raw_payload_displayed:
+        const: false
+      operator_ui_card_bound:
+        const: true
+  workflow_step:
+    type: object
+    additionalProperties: false
+    required:
+      - step_id
+      - order
+      - operator_label
+      - coding_agent_task
+      - safe_next_action
+      - claim_ceiling
+      - raw_payload_displayed
+      - workflow_step_bound
+    properties:
+      step_id:
+        pattern: "^human-body-ui-step-[0-9]{2}-[a-z0-9-]+$"
+      order:
+        type: integer
+        minimum: 1
+      operator_label:
+        type: string
+        minLength: 1
+      coding_agent_task:
+        type: string
+        minLength: 1
+      safe_next_action:
+        type: string
+        minLength: 1
+      claim_ceiling:
+        const: feature-alignment-and-analysis-plan-only
+      raw_payload_displayed:
+        const: false
+      workflow_step_bound:
+        const: true
+  release_package:
+    type: object
+    additionalProperties: false
+    required:
+      - profile_id
+      - runtime_version
+      - runtime_stability
+      - release_manifest_digest
+      - package_targets
+      - package_target_count
+      - environment_matrix
+      - environment_target_count
+      - install_commands
+      - release_checks
+      - release_check_count
+      - package_targets_bound
+      - environment_matrix_bound
+      - installed_wheel_smoke_bound
+      - portable_checksum_bound
+      - multi_arch_container_bound
+      - release_package_bound
+      - storage_policy
+      - claim_ceiling
+      - raw_release_payload_stored
+      - clinical_diagnosis_claimed
+      - semantic_thought_content_generated
+      - consciousness_reproduction_claimed
+      - identity_replacement_claimed
+      - upload_readiness_claimed
+      - release_package_digest
+    properties:
+      profile_id:
+        const: human-body-analysis-release-package-v1
+      runtime_version:
+        type: string
+        minLength: 1
+      runtime_stability:
+        type: string
+        minLength: 1
+      release_manifest_digest:
+        $ref: "#/$defs/optional_sha256"
+      package_targets:
+        const:
+          - python-wheel
+          - source-distribution
+          - cli-json
+          - schema-bundle
+          - oci-container
+      package_target_count:
+        const: 5
+      environment_matrix:
+        type: object
+        additionalProperties: false
+        required:
+          - operating_systems
+          - python_versions
+          - container_platforms
+          - all_operating_systems_bound
+          - all_python_versions_bound
+          - all_container_platforms_bound
+        properties:
+          operating_systems:
+            const: [linux, macos, windows]
+          python_versions:
+            const: ["3.10", "3.11", "3.12"]
+          container_platforms:
+            const: [linux/amd64, linux/arm64]
+          all_operating_systems_bound:
+            const: true
+          all_python_versions_bound:
+            const: true
+          all_container_platforms_bound:
+            const: true
+      environment_target_count:
+        const: 8
+      install_commands:
+        type: array
+        minItems: 3
+        items:
+          type: string
+          minLength: 1
+      release_checks:
+        const:
+          - unit-test-discover
+          - schema-contract-validation
+          - wheel-and-sdist-build
+          - installed-wheel-smoke
+          - tag-version-match
+          - portable-sha256-checksums
+          - multi-arch-oci-build
+      release_check_count:
+        const: 7
+      package_targets_bound:
+        const: true
+      environment_matrix_bound:
+        const: true
+      installed_wheel_smoke_bound:
+        const: true
+      portable_checksum_bound:
+        const: true
+      multi_arch_container_bound:
+        const: true
+      release_package_bound:
+        const: true
+      storage_policy:
+        const: family-modality-digest+operator-card+release-check-only
+      claim_ceiling:
+        const: feature-alignment-and-analysis-plan-only
+      raw_release_payload_stored:
+        const: false
+      clinical_diagnosis_claimed:
+        const: false
+      semantic_thought_content_generated:
+        const: false
+      consciousness_reproduction_claimed:
+        const: false
+      identity_replacement_claimed:
+        const: false
+      upload_readiness_claimed:
+        const: false
+      release_package_digest:
+        $ref: "#/$defs/sha256"

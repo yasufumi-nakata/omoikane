@@ -228,6 +228,14 @@ class InterfaceSchemaContractTests(unittest.TestCase):
                 receipt,
             )
         self._assert_schema_valid(
+            "specs/schemas/neuro_integration_source_onboarding_catalog.schema",
+            result["source_onboarding_catalog"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_human_body_analysis_package.schema",
+            result["human_body_analysis_package"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/neuro_integration_source_bundle.schema",
             result["source_bundle"],
         )
@@ -348,6 +356,42 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["operator_runbook_steps_bound"])
         self.assertTrue(result["validation"]["operator_runbook_payload_redacted"])
         self.assertTrue(result["validation"]["operator_runbook_no_identity_or_upload_claim"])
+        self.assertTrue(result["validation"]["source_onboarding_catalog_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_catalog_digest_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_items_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_operator_ui_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_future_modalities_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_payload_redacted"])
+        self.assertTrue(
+            result["validation"]["source_onboarding_no_identity_or_upload_claim"]
+        )
+        self.assertEqual(23, result["validation"]["source_onboarding_item_count"])
+        self.assertEqual(
+            23,
+            result["validation"]["source_onboarding_operator_ui_card_count"],
+        )
+        self.assertEqual(
+            15,
+            result["validation"]["source_onboarding_future_source_type_count"],
+        )
+        self.assertTrue(result["validation"]["human_body_analysis_package_bound"])
+        self.assertTrue(
+            result["validation"]["human_body_analysis_package_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["human_body_biosignal_catalog_bound"])
+        self.assertTrue(result["validation"]["human_body_all_modalities_cataloged"])
+        self.assertTrue(
+            result["validation"]["human_body_analysis_capabilities_bound"]
+        )
+        self.assertTrue(result["validation"]["human_body_operator_ui_bound"])
+        self.assertTrue(result["validation"]["human_body_release_package_bound"])
+        self.assertTrue(result["validation"]["human_body_environment_matrix_bound"])
+        self.assertTrue(result["validation"]["human_body_payload_redacted"])
+        self.assertTrue(result["validation"]["human_body_no_identity_or_upload_claim"])
+        self.assertGreaterEqual(result["validation"]["human_body_family_count"], 20)
+        self.assertGreaterEqual(result["validation"]["human_body_modality_count"], 90)
+        self.assertEqual(5, result["validation"]["human_body_package_target_count"])
+        self.assertEqual(8, result["validation"]["human_body_environment_target_count"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])

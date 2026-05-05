@@ -11,6 +11,8 @@ summary: >
 imports:
   biodata_survey_eeg_fusion_receipt: ../schemas/biodata_survey_eeg_fusion_receipt.schema
   neuro_integration_app_registry_receipt: ../schemas/neuro_integration_app_registry_receipt.schema
+  neuro_integration_source_onboarding_catalog: ../schemas/neuro_integration_source_onboarding_catalog.schema
+  neuro_integration_human_body_analysis_package: ../schemas/neuro_integration_human_body_analysis_package.schema
   neuro_integration_source_bundle: ../schemas/neuro_integration_source_bundle.schema
   neuro_integration_workspace: ../schemas/neuro_integration_workspace.schema
   neuro_integration_analysis_receipt: ../schemas/neuro_integration_analysis_receipt.schema
@@ -66,6 +68,53 @@ operations:
       - measurement, analysis, data-curation, operator-copilot, and agent-automation lanes must be representable
       - non-ML operators and coding agents must both have explicit operator-skill floor metadata
       - raw application and credential payload storage must remain false
+  build_source_onboarding_catalog:
+    summary: Emit a digest-only onboarding catalog for current and future biodata source types before binding concrete source summaries.
+    input:
+      inline_schema:
+        type: object
+        properties:
+          candidate_source_types:
+            type: array
+            minItems: 1
+            uniqueItems: true
+            items:
+              type: string
+              pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+    output:
+      schema_ref: neuro_integration_source_onboarding_catalog
+    guarantees:
+      - questionnaire and EEG seed source types must be cataloged before expansion onboarding
+      - fMRI, brain organoid, biosensor, behavioral, omics, and clinical metadata source types must remain current bounded context
+      - MEG, ECoG, fNIRS, diffusion MRI, spiking, eye tracking, speech, gait, microbiome, metabolomics, proteomics, digital phenotyping, sleep staging, and organoid submodalities must be represented as future onboarding candidates
+      - every catalog item must expose collection method, analysis recipe hint, required replacement lanes, non-ML operator summary, and coding-agent task metadata
+      - every catalog item must expose an operator UI card with a status badge, safe next action, disabled claim list, and raw-payload display disabled
+      - raw catalog, source, and analysis payload storage must remain false
+      - diagnosis, semantic thought content, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
+  build_human_body_analysis_package:
+    summary: Bind the BioData human biosignal catalog to family-level NIW analysis capabilities, operator UI workflow artifacts, and cross-environment package targets.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_onboarding_catalog
+          - human_biosignal_catalog
+        properties:
+          source_onboarding_catalog:
+            schema_ref: neuro_integration_source_onboarding_catalog
+          human_biosignal_catalog:
+            type: object
+          release_manifest:
+            type: object
+    output:
+      schema_ref: neuro_integration_human_body_analysis_package
+    guarantees:
+      - every BioData human biosignal family must become a family-level analysis capability card
+      - every known human biosignal modality must remain catalog-bound as feature-summary input only
+      - operator UI output must expose family tabs, review cards, workflow steps, status badges, and disabled claim lists
+      - release package metadata must cover Python wheel, source distribution, CLI JSON, schema bundle, OCI container, Linux, macOS, Windows, Python 3.10 / 3.11 / 3.12, and linux/amd64 plus linux/arm64 containers
+      - raw catalog, biosignal, analysis, UI, and release payload storage must remain false
+      - diagnosis, semantic thought content, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
   bind_source_bundle:
     summary: Bind questionnaire, EEG, fMRI, organoid, biosensor, behavioral, omics, clinical metadata, and future biological feature summaries into one digest-only source bundle.
     input:
@@ -575,7 +624,7 @@ operations:
       - raw receipt, runbook, operator, and agent-task payload storage must remain false
       - semantic thought content, diagnosis, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, optional cross-modal analysis-run, optional interpretation-synthesis, optional longitudinal-timeline, and optional operator-runbook digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, optional cross-modal analysis-run, optional interpretation-synthesis, optional longitudinal-timeline, optional operator-runbook, optional source-onboarding-catalog, and optional human-body analysis package digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -617,6 +666,14 @@ operations:
             schema_ref: neuro_integration_interpretation_synthesis
           longitudinal_timeline:
             schema_ref: neuro_integration_longitudinal_timeline
+          operator_runbook:
+            schema_ref: neuro_integration_operator_runbook
+          source_onboarding_catalog:
+            schema_ref: neuro_integration_source_onboarding_catalog
+          human_biosignal_catalog:
+            type: object
+          human_body_analysis_package:
+            schema_ref: neuro_integration_human_body_analysis_package
     output:
       inline_schema:
         type: object
@@ -675,6 +732,23 @@ operations:
           - operator_runbook_steps_bound
           - operator_runbook_payload_redacted
           - operator_runbook_no_identity_or_upload_claim
+          - source_onboarding_catalog_bound
+          - source_onboarding_catalog_digest_bound
+          - source_onboarding_items_bound
+          - source_onboarding_operator_ui_bound
+          - source_onboarding_future_modalities_bound
+          - source_onboarding_payload_redacted
+          - source_onboarding_no_identity_or_upload_claim
+          - human_body_analysis_package_bound
+          - human_body_analysis_package_digest_bound
+          - human_body_biosignal_catalog_bound
+          - human_body_all_modalities_cataloged
+          - human_body_analysis_capabilities_bound
+          - human_body_operator_ui_bound
+          - human_body_release_package_bound
+          - human_body_environment_matrix_bound
+          - human_body_payload_redacted
+          - human_body_no_identity_or_upload_claim
           - claim_ceiling_bound
           - raw_payload_redacted
           - no_diagnosis_or_identity_claim
@@ -788,6 +862,40 @@ operations:
             type: boolean
           operator_runbook_no_identity_or_upload_claim:
             type: boolean
+          source_onboarding_catalog_bound:
+            type: boolean
+          source_onboarding_catalog_digest_bound:
+            type: boolean
+          source_onboarding_items_bound:
+            type: boolean
+          source_onboarding_operator_ui_bound:
+            type: boolean
+          source_onboarding_future_modalities_bound:
+            type: boolean
+          source_onboarding_payload_redacted:
+            type: boolean
+          source_onboarding_no_identity_or_upload_claim:
+            type: boolean
+          human_body_analysis_package_bound:
+            type: boolean
+          human_body_analysis_package_digest_bound:
+            type: boolean
+          human_body_biosignal_catalog_bound:
+            type: boolean
+          human_body_all_modalities_cataloged:
+            type: boolean
+          human_body_analysis_capabilities_bound:
+            type: boolean
+          human_body_operator_ui_bound:
+            type: boolean
+          human_body_release_package_bound:
+            type: boolean
+          human_body_environment_matrix_bound:
+            type: boolean
+          human_body_payload_redacted:
+            type: boolean
+          human_body_no_identity_or_upload_claim:
+            type: boolean
           claim_ceiling_bound:
             type: boolean
           raw_payload_redacted:
@@ -832,7 +940,38 @@ operations:
           operator_runbook_receipt_binding_count:
             type: integer
             minimum: 0
+          source_onboarding_item_count:
+            type: integer
+            minimum: 0
+          source_onboarding_operator_ui_card_count:
+            type: integer
+            minimum: 0
+          source_onboarding_future_source_type_count:
+            type: integer
+            minimum: 0
+          human_body_family_count:
+            type: integer
+            minimum: 0
+          human_body_modality_count:
+            type: integer
+            minimum: 0
+          human_body_analysis_capability_count:
+            type: integer
+            minimum: 0
+          human_body_operator_ui_card_count:
+            type: integer
+            minimum: 0
+          human_body_package_target_count:
+            type: integer
+            minimum: 0
+          human_body_environment_target_count:
+            type: integer
+            minimum: 0
 events:
+  - name: neuro_integration_workbench.source_onboarding_catalog.bound
+    payload_schema: neuro_integration_source_onboarding_catalog
+  - name: neuro_integration_workbench.human_body_analysis_package.bound
+    payload_schema: neuro_integration_human_body_analysis_package
   - name: neuro_integration_workbench.source_bundle.bound
     payload_schema: neuro_integration_source_bundle
   - name: neuro_integration_workbench.survey_eeg_fusion.bound

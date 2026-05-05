@@ -170,7 +170,18 @@ raw continuity event payload は保存しない。
 seed pair として束縛したうえで、BioData Transmitter の Survey EEG Fusion receipt digest
 を upstream binding として受け取り、fMRI BOLD と brain organoid feature summary を
 expansion lane として、biosensor、behavioral task、omics、clinical metadata を
-open biodata lane として同じ source bundle に追加する。measurement / analysis /
+open biodata lane として同じ source bundle に追加する。source onboarding catalog は
+MEG、ECoG、neural spiking、fNIRS、diffusion MRI、eye tracking、speech acoustics、
+gait kinematics、microbiome、metabolomics、proteomics、digital phenotyping、
+sleep staging、organoid electrophysiology / morphology を将来 biodata source として
+collection method、analysis recipe hint、replacement lane、operator summary、
+coding-agent task、operator UI status card に束縛する。`human-body-analysis-demo` は
+同じ workbench の human body analysis package surface を返し、BioData human biosignal
+catalog 全体を family-level analysis capability、operator UI tabs/cards/workflow、
+release package target に束縛する。release package metadata は Python wheel、source
+distribution、CLI JSON、schema bundle、OCI container、Linux / macOS / Windows、
+Python 3.10 / 3.11 / 3.12、linux/amd64 / linux/arm64 を検証対象にする。
+measurement / analysis /
 data-curation / operator-copilot / agent-automation の 5 replacement lane を
 workspace digest に束縛し、各 source type が 5 lane すべてで app digest に覆われる
 application replacement plan も返す。さらに replacement plan に対して connector refs、
@@ -198,8 +209,8 @@ quality gate、cross-modal analysis、interpretation、longitudinal review を 9
 plain-language operator card と coding-agent task に束縛する。
 非 ML 専門家向け plain-language cards と coding agent 向け task template を同じ operator guide に入れる。claim ceiling は
 `feature-alignment-and-analysis-plan-only` で、raw questionnaire / EEG /
-neuroimaging / organoid / analysis / connector / collection / collection-result /
-quality / calibration / artifact / consent / plan / result / interpretation / agent-task
+neuroimaging / organoid / catalog / analysis / connector / collection / collection-result /
+quality / calibration / artifact / consent / plan / result / interpretation / UI / release / agent-task
 payload / timeline payload / runbook payload、semantic thought content、clinical diagnosis、consciousness reproduction、
 identity replacement、upload readiness は保持または主張しない。
 

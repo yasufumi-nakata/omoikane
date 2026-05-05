@@ -5,6 +5,9 @@ description: >
   NeuroIntegrationWorkbench がアンケートと EEG を seed pair として束縛し、
   fMRI と脳オルガノイド feature summary を expansion lane として追加し、
   biosensor、behavioral task、omics、clinical metadata も同じ source bundle に入れ、
+  MEG、ECoG、fNIRS、diffusion MRI、spiking、eye tracking、speech、gait、
+  microbiome、metabolomics、proteomics、digital phenotyping、sleep staging、
+  organoid submodalities を source onboarding catalog で将来候補として束縛し、
   計測・解析・データ整備・operator copilot・agent automation の置換 lane を
   LLM-native かつ非 ML 専門家向けにまとめ、2 window の longitudinal timeline として
   axis drift review まで束縛し、operator runbook として手順化できることを確認する。
@@ -94,6 +97,30 @@ expected:
   operator_runbook_no_identity_or_upload_claim: true
   operator_runbook_step_count: 9
   operator_runbook_receipt_binding_count: 13
+  source_onboarding_catalog_bound: true
+  source_onboarding_catalog_digest_bound: true
+  source_onboarding_items_bound: true
+  source_onboarding_operator_ui_bound: true
+  source_onboarding_future_modalities_bound: true
+  source_onboarding_payload_redacted: true
+  source_onboarding_no_identity_or_upload_claim: true
+  source_onboarding_item_count: 23
+  source_onboarding_operator_ui_card_count: 23
+  source_onboarding_future_source_type_count: 15
+  human_body_analysis_package_bound: true
+  human_body_analysis_package_digest_bound: true
+  human_body_biosignal_catalog_bound: true
+  human_body_all_modalities_cataloged: true
+  human_body_analysis_capabilities_bound: true
+  human_body_operator_ui_bound: true
+  human_body_release_package_bound: true
+  human_body_environment_matrix_bound: true
+  human_body_payload_redacted: true
+  human_body_no_identity_or_upload_claim: true
+  human_body_family_count_min: 20
+  human_body_modality_count_min: 90
+  human_body_package_target_count: 5
+  human_body_environment_target_count: 8
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

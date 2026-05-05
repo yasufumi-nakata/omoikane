@@ -28,6 +28,10 @@ NIW_LONGITUDINAL_TIMELINE_PROFILE_ID = (
     "neuro-longitudinal-integration-timeline-v1"
 )
 NIW_OPERATOR_RUNBOOK_PROFILE_ID = "neuro-operator-runbook-v1"
+NIW_SOURCE_ONBOARDING_CATALOG_PROFILE_ID = "neuro-source-onboarding-catalog-v1"
+NIW_HUMAN_BODY_ANALYSIS_PACKAGE_PROFILE_ID = (
+    "human-body-data-analysis-package-v1"
+)
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -62,6 +66,50 @@ NIW_LONGITUDINAL_TIMELINE_POLICY = (
 NIW_OPERATOR_RUNBOOK_POLICY = (
     "receipt-digest+plain-language-workflow-step-only"
 )
+NIW_SOURCE_ONBOARDING_CATALOG_POLICY = (
+    "source-type-alias+family+lane-onboarding-only"
+)
+NIW_SOURCE_ONBOARDING_STORAGE_POLICY = (
+    "source-type-digest+collection-method+lane-hint-only"
+)
+NIW_SOURCE_ONBOARDING_UI_POLICY = (
+    "operator-status-card+safe-next-action+disabled-claim-only"
+)
+NIW_HUMAN_BODY_ANALYSIS_PACKAGE_POLICY = (
+    "human-biosignal-catalog+operator-ui+release-package-only"
+)
+NIW_HUMAN_BODY_ANALYSIS_STORAGE_POLICY = (
+    "family-modality-digest+operator-card+release-check-only"
+)
+NIW_HUMAN_BODY_ANALYSIS_UI_POLICY = (
+    "family-tabs+workflow-cards+disabled-claim-only"
+)
+NIW_HUMAN_BODY_ANALYSIS_LANES = (
+    "catalog-review",
+    "feature-summary-ingest",
+    "quality-gate",
+    "cross-modal-analysis",
+    "operator-review",
+)
+NIW_HUMAN_BODY_PACKAGE_TARGETS = (
+    "python-wheel",
+    "source-distribution",
+    "cli-json",
+    "schema-bundle",
+    "oci-container",
+)
+NIW_HUMAN_BODY_ENVIRONMENT_TARGETS = ("linux", "macos", "windows")
+NIW_HUMAN_BODY_PYTHON_TARGETS = ("3.10", "3.11", "3.12")
+NIW_HUMAN_BODY_CONTAINER_PLATFORMS = ("linux/amd64", "linux/arm64")
+NIW_HUMAN_BODY_RELEASE_CHECKS = (
+    "unit-test-discover",
+    "schema-contract-validation",
+    "wheel-and-sdist-build",
+    "installed-wheel-smoke",
+    "tag-version-match",
+    "portable-sha256-checksums",
+    "multi-arch-oci-build",
+)
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
 NIW_OPEN_BIODATA_SOURCE_TYPES = (
@@ -69,6 +117,23 @@ NIW_OPEN_BIODATA_SOURCE_TYPES = (
     "behavioral_task",
     "omics",
     "clinical_metadata",
+)
+NIW_FUTURE_BIODATA_SOURCE_TYPES = (
+    "meg",
+    "ecog",
+    "neural_spiking",
+    "fnirs",
+    "diffusion_mri",
+    "eye_tracking",
+    "speech_acoustics",
+    "gait_kinematics",
+    "microbiome",
+    "metabolomics",
+    "proteomics",
+    "digital_phenotyping",
+    "sleep_staging",
+    "electrophysiology_organoid",
+    "morphology_organoid",
 )
 NIW_REQUIRED_REPLACEMENT_LANES = (
     "measurement",
@@ -132,6 +197,25 @@ NIW_SOURCE_TYPE_ALIASES = {
     "wearable": "biosensor",
     "wearables": "biosensor",
     "behavior": "behavioral_task",
+    "dti": "diffusion_mri",
+    "dwi": "diffusion_mri",
+    "diffusion": "diffusion_mri",
+    "e_cog": "ecog",
+    "single_unit": "neural_spiking",
+    "single_unit_spiking": "neural_spiking",
+    "spikes": "neural_spiking",
+    "f_nirs": "fnirs",
+    "near_infrared_spectroscopy": "fnirs",
+    "eye_gaze": "eye_tracking",
+    "speech": "speech_acoustics",
+    "voice": "speech_acoustics",
+    "gait": "gait_kinematics",
+    "walking": "gait_kinematics",
+    "microbial_omics": "microbiome",
+    "wearable_context": "digital_phenotyping",
+    "sleep": "sleep_staging",
+    "organoid_electrophysiology": "electrophysiology_organoid",
+    "organoid_morphology": "morphology_organoid",
 }
 NIW_SOURCE_FAMILIES = {
     "questionnaire": "self_report_survey",
@@ -143,6 +227,21 @@ NIW_SOURCE_FAMILIES = {
     "omics": "molecular_omics",
     "clinical_metadata": "clinical_context",
     "environment": "environmental_context",
+    "meg": "neural_magnetic",
+    "ecog": "invasive_neural_electrical",
+    "neural_spiking": "single_unit_neural_activity",
+    "fnirs": "neurovascular_optical",
+    "diffusion_mri": "structural_connectivity_imaging",
+    "eye_tracking": "oculomotor_behavior",
+    "speech_acoustics": "vocal_behavior",
+    "gait_kinematics": "movement_biomechanics",
+    "microbiome": "microbial_omics",
+    "metabolomics": "molecular_omics",
+    "proteomics": "molecular_omics",
+    "digital_phenotyping": "behavioral_context",
+    "sleep_staging": "sleep_circadian",
+    "electrophysiology_organoid": "in_vitro_neural_tissue",
+    "morphology_organoid": "in_vitro_neural_tissue",
 }
 NIW_REPLACEMENT_LANE_BY_APP_KIND = {
     "measurement": "measurement",
@@ -200,12 +299,19 @@ class NeuroIntegrationWorkbench:
                 NIW_LONGITUDINAL_TIMELINE_PROFILE_ID
             ),
             "operator_runbook_profile_id": NIW_OPERATOR_RUNBOOK_PROFILE_ID,
+            "source_onboarding_catalog_profile_id": (
+                NIW_SOURCE_ONBOARDING_CATALOG_PROFILE_ID
+            ),
+            "human_body_analysis_package_profile_id": (
+                NIW_HUMAN_BODY_ANALYSIS_PACKAGE_PROFILE_ID
+            ),
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
             "seed_source_types": list(NIW_SEED_SOURCE_TYPES),
             "expansion_source_types": list(NIW_EXPANSION_SOURCE_TYPES),
             "open_biodata_source_types": list(NIW_OPEN_BIODATA_SOURCE_TYPES),
+            "future_biodata_source_types": list(NIW_FUTURE_BIODATA_SOURCE_TYPES),
             "source_families": dict(NIW_SOURCE_FAMILIES),
             "required_replacement_lanes": list(NIW_REQUIRED_REPLACEMENT_LANES),
             "operator_skill_floors": list(NIW_OPERATOR_SKILL_FLOORS),
@@ -229,6 +335,25 @@ class NeuroIntegrationWorkbench:
             ),
             "longitudinal_timeline_policy": NIW_LONGITUDINAL_TIMELINE_POLICY,
             "operator_runbook_policy": NIW_OPERATOR_RUNBOOK_POLICY,
+            "source_onboarding_catalog_policy": (
+                NIW_SOURCE_ONBOARDING_CATALOG_POLICY
+            ),
+            "human_body_analysis_package_policy": (
+                NIW_HUMAN_BODY_ANALYSIS_PACKAGE_POLICY
+            ),
+            "human_body_analysis_storage_policy": (
+                NIW_HUMAN_BODY_ANALYSIS_STORAGE_POLICY
+            ),
+            "human_body_analysis_ui_policy": NIW_HUMAN_BODY_ANALYSIS_UI_POLICY,
+            "human_body_analysis_lanes": list(NIW_HUMAN_BODY_ANALYSIS_LANES),
+            "human_body_package_targets": list(NIW_HUMAN_BODY_PACKAGE_TARGETS),
+            "human_body_environment_targets": list(
+                NIW_HUMAN_BODY_ENVIRONMENT_TARGETS
+            ),
+            "human_body_python_targets": list(NIW_HUMAN_BODY_PYTHON_TARGETS),
+            "human_body_container_platforms": list(
+                NIW_HUMAN_BODY_CONTAINER_PLATFORMS
+            ),
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -236,6 +361,376 @@ class NeuroIntegrationWorkbench:
             "raw_organoid_payload_stored": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
+        }
+
+    def build_source_onboarding_catalog(
+        self,
+        candidate_source_types: Sequence[str] | None = None,
+    ) -> Dict[str, Any]:
+        source_types = self._normalize_source_types(
+            candidate_source_types
+            or (
+                *NIW_SEED_SOURCE_TYPES,
+                *NIW_EXPANSION_SOURCE_TYPES,
+                *NIW_OPEN_BIODATA_SOURCE_TYPES,
+                *NIW_FUTURE_BIODATA_SOURCE_TYPES,
+            ),
+            "candidate_source_types",
+        )
+        onboarding_items = [
+            self._build_source_onboarding_item(source_type)
+            for source_type in source_types
+        ]
+        onboarding_item_digests = [
+            item["onboarding_item_digest"] for item in onboarding_items
+        ]
+        operator_ui_cards = [
+            item["operator_ui_card"] for item in onboarding_items
+        ]
+        onboarding_item_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_SOURCE_ONBOARDING_CATALOG_PROFILE_ID,
+                    "source_types": source_types,
+                    "onboarding_item_digests": onboarding_item_digests,
+                }
+            )
+        )
+        future_source_types = [
+            source_type
+            for source_type in source_types
+            if source_type in NIW_FUTURE_BIODATA_SOURCE_TYPES
+        ]
+        catalog = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "source_onboarding_catalog_ref": (
+                "source-onboarding-catalog://neuro-integration/"
+                f"{new_id('niw-source-onboarding-catalog')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_SOURCE_ONBOARDING_CATALOG_PROFILE_ID,
+            "catalog_policy": NIW_SOURCE_ONBOARDING_CATALOG_POLICY,
+            "operator_ui_policy": NIW_SOURCE_ONBOARDING_UI_POLICY,
+            "source_types": source_types,
+            "source_type_count": len(source_types),
+            "source_families": {
+                source_type: self._source_family(source_type)
+                for source_type in source_types
+            },
+            "source_family_count": len(
+                {self._source_family(source_type) for source_type in source_types}
+            ),
+            "onboarding_items": onboarding_items,
+            "onboarding_item_count": len(onboarding_items),
+            "onboarding_item_digests": onboarding_item_digests,
+            "onboarding_item_digest_set": onboarding_item_digest_set,
+            "operator_ui_cards": operator_ui_cards,
+            "operator_ui_card_count": len(operator_ui_cards),
+            "seed_source_types": list(NIW_SEED_SOURCE_TYPES),
+            "expansion_source_types": list(NIW_EXPANSION_SOURCE_TYPES),
+            "open_biodata_source_types": list(NIW_OPEN_BIODATA_SOURCE_TYPES),
+            "future_biodata_source_types": future_source_types,
+            "future_source_type_count": len(future_source_types),
+            "required_replacement_lanes": list(NIW_REQUIRED_REPLACEMENT_LANES),
+            "seed_sources_cataloged": all(
+                source_type in source_types for source_type in NIW_SEED_SOURCE_TYPES
+            ),
+            "expansion_sources_cataloged": all(
+                source_type in source_types for source_type in NIW_EXPANSION_SOURCE_TYPES
+            ),
+            "open_biodata_sources_cataloged": all(
+                source_type in source_types for source_type in NIW_OPEN_BIODATA_SOURCE_TYPES
+            ),
+            "future_modalities_cataloged": all(
+                source_type in source_types
+                for source_type in NIW_FUTURE_BIODATA_SOURCE_TYPES
+            ),
+            "all_items_bound": all(
+                item["onboarding_item_bound"] for item in onboarding_items
+            ),
+            "non_ml_operator_ready": all(
+                item["requires_ml_expertise"] is False
+                for item in onboarding_items
+            ),
+            "coding_agent_ready": all(
+                bool(item["coding_agent_task"]) for item in onboarding_items
+            ),
+            "operator_ui_cards_bound": all(
+                card["operator_ui_card_bound"] for card in operator_ui_cards
+            ),
+            "operator_ui_ready": all(
+                card["raw_payload_displayed"] is False
+                and bool(card["safe_next_action"])
+                and bool(card["disabled_claims"])
+                for card in operator_ui_cards
+            ),
+            "source_onboarding_catalog_bound": True,
+            "storage_policy": NIW_SOURCE_ONBOARDING_STORAGE_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_catalog_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        catalog["source_onboarding_catalog_bound"] = (
+            catalog["seed_sources_cataloged"]
+            and catalog["expansion_sources_cataloged"]
+            and catalog["open_biodata_sources_cataloged"]
+            and catalog["future_modalities_cataloged"]
+            and catalog["all_items_bound"]
+            and catalog["non_ml_operator_ready"]
+            and catalog["coding_agent_ready"]
+            and catalog["operator_ui_cards_bound"]
+            and catalog["operator_ui_ready"]
+        )
+        catalog["source_onboarding_catalog_digest"] = sha256_text(
+            canonical_json(self._source_onboarding_catalog_digest_payload(catalog))
+        )
+        return deepcopy(catalog)
+
+    def build_human_body_analysis_package(
+        self,
+        source_onboarding_catalog: Dict[str, Any],
+        human_biosignal_catalog: Dict[str, Any],
+        release_manifest: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        self._check_source_onboarding_catalog(source_onboarding_catalog)
+        self._check_human_biosignal_catalog_summary(human_biosignal_catalog)
+        modality_families = human_biosignal_catalog["modality_families"]
+        known_modalities = list(human_biosignal_catalog["known_modalities"])
+        analysis_capabilities = [
+            self._build_human_body_analysis_capability(family_id, modalities)
+            for family_id, modalities in modality_families.items()
+        ]
+        analysis_capability_digests = [
+            capability["capability_digest"]
+            for capability in analysis_capabilities
+        ]
+        analysis_capability_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_HUMAN_BODY_ANALYSIS_PACKAGE_PROFILE_ID,
+                    "human_biosignal_catalog_digest": human_biosignal_catalog[
+                        "catalog_digest"
+                    ],
+                    "analysis_capability_digests": analysis_capability_digests,
+                }
+            )
+        )
+        operator_ui = self._build_human_body_operator_ui(
+            analysis_capabilities,
+            source_onboarding_catalog,
+        )
+        release_package = self._build_human_body_release_package(release_manifest)
+        cataloged_modalities = sorted(
+            {
+                modality
+                for modalities in modality_families.values()
+                for modality in modalities
+            }
+        )
+        package = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "human_body_analysis_package_ref": (
+                "human-body-analysis-package://neuro-integration/"
+                f"{new_id('niw-human-body-analysis-package')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_HUMAN_BODY_ANALYSIS_PACKAGE_PROFILE_ID,
+            "package_policy": NIW_HUMAN_BODY_ANALYSIS_PACKAGE_POLICY,
+            "source_onboarding_catalog_ref": source_onboarding_catalog[
+                "source_onboarding_catalog_ref"
+            ],
+            "source_onboarding_catalog_digest": source_onboarding_catalog[
+                "source_onboarding_catalog_digest"
+            ],
+            "human_biosignal_catalog_ref": human_biosignal_catalog["catalog_ref"],
+            "human_biosignal_catalog_digest": human_biosignal_catalog[
+                "catalog_digest"
+            ],
+            "human_biosignal_scope": human_biosignal_catalog[
+                "human_biosignal_scope"
+            ],
+            "human_body_family_count": human_biosignal_catalog["family_count"],
+            "human_body_modality_count": human_biosignal_catalog["modality_count"],
+            "known_modality_count": len(known_modalities),
+            "analysis_capabilities": analysis_capabilities,
+            "analysis_capability_count": len(analysis_capabilities),
+            "analysis_capability_digests": analysis_capability_digests,
+            "analysis_capability_digest_set": analysis_capability_digest_set,
+            "operator_ui": operator_ui,
+            "operator_ui_card_count": operator_ui["operator_ui_card_count"],
+            "release_package": release_package,
+            "package_target_count": release_package["package_target_count"],
+            "environment_target_count": release_package[
+                "environment_target_count"
+            ],
+            "human_biosignal_catalog_bound": True,
+            "source_onboarding_catalog_bound": source_onboarding_catalog[
+                "source_onboarding_catalog_bound"
+            ],
+            "all_biosignal_families_cataloged": (
+                human_biosignal_catalog["family_count"]
+                == len(human_biosignal_catalog["modality_families"])
+            ),
+            "all_known_modalities_cataloged": (
+                cataloged_modalities == sorted(set(known_modalities))
+                and human_biosignal_catalog["modality_count"] == len(known_modalities)
+            ),
+            "analysis_capabilities_bound": all(
+                capability["capability_bound"]
+                for capability in analysis_capabilities
+            ),
+            "operator_ui_bound": operator_ui["operator_ui_bound"],
+            "release_package_bound": release_package["release_package_bound"],
+            "package_targets_bound": release_package["package_targets_bound"],
+            "environment_matrix_bound": release_package[
+                "environment_matrix_bound"
+            ],
+            "storage_policy": NIW_HUMAN_BODY_ANALYSIS_STORAGE_POLICY,
+            "operator_ui_policy": NIW_HUMAN_BODY_ANALYSIS_UI_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_catalog_payload_stored": False,
+            "raw_biosignal_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "raw_operator_ui_payload_stored": False,
+            "raw_release_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        package["payload_redacted"] = (
+            self._human_body_analysis_package_payload_redacted(package)
+        )
+        package["no_identity_or_upload_claim"] = (
+            self._human_body_analysis_package_no_identity_or_upload_claim(package)
+        )
+        package["human_body_analysis_package_bound"] = (
+            package["human_biosignal_catalog_bound"]
+            and package["source_onboarding_catalog_bound"]
+            and package["all_biosignal_families_cataloged"]
+            and package["all_known_modalities_cataloged"]
+            and package["analysis_capabilities_bound"]
+            and package["operator_ui_bound"]
+            and package["release_package_bound"]
+            and package["payload_redacted"]
+            and package["no_identity_or_upload_claim"]
+        )
+        package["human_body_analysis_package_digest"] = sha256_text(
+            canonical_json(self._human_body_analysis_package_digest_payload(package))
+        )
+        return deepcopy(package)
+
+    def validate_human_body_analysis_package(
+        self,
+        human_body_analysis_package: Dict[str, Any],
+        source_onboarding_catalog: Dict[str, Any],
+        human_biosignal_catalog: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        errors: List[str] = []
+        try:
+            self._check_source_onboarding_catalog(source_onboarding_catalog)
+        except ValueError as exc:
+            errors.append(str(exc))
+        try:
+            self._check_human_biosignal_catalog_summary(human_biosignal_catalog)
+        except ValueError as exc:
+            errors.append(str(exc))
+        try:
+            self._check_human_body_analysis_package(
+                human_body_analysis_package,
+                source_onboarding_catalog,
+                human_biosignal_catalog,
+            )
+        except ValueError as exc:
+            errors.append(str(exc))
+        checks = {
+            "human_body_analysis_package_bound": (
+                human_body_analysis_package.get(
+                    "human_body_analysis_package_bound"
+                )
+                is True
+            ),
+            "human_body_analysis_package_digest_bound": (
+                human_body_analysis_package.get(
+                    "human_body_analysis_package_digest"
+                )
+                == sha256_text(
+                    canonical_json(
+                        self._human_body_analysis_package_digest_payload(
+                            human_body_analysis_package
+                        )
+                    )
+                )
+            ),
+            "human_body_biosignal_catalog_bound": (
+                human_body_analysis_package.get("human_biosignal_catalog_bound")
+                is True
+            ),
+            "human_body_analysis_capabilities_bound": (
+                human_body_analysis_package.get("analysis_capabilities_bound")
+                is True
+            ),
+            "human_body_operator_ui_bound": (
+                human_body_analysis_package.get("operator_ui_bound") is True
+            ),
+            "human_body_release_package_bound": (
+                human_body_analysis_package.get("release_package_bound") is True
+            ),
+            "human_body_environment_matrix_bound": (
+                human_body_analysis_package.get("environment_matrix_bound") is True
+            ),
+            "human_body_payload_redacted": (
+                self._human_body_analysis_package_payload_redacted(
+                    human_body_analysis_package
+                )
+            ),
+            "human_body_no_identity_or_upload_claim": (
+                self._human_body_analysis_package_no_identity_or_upload_claim(
+                    human_body_analysis_package
+                )
+            ),
+        }
+        for name, ok in checks.items():
+            if not ok:
+                errors.append(f"{name} failed")
+        return {
+            "ok": not errors,
+            "errors": errors,
+            **checks,
+            "human_body_family_count": human_body_analysis_package.get(
+                "human_body_family_count",
+                0,
+            ),
+            "human_body_modality_count": human_body_analysis_package.get(
+                "human_body_modality_count",
+                0,
+            ),
+            "human_body_analysis_capability_count": (
+                human_body_analysis_package.get("analysis_capability_count", 0)
+            ),
+            "human_body_operator_ui_card_count": human_body_analysis_package.get(
+                "operator_ui_card_count",
+                0,
+            ),
+            "human_body_package_target_count": human_body_analysis_package.get(
+                "package_target_count",
+                0,
+            ),
+            "human_body_environment_target_count": (
+                human_body_analysis_package.get("environment_target_count", 0)
+            ),
+            "claim_ceiling": NIW_CLAIM_CEILING,
         }
 
     def register_application(
@@ -2175,6 +2670,9 @@ class NeuroIntegrationWorkbench:
         interpretation_synthesis: Dict[str, Any] | None = None,
         longitudinal_timeline: Dict[str, Any] | None = None,
         operator_runbook: Dict[str, Any] | None = None,
+        source_onboarding_catalog: Dict[str, Any] | None = None,
+        human_biosignal_catalog: Dict[str, Any] | None = None,
+        human_body_analysis_package: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -2271,6 +2769,37 @@ class NeuroIntegrationWorkbench:
                 errors.append("operator_runbook requires longitudinal_timeline")
             if interpretation_synthesis is None:
                 errors.append("operator_runbook requires interpretation_synthesis")
+        if source_onboarding_catalog is not None:
+            try:
+                self._check_source_onboarding_catalog(source_onboarding_catalog)
+            except ValueError as exc:
+                errors.append(str(exc))
+        if human_biosignal_catalog is not None:
+            try:
+                self._check_human_biosignal_catalog_summary(human_biosignal_catalog)
+            except ValueError as exc:
+                errors.append(str(exc))
+        if human_body_analysis_package is not None:
+            if source_onboarding_catalog is None:
+                errors.append(
+                    "human_body_analysis_package requires source_onboarding_catalog"
+                )
+            if human_biosignal_catalog is None:
+                errors.append(
+                    "human_body_analysis_package requires human_biosignal_catalog"
+                )
+            if (
+                source_onboarding_catalog is not None
+                and human_biosignal_catalog is not None
+            ):
+                try:
+                    self._check_human_body_analysis_package(
+                        human_body_analysis_package,
+                        source_onboarding_catalog,
+                        human_biosignal_catalog,
+                    )
+                except ValueError as exc:
+                    errors.append(str(exc))
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -2900,6 +3429,202 @@ class NeuroIntegrationWorkbench:
                 ),
             }
 
+        source_onboarding_catalog_checks: Dict[str, bool] = {}
+        if source_onboarding_catalog is not None:
+            source_onboarding_catalog_digest_bound = (
+                source_onboarding_catalog.get("source_onboarding_catalog_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._source_onboarding_catalog_digest_payload(
+                            source_onboarding_catalog
+                        )
+                    )
+                )
+            )
+            source_onboarding_catalog_checks = {
+                "source_onboarding_catalog_digest_bound": (
+                    source_onboarding_catalog_digest_bound
+                ),
+                "source_onboarding_catalog_bound": (
+                    source_onboarding_catalog.get(
+                        "source_onboarding_catalog_bound"
+                    )
+                    is True
+                    and source_onboarding_catalog.get("seed_sources_cataloged")
+                    is True
+                    and source_onboarding_catalog.get(
+                        "open_biodata_sources_cataloged"
+                    )
+                    is True
+                ),
+                "source_onboarding_items_bound": (
+                    source_onboarding_catalog.get("all_items_bound") is True
+                    and source_onboarding_catalog.get("onboarding_item_count")
+                    == len(
+                        source_onboarding_catalog.get(
+                            "onboarding_items",
+                            [],
+                        )
+                    )
+                    and source_onboarding_catalog.get("source_type_count")
+                    == len(source_onboarding_catalog.get("source_types", []))
+                ),
+                "source_onboarding_operator_ui_bound": (
+                    source_onboarding_catalog.get("operator_ui_cards_bound")
+                    is True
+                    and source_onboarding_catalog.get("operator_ui_ready") is True
+                    and source_onboarding_catalog.get("operator_ui_card_count")
+                    == source_onboarding_catalog.get("onboarding_item_count")
+                    == len(
+                        source_onboarding_catalog.get(
+                            "operator_ui_cards",
+                            [],
+                        )
+                    )
+                ),
+                "source_onboarding_future_modalities_bound": (
+                    source_onboarding_catalog.get("future_modalities_cataloged")
+                    is True
+                    and source_onboarding_catalog.get("future_source_type_count")
+                    == len(NIW_FUTURE_BIODATA_SOURCE_TYPES)
+                ),
+                "source_onboarding_payload_redacted": (
+                    self._source_onboarding_catalog_payload_redacted(
+                        source_onboarding_catalog
+                    )
+                ),
+                "source_onboarding_no_identity_or_upload_claim": (
+                    source_onboarding_catalog.get("clinical_diagnosis_claimed")
+                    is False
+                    and source_onboarding_catalog.get(
+                        "semantic_thought_content_generated"
+                    )
+                    is False
+                    and source_onboarding_catalog.get(
+                        "consciousness_reproduction_claimed"
+                    )
+                    is False
+                    and source_onboarding_catalog.get(
+                        "identity_replacement_claimed"
+                    )
+                    is False
+                    and source_onboarding_catalog.get("upload_readiness_claimed")
+                    is False
+                ),
+            }
+
+        human_body_analysis_package_checks: Dict[str, bool] = {}
+        if (
+            human_body_analysis_package is not None
+            and source_onboarding_catalog is not None
+            and human_biosignal_catalog is not None
+        ):
+            human_body_analysis_package_digest_bound = (
+                human_body_analysis_package.get(
+                    "human_body_analysis_package_digest"
+                )
+                == sha256_text(
+                    canonical_json(
+                        self._human_body_analysis_package_digest_payload(
+                            human_body_analysis_package
+                        )
+                    )
+                )
+            )
+            release_package = human_body_analysis_package.get(
+                "release_package",
+                {},
+            )
+            operator_ui = human_body_analysis_package.get("operator_ui", {})
+            human_body_analysis_package_checks = {
+                "human_body_analysis_package_digest_bound": (
+                    human_body_analysis_package_digest_bound
+                ),
+                "human_body_analysis_package_bound": (
+                    human_body_analysis_package.get(
+                        "human_body_analysis_package_bound"
+                    )
+                    is True
+                    and human_body_analysis_package.get(
+                        "source_onboarding_catalog_digest"
+                    )
+                    == source_onboarding_catalog.get(
+                        "source_onboarding_catalog_digest"
+                    )
+                    and human_body_analysis_package.get(
+                        "human_biosignal_catalog_digest"
+                    )
+                    == human_biosignal_catalog.get("catalog_digest")
+                ),
+                "human_body_biosignal_catalog_bound": (
+                    human_body_analysis_package.get(
+                        "human_biosignal_catalog_bound"
+                    )
+                    is True
+                    and human_body_analysis_package.get(
+                        "human_body_family_count"
+                    )
+                    == human_biosignal_catalog.get("family_count")
+                    and human_body_analysis_package.get(
+                        "human_body_modality_count"
+                    )
+                    == human_biosignal_catalog.get("modality_count")
+                ),
+                "human_body_all_modalities_cataloged": (
+                    human_body_analysis_package.get(
+                        "all_biosignal_families_cataloged"
+                    )
+                    is True
+                    and human_body_analysis_package.get(
+                        "all_known_modalities_cataloged"
+                    )
+                    is True
+                ),
+                "human_body_analysis_capabilities_bound": (
+                    human_body_analysis_package.get(
+                        "analysis_capabilities_bound"
+                    )
+                    is True
+                    and human_body_analysis_package.get(
+                        "analysis_capability_count"
+                    )
+                    == human_biosignal_catalog.get("family_count")
+                ),
+                "human_body_operator_ui_bound": (
+                    human_body_analysis_package.get("operator_ui_bound") is True
+                    and isinstance(operator_ui, dict)
+                    and operator_ui.get("operator_ui_bound") is True
+                    and operator_ui.get("operator_ui_card_count")
+                    == human_body_analysis_package.get(
+                        "analysis_capability_count"
+                    )
+                ),
+                "human_body_release_package_bound": (
+                    human_body_analysis_package.get("release_package_bound")
+                    is True
+                    and isinstance(release_package, dict)
+                    and release_package.get("release_package_bound") is True
+                    and release_package.get("package_target_count")
+                    == len(NIW_HUMAN_BODY_PACKAGE_TARGETS)
+                ),
+                "human_body_environment_matrix_bound": (
+                    human_body_analysis_package.get("environment_matrix_bound")
+                    is True
+                    and isinstance(release_package, dict)
+                    and release_package.get("environment_matrix_bound") is True
+                ),
+                "human_body_payload_redacted": (
+                    self._human_body_analysis_package_payload_redacted(
+                        human_body_analysis_package
+                    )
+                ),
+                "human_body_no_identity_or_upload_claim": (
+                    self._human_body_analysis_package_no_identity_or_upload_claim(
+                        human_body_analysis_package
+                    )
+                ),
+            }
+
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
             "source_bundle_digest_bound": source_bundle_digest_bound,
@@ -2928,6 +3653,8 @@ class NeuroIntegrationWorkbench:
             **interpretation_synthesis_checks,
             **longitudinal_timeline_checks,
             **operator_runbook_checks,
+            **source_onboarding_catalog_checks,
+            **human_body_analysis_package_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -3018,6 +3745,54 @@ class NeuroIntegrationWorkbench:
                 if operator_runbook is not None
                 else 0
             ),
+            "source_onboarding_item_count": (
+                source_onboarding_catalog.get("onboarding_item_count", 0)
+                if source_onboarding_catalog is not None
+                else 0
+            ),
+            "source_onboarding_operator_ui_card_count": (
+                source_onboarding_catalog.get("operator_ui_card_count", 0)
+                if source_onboarding_catalog is not None
+                else 0
+            ),
+            "source_onboarding_future_source_type_count": (
+                source_onboarding_catalog.get("future_source_type_count", 0)
+                if source_onboarding_catalog is not None
+                else 0
+            ),
+            "human_body_family_count": (
+                human_body_analysis_package.get("human_body_family_count", 0)
+                if human_body_analysis_package is not None
+                else 0
+            ),
+            "human_body_modality_count": (
+                human_body_analysis_package.get("human_body_modality_count", 0)
+                if human_body_analysis_package is not None
+                else 0
+            ),
+            "human_body_analysis_capability_count": (
+                human_body_analysis_package.get(
+                    "analysis_capability_count",
+                    0,
+                )
+                if human_body_analysis_package is not None
+                else 0
+            ),
+            "human_body_operator_ui_card_count": (
+                human_body_analysis_package.get("operator_ui_card_count", 0)
+                if human_body_analysis_package is not None
+                else 0
+            ),
+            "human_body_package_target_count": (
+                human_body_analysis_package.get("package_target_count", 0)
+                if human_body_analysis_package is not None
+                else 0
+            ),
+            "human_body_environment_target_count": (
+                human_body_analysis_package.get("environment_target_count", 0)
+                if human_body_analysis_package is not None
+                else 0
+            ),
             "claim_ceiling": NIW_CLAIM_CEILING,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -3028,7 +3803,510 @@ class NeuroIntegrationWorkbench:
             "semantic_thought_content_generated": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
         }
+
+    def _build_human_body_analysis_capability(
+        self,
+        family_id: str,
+        modalities: Sequence[str],
+    ) -> Dict[str, Any]:
+        modality_list = list(modalities)
+        supported_modalities_digest = sha256_text(
+            canonical_json(
+                {
+                    "family_id": family_id,
+                    "supported_modalities": modality_list,
+                }
+            )
+        )
+        capability = {
+            "capability_ref": (
+                "analysis-capability://neuro-integration/"
+                f"{new_id('niw-human-body-capability')}"
+            ),
+            "family_id": family_id,
+            "family_label": family_id.replace("_", " "),
+            "modality_count": len(modality_list),
+            "supported_modalities": modality_list,
+            "supported_modalities_digest": supported_modalities_digest,
+            "analysis_lanes": list(NIW_HUMAN_BODY_ANALYSIS_LANES),
+            "analysis_recipe_id": self._human_body_analysis_recipe_id(family_id),
+            "operator_summary": self._human_body_capability_summary(
+                family_id,
+                modality_list,
+            ),
+            "operator_ui_tab_id": self._human_body_operator_ui_tab_id(family_id),
+            "safe_next_action": self._human_body_safe_next_action(family_id),
+            "storage_policy": NIW_HUMAN_BODY_ANALYSIS_STORAGE_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_biosignal_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+            "capability_bound": True,
+        }
+        capability["capability_digest"] = sha256_text(
+            canonical_json(self._human_body_analysis_capability_digest_payload(capability))
+        )
+        return capability
+
+    def _human_body_analysis_recipe_id(self, family_id: str) -> str:
+        if family_id.startswith("neural_"):
+            return "neural-biosignal-feature-summary-screen"
+        if family_id.startswith("cardiac") or family_id.startswith("vascular"):
+            return "cardiovascular-feature-summary-screen"
+        if family_id.startswith("respiratory"):
+            return "respiratory-feature-summary-screen"
+        if family_id in ("electrodermal", "thermal"):
+            return "autonomic-feature-summary-screen"
+        if family_id in (
+            "muscle_peripheral",
+            "motion_kinematics",
+            "posture_pressure_force",
+        ):
+            return "movement-biomechanics-feature-summary-screen"
+        if family_id in ("ocular", "acoustic_vocal"):
+            return "behavioral-signal-feature-summary-screen"
+        if family_id.endswith("_omics") or family_id in (
+            "blood_biochemistry",
+            "sweat_interstitial",
+            "saliva_breath",
+            "urinary",
+            "gastrointestinal",
+        ):
+            return "molecular-physiology-feature-summary-screen"
+        if family_id in ("sleep_circadian", "body_composition_imaging"):
+            return "longitudinal-context-feature-summary-screen"
+        return "human-biosignal-generic-feature-summary-screen"
+
+    def _human_body_capability_summary(
+        self,
+        family_id: str,
+        modalities: Sequence[str],
+    ) -> str:
+        return (
+            f"{family_id.replace('_', ' ')} supports {len(modalities)} cataloged "
+            "human biosignal modalities as feature-summary inputs only."
+        )
+
+    def _human_body_safe_next_action(self, family_id: str) -> str:
+        return (
+            f"Review {family_id.replace('_', ' ')} consent, feature digest, "
+            "quality gate, and operator action before analysis."
+        )
+
+    def _human_body_operator_ui_tab_id(self, family_id: str) -> str:
+        return f"human-body-tab-{family_id.replace('_', '-')}"
+
+    def _build_human_body_operator_ui(
+        self,
+        analysis_capabilities: Sequence[Dict[str, Any]],
+        source_onboarding_catalog: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        cards = [
+            self._human_body_operator_ui_card(capability)
+            for capability in analysis_capabilities
+        ]
+        tabs = [
+            {
+                "tab_id": "human-body-overview",
+                "label": "Overview",
+                "card_refs": [card["card_id"] for card in cards[:4]],
+                "raw_payload_displayed": False,
+            }
+        ]
+        tabs.extend(
+            {
+                "tab_id": capability["operator_ui_tab_id"],
+                "label": capability["family_label"],
+                "card_refs": [
+                    f"human-body-family-card-{capability['family_id'].replace('_', '-')}"
+                ],
+                "raw_payload_displayed": False,
+            }
+            for capability in analysis_capabilities
+        )
+        workflow_steps = self._human_body_operator_workflow_steps()
+        ui = {
+            "profile_id": "human-body-analysis-operator-ui-v1",
+            "operator_ui_policy": NIW_HUMAN_BODY_ANALYSIS_UI_POLICY,
+            "source_onboarding_operator_ui_policy": source_onboarding_catalog[
+                "operator_ui_policy"
+            ],
+            "tabs": tabs,
+            "tab_count": len(tabs),
+            "cards": cards,
+            "operator_ui_card_count": len(cards),
+            "workflow_steps": workflow_steps,
+            "workflow_step_count": len(workflow_steps),
+            "status_badges": {
+                "catalog-bound": "Catalog bound",
+                "review-ready": "Review ready",
+                "claim-ceiling-active": "Claim ceiling active",
+            },
+            "summary": {
+                "family_card_count": len(cards),
+                "workflow_step_count": len(workflow_steps),
+                "disabled_claim_count": 5,
+                "raw_payload_displayed": False,
+            },
+            "operator_ui_cards_bound": all(
+                card["operator_ui_card_bound"] for card in cards
+            ),
+            "operator_ui_workflow_bound": all(
+                step["workflow_step_bound"] for step in workflow_steps
+            ),
+            "operator_ui_bound": True,
+            "raw_payload_displayed": False,
+        }
+        ui["operator_ui_digest"] = sha256_text(
+            canonical_json(self._human_body_operator_ui_digest_payload(ui))
+        )
+        return ui
+
+    def _human_body_operator_ui_card(
+        self,
+        capability: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        family_id = capability["family_id"]
+        return {
+            "card_id": f"human-body-family-card-{family_id.replace('_', '-')}",
+            "family_id": family_id,
+            "primary_label": capability["family_label"],
+            "secondary_label": (
+                f"{capability['modality_count']} cataloged modalities"
+            ),
+            "status_badge": "Catalog bound",
+            "analysis_recipe_id": capability["analysis_recipe_id"],
+            "safe_next_action": capability["safe_next_action"],
+            "operator_control": "review-human-body-family-card",
+            "agent_control": f"prepare_{family_id}_analysis_package_manifest",
+            "risk_banner": "feature-summary-only-no-diagnosis-identity-or-upload",
+            "disabled_claims": [
+                "clinical_diagnosis",
+                "semantic_thought_content",
+                "consciousness_reproduction",
+                "identity_replacement",
+                "upload_readiness",
+            ],
+            "raw_payload_displayed": False,
+            "operator_ui_card_bound": True,
+        }
+
+    def _human_body_operator_workflow_steps(self) -> List[Dict[str, Any]]:
+        step_specs = (
+            (
+                "import-catalog",
+                "Import the human biosignal catalog and verify its digest.",
+                "validate_human_biosignal_catalog_digest",
+            ),
+            (
+                "review-family-card",
+                "Review each family card before source feature summaries enter analysis.",
+                "review_human_body_family_cards",
+            ),
+            (
+                "bind-feature-summary",
+                "Bind consent, feature digest, and collection method refs.",
+                "prepare_digest_only_feature_summary_binding",
+            ),
+            (
+                "run-quality-gate",
+                "Check calibration, artifact, consent freshness, and operator review refs.",
+                "prepare_measurement_quality_gate_inputs",
+            ),
+            (
+                "release-package",
+                "Verify wheel, source, CLI JSON, schema bundle, and container targets.",
+                "verify_cross_environment_release_package",
+            ),
+        )
+        return [
+            {
+                "step_id": f"human-body-ui-step-{index:02d}-{step_id}",
+                "order": index,
+                "operator_label": label,
+                "coding_agent_task": task,
+                "safe_next_action": label,
+                "claim_ceiling": NIW_CLAIM_CEILING,
+                "raw_payload_displayed": False,
+                "workflow_step_bound": True,
+            }
+            for index, (step_id, label, task) in enumerate(step_specs, start=1)
+        ]
+
+    def _build_human_body_release_package(
+        self,
+        release_manifest: Dict[str, Any] | None,
+    ) -> Dict[str, Any]:
+        release_manifest = release_manifest or {}
+        environment_matrix = {
+            "operating_systems": list(NIW_HUMAN_BODY_ENVIRONMENT_TARGETS),
+            "python_versions": list(NIW_HUMAN_BODY_PYTHON_TARGETS),
+            "container_platforms": list(NIW_HUMAN_BODY_CONTAINER_PLATFORMS),
+            "all_operating_systems_bound": True,
+            "all_python_versions_bound": True,
+            "all_container_platforms_bound": True,
+        }
+        release_package = {
+            "profile_id": "human-body-analysis-release-package-v1",
+            "runtime_version": release_manifest.get("runtime_version", "0.0.0"),
+            "runtime_stability": release_manifest.get(
+                "runtime_stability",
+                "bootstrap",
+            ),
+            "release_manifest_digest": self._release_manifest_digest(
+                release_manifest
+            ),
+            "package_targets": list(NIW_HUMAN_BODY_PACKAGE_TARGETS),
+            "package_target_count": len(NIW_HUMAN_BODY_PACKAGE_TARGETS),
+            "environment_matrix": environment_matrix,
+            "environment_target_count": (
+                len(NIW_HUMAN_BODY_ENVIRONMENT_TARGETS)
+                + len(NIW_HUMAN_BODY_PYTHON_TARGETS)
+                + len(NIW_HUMAN_BODY_CONTAINER_PLATFORMS)
+            ),
+            "install_commands": [
+                "python -m pip install omoikane-os",
+                "omoikane neuro-integration-demo --json",
+                "omoikane human-body-analysis-demo --json",
+            ],
+            "release_checks": list(NIW_HUMAN_BODY_RELEASE_CHECKS),
+            "release_check_count": len(NIW_HUMAN_BODY_RELEASE_CHECKS),
+            "package_targets_bound": True,
+            "environment_matrix_bound": True,
+            "installed_wheel_smoke_bound": True,
+            "portable_checksum_bound": True,
+            "multi_arch_container_bound": True,
+            "release_package_bound": True,
+            "storage_policy": NIW_HUMAN_BODY_ANALYSIS_STORAGE_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_release_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        release_package["release_package_digest"] = sha256_text(
+            canonical_json(
+                self._human_body_release_package_digest_payload(release_package)
+            )
+        )
+        return release_package
+
+    def _release_manifest_digest(
+        self,
+        release_manifest: Dict[str, Any],
+    ) -> str:
+        if not release_manifest:
+            return ""
+        return sha256_text(
+            canonical_json(
+                {
+                    "kind": release_manifest.get("kind"),
+                    "schema_version": release_manifest.get("schema_version"),
+                    "runtime_version": release_manifest.get("runtime_version"),
+                    "runtime_stability": release_manifest.get(
+                        "runtime_stability"
+                    ),
+                    "catalog_snapshot": release_manifest.get("catalog_snapshot"),
+                }
+            )
+        )
+
+    def _build_source_onboarding_item(self, source_type: str) -> Dict[str, Any]:
+        item = {
+            "onboarding_item_ref": (
+                "source-onboarding-item://neuro-integration/"
+                f"{new_id('niw-source-onboarding-item')}"
+            ),
+            "source_type": source_type,
+            "source_family": self._source_family(source_type),
+            "onboarding_status": self._source_onboarding_status(source_type),
+            "aliases": self._source_onboarding_aliases(source_type),
+            "collection_method_id": self._collection_method_id(source_type),
+            "analysis_recipe_hint": self._source_onboarding_analysis_recipe_hint(
+                source_type
+            ),
+            "required_replacement_lanes": list(NIW_REQUIRED_REPLACEMENT_LANES),
+            "operator_summary": self._source_onboarding_operator_summary(
+                source_type
+            ),
+            "coding_agent_task": self._source_onboarding_agent_task(source_type),
+            "operator_ui_card": self._source_onboarding_operator_ui_card(
+                source_type
+            ),
+            "operator_skill_floor": "non_ml_operator",
+            "requires_ml_expertise": False,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_catalog_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+            "onboarding_item_bound": False,
+        }
+        item["onboarding_item_bound"] = (
+            item["operator_ui_card"]["operator_ui_card_bound"]
+            and item["operator_ui_card"]["raw_payload_displayed"] is False
+        )
+        item["onboarding_item_digest"] = sha256_text(
+            canonical_json(self._source_onboarding_item_digest_payload(item))
+        )
+        return item
+
+    def _source_onboarding_status(self, source_type: str) -> str:
+        if source_type in NIW_SEED_SOURCE_TYPES:
+            return "seed-required"
+        if (
+            source_type in NIW_EXPANSION_SOURCE_TYPES
+            or source_type in NIW_OPEN_BIODATA_SOURCE_TYPES
+        ):
+            return "already-bound"
+        if source_type in (
+            "electrophysiology_organoid",
+            "morphology_organoid",
+        ):
+            return "research-frontier"
+        return "onboardable"
+
+    def _source_onboarding_aliases(self, source_type: str) -> List[str]:
+        aliases = [
+            alias
+            for alias, normalized in NIW_SOURCE_TYPE_ALIASES.items()
+            if normalized == source_type
+        ]
+        return sorted(aliases)
+
+    def _source_onboarding_analysis_recipe_hint(self, source_type: str) -> str:
+        if source_type == "questionnaire" or source_type == "eeg":
+            return "survey-eeg-feature-alignment"
+        if source_type == "fmri_bold":
+            return "neural-electrical-hemodynamic-context"
+        if source_type in (
+            "brain_organoid",
+            "electrophysiology_organoid",
+            "morphology_organoid",
+        ):
+            return "organoid-context-comparison"
+        if source_type in ("meg", "ecog", "neural_spiking"):
+            return "neural-signal-context-screen"
+        if source_type in ("fnirs", "diffusion_mri"):
+            return "neurovascular-structural-context-screen"
+        if source_type in ("biosensor", "sleep_staging"):
+            return "biosignal-autonomic-context-screen"
+        if source_type in (
+            "behavioral_task",
+            "eye_tracking",
+            "speech_acoustics",
+            "gait_kinematics",
+            "digital_phenotyping",
+        ):
+            return "behavioral-performance-context-screen"
+        if source_type in ("omics", "microbiome", "metabolomics", "proteomics"):
+            return "omics-physiology-context-screen"
+        if source_type == "clinical_metadata":
+            return "clinical-context-modulator-screen"
+        return "feature-summary-cross-modal-screen"
+
+    def _source_onboarding_operator_summary(self, source_type: str) -> str:
+        label = source_type.replace("_", " ")
+        if source_type in NIW_SEED_SOURCE_TYPES:
+            return (
+                f"{label} must remain a seed feature summary with consent and "
+                "digest refs before any expansion analysis."
+            )
+        if source_type in NIW_EXPANSION_SOURCE_TYPES:
+            return (
+                f"{label} is current expansion context only; keep it below the "
+                "identity and upload-readiness claim ceiling."
+            )
+        if source_type in NIW_OPEN_BIODATA_SOURCE_TYPES:
+            return (
+                f"{label} is current open biodata context; route it through all "
+                "replacement lanes without raw payload storage."
+            )
+        return (
+            f"{label} can be onboarded as a future biodata source type after "
+            "consent, feature summary, quality, and replacement-lane refs exist."
+        )
+
+    def _source_onboarding_agent_task(self, source_type: str) -> str:
+        return f"prepare_{source_type}_source_onboarding_manifest"
+
+    def _source_onboarding_operator_ui_card(self, source_type: str) -> Dict[str, Any]:
+        status = self._source_onboarding_status(source_type)
+        label = source_type.replace("_", " ")
+        card = {
+            "card_id": f"source-onboarding-ui-{source_type.replace('_', '-')}",
+            "source_type": source_type,
+            "display_group": self._source_onboarding_ui_group(source_type),
+            "primary_label": label,
+            "secondary_label": self._source_family(source_type).replace("_", " "),
+            "status_badge": self._source_onboarding_status_badge(status),
+            "safe_next_action": self._source_onboarding_safe_next_action(source_type),
+            "operator_control": "review-source-onboarding-card",
+            "agent_control": self._source_onboarding_agent_task(source_type),
+            "risk_banner": "catalog-only-no-diagnosis-identity-or-upload-readiness",
+            "disabled_claims": [
+                "clinical_diagnosis",
+                "semantic_thought_content",
+                "consciousness_reproduction",
+                "identity_replacement",
+                "upload_readiness",
+            ],
+            "raw_payload_displayed": False,
+            "operator_ui_card_bound": True,
+        }
+        return card
+
+    def _source_onboarding_ui_group(self, source_type: str) -> str:
+        if source_type in NIW_SEED_SOURCE_TYPES:
+            return "seed"
+        if source_type in NIW_EXPANSION_SOURCE_TYPES:
+            return "current-expansion"
+        if source_type in NIW_OPEN_BIODATA_SOURCE_TYPES:
+            return "current-open-biodata"
+        if source_type in (
+            "electrophysiology_organoid",
+            "morphology_organoid",
+        ):
+            return "research-frontier"
+        return "future-onboarding"
+
+    def _source_onboarding_status_badge(self, status: str) -> str:
+        return {
+            "seed-required": "Seed required",
+            "already-bound": "Current context",
+            "onboardable": "Future candidate",
+            "research-frontier": "Research frontier",
+        }.get(status, "Review required")
+
+    def _source_onboarding_safe_next_action(self, source_type: str) -> str:
+        if source_type in NIW_SEED_SOURCE_TYPES:
+            return f"Confirm {source_type.replace('_', ' ')} consent and feature digest."
+        if source_type in NIW_EXPANSION_SOURCE_TYPES:
+            return (
+                f"Review {source_type.replace('_', ' ')} as context only; keep "
+                "identity and upload-readiness claims disabled."
+            )
+        if source_type in NIW_OPEN_BIODATA_SOURCE_TYPES:
+            return (
+                f"Route {source_type.replace('_', ' ')} through all replacement "
+                "lanes using digest-only summaries."
+            )
+        return (
+            f"Prepare {source_type.replace('_', ' ')} onboarding metadata before "
+            "any source-bundle entry is allowed."
+        )
 
     def _operator_runbook_receipt_binding(
         self,
@@ -4526,6 +5804,21 @@ class NeuroIntegrationWorkbench:
             "behavioral_task": "behavioral-task-feature-summary-ingest",
             "omics": "molecular-omics-feature-summary-ingest",
             "clinical_metadata": "clinical-context-feature-summary-ingest",
+            "meg": "meg-source-localization-feature-summary-ingest",
+            "ecog": "ecog-feature-summary-ingest",
+            "neural_spiking": "single-unit-spiking-feature-summary-ingest",
+            "fnirs": "fnirs-hemodynamic-feature-summary-ingest",
+            "diffusion_mri": "diffusion-mri-connectivity-summary-ingest",
+            "eye_tracking": "eye-tracking-feature-summary-ingest",
+            "speech_acoustics": "speech-acoustic-feature-summary-ingest",
+            "gait_kinematics": "gait-kinematic-feature-summary-ingest",
+            "microbiome": "microbiome-feature-summary-ingest",
+            "metabolomics": "metabolomics-feature-summary-ingest",
+            "proteomics": "proteomics-feature-summary-ingest",
+            "digital_phenotyping": "digital-phenotyping-feature-summary-ingest",
+            "sleep_staging": "sleep-stage-feature-summary-ingest",
+            "electrophysiology_organoid": "organoid-electrophysiology-summary-ingest",
+            "morphology_organoid": "organoid-morphology-summary-ingest",
         }.get(source_type, "generic-biodata-feature-summary-ingest")
 
     def _collection_operator_summary(self, source_type: str) -> str:
@@ -5194,6 +6487,313 @@ class NeuroIntegrationWorkbench:
         )
         if source_bundle.get("survey_eeg_fusion_receipt_bound") != expected_fusion_bound:
             raise ValueError("source_bundle.survey_eeg_fusion_receipt_bound mismatch")
+
+    def _check_source_onboarding_catalog(self, catalog: Dict[str, Any]) -> None:
+        if not isinstance(catalog, dict):
+            raise ValueError("source_onboarding_catalog must be a mapping")
+        if catalog.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("source_onboarding_catalog.schema_version mismatch")
+        if catalog.get("profile_id") != NIW_SOURCE_ONBOARDING_CATALOG_PROFILE_ID:
+            raise ValueError("source_onboarding_catalog.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._source_onboarding_catalog_digest_payload(catalog))
+        )
+        if catalog.get("source_onboarding_catalog_digest") != expected_digest:
+            raise ValueError(
+                "source_onboarding_catalog.source_onboarding_catalog_digest mismatch"
+            )
+        if catalog.get("catalog_policy") != NIW_SOURCE_ONBOARDING_CATALOG_POLICY:
+            raise ValueError("source_onboarding_catalog.catalog_policy mismatch")
+        if catalog.get("operator_ui_policy") != NIW_SOURCE_ONBOARDING_UI_POLICY:
+            raise ValueError("source_onboarding_catalog.operator_ui_policy mismatch")
+        if catalog.get("storage_policy") != NIW_SOURCE_ONBOARDING_STORAGE_POLICY:
+            raise ValueError("source_onboarding_catalog.storage_policy mismatch")
+        if catalog.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("source_onboarding_catalog.claim_ceiling mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "semantic_thought_content_generated",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+            "upload_readiness_claimed",
+        ):
+            if catalog.get(field_name) is not False:
+                raise ValueError(f"source_onboarding_catalog.{field_name} must be false")
+        items = catalog.get("onboarding_items")
+        if not isinstance(items, list) or not items:
+            raise ValueError(
+                "source_onboarding_catalog.onboarding_items must be a non-empty list"
+            )
+        if catalog.get("onboarding_item_count") != len(items):
+            raise ValueError(
+                "source_onboarding_catalog.onboarding_item_count must match items"
+            )
+        if catalog.get("source_type_count") != len(catalog.get("source_types", [])):
+            raise ValueError("source_onboarding_catalog.source_type_count mismatch")
+        item_source_types = []
+        item_digests = []
+        item_ui_cards = []
+        for item in items:
+            if not isinstance(item, dict):
+                raise ValueError(
+                    "source_onboarding_catalog.onboarding_items must contain mappings"
+                )
+            ui_card = item.get("operator_ui_card")
+            if not isinstance(ui_card, dict):
+                raise ValueError(
+                    "source_onboarding_item.operator_ui_card must be a mapping"
+                )
+            if ui_card.get("source_type") != item.get("source_type"):
+                raise ValueError("source_onboarding_item.operator_ui_card source mismatch")
+            if ui_card.get("operator_ui_card_bound") is not True:
+                raise ValueError("source_onboarding_item.operator_ui_card must be bound")
+            if ui_card.get("raw_payload_displayed") is not False:
+                raise ValueError(
+                    "source_onboarding_item.operator_ui_card raw payload display must be false"
+                )
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "semantic_thought_content_generated",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+                "upload_readiness_claimed",
+            ):
+                if item.get(field_name) is not False:
+                    raise ValueError(
+                        f"source_onboarding_item.{field_name} must be false"
+                    )
+            expected_item_digest = sha256_text(
+                canonical_json(self._source_onboarding_item_digest_payload(item))
+            )
+            if item.get("onboarding_item_digest") != expected_item_digest:
+                raise ValueError("source_onboarding_item.onboarding_item_digest mismatch")
+            item_source_types.append(item.get("source_type"))
+            item_digests.append(expected_item_digest)
+            item_ui_cards.append(ui_card)
+        if catalog.get("source_types") != item_source_types:
+            raise ValueError("source_onboarding_catalog.source_types mismatch")
+        if catalog.get("operator_ui_cards") != item_ui_cards:
+            raise ValueError("source_onboarding_catalog.operator_ui_cards mismatch")
+        if catalog.get("operator_ui_card_count") != len(item_ui_cards):
+            raise ValueError(
+                "source_onboarding_catalog.operator_ui_card_count mismatch"
+            )
+        if catalog.get("onboarding_item_digests") != item_digests:
+            raise ValueError(
+                "source_onboarding_catalog.onboarding_item_digests mismatch"
+            )
+        expected_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_SOURCE_ONBOARDING_CATALOG_PROFILE_ID,
+                    "source_types": catalog.get("source_types"),
+                    "onboarding_item_digests": item_digests,
+                }
+            )
+        )
+        if catalog.get("onboarding_item_digest_set") != expected_digest_set:
+            raise ValueError(
+                "source_onboarding_catalog.onboarding_item_digest_set mismatch"
+            )
+
+    def _check_human_biosignal_catalog_summary(
+        self,
+        catalog: Dict[str, Any],
+    ) -> None:
+        if not isinstance(catalog, dict):
+            raise ValueError("human_biosignal_catalog must be a mapping")
+        if catalog.get("schema_version") != "1.0":
+            raise ValueError("human_biosignal_catalog.schema_version mismatch")
+        if catalog.get("profile_id") != "human-biosignal-modality-catalog-v1":
+            raise ValueError("human_biosignal_catalog.profile_id mismatch")
+        if catalog.get("policy_id") != "human-biosignal-open-modality-catalog-v1":
+            raise ValueError("human_biosignal_catalog.policy_id mismatch")
+        if (
+            catalog.get("human_biosignal_scope")
+            != "human-derived-sensor-feature-summary-only"
+        ):
+            raise ValueError("human_biosignal_catalog.human_biosignal_scope mismatch")
+        if not isinstance(catalog.get("catalog_digest"), str) or len(
+            catalog.get("catalog_digest", "")
+        ) != 64:
+            raise ValueError("human_biosignal_catalog.catalog_digest mismatch")
+        modality_families = catalog.get("modality_families")
+        known_modalities = catalog.get("known_modalities")
+        modality_to_family = catalog.get("modality_to_family")
+        if not isinstance(modality_families, dict) or not modality_families:
+            raise ValueError("human_biosignal_catalog.modality_families must be a mapping")
+        if not isinstance(known_modalities, list) or not known_modalities:
+            raise ValueError("human_biosignal_catalog.known_modalities must be a list")
+        if not isinstance(modality_to_family, dict) or not modality_to_family:
+            raise ValueError("human_biosignal_catalog.modality_to_family must be a mapping")
+        for family_id, modalities in modality_families.items():
+            if not isinstance(family_id, str) or not family_id:
+                raise ValueError("human_biosignal_catalog family id must be a string")
+            if not isinstance(modalities, list) or not modalities:
+                raise ValueError(
+                    "human_biosignal_catalog modality family must be a non-empty list"
+                )
+        if catalog.get("family_count") != len(modality_families):
+            raise ValueError("human_biosignal_catalog.family_count mismatch")
+        if catalog.get("modality_count") != len(known_modalities):
+            raise ValueError("human_biosignal_catalog.modality_count mismatch")
+        cataloged_modalities = sorted(
+            {
+                modality
+                for modalities in modality_families.values()
+                for modality in modalities
+            }
+        )
+        if cataloged_modalities != sorted(set(known_modalities)):
+            raise ValueError("human_biosignal_catalog modality coverage mismatch")
+        for field_name in (
+            "raw_catalog_payload_stored",
+            "raw_biosignal_payload_stored",
+            "subjective_equivalence_claimed",
+            "semantic_thought_content_generated",
+        ):
+            if catalog.get(field_name) is not False:
+                raise ValueError(f"human_biosignal_catalog.{field_name} must be false")
+
+    def _check_human_body_analysis_package(
+        self,
+        package: Dict[str, Any],
+        source_onboarding_catalog: Dict[str, Any],
+        human_biosignal_catalog: Dict[str, Any],
+    ) -> None:
+        if not isinstance(package, dict):
+            raise ValueError("human_body_analysis_package must be a mapping")
+        if package.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("human_body_analysis_package.schema_version mismatch")
+        if package.get("profile_id") != NIW_HUMAN_BODY_ANALYSIS_PACKAGE_PROFILE_ID:
+            raise ValueError("human_body_analysis_package.profile_id mismatch")
+        if package.get("package_policy") != NIW_HUMAN_BODY_ANALYSIS_PACKAGE_POLICY:
+            raise ValueError("human_body_analysis_package.package_policy mismatch")
+        if package.get("storage_policy") != NIW_HUMAN_BODY_ANALYSIS_STORAGE_POLICY:
+            raise ValueError("human_body_analysis_package.storage_policy mismatch")
+        if package.get("operator_ui_policy") != NIW_HUMAN_BODY_ANALYSIS_UI_POLICY:
+            raise ValueError("human_body_analysis_package.operator_ui_policy mismatch")
+        if package.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("human_body_analysis_package.claim_ceiling mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._human_body_analysis_package_digest_payload(package))
+        )
+        if package.get("human_body_analysis_package_digest") != expected_digest:
+            raise ValueError(
+                "human_body_analysis_package.human_body_analysis_package_digest mismatch"
+            )
+        if (
+            package.get("source_onboarding_catalog_digest")
+            != source_onboarding_catalog.get("source_onboarding_catalog_digest")
+        ):
+            raise ValueError(
+                "human_body_analysis_package.source_onboarding_catalog_digest mismatch"
+            )
+        if (
+            package.get("human_biosignal_catalog_digest")
+            != human_biosignal_catalog.get("catalog_digest")
+        ):
+            raise ValueError(
+                "human_body_analysis_package.human_biosignal_catalog_digest mismatch"
+            )
+        capabilities = package.get("analysis_capabilities")
+        if not isinstance(capabilities, list) or not capabilities:
+            raise ValueError(
+                "human_body_analysis_package.analysis_capabilities must be a list"
+            )
+        if package.get("analysis_capability_count") != len(capabilities):
+            raise ValueError(
+                "human_body_analysis_package.analysis_capability_count mismatch"
+            )
+        capability_digests = []
+        for capability in capabilities:
+            if not isinstance(capability, dict):
+                raise ValueError(
+                    "human_body_analysis_package.analysis_capabilities must contain mappings"
+                )
+            expected_capability_digest = sha256_text(
+                canonical_json(
+                    self._human_body_analysis_capability_digest_payload(capability)
+                )
+            )
+            if capability.get("capability_digest") != expected_capability_digest:
+                raise ValueError(
+                    "human_body_analysis_package.capability_digest mismatch"
+                )
+            if capability.get("capability_bound") is not True:
+                raise ValueError(
+                    "human_body_analysis_package.capability_bound must be true"
+                )
+            for field_name in (
+                "raw_biosignal_payload_stored",
+                "raw_analysis_payload_stored",
+                "clinical_diagnosis_claimed",
+                "semantic_thought_content_generated",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+                "upload_readiness_claimed",
+            ):
+                if capability.get(field_name) is not False:
+                    raise ValueError(
+                        f"human_body_analysis_package.capability.{field_name} must be false"
+                    )
+            capability_digests.append(expected_capability_digest)
+        if package.get("analysis_capability_digests") != capability_digests:
+            raise ValueError(
+                "human_body_analysis_package.analysis_capability_digests mismatch"
+            )
+        expected_capability_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_HUMAN_BODY_ANALYSIS_PACKAGE_PROFILE_ID,
+                    "human_biosignal_catalog_digest": human_biosignal_catalog[
+                        "catalog_digest"
+                    ],
+                    "analysis_capability_digests": capability_digests,
+                }
+            )
+        )
+        if (
+            package.get("analysis_capability_digest_set")
+            != expected_capability_digest_set
+        ):
+            raise ValueError(
+                "human_body_analysis_package.analysis_capability_digest_set mismatch"
+            )
+        operator_ui = package.get("operator_ui")
+        if not isinstance(operator_ui, dict):
+            raise ValueError("human_body_analysis_package.operator_ui must be a mapping")
+        expected_operator_ui_digest = sha256_text(
+            canonical_json(self._human_body_operator_ui_digest_payload(operator_ui))
+        )
+        if operator_ui.get("operator_ui_digest") != expected_operator_ui_digest:
+            raise ValueError("human_body_analysis_package.operator_ui_digest mismatch")
+        if operator_ui.get("operator_ui_bound") is not True:
+            raise ValueError("human_body_analysis_package.operator_ui_bound must be true")
+        release_package = package.get("release_package")
+        if not isinstance(release_package, dict):
+            raise ValueError(
+                "human_body_analysis_package.release_package must be a mapping"
+            )
+        expected_release_digest = sha256_text(
+            canonical_json(
+                self._human_body_release_package_digest_payload(release_package)
+            )
+        )
+        if release_package.get("release_package_digest") != expected_release_digest:
+            raise ValueError(
+                "human_body_analysis_package.release_package_digest mismatch"
+            )
+        if release_package.get("release_package_bound") is not True:
+            raise ValueError(
+                "human_body_analysis_package.release_package_bound must be true"
+            )
+        if not self._human_body_analysis_package_payload_redacted(package):
+            raise ValueError("human_body_analysis_package payload must be redacted")
+        if not self._human_body_analysis_package_no_identity_or_upload_claim(package):
+            raise ValueError(
+                "human_body_analysis_package identity or upload claim must be false"
+            )
 
     def _check_workspace(self, workspace: Dict[str, Any]) -> None:
         if not isinstance(workspace, dict):
@@ -6144,6 +7744,118 @@ class NeuroIntegrationWorkbench:
         )
         return runbook_raw_flags and binding_raw_flags and step_raw_flags
 
+    def _source_onboarding_catalog_payload_redacted(
+        self,
+        catalog: Dict[str, Any],
+    ) -> bool:
+        catalog_raw_flags = all(
+            catalog.get(field_name) is False
+            for field_name in catalog
+            if field_name.startswith("raw_")
+        )
+        item_raw_flags = all(
+            item.get(field_name) is False
+            for item in catalog.get("onboarding_items", [])
+            if isinstance(item, dict)
+            for field_name in item
+            if field_name.startswith("raw_")
+        )
+        card_raw_flags = all(
+            card.get(field_name) is False
+            for card in catalog.get("operator_ui_cards", [])
+            if isinstance(card, dict)
+            for field_name in card
+            if field_name.startswith("raw_")
+        )
+        nested_card_raw_flags = all(
+            card.get(field_name) is False
+            for item in catalog.get("onboarding_items", [])
+            if isinstance(item, dict)
+            for card in [item.get("operator_ui_card")]
+            if isinstance(card, dict)
+            for field_name in card
+            if field_name.startswith("raw_")
+        )
+        return (
+            catalog_raw_flags
+            and item_raw_flags
+            and card_raw_flags
+            and nested_card_raw_flags
+        )
+
+    def _human_body_analysis_package_payload_redacted(
+        self,
+        package: Dict[str, Any],
+    ) -> bool:
+        package_raw_flags = all(
+            package.get(field_name) is False
+            for field_name in package
+            if field_name.startswith("raw_")
+        )
+        capability_raw_flags = all(
+            capability.get(field_name) is False
+            for capability in package.get("analysis_capabilities", [])
+            if isinstance(capability, dict)
+            for field_name in capability
+            if field_name.startswith("raw_")
+        )
+        operator_ui = package.get("operator_ui", {})
+        operator_ui_raw_flags = (
+            isinstance(operator_ui, dict)
+            and operator_ui.get("raw_payload_displayed") is False
+            and all(
+                card.get("raw_payload_displayed") is False
+                for card in operator_ui.get("cards", [])
+                if isinstance(card, dict)
+            )
+            and all(
+                step.get("raw_payload_displayed") is False
+                for step in operator_ui.get("workflow_steps", [])
+                if isinstance(step, dict)
+            )
+            and all(
+                tab.get("raw_payload_displayed") is False
+                for tab in operator_ui.get("tabs", [])
+                if isinstance(tab, dict)
+            )
+        )
+        release_package = package.get("release_package", {})
+        release_package_raw_flags = isinstance(release_package, dict) and all(
+            release_package.get(field_name) is False
+            for field_name in release_package
+            if field_name.startswith("raw_")
+        )
+        return (
+            package_raw_flags
+            and capability_raw_flags
+            and operator_ui_raw_flags
+            and release_package_raw_flags
+        )
+
+    def _human_body_analysis_package_no_identity_or_upload_claim(
+        self,
+        package: Dict[str, Any],
+    ) -> bool:
+        claim_fields = (
+            "clinical_diagnosis_claimed",
+            "semantic_thought_content_generated",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+            "upload_readiness_claimed",
+        )
+        package_claims = all(package.get(field_name) is False for field_name in claim_fields)
+        capability_claims = all(
+            capability.get(field_name) is False
+            for capability in package.get("analysis_capabilities", [])
+            if isinstance(capability, dict)
+            for field_name in claim_fields
+        )
+        release_package = package.get("release_package", {})
+        release_claims = isinstance(release_package, dict) and all(
+            release_package.get(field_name) is False for field_name in claim_fields
+        )
+        return package_claims and capability_claims and release_claims
+
     def _upstream_receipt_digest_set(
         self,
         upstream_receipt_bindings: Sequence[Dict[str, Any]],
@@ -6171,6 +7883,248 @@ class NeuroIntegrationWorkbench:
                 }
             )
         )
+
+    def _source_onboarding_item_digest_payload(
+        self,
+        item: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "source_type": item.get("source_type"),
+            "source_family": item.get("source_family"),
+            "onboarding_status": item.get("onboarding_status"),
+            "aliases": item.get("aliases"),
+            "collection_method_id": item.get("collection_method_id"),
+            "analysis_recipe_hint": item.get("analysis_recipe_hint"),
+            "required_replacement_lanes": item.get("required_replacement_lanes"),
+            "operator_summary": item.get("operator_summary"),
+            "coding_agent_task": item.get("coding_agent_task"),
+            "operator_ui_card": item.get("operator_ui_card"),
+            "operator_skill_floor": item.get("operator_skill_floor"),
+            "requires_ml_expertise": item.get("requires_ml_expertise"),
+            "onboarding_item_bound": item.get("onboarding_item_bound"),
+            "claim_ceiling": item.get("claim_ceiling"),
+            "semantic_thought_content_generated": item.get(
+                "semantic_thought_content_generated"
+            ),
+        }
+
+    def _source_onboarding_catalog_digest_payload(
+        self,
+        catalog: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": catalog.get("profile_id"),
+            "catalog_policy": catalog.get("catalog_policy"),
+            "operator_ui_policy": catalog.get("operator_ui_policy"),
+            "source_types": catalog.get("source_types"),
+            "source_type_count": catalog.get("source_type_count"),
+            "source_families": catalog.get("source_families"),
+            "source_family_count": catalog.get("source_family_count"),
+            "onboarding_item_count": catalog.get("onboarding_item_count"),
+            "onboarding_item_digest_set": catalog.get(
+                "onboarding_item_digest_set"
+            ),
+            "operator_ui_card_count": catalog.get("operator_ui_card_count"),
+            "operator_ui_cards_bound": catalog.get("operator_ui_cards_bound"),
+            "operator_ui_ready": catalog.get("operator_ui_ready"),
+            "seed_source_types": catalog.get("seed_source_types"),
+            "expansion_source_types": catalog.get("expansion_source_types"),
+            "open_biodata_source_types": catalog.get(
+                "open_biodata_source_types"
+            ),
+            "future_biodata_source_types": catalog.get(
+                "future_biodata_source_types"
+            ),
+            "future_source_type_count": catalog.get(
+                "future_source_type_count"
+            ),
+            "required_replacement_lanes": catalog.get(
+                "required_replacement_lanes"
+            ),
+            "seed_sources_cataloged": catalog.get("seed_sources_cataloged"),
+            "expansion_sources_cataloged": catalog.get(
+                "expansion_sources_cataloged"
+            ),
+            "open_biodata_sources_cataloged": catalog.get(
+                "open_biodata_sources_cataloged"
+            ),
+            "future_modalities_cataloged": catalog.get(
+                "future_modalities_cataloged"
+            ),
+            "all_items_bound": catalog.get("all_items_bound"),
+            "non_ml_operator_ready": catalog.get("non_ml_operator_ready"),
+            "coding_agent_ready": catalog.get("coding_agent_ready"),
+            "source_onboarding_catalog_bound": catalog.get(
+                "source_onboarding_catalog_bound"
+            ),
+            "storage_policy": catalog.get("storage_policy"),
+            "claim_ceiling": catalog.get("claim_ceiling"),
+            "semantic_thought_content_generated": catalog.get(
+                "semantic_thought_content_generated"
+            ),
+        }
+
+    def _human_body_analysis_capability_digest_payload(
+        self,
+        capability: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "family_id": capability.get("family_id"),
+            "modality_count": capability.get("modality_count"),
+            "supported_modalities_digest": capability.get(
+                "supported_modalities_digest"
+            ),
+            "analysis_lanes": capability.get("analysis_lanes"),
+            "analysis_recipe_id": capability.get("analysis_recipe_id"),
+            "operator_ui_tab_id": capability.get("operator_ui_tab_id"),
+            "capability_bound": capability.get("capability_bound"),
+            "storage_policy": capability.get("storage_policy"),
+            "claim_ceiling": capability.get("claim_ceiling"),
+            "semantic_thought_content_generated": capability.get(
+                "semantic_thought_content_generated"
+            ),
+        }
+
+    def _human_body_operator_ui_digest_payload(
+        self,
+        operator_ui: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": operator_ui.get("profile_id"),
+            "operator_ui_policy": operator_ui.get("operator_ui_policy"),
+            "source_onboarding_operator_ui_policy": operator_ui.get(
+                "source_onboarding_operator_ui_policy"
+            ),
+            "tab_count": operator_ui.get("tab_count"),
+            "tabs": operator_ui.get("tabs"),
+            "operator_ui_card_count": operator_ui.get(
+                "operator_ui_card_count"
+            ),
+            "cards": operator_ui.get("cards"),
+            "workflow_step_count": operator_ui.get("workflow_step_count"),
+            "workflow_steps": operator_ui.get("workflow_steps"),
+            "status_badges": operator_ui.get("status_badges"),
+            "summary": operator_ui.get("summary"),
+            "operator_ui_cards_bound": operator_ui.get(
+                "operator_ui_cards_bound"
+            ),
+            "operator_ui_workflow_bound": operator_ui.get(
+                "operator_ui_workflow_bound"
+            ),
+            "operator_ui_bound": operator_ui.get("operator_ui_bound"),
+            "raw_payload_displayed": operator_ui.get("raw_payload_displayed"),
+        }
+
+    def _human_body_release_package_digest_payload(
+        self,
+        release_package: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": release_package.get("profile_id"),
+            "runtime_version": release_package.get("runtime_version"),
+            "runtime_stability": release_package.get("runtime_stability"),
+            "release_manifest_digest": release_package.get(
+                "release_manifest_digest"
+            ),
+            "package_targets": release_package.get("package_targets"),
+            "package_target_count": release_package.get("package_target_count"),
+            "environment_matrix": release_package.get("environment_matrix"),
+            "environment_target_count": release_package.get(
+                "environment_target_count"
+            ),
+            "install_commands": release_package.get("install_commands"),
+            "release_checks": release_package.get("release_checks"),
+            "release_check_count": release_package.get("release_check_count"),
+            "package_targets_bound": release_package.get(
+                "package_targets_bound"
+            ),
+            "environment_matrix_bound": release_package.get(
+                "environment_matrix_bound"
+            ),
+            "installed_wheel_smoke_bound": release_package.get(
+                "installed_wheel_smoke_bound"
+            ),
+            "portable_checksum_bound": release_package.get(
+                "portable_checksum_bound"
+            ),
+            "multi_arch_container_bound": release_package.get(
+                "multi_arch_container_bound"
+            ),
+            "release_package_bound": release_package.get(
+                "release_package_bound"
+            ),
+            "storage_policy": release_package.get("storage_policy"),
+            "claim_ceiling": release_package.get("claim_ceiling"),
+            "semantic_thought_content_generated": release_package.get(
+                "semantic_thought_content_generated"
+            ),
+        }
+
+    def _human_body_analysis_package_digest_payload(
+        self,
+        package: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": package.get("profile_id"),
+            "package_policy": package.get("package_policy"),
+            "source_onboarding_catalog_digest": package.get(
+                "source_onboarding_catalog_digest"
+            ),
+            "human_biosignal_catalog_digest": package.get(
+                "human_biosignal_catalog_digest"
+            ),
+            "human_biosignal_scope": package.get("human_biosignal_scope"),
+            "human_body_family_count": package.get("human_body_family_count"),
+            "human_body_modality_count": package.get(
+                "human_body_modality_count"
+            ),
+            "analysis_capability_count": package.get(
+                "analysis_capability_count"
+            ),
+            "analysis_capability_digest_set": package.get(
+                "analysis_capability_digest_set"
+            ),
+            "operator_ui_digest": package.get("operator_ui", {}).get(
+                "operator_ui_digest"
+            ),
+            "release_package_digest": package.get("release_package", {}).get(
+                "release_package_digest"
+            ),
+            "operator_ui_card_count": package.get("operator_ui_card_count"),
+            "package_target_count": package.get("package_target_count"),
+            "environment_target_count": package.get("environment_target_count"),
+            "human_biosignal_catalog_bound": package.get(
+                "human_biosignal_catalog_bound"
+            ),
+            "source_onboarding_catalog_bound": package.get(
+                "source_onboarding_catalog_bound"
+            ),
+            "all_biosignal_families_cataloged": package.get(
+                "all_biosignal_families_cataloged"
+            ),
+            "all_known_modalities_cataloged": package.get(
+                "all_known_modalities_cataloged"
+            ),
+            "analysis_capabilities_bound": package.get(
+                "analysis_capabilities_bound"
+            ),
+            "operator_ui_bound": package.get("operator_ui_bound"),
+            "release_package_bound": package.get("release_package_bound"),
+            "package_targets_bound": package.get("package_targets_bound"),
+            "environment_matrix_bound": package.get(
+                "environment_matrix_bound"
+            ),
+            "payload_redacted": package.get("payload_redacted"),
+            "no_identity_or_upload_claim": package.get(
+                "no_identity_or_upload_claim"
+            ),
+            "storage_policy": package.get("storage_policy"),
+            "operator_ui_policy": package.get("operator_ui_policy"),
+            "claim_ceiling": package.get("claim_ceiling"),
+            "semantic_thought_content_generated": package.get(
+                "semantic_thought_content_generated"
+            ),
+        }
 
     def _app_digest_payload(self, app_receipt: Dict[str, Any]) -> Dict[str, Any]:
         return {

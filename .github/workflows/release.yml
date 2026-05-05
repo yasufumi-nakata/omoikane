@@ -16,16 +16,24 @@ permissions:
   packages: write
 
 jobs:
-  release:
-    name: Publish GitHub Release and GHCR package
+  release-metadata:
+    name: Resolve and validate release metadata
     runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      version: ${{ steps.release.outputs.version }}
+      image: ${{ steps.release.outputs.image }}
+      full_sha: ${{ steps.revision.outputs.full_sha }}
+      short_sha: ${{ steps.revision.outputs.short_sha }}
     steps:
       - name: Resolve release metadata
         id: release
         shell: bash
+        env:
+          DISPATCH_TAG: ${{ inputs.tag }}
         run: |
           if [[ "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
-            tag="${{ inputs.tag }}"
+            tag="${DISPATCH_TAG}"
           else
             tag="${GITHUB_REF_NAME}"
           fi
@@ -39,6 +47,34 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.release.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Check tag matches project version
+        shell: python
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          import os
+          from pathlib import Path
+          import re
+          import tomllib
+
+          tag = os.environ["RELEASE_TAG"]
+          if not re.fullmatch(r"v[0-9]+\.[0-9]+\.[0-9]+", tag):
+              raise SystemExit(f"release tag must be vMAJOR.MINOR.PATCH, got {tag!r}")
+
+          project = tomllib.loads(Path("pyproject.toml").read_text(encoding="utf-8"))
+          project_version = project["project"]["version"]
+          tag_version = tag.removeprefix("v")
+          if project_version != tag_version:
+              raise SystemExit(
+                  f"release tag {tag!r} does not match pyproject version {project_version!r}"
+              )
 
       - name: Resolve checked-out revision
         id: revision
@@ -46,6 +82,16 @@ jobs:
         run: |
           echo "full_sha=$(git rev-parse HEAD)" >> "${GITHUB_OUTPUT}"
           echo "short_sha=$(git rev-parse --short=12 HEAD)" >> "${GITHUB_OUTPUT}"
+
+  python-package:
+    name: Build release Python package
+    runs-on: ubuntu-latest
+    needs: release-metadata
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-metadata.outputs.tag }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -64,64 +110,230 @@ jobs:
           python -m omoikane.cli gap-report --json > gap-report.json
 
       - name: Build wheel and source distribution
-        run: python -m build
+        run: python -m build --sdist --wheel
 
       - name: Verify installed wheel
+        shell: python
         run: |
-          python -m venv /tmp/omoikane-install-check
-          /tmp/omoikane-install-check/bin/python -m pip install --upgrade pip
-          /tmp/omoikane-install-check/bin/python -m pip install dist/*.whl
-          /tmp/omoikane-install-check/bin/omoikane demo --json > installed-demo.json
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          venv = Path(".venv-install-check")
+          subprocess.check_call([sys.executable, "-m", "venv", str(venv)])
+          scripts_dir = venv / ("Scripts" if os.name == "nt" else "bin")
+          python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
+          omoikane = scripts_dir / ("omoikane.exe" if os.name == "nt" else "omoikane")
+          subprocess.check_call([str(python), "-m", "pip", "install", "--upgrade", "pip"])
+
+          wheels = sorted(Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"expected one wheel, found {len(wheels)}")
+          subprocess.check_call([str(python), "-m", "pip", "install", str(wheels[0])])
+          if not omoikane.is_file():
+              raise SystemExit(f"installed console script not found: {omoikane}")
+
+          with Path("installed-demo.json").open("w", encoding="utf-8") as output:
+              subprocess.check_call(
+                  [str(omoikane), "demo", "--json"],
+                  stdout=output,
+              )
+          with Path("installed-human-body-analysis.json").open("w", encoding="utf-8") as output:
+              subprocess.check_call(
+                  [str(omoikane), "human-body-analysis-demo", "--json"],
+                  stdout=output,
+              )
 
       - name: Generate release checksums and notes
+        shell: python
         run: |
-          sha256sum dist/* release-manifest.json gap-report.json installed-demo.json > SHA256SUMS
-          cat > RELEASE_NOTES.md <<'EOF'
-          OmoikaneOS reference runtime release.
+          import hashlib
+          from pathlib import Path
+          import shutil
 
-          Attached assets:
-          - Python wheel and source distribution.
-          - Release manifest generated by `omoikane version-demo --json`.
-          - Gap report generated by `omoikane gap-report --json`.
-          - Installed wheel smoke output.
-          - SHA256 checksums.
+          assets = Path("release-assets")
+          assets.mkdir(exist_ok=True)
 
-          The matching GitHub Packages image is published to GHCR.
-          EOF
+          for path in sorted(Path("dist").iterdir()):
+              if path.is_file():
+                  shutil.copy2(path, assets / path.name)
+
+          for name in (
+              "release-manifest.json",
+              "gap-report.json",
+              "installed-demo.json",
+              "installed-human-body-analysis.json",
+          ):
+              shutil.copy2(name, assets / name)
+
+          files = sorted(
+              path for path in assets.iterdir()
+              if path.is_file() and path.name not in {"SHA256SUMS", "RELEASE_NOTES.md"}
+          )
+          with (assets / "SHA256SUMS").open("w", encoding="utf-8", newline="\n") as output:
+              for path in files:
+                  output.write(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.name}\n")
+
+          (assets / "RELEASE_NOTES.md").write_text(
+              "\n".join(
+                  [
+                      "OmoikaneOS reference runtime release.",
+                      "",
+                      "Attached assets:",
+                      "- Python wheel and source distribution.",
+                      "- Release manifest generated by `omoikane version-demo --json`.",
+                      "- Gap report generated by `omoikane gap-report --json`.",
+                      "- Installed wheel smoke output.",
+                      "- Installed human body analysis package smoke output.",
+                      "- SHA256 checksums generated by Python.",
+                      "",
+                      "The matching multi-arch GitHub Packages image is published to GHCR.",
+                      "",
+                  ]
+              ),
+              encoding="utf-8",
+              newline="\n",
+          )
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: omoikane-release-assets
+          path: release-assets/*
+          if-no-files-found: error
+
+  installed-wheel-smoke:
+    name: Smoke installed wheel (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    needs:
+      - release-metadata
+      - python-package
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+    steps:
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: omoikane-release-assets
+          path: release-assets
+
+      - name: Verify installed wheel
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          venv = Path(".venv-install-check")
+          subprocess.check_call([sys.executable, "-m", "venv", str(venv)])
+          scripts_dir = venv / ("Scripts" if os.name == "nt" else "bin")
+          python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
+          omoikane = scripts_dir / ("omoikane.exe" if os.name == "nt" else "omoikane")
+          subprocess.check_call([str(python), "-m", "pip", "install", "--upgrade", "pip"])
+
+          wheels = sorted(Path("release-assets").glob("*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"expected one wheel, found {len(wheels)}")
+          subprocess.check_call([str(python), "-m", "pip", "install", str(wheels[0])])
+          if not omoikane.is_file():
+              raise SystemExit(f"installed console script not found: {omoikane}")
+
+          with Path("installed-wheel-smoke.json").open("w", encoding="utf-8") as output:
+              subprocess.check_call(
+                  [str(omoikane), "demo", "--json"],
+                  stdout=output,
+              )
+          with Path("installed-human-body-analysis-smoke.json").open("w", encoding="utf-8") as output:
+              subprocess.check_call(
+                  [str(omoikane), "human-body-analysis-demo", "--json"],
+                  stdout=output,
+              )
+
+  container-package:
+    name: Publish multi-arch GHCR container package
+    runs-on: ubuntu-latest
+    needs: release-metadata
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-metadata.outputs.tag }}
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build release container image
-        run: |
-          docker build \
-            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.version=${{ steps.release.outputs.version }}" \
-            --label "org.opencontainers.image.revision=${{ steps.revision.outputs.full_sha }}" \
-            --tag "${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}" \
-            --tag "${{ steps.release.outputs.image }}:${{ steps.release.outputs.tag }}" \
-            --tag "${{ steps.release.outputs.image }}:latest" \
-            .
+      - name: Build and push multi-arch release container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ needs.release-metadata.outputs.image }}:${{ needs.release-metadata.outputs.version }}
+            ${{ needs.release-metadata.outputs.image }}:${{ needs.release-metadata.outputs.tag }}
+            ${{ needs.release-metadata.outputs.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ needs.release-metadata.outputs.version }}
+            org.opencontainers.image.revision=${{ needs.release-metadata.outputs.full_sha }}
 
-      - name: Push release container image
-        run: |
-          docker push "${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}"
-          docker push "${{ steps.release.outputs.image }}:${{ steps.release.outputs.tag }}"
-          docker push "${{ steps.release.outputs.image }}:latest"
+  publish-release:
+    name: Publish GitHub Release
+    runs-on: ubuntu-latest
+    needs:
+      - release-metadata
+      - python-package
+      - installed-wheel-smoke
+      - container-package
+    steps:
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: omoikane-release-assets
+          path: release-assets
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          tag="${{ steps.release.outputs.tag }}"
-          assets=(dist/* release-manifest.json gap-report.json installed-demo.json SHA256SUMS)
+          tag="${{ needs.release-metadata.outputs.tag }}"
+          assets=(
+            release-assets/*.whl
+            release-assets/*.tar.gz
+            release-assets/release-manifest.json
+            release-assets/gap-report.json
+            release-assets/installed-demo.json
+            release-assets/installed-human-body-analysis.json
+            release-assets/SHA256SUMS
+          )
           if gh release view "${tag}" >/dev/null 2>&1; then
             gh release upload "${tag}" "${assets[@]}" --clobber
           else
             gh release create "${tag}" "${assets[@]}" \
               --verify-tag \
               --title "OmoikaneOS ${tag}" \
-              --notes-file RELEASE_NOTES.md
+              --notes-file release-assets/RELEASE_NOTES.md
           fi

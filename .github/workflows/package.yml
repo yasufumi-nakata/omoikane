@@ -15,8 +15,22 @@ permissions:
 
 jobs:
   python-package:
-    name: Build Python package
-    runs-on: ubuntu-latest
+    name: Build and smoke Python package (${{ matrix.os }}, py${{ matrix.python-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            python-version: "3.10"
+          - os: ubuntu-latest
+            python-version: "3.11"
+          - os: ubuntu-latest
+            python-version: "3.12"
+          - os: macos-latest
+            python-version: "3.11"
+          - os: windows-latest
+            python-version: "3.11"
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -24,30 +38,81 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
 
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
           python -m pip install ".[dev]"
 
-      - name: Run package smoke checks
+      - name: Run source checkout smoke checks
         run: |
-          python -m omoikane.cli demo --json > /tmp/omoikane-demo.json
-          python -m omoikane.cli gap-report --json > /tmp/omoikane-gap-report.json
+          python -m omoikane.cli demo --json > package-demo.json
+          python -m omoikane.cli gap-report --json > package-gap-report.json
 
       - name: Build wheel and source distribution
-        run: python -m build
+        run: python -m build --sdist --wheel
+
+      - name: Verify installed wheel
+        shell: python
+        run: |
+          import os
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          venv = Path(".venv-install-check")
+          subprocess.check_call([sys.executable, "-m", "venv", str(venv)])
+          scripts_dir = venv / ("Scripts" if os.name == "nt" else "bin")
+          python = scripts_dir / ("python.exe" if os.name == "nt" else "python")
+          omoikane = scripts_dir / ("omoikane.exe" if os.name == "nt" else "omoikane")
+          subprocess.check_call([str(python), "-m", "pip", "install", "--upgrade", "pip"])
+
+          wheels = sorted(Path("dist").glob("*.whl"))
+          if len(wheels) != 1:
+              raise SystemExit(f"expected one wheel, found {len(wheels)}")
+          subprocess.check_call([str(python), "-m", "pip", "install", str(wheels[0])])
+          if not omoikane.is_file():
+              raise SystemExit(f"installed console script not found: {omoikane}")
+
+          with Path("installed-demo.json").open("w", encoding="utf-8") as output:
+              subprocess.check_call(
+                  [str(omoikane), "demo", "--json"],
+                  stdout=output,
+              )
+          with Path("installed-human-body-analysis.json").open("w", encoding="utf-8") as output:
+              subprocess.check_call(
+                  [str(omoikane), "human-body-analysis-demo", "--json"],
+                  stdout=output,
+              )
+
+      - name: Generate portable package checksums
+        shell: python
+        run: |
+          import hashlib
+          from pathlib import Path
+
+          dist = Path("dist")
+          files = sorted(
+              path for path in dist.iterdir()
+              if path.is_file() and path.name != "SHA256SUMS"
+          )
+          with (dist / "SHA256SUMS").open("w", encoding="utf-8", newline="\n") as output:
+              for path in files:
+                  output.write(f"{hashlib.sha256(path.read_bytes()).hexdigest()}  {path.as_posix()}\n")
 
       - name: Upload Python package artifact
         uses: actions/upload-artifact@v4
         with:
-          name: omoikane-python-package
-          path: dist/*
+          name: omoikane-python-package-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: |
+            dist/*
+            installed-demo.json
+            installed-human-body-analysis.json
           if-no-files-found: error
 
   container-package:
-    name: Publish GHCR container package
+    name: Publish multi-arch GHCR container package
     runs-on: ubuntu-latest
     if: github.event_name != 'pull_request'
     steps:
@@ -63,21 +128,28 @@ jobs:
           echo "image=${image}" >> "${GITHUB_OUTPUT}"
           echo "short_sha=${short_sha}" >> "${GITHUB_OUTPUT}"
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GitHub Container Registry
-        run: echo "${GITHUB_TOKEN}" | docker login ghcr.io -u "${GITHUB_ACTOR}" --password-stdin
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build container image
-        run: |
-          docker build \
-            --label "org.opencontainers.image.source=https://github.com/${GITHUB_REPOSITORY}" \
-            --label "org.opencontainers.image.revision=${GITHUB_SHA}" \
-            --tag "${{ steps.image.outputs.image }}:main" \
-            --tag "${{ steps.image.outputs.image }}:sha-${{ steps.image.outputs.short_sha }}" \
-            .
-
-      - name: Push container image
-        run: |
-          docker push "${{ steps.image.outputs.image }}:main"
-          docker push "${{ steps.image.outputs.image }}:sha-${{ steps.image.outputs.short_sha }}"
+      - name: Build and push multi-arch container image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ${{ steps.image.outputs.image }}:main
+            ${{ steps.image.outputs.image }}:sha-${{ steps.image.outputs.short_sha }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}

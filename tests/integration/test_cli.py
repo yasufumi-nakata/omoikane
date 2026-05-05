@@ -495,6 +495,42 @@ class CliIntegrationTests(unittest.TestCase):
             13,
             result["validation"]["operator_runbook_receipt_binding_count"],
         )
+        self.assertTrue(result["validation"]["source_onboarding_catalog_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_catalog_digest_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_items_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_operator_ui_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_future_modalities_bound"])
+        self.assertTrue(result["validation"]["source_onboarding_payload_redacted"])
+        self.assertTrue(
+            result["validation"]["source_onboarding_no_identity_or_upload_claim"]
+        )
+        self.assertEqual(23, result["validation"]["source_onboarding_item_count"])
+        self.assertEqual(
+            23,
+            result["validation"]["source_onboarding_operator_ui_card_count"],
+        )
+        self.assertEqual(
+            15,
+            result["validation"]["source_onboarding_future_source_type_count"],
+        )
+        self.assertTrue(result["validation"]["human_body_analysis_package_bound"])
+        self.assertTrue(
+            result["validation"]["human_body_analysis_package_digest_bound"]
+        )
+        self.assertTrue(result["validation"]["human_body_biosignal_catalog_bound"])
+        self.assertTrue(result["validation"]["human_body_all_modalities_cataloged"])
+        self.assertTrue(
+            result["validation"]["human_body_analysis_capabilities_bound"]
+        )
+        self.assertTrue(result["validation"]["human_body_operator_ui_bound"])
+        self.assertTrue(result["validation"]["human_body_release_package_bound"])
+        self.assertTrue(result["validation"]["human_body_environment_matrix_bound"])
+        self.assertTrue(result["validation"]["human_body_payload_redacted"])
+        self.assertTrue(result["validation"]["human_body_no_identity_or_upload_claim"])
+        self.assertGreaterEqual(result["validation"]["human_body_family_count"], 20)
+        self.assertGreaterEqual(result["validation"]["human_body_modality_count"], 90)
+        self.assertEqual(5, result["validation"]["human_body_package_target_count"])
+        self.assertEqual(8, result["validation"]["human_body_environment_target_count"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
@@ -576,6 +612,67 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["operator_runbook"]["operator_runbook_bound"])
         self.assertEqual(9, result["operator_runbook"]["workflow_step_count"])
         self.assertFalse(result["operator_runbook"]["upload_readiness_claimed"])
+        self.assertTrue(
+            result["source_onboarding_catalog"]["source_onboarding_catalog_bound"]
+        )
+        self.assertIn(
+            "meg",
+            result["source_onboarding_catalog"]["future_biodata_source_types"],
+        )
+        self.assertTrue(result["source_onboarding_catalog"]["operator_ui_ready"])
+        self.assertEqual(
+            "Future candidate",
+            {
+                card["source_type"]: card
+                for card in result["source_onboarding_catalog"]["operator_ui_cards"]
+            }["meg"]["status_badge"],
+        )
+        self.assertFalse(
+            result["source_onboarding_catalog"]["upload_readiness_claimed"]
+        )
+        self.assertTrue(
+            result["human_body_analysis_package"][
+                "human_body_analysis_package_bound"
+            ]
+        )
+        self.assertTrue(result["human_body_analysis_package"]["operator_ui_bound"])
+        self.assertFalse(
+            result["human_body_analysis_package"]["upload_readiness_claimed"]
+        )
+
+    def test_human_body_analysis_demo_emits_packaged_operator_ui(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "human-body-analysis-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        package = result["human_body_analysis_package"]
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["human_body_analysis_package_bound"])
+        self.assertTrue(package["operator_ui"]["operator_ui_bound"])
+        self.assertGreaterEqual(package["human_body_modality_count"], 90)
+        self.assertEqual(5, package["package_target_count"])
+        self.assertEqual(
+            ["linux", "macos", "windows"],
+            package["release_package"]["environment_matrix"]["operating_systems"],
+        )
+        self.assertEqual(
+            ["3.10", "3.11", "3.12"],
+            package["release_package"]["environment_matrix"]["python_versions"],
+        )
+        self.assertEqual(
+            ["linux/amd64", "linux/arm64"],
+            package["release_package"]["environment_matrix"][
+                "container_platforms"
+            ],
+        )
+        self.assertFalse(package["raw_biosignal_payload_stored"])
+        self.assertFalse(package["clinical_diagnosis_claimed"])
+        self.assertFalse(package["identity_replacement_claimed"])
 
     def test_observation_integration_demo_emits_universal_observation_package(self) -> None:
         stdout = io.StringIO()

@@ -45,6 +45,10 @@
   - session-declared source / target modality を human biosignal catalog digest、family map、未カタログ modality policy に束縛する
 - `neuro_integration_app_registry_receipt.schema`
   - 計測・解析・データ整備・operator copilot・agent automation の置換 lane を app digest と operator skill floor に束縛する
+- `neuro_integration_source_onboarding_catalog.schema`
+  - current / future biodata source type、alias、source family、collection method、analysis recipe hint、replacement lane、非 ML operator summary、coding-agent task、operator UI card を digest-only catalog として束縛する
+- `neuro_integration_human_body_analysis_package.schema`
+  - BioData の human biosignal catalog 全体を NIW の analysis capability、operator UI card、workflow step、wheel / sdist / CLI JSON / schema bundle / OCI container release target に束縛し、raw payload と診断・同一性・upload-readiness claim を禁止する
 - `neuro_integration_source_bundle.schema`
   - questionnaire + EEG を seed pair として束縛し、fMRI / 脳オルガノイド / biosensor / behavioral task / omics / clinical metadata / future biological source を raw payload 無しの expansion lane として保持する
 - `neuro_integration_workspace.schema`

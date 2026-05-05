@@ -75,6 +75,15 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   per-source axis drift / stability proxy として束縛するようにした。
 - 同日、NIW は operator runbook receipt を追加し、receipt chain 全体を 9 step の
   plain-language operator card と coding-agent task に束縛するようにした。
+- 同日、NIW は source onboarding catalog receipt を追加し、MEG、ECoG、fNIRS、
+  diffusion MRI、neural spiking、eye tracking、speech、gait、microbiome、
+  metabolomics、proteomics、digital phenotyping、sleep staging、organoid submodality
+  を future biodata source として raw-free に catalog 化し、operator UI status card から
+  safe next action と無効化された claim を確認できるようにした。
+- 同日、NIW は human body analysis package receipt を追加し、BioData human biosignal
+  catalog の全 family / modality を family-level analysis capability、operator UI
+  tabs/cards/workflow、release package target、Linux / macOS / Windows matrix に
+  raw-free に束縛するようにした。
 
 ## ブロッキング要因
 
@@ -148,6 +157,13 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
   証明には昇格しない
 - operator runbook は既存 receipt の順序化と review task だけを返し、operator 判断、
   臨床判断、semantic thought content、upload readiness の自動結論には昇格しない
+- source onboarding catalog は future source type の取り込み準備だけを返し、各 modality
+  の測定妥当性、解析妥当性、臨床妥当性、identity relevance は source-specific research
+  frontier として残す
+- human body analysis package は BioData catalog 全体を feature-summary analysis
+  capability と operator UI / release package metadata に束縛するだけで、全 modality の
+  科学的妥当性、device-specific calibration、clinical validation、regulatory readiness、
+  identity relevance は source-specific research frontier として残す
 - open biodata lane は source type coverage を増やすが、各 modality の専門的妥当性、
   専用 axis derivation と bounded context recipe を持っても、longitudinal stability、
   clinical validity、regulatory readiness は source-specific research frontier として残す

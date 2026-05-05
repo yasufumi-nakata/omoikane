@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from copy import deepcopy
 from dataclasses import asdict
+from importlib import metadata as importlib_metadata
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -286,6 +287,33 @@ class OmoikaneReferenceOS:
         self.sandbox = SandboxSentinel()
         self._bootstrap_trust()
         self._bootstrap_council()
+
+    def _build_runtime_release_manifest_for_demo(self) -> Dict[str, Any]:
+        if (
+            (self.repo_root / "pyproject.toml").is_file()
+            and (self.repo_root / "specs" / "catalog.yaml").is_file()
+        ):
+            return self.versioning.build_release_manifest(self.repo_root)
+        try:
+            runtime_version = importlib_metadata.version("omoikane-os")
+        except importlib_metadata.PackageNotFoundError:
+            runtime_version = "0.0.0"
+        return {
+            "kind": "release_manifest",
+            "schema_version": "1.0.0",
+            "manifest_id": "release-manifest://installed-package-fallback",
+            "generated_at": utc_now_iso(),
+            "runtime_version": runtime_version,
+            "runtime_stability": "bootstrap",
+            "catalog_snapshot": {
+                "calver": "",
+                "sha256": "",
+            },
+            "notes": [
+                "installed package fallback manifest excludes repo-local catalog inventory",
+                "release package smoke checks use this manifest when specs/catalog.yaml is not installed",
+            ],
+        }
 
     def _builder_design_packet(
         self,
@@ -11130,6 +11158,18 @@ json.dump(response, sys.stdout)
             "omics",
             "clinical_metadata",
         ]
+        source_onboarding_catalog = (
+            self.neuro_integration_workbench.build_source_onboarding_catalog()
+        )
+        human_biosignal_catalog = self.biodata_transmitter.human_biosignal_catalog()
+        release_manifest = self._build_runtime_release_manifest_for_demo()
+        human_body_analysis_package = (
+            self.neuro_integration_workbench.build_human_body_analysis_package(
+                source_onboarding_catalog,
+                human_biosignal_catalog,
+                release_manifest,
+            )
+        )
         measurement_app = self.neuro_integration_workbench.register_application(
             app_name="Unified BioMeasure",
             app_kind="measurement",
@@ -11640,6 +11680,9 @@ json.dump(response, sys.stdout)
             interpretation_synthesis=interpretation_synthesis,
             longitudinal_timeline=longitudinal_timeline,
             operator_runbook=operator_runbook,
+            source_onboarding_catalog=source_onboarding_catalog,
+            human_biosignal_catalog=human_biosignal_catalog,
+            human_body_analysis_package=human_body_analysis_package,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11651,6 +11694,106 @@ json.dump(response, sys.stdout)
             biodata_survey_eeg_validation["operator_accessibility_bound"]
         )
         validation["ok"] = validation["ok"] and biodata_survey_eeg_validation["ok"]
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.source_onboarding_catalog.bound",
+            payload={
+                "source_onboarding_catalog_ref": source_onboarding_catalog[
+                    "source_onboarding_catalog_ref"
+                ],
+                "source_onboarding_catalog_digest": source_onboarding_catalog[
+                    "source_onboarding_catalog_digest"
+                ],
+                "onboarding_item_digest_set": source_onboarding_catalog[
+                    "onboarding_item_digest_set"
+                ],
+                "onboarding_item_count": source_onboarding_catalog[
+                    "onboarding_item_count"
+                ],
+                "operator_ui_card_count": source_onboarding_catalog[
+                    "operator_ui_card_count"
+                ],
+                "operator_ui_ready": source_onboarding_catalog[
+                    "operator_ui_ready"
+                ],
+                "future_source_type_count": source_onboarding_catalog[
+                    "future_source_type_count"
+                ],
+                "future_modalities_cataloged": source_onboarding_catalog[
+                    "future_modalities_cataloged"
+                ],
+                "source_onboarding_catalog_bound": (
+                    source_onboarding_catalog[
+                        "source_onboarding_catalog_bound"
+                    ]
+                ),
+                "claim_ceiling": source_onboarding_catalog["claim_ceiling"],
+                "raw_catalog_payload_stored": source_onboarding_catalog[
+                    "raw_catalog_payload_stored"
+                ],
+                "upload_readiness_claimed": source_onboarding_catalog[
+                    "upload_readiness_claimed"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-source-onboarding",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type=(
+                "neuro_integration_workbench.human_body_analysis_package.bound"
+            ),
+            payload={
+                "human_body_analysis_package_ref": human_body_analysis_package[
+                    "human_body_analysis_package_ref"
+                ],
+                "human_body_analysis_package_digest": (
+                    human_body_analysis_package[
+                        "human_body_analysis_package_digest"
+                    ]
+                ),
+                "human_biosignal_catalog_digest": human_body_analysis_package[
+                    "human_biosignal_catalog_digest"
+                ],
+                "analysis_capability_digest_set": human_body_analysis_package[
+                    "analysis_capability_digest_set"
+                ],
+                "human_body_family_count": human_body_analysis_package[
+                    "human_body_family_count"
+                ],
+                "human_body_modality_count": human_body_analysis_package[
+                    "human_body_modality_count"
+                ],
+                "operator_ui_card_count": human_body_analysis_package[
+                    "operator_ui_card_count"
+                ],
+                "package_target_count": human_body_analysis_package[
+                    "package_target_count"
+                ],
+                "environment_target_count": human_body_analysis_package[
+                    "environment_target_count"
+                ],
+                "human_body_analysis_package_bound": (
+                    human_body_analysis_package[
+                        "human_body_analysis_package_bound"
+                    ]
+                ),
+                "payload_redacted": human_body_analysis_package[
+                    "payload_redacted"
+                ],
+                "upload_readiness_claimed": human_body_analysis_package[
+                    "upload_readiness_claimed"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-human-body-package",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         self.ledger.append(
             identity_id=identity.identity_id,
             event_type="neuro_integration_workbench.upstream_survey_eeg_fusion.bound",
@@ -12225,6 +12368,9 @@ json.dump(response, sys.stdout)
             "app_receipts": app_receipts,
             "biodata_survey_eeg_fusion": biodata_survey_eeg_fusion,
             "biodata_survey_eeg_validation": biodata_survey_eeg_validation,
+            "human_biosignal_catalog": human_biosignal_catalog,
+            "source_onboarding_catalog": source_onboarding_catalog,
+            "human_body_analysis_package": human_body_analysis_package,
             "source_bundle": source_bundle,
             "workspace": workspace,
             "analysis": analysis,
@@ -12250,6 +12396,16 @@ json.dump(response, sys.stdout)
                     "payload_path": "biodata_survey_eeg_fusion",
                     "schema_path": "specs/schemas/biodata_survey_eeg_fusion_receipt.schema",
                     "contract_role": "upstream-biodata-survey-eeg-fusion",
+                },
+                {
+                    "payload_path": "source_onboarding_catalog",
+                    "schema_path": "specs/schemas/neuro_integration_source_onboarding_catalog.schema",
+                    "contract_role": "neuro-integration-source-onboarding-catalog",
+                },
+                {
+                    "payload_path": "human_body_analysis_package",
+                    "schema_path": "specs/schemas/neuro_integration_human_body_analysis_package.schema",
+                    "contract_role": "neuro-integration-human-body-analysis-package",
                 },
                 {
                     "payload_path": "source_bundle",

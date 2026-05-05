@@ -59,6 +59,8 @@
 | **Measurement Quality Gate** | Collection Run result を calibration / artifact QC / consent freshness / operator review / quality authority refs に束縛する NIW receipt |
 | **Interpretation Synthesis** | Measurement Quality Gate と Cross-Modal Analysis Run を plain-language cards / coding-agent tasks に束縛する NIW receipt |
 | **Open Biodata Lane** | NIW で biosensor / behavioral task / omics / clinical metadata などを seed source と同じ digest-only pipeline に追加する拡張 lane |
+| **Source Onboarding Catalog** | NIW の current / future biodata source type、alias、family、collection method、analysis recipe hint、replacement lane、operator summary、coding-agent task、operator UI card を raw-free に束縛する digest-only catalog |
+| **Human Body Analysis Package** | BioData human biosignal catalog 全体を NIW の family-level analysis capability、operator UI workflow、release package target に raw-free に束縛する digest-only package |
 | **Longitudinal Timeline** | NIW の複数 source-bundle window を per-source axis drift / stability proxy に束縛する digest-only receipt |
 | **Operator Runbook** | NIW の receipt chain を非 ML operator 向け手順と coding-agent task に束縛する digest-only receipt |
 | **Observation Integration Workbench** | 人類が取得・計測してきた source を taxonomy / source bundle / graph / analysis plan / operator guide に raw payload なしで束縛する L6 workbench |

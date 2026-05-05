@@ -19,6 +19,13 @@
   behavioral task、omics、clinical metadata、future biological source を同じ source bundle に追加する
 - BDT の Survey EEG Fusion receipt を upstream digest として受け取り、NIW の source bundle /
   analysis receipt に再束縛する
+- current 8 source type と future 15 biodata source type を source onboarding catalog に束縛し、
+  collection method / analysis recipe hint / replacement lane / operator summary /
+  coding-agent task / operator UI card を raw payload なしで先に確認できるようにする
+- BioData の human biosignal catalog 全体を human body analysis package に束縛し、
+  family-level analysis capability、operator UI tabs/cards/workflow、wheel / sdist /
+  CLI JSON / schema bundle / OCI container package target、Linux / macOS / Windows
+  matrix を raw payload なしで確認できるようにする
 - 計測アプリ、解析アプリ、データ整備アプリ、operator copilot、coding-agent automation を
   LLM-native workspace の置換 lane として束縛する
 - source type ごとに 5 置換 lane の app digest coverage を application replacement plan に束縛する
@@ -44,12 +51,15 @@
 - 非 ML 専門家向け plain-language guide と coding agent 向け task template を同じ receipt に入れる
 - fMRI と脳オルガノイドは expansion context であり、意識再現や本人同一性の証明にはしない
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
+  または `PYTHONPATH=src python3 -m omoikane.cli human-body-analysis-demo --json`
   で BDT Survey EEG Fusion receipt binding、expansion modality binding、replacement lane coverage、
   source-type lane coverage、connector bundle binding、collection protocol binding、
   collection run binding、measurement quality gate binding、cross-modal analysis pair coverage、
   bounded result summary binding、interpretation synthesis binding、raw payload redaction、
-  longitudinal timeline binding、operator runbook binding、claim ceiling と modality-specific
-  open biodata recipe coverage を 8 source type / 28 pair / 2 window / 9 runbook step として検証する
+  longitudinal timeline binding、operator runbook binding、source onboarding catalog binding、
+  human body analysis package binding、operator UI artifact binding、release package matrix binding、
+  claim ceiling と modality-specific open biodata recipe coverage を
+  23 catalog source type / 8 bound source type / 28 pair / 2 window / 9 runbook step として検証する
 
 ### Observation Integration Workbench (OIW)
 - 人類が取得・計測してきた source を、human biodata、neuroscience、clinical health、

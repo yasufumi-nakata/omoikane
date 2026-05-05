@@ -4,6 +4,7 @@ from copy import deepcopy
 import unittest
 
 from omoikane.common import canonical_json, sha256_text
+from omoikane.interface.biodata_transmitter import BioDataTransmitter
 from omoikane.interface.neuro_integration_workbench import NeuroIntegrationWorkbench
 
 
@@ -103,6 +104,13 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
 
     def _build_demo_artifacts(self) -> dict:
         workbench = NeuroIntegrationWorkbench()
+        biodata_transmitter = BioDataTransmitter()
+        source_onboarding_catalog = workbench.build_source_onboarding_catalog()
+        human_biosignal_catalog = biodata_transmitter.human_biosignal_catalog()
+        human_body_analysis_package = workbench.build_human_body_analysis_package(
+            source_onboarding_catalog,
+            human_biosignal_catalog,
+        )
         source_types = [
             "questionnaire",
             "eeg",
@@ -442,6 +450,9 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         return {
             "workbench": workbench,
             "apps": apps,
+            "source_onboarding_catalog": source_onboarding_catalog,
+            "human_biosignal_catalog": human_biosignal_catalog,
+            "human_body_analysis_package": human_body_analysis_package,
             "source_bundle": source_bundle,
             "second_source_bundle": second_source_bundle,
             "workspace": workspace,
@@ -477,6 +488,11 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             interpretation_synthesis=artifacts["interpretation_synthesis"],
             longitudinal_timeline=artifacts["longitudinal_timeline"],
             operator_runbook=artifacts["operator_runbook"],
+            source_onboarding_catalog=artifacts["source_onboarding_catalog"],
+            human_biosignal_catalog=artifacts["human_biosignal_catalog"],
+            human_body_analysis_package=artifacts[
+                "human_body_analysis_package"
+            ],
         )
 
         self.assertTrue(validation["ok"])
@@ -535,6 +551,25 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["operator_runbook_steps_bound"])
         self.assertTrue(validation["operator_runbook_payload_redacted"])
         self.assertTrue(validation["operator_runbook_no_identity_or_upload_claim"])
+        self.assertTrue(validation["source_onboarding_catalog_bound"])
+        self.assertTrue(validation["source_onboarding_catalog_digest_bound"])
+        self.assertTrue(validation["source_onboarding_items_bound"])
+        self.assertTrue(validation["source_onboarding_operator_ui_bound"])
+        self.assertTrue(validation["source_onboarding_future_modalities_bound"])
+        self.assertTrue(validation["source_onboarding_payload_redacted"])
+        self.assertTrue(
+            validation["source_onboarding_no_identity_or_upload_claim"]
+        )
+        self.assertTrue(validation["human_body_analysis_package_bound"])
+        self.assertTrue(validation["human_body_analysis_package_digest_bound"])
+        self.assertTrue(validation["human_body_biosignal_catalog_bound"])
+        self.assertTrue(validation["human_body_all_modalities_cataloged"])
+        self.assertTrue(validation["human_body_analysis_capabilities_bound"])
+        self.assertTrue(validation["human_body_operator_ui_bound"])
+        self.assertTrue(validation["human_body_release_package_bound"])
+        self.assertTrue(validation["human_body_environment_matrix_bound"])
+        self.assertTrue(validation["human_body_payload_redacted"])
+        self.assertTrue(validation["human_body_no_identity_or_upload_claim"])
         self.assertTrue(validation["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(validation["upstream_receipt_payload_redacted"])
         self.assertTrue(validation["claim_ceiling_bound"])
@@ -690,9 +725,100 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             13,
             validation["operator_runbook_receipt_binding_count"],
         )
+        self.assertEqual(23, validation["source_onboarding_item_count"])
+        self.assertEqual(
+            23,
+            validation["source_onboarding_operator_ui_card_count"],
+        )
+        self.assertEqual(
+            15,
+            validation["source_onboarding_future_source_type_count"],
+        )
+        self.assertTrue(
+            artifacts["source_onboarding_catalog"][
+                "source_onboarding_catalog_bound"
+            ]
+        )
+        self.assertIn(
+            "meg",
+            artifacts["source_onboarding_catalog"]["future_biodata_source_types"],
+        )
+        self.assertIn(
+            "electrophysiology_organoid",
+            artifacts["source_onboarding_catalog"]["future_biodata_source_types"],
+        )
+        self.assertTrue(artifacts["source_onboarding_catalog"]["operator_ui_ready"])
+        self.assertEqual(
+            23,
+            artifacts["source_onboarding_catalog"]["operator_ui_card_count"],
+        )
+        source_onboarding_statuses = {
+            item["source_type"]: item["onboarding_status"]
+            for item in artifacts["source_onboarding_catalog"]["onboarding_items"]
+        }
+        source_onboarding_ui_cards = {
+            card["source_type"]: card
+            for card in artifacts["source_onboarding_catalog"]["operator_ui_cards"]
+        }
+        self.assertEqual("seed-required", source_onboarding_statuses["questionnaire"])
+        self.assertEqual("already-bound", source_onboarding_statuses["biosensor"])
+        self.assertEqual("onboardable", source_onboarding_statuses["meg"])
+        self.assertEqual(
+            "Seed required",
+            source_onboarding_ui_cards["questionnaire"]["status_badge"],
+        )
+        self.assertEqual(
+            "Future candidate",
+            source_onboarding_ui_cards["meg"]["status_badge"],
+        )
+        self.assertFalse(
+            source_onboarding_ui_cards["meg"]["raw_payload_displayed"]
+        )
+        self.assertEqual(
+            "research-frontier",
+            source_onboarding_statuses["morphology_organoid"],
+        )
         self.assertTrue(
             artifacts["operator_runbook"]["all_required_receipts_bound"]
         )
+        self.assertGreaterEqual(validation["human_body_family_count"], 20)
+        self.assertGreaterEqual(validation["human_body_modality_count"], 90)
+        self.assertEqual(
+            validation["human_body_family_count"],
+            validation["human_body_analysis_capability_count"],
+        )
+        self.assertEqual(
+            validation["human_body_family_count"],
+            validation["human_body_operator_ui_card_count"],
+        )
+        self.assertEqual(5, validation["human_body_package_target_count"])
+        self.assertEqual(8, validation["human_body_environment_target_count"])
+        human_body_package = artifacts["human_body_analysis_package"]
+        self.assertTrue(human_body_package["human_body_analysis_package_bound"])
+        self.assertTrue(human_body_package["operator_ui"]["operator_ui_bound"])
+        self.assertEqual(
+            ["linux", "macos", "windows"],
+            human_body_package["release_package"]["environment_matrix"][
+                "operating_systems"
+            ],
+        )
+        self.assertEqual(
+            ["3.10", "3.11", "3.12"],
+            human_body_package["release_package"]["environment_matrix"][
+                "python_versions"
+            ],
+        )
+        self.assertEqual(
+            ["linux/amd64", "linux/arm64"],
+            human_body_package["release_package"]["environment_matrix"][
+                "container_platforms"
+            ],
+        )
+        self.assertIn(
+            "human-body-analysis-demo --json",
+            " ".join(human_body_package["release_package"]["install_commands"]),
+        )
+        self.assertFalse(human_body_package["upload_readiness_claimed"])
         self.assertFalse(artifacts["operator_runbook"]["upload_readiness_claimed"])
         self.assertEqual(
             8,
@@ -1012,6 +1138,69 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "runbook_step.runbook_step_digest mismatch",
+            validation["errors"],
+        )
+
+    def test_tampered_source_onboarding_item_digest_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_catalog = deepcopy(artifacts["source_onboarding_catalog"])
+        tampered_catalog["onboarding_items"][0]["onboarding_item_digest"] = "0" * 64
+        tampered_catalog["source_onboarding_catalog_digest"] = sha256_text(
+            canonical_json(
+                artifacts["workbench"]._source_onboarding_catalog_digest_payload(
+                    tampered_catalog
+                )
+            )
+        )
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            artifacts["cross_modal_analysis_plan"],
+            artifacts["cross_modal_analysis_run"],
+            collection_protocol=artifacts["collection_protocol"],
+            collection_run=artifacts["collection_run"],
+            measurement_quality_gate=artifacts["measurement_quality_gate"],
+            interpretation_synthesis=artifacts["interpretation_synthesis"],
+            longitudinal_timeline=artifacts["longitudinal_timeline"],
+            operator_runbook=artifacts["operator_runbook"],
+            source_onboarding_catalog=tampered_catalog,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "source_onboarding_item.onboarding_item_digest mismatch",
+            validation["errors"],
+        )
+
+    def test_tampered_human_body_package_capability_digest_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_package = deepcopy(artifacts["human_body_analysis_package"])
+        tampered_package["analysis_capabilities"][0]["capability_digest"] = "0" * 64
+        tampered_package["human_body_analysis_package_digest"] = sha256_text(
+            canonical_json(
+                artifacts["workbench"]._human_body_analysis_package_digest_payload(
+                    tampered_package
+                )
+            )
+        )
+
+        validation = artifacts[
+            "workbench"
+        ].validate_human_body_analysis_package(
+            tampered_package,
+            artifacts["source_onboarding_catalog"],
+            artifacts["human_biosignal_catalog"],
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "human_body_analysis_package.capability_digest mismatch",
             validation["errors"],
         )
 

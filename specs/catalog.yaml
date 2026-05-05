@@ -2481,6 +2481,27 @@ entries:
     rationale: Required to bind questionnaire and EEG seed sources plus fMRI, brain organoid, biosensor, behavioral task, omics, clinical metadata, and future biological expansion sources into digest-only feature-summary source bundles without raw payload storage.
   - priority: P1
     kind: schema
+    file: specs/schemas/neuro_integration_source_onboarding_catalog.schema
+    consumers:
+      - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+      - docs/02-subsystems/interface/neuro-integration-workbench.md
+      - reference-runtime
+      - evals/interface/neuro_integration_workbench.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to catalog current and future biological source types, aliases, collection methods, analysis recipe hints, replacement lanes, non-ML operator summaries, coding-agent onboarding tasks, and operator UI cards before raw-free source bundle binding.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/neuro_integration_human_body_analysis_package.schema
+    consumers:
+      - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+      - docs/02-subsystems/interface/neuro-integration-workbench.md
+      - docs/07-reference-implementation/README.md
+      - reference-runtime
+      - evals/interface/neuro_integration_workbench.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind the complete BioData human biosignal catalog into NIW analysis capability cards, operator UI workflow steps, and cross-environment release package targets while preserving digest-only payload handling and the no diagnosis / no identity / no upload-readiness claim ceiling.
+  - priority: P1
+    kind: schema
     file: specs/schemas/neuro_integration_workspace.schema
     consumers:
       - specs/interfaces/interface.neuro_integration_workbench.v0.idl

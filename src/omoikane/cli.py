@@ -61,6 +61,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     neuro_integration_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    human_body_analysis_parser = subparsers.add_parser(
+        "human-body-analysis-demo",
+        help="Run the L6 human body biosignal analysis package and operator UI scenario",
+    )
+    human_body_analysis_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     observation_integration_parser = subparsers.add_parser(
         "observation-integration-demo",
         help="Run the L6 universal observation source-bundle, integration graph, and analysis-plan scenario",
@@ -513,6 +519,10 @@ def main() -> None:
         return
 
     if args.command == "neuro-integration-demo":
+        _print_result(runtime.run_neuro_integration_workbench_demo(), args.json)
+        return
+
+    if args.command == "human-body-analysis-demo":
         _print_result(runtime.run_neuro_integration_workbench_demo(), args.json)
         return
 
