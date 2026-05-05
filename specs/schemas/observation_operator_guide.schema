@@ -1,0 +1,122 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/observation_operator_guide.schema"
+title: ObservationOperatorGuide
+description: >
+  Plain-language and coding-agent guide for operating a universal observation
+  integration package without raw payload retention or totality claims.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - operator_guide_ref
+  - created_at
+  - profile_id
+  - source_bundle_ref
+  - source_bundle_digest
+  - analysis_plan_ref
+  - analysis_plan_digest
+  - operator_cards
+  - coding_agent_task_templates
+  - beginner_operator_supported
+  - coding_agent_ready
+  - claim_ceiling
+  - storage_policy
+  - raw_instruction_payload_stored
+  - raw_analysis_payload_stored
+  - raw_source_payload_stored
+  - truth_unification_claimed
+  - complete_human_knowledge_claimed
+  - operator_guide_digest
+properties:
+  schema_version:
+    const: "1.0"
+  operator_guide_ref:
+    type: string
+    pattern: "^operator-guide://universal-observation/uoi-guide-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: universal-observation-operator-guide-v1
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+  analysis_plan_ref:
+    type: string
+    minLength: 1
+  analysis_plan_digest:
+    $ref: "#/$defs/sha256"
+  operator_cards:
+    type: array
+    minItems: 3
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - card_id
+        - plain_language_prompt
+        - agent_action
+        - safety_gate
+      properties:
+        card_id:
+          type: string
+          minLength: 1
+        plain_language_prompt:
+          type: string
+          minLength: 1
+        agent_action:
+          type: string
+          minLength: 1
+        safety_gate:
+          type: string
+          minLength: 1
+  coding_agent_task_templates:
+    type: array
+    minItems: 2
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - template_id
+        - target_actor
+        - prompt_contract
+        - output_ref
+      properties:
+        template_id:
+          type: string
+          minLength: 1
+        target_actor:
+          type: string
+          minLength: 1
+        prompt_contract:
+          type: string
+          minLength: 1
+        output_ref:
+          type: string
+          minLength: 1
+  beginner_operator_supported:
+    const: true
+  coding_agent_ready:
+    const: true
+  claim_ceiling:
+    const: cross-domain-feature-integration-plan-only
+  storage_policy:
+    const: feature-digest+provenance+axis-summary-only
+  raw_instruction_payload_stored:
+    const: false
+  raw_analysis_payload_stored:
+    const: false
+  raw_source_payload_stored:
+    const: false
+  truth_unification_claimed:
+    const: false
+  complete_human_knowledge_claimed:
+    const: false
+  operator_guide_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"

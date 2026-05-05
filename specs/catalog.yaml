@@ -4025,5 +4025,84 @@ entries:
       - docs/02-subsystems/interface/ewa-safety.md
       - docs/07-reference-implementation/README.md
     rationale: Guards that regulator permit verifier and quorum receipts remain legal-execution-bound, permit-status-valid, multi-jurisdiction, threshold-policy-bound, digest-only, raw-payload-redacted, outside EWA decision authority, and carried through authorization, command audit, emergency-stop receipts, and permit revocation forced-stop handling.
+  - priority: P1
+    kind: interface
+    file: specs/interfaces/interface.observation_integration_workbench.v0.idl
+    consumers:
+      - reference-runtime
+      - specs/schemas/observation_source_catalog.schema
+      - specs/schemas/observation_source_bundle.schema
+      - specs/schemas/observation_integration_graph.schema
+      - specs/schemas/observation_analysis_plan.schema
+      - specs/schemas/observation_operator_guide.schema
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to expose the digest-only L6 observation integration workbench contract for human-acquired measurements without claiming complete knowledge, truth unification, consciousness reproduction, or identity replacement.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/observation_source_catalog.schema
+    consumers:
+      - specs/interfaces/interface.observation_integration_workbench.v0.idl
+      - reference-runtime
+      - tests/integration/test_interface_schema_contracts.py
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+    rationale: Required to serialize the open-world taxonomy of observation families, source types, alignment axes, and analysis lanes while keeping the complete-human-knowledge claim false.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/observation_source_bundle.schema
+    consumers:
+      - specs/interfaces/interface.observation_integration_workbench.v0.idl
+      - reference-runtime
+      - specs/schemas/observation_integration_graph.schema
+      - specs/schemas/observation_analysis_plan.schema
+      - tests/integration/test_interface_schema_contracts.py
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+    rationale: Required to bind cross-domain source manifests to provenance, rights, time, space, unit, uncertainty, and entity axes without storing raw observation, personal, or external dataset payloads.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/observation_integration_graph.schema
+    consumers:
+      - specs/interfaces/interface.observation_integration_workbench.v0.idl
+      - reference-runtime
+      - specs/schemas/observation_analysis_plan.schema
+      - tests/integration/test_interface_schema_contracts.py
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+    rationale: Required to serialize cross-domain nodes, edges, uncertainty propagation, and rights boundary binding while keeping truth-unification and total-knowledge claims false.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/observation_analysis_plan.schema
+    consumers:
+      - specs/interfaces/interface.observation_integration_workbench.v0.idl
+      - reference-runtime
+      - specs/schemas/observation_operator_guide.schema
+      - tests/integration/test_interface_schema_contracts.py
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+    rationale: Required to bind ingest, normalize, align, model, audit, and publish-digest lanes to the integration graph as an analysis plan, not a causal truth or consciousness claim.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/observation_operator_guide.schema
+    consumers:
+      - specs/interfaces/interface.observation_integration_workbench.v0.idl
+      - reference-runtime
+      - tests/integration/test_interface_schema_contracts.py
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+    rationale: Required to serialize beginner operator cards and coding-agent task templates bound to the analysis plan digest without storing raw instruction, analysis, or source payloads.
+  - priority: P1
+    kind: eval
+    file: evals/interface/observation_integration_workbench.yaml
+    consumers:
+      - reference-runtime
+      - tests/unit/test_observation_integration_workbench.py
+      - tests/integration/test_interface_schema_contracts.py
+      - tests/integration/test_cli.py
+      - tests/integration/test_reference_runtime.py
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+    rationale: Guards that the universal observation workbench keeps taxonomy, source bundle, graph, analysis plan, and operator guide digest-bound while raw payloads, complete knowledge, truth unification, consciousness reproduction, and identity replacement remain false.
 next_priority:
   # Future automation can append the next missing contract here.

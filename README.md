@@ -67,6 +67,7 @@ Researcher の evidence seed や調査補助メモは [agents/researchers/](agen
 - 今日の技術で実装できない部分は多いが、L1/L4/L5 の統率や append-only ledger のような骨格は今から prototype 化できる。
 - L6 では BDB（Biological-Digital Bridge）の bounded viability を proxy 実装し、ms 級 latency budget・fail-safe fallback・可逆な置換比率調整までは reference runtime で検証できる。
 - L6 では BioData Transmitter も reference runtime 化し、人間から取られる神経・心血管・呼吸・皮膚・筋・眼・体温・運動・音声・生化学系などの宣言済み生体信号を catalog / family map に束縛し、体内状態 latent を経由して別モダリティの生体データ proxy を生成し、未知 target は汎用 biosignal proxy として digest-bound に扱い、複数日の latent digest から個人内 calibration profile と identity / loopback confidence gate を作る境界を検証できる。
+- L6 では Observation Integration Workbench も reference runtime 化し、人類が取得・計測してきた観測 source を taxonomy / source bundle / integration graph / analysis plan / operator guide に束縛し、raw payload を保持せずに統合解析計画を作る境界を検証できる。
 - automation は [Daily Automation Direction](references/daily-automation-direction.md) に従い、repo 内 gap または追跡可能な研究進展がある時だけ更新する。進展が無い日は no-op とし、意識再現や同一性達成を装う差分を作らない。
 - このリポジトリは「設計が成熟するほど、必要な研究が明確になり、reference runtime も厚くなる」ことを目指す。
 
@@ -78,6 +79,7 @@ Researcher の evidence seed や調査補助メモは [agents/researchers/](agen
 - `PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
+- `PYTHONPATH=src python3 -m omoikane.cli observation-integration-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli collective-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli memory-edit-demo --json`
@@ -112,7 +114,7 @@ Researcher の evidence seed や調査補助メモは [agents/researchers/](agen
 | `PYTHONPATH=src python3 -m unittest discover -s tests -t .` | reference runtime、CLI、schema、eval 連携の回帰テスト結果 | 実環境の起動、外部サービス接続、研究上の正しさの証明 |
 | `demo` | identity 作成、substrate allocation、ContinuityLedger、Council 承認、EthicsEnforcer veto の最小シナリオ | 意識・人格・同一性成立の主張 |
 | `substrate-demo` / `connectome-demo` | substrate allocation / attestation / migration と、L2 connectome snapshot の validation summary | 実ハードウェア移行、実神経データの取り込み |
-| `bdb-demo` / `biodata-transmitter-demo` / `neuro-integration-demo` / `collective-demo` | L6 interface の proxy contract、biosignal roundtrip、アンケート+EEG の digest-only fusion receipt、アンケート+EEG seed から fMRI / 脳オルガノイド expansion lane までの multi-application workbench、collective identity の bounded merge / recovery receipt | 生体データの実測、身体状態の医学的診断、意識再現、集合人格成立の証明 |
+| `bdb-demo` / `biodata-transmitter-demo` / `neuro-integration-demo` / `observation-integration-demo` / `collective-demo` | L6 interface の proxy contract、biosignal roundtrip、アンケート+EEG の digest-only fusion receipt、アンケート+EEG seed から fMRI / 脳オルガノイド expansion lane までの multi-application workbench、人類の観測・計測 source を raw payload なしで束縛する cross-domain analysis plan、collective identity の bounded merge / recovery receipt | 生体データの実測、身体状態の医学的診断、完全知識や真理統一の証明、意識再現、集合人格成立の証明 |
 | `memory-edit-demo` / `memory-replication-demo` / `semantic-demo` / `procedural-demo` / `cognitive-demo` | MemoryCrystal、reversible memory edit、semantic / procedural projection、L3 reasoning failover の安全な代理シナリオ | 記憶の実改変、技能の実世界実行、汎用推論エンジン |
 | `cognitive-audit-governance-demo` / `council-demo` / `task-graph-demo` / `consensus-bus-demo` / `trust-demo` / `trust-transfer-demo` | Council、TaskGraph、ConsensusBus、TrustService、audit governance の policy / receipt / timeout / quorum 結果 | 人間監督の代替、法的承認、外部組織の実署名 |
 | `patch-generator-demo` / `diff-eval-demo` / `sandbox-demo` / `yaoyorozu-demo` / `builder-live-demo` / `rollback-demo` | Builder 系の patch plan、diff evaluation、sandbox freeze、worker dispatch、temp workspace 実行、rollback receipt | 現 checkout への無断永続変更、本番 worker 実行、秘密情報を含む長いログ保存 |

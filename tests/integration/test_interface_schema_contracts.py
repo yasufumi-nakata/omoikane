@@ -280,6 +280,49 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
         self.assertFalse(result["validation"]["identity_replacement_claimed"])
 
+    def test_observation_integration_demo_matches_public_schemas(self) -> None:
+        result = self.runtime.run_observation_integration_demo()
+
+        self._assert_schema_valid(
+            "specs/schemas/observation_source_catalog.schema",
+            result["taxonomy"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/observation_source_bundle.schema",
+            result["source_bundle"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/observation_integration_graph.schema",
+            result["integration_graph"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/observation_analysis_plan.schema",
+            result["analysis_plan"],
+        )
+        self._assert_schema_valid(
+            "specs/schemas/observation_operator_guide.schema",
+            result["operator_guide"],
+        )
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["taxonomy_digest_bound"])
+        self.assertTrue(result["validation"]["source_bundle_digest_bound"])
+        self.assertTrue(result["validation"]["integration_graph_digest_bound"])
+        self.assertTrue(result["validation"]["analysis_plan_digest_bound"])
+        self.assertTrue(result["validation"]["operator_guide_digest_bound"])
+        self.assertTrue(result["validation"]["alignment_axes_bound"])
+        self.assertTrue(result["validation"]["rights_and_consent_bound"])
+        self.assertTrue(result["validation"]["cross_domain_graph_bound"])
+        self.assertTrue(result["validation"]["all_analysis_lanes_bound"])
+        self.assertTrue(result["validation"]["operator_handoff_bound"])
+        self.assertTrue(result["validation"]["claim_ceiling_bound"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertTrue(result["validation"]["no_totality_or_truth_claim"])
+        self.assertTrue(result["validation"]["no_identity_or_consciousness_claim"])
+        self.assertFalse(result["validation"]["complete_human_knowledge_claimed"])
+        self.assertFalse(result["validation"]["truth_unification_claimed"])
+        self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
+        self.assertFalse(result["validation"]["identity_replacement_claimed"])
+
     def test_l3_cognitive_demos_match_public_schemas(self) -> None:
         demos = [
             {

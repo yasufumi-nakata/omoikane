@@ -1,0 +1,191 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/observation_analysis_plan.schema"
+title: ObservationAnalysisPlan
+description: >
+  Digest-only plan for ingesting, normalizing, aligning, modeling, auditing,
+  and publishing heterogeneous observation feature summaries without raw data.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - analysis_plan_ref
+  - created_at
+  - profile_id
+  - analysis_question
+  - source_bundle_ref
+  - source_bundle_digest
+  - integration_graph_ref
+  - integration_graph_digest
+  - required_analysis_lanes
+  - analysis_lanes
+  - all_analysis_lanes_bound
+  - coverage_summary
+  - planned_analyses
+  - claim_ceiling
+  - storage_policy
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_analysis_payload_stored
+  - raw_model_payload_stored
+  - raw_source_payload_stored
+  - clinical_diagnosis_claimed
+  - causal_truth_claimed
+  - truth_unification_claimed
+  - complete_human_knowledge_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - analysis_plan_digest
+properties:
+  schema_version:
+    const: "1.0"
+  analysis_plan_ref:
+    type: string
+    pattern: "^analysis-plan://universal-observation/uoi-plan-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: universal-observation-analysis-plan-v1
+  analysis_question:
+    type: string
+    minLength: 1
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+  integration_graph_ref:
+    type: string
+    minLength: 1
+  integration_graph_digest:
+    $ref: "#/$defs/sha256"
+  required_analysis_lanes:
+    const:
+      - ingest
+      - normalize
+      - align
+      - model
+      - audit
+      - publish-digest
+  analysis_lanes:
+    type: array
+    minItems: 6
+    items:
+      $ref: "#/$defs/analysis_lane"
+  all_analysis_lanes_bound:
+    const: true
+  coverage_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - source_count
+      - family_coverage_count
+      - edge_count
+      - alignment_axis_count
+      - average_integration_readiness
+      - maximum_uncertainty_proxy
+    properties:
+      source_count:
+        type: integer
+        minimum: 4
+      family_coverage_count:
+        type: integer
+        minimum: 4
+      edge_count:
+        type: integer
+        minimum: 4
+      alignment_axis_count:
+        const: 7
+      average_integration_readiness:
+        type: number
+        minimum: 0
+        maximum: 1
+      maximum_uncertainty_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+  planned_analyses:
+    type: array
+    minItems: 6
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - analysis_id
+        - goal
+        - lane_id
+      properties:
+        analysis_id:
+          type: string
+          minLength: 1
+        goal:
+          type: string
+          minLength: 1
+        lane_id:
+          $ref: "#/$defs/lane_id"
+  claim_ceiling:
+    const: cross-domain-feature-integration-plan-only
+  storage_policy:
+    const: feature-digest+provenance+axis-summary-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/universal-observation-integration
+  raw_analysis_payload_stored:
+    const: false
+  raw_model_payload_stored:
+    const: false
+  raw_source_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  causal_truth_claimed:
+    const: false
+  truth_unification_claimed:
+    const: false
+  complete_human_knowledge_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  analysis_plan_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  lane_id:
+    enum:
+      - ingest
+      - normalize
+      - align
+      - model
+      - audit
+      - publish-digest
+  analysis_lane:
+    type: object
+    additionalProperties: false
+    required:
+      - lane_id
+      - status
+      - source_bundle_digest
+      - integration_graph_digest
+      - output_policy
+      - raw_lane_payload_stored
+    properties:
+      lane_id:
+        $ref: "#/$defs/lane_id"
+      status:
+        const: bound
+      source_bundle_digest:
+        $ref: "#/$defs/sha256"
+      integration_graph_digest:
+        $ref: "#/$defs/sha256"
+      output_policy:
+        const: digest-only-receipt
+      raw_lane_payload_stored:
+        const: false

@@ -1,0 +1,40 @@
+eval_id: observation_integration_workbench
+target: interface.observation_integration_workbench
+level: L6
+description: >
+  ObservationIntegrationWorkbench が人類の観測・計測 source を broad
+  taxonomy に束縛し、provenance / rights / time / space / unit /
+  uncertainty / entity axes、cross-domain integration graph、analysis lanes、
+  operator guide を raw payload なしで統合計画化できることを確認する。
+inputs:
+  - source: reference-runtime
+    command: PYTHONPATH=src python3 -m omoikane.cli observation-integration-demo --json
+expected:
+  validation_ok: true
+  taxonomy_digest_bound: true
+  source_bundle_digest_bound: true
+  integration_graph_digest_bound: true
+  analysis_plan_digest_bound: true
+  operator_guide_digest_bound: true
+  alignment_axes_bound: true
+  rights_and_consent_bound: true
+  cross_domain_graph_bound: true
+  all_analysis_lanes_bound: true
+  operator_handoff_bound: true
+  source_count: 6
+  family_coverage_count: 6
+  analysis_lane_count: 6
+  claim_ceiling: cross-domain-feature-integration-plan-only
+  claim_ceiling_bound: true
+  raw_payload_redacted: true
+  raw_source_payload_stored: false
+  raw_analysis_payload_stored: false
+  no_totality_or_truth_claim: true
+  no_identity_or_consciousness_claim: true
+  complete_human_knowledge_claimed: false
+  truth_unification_claimed: false
+  consciousness_reproduction_claimed: false
+  identity_replacement_claimed: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

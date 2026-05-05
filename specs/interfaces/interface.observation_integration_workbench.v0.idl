@@ -1,0 +1,193 @@
+idl_version: 1
+kind: service
+namespace: interface.observation_integration_workbench.v0
+service: ObservationIntegrationWorkbenchService
+summary: >
+  Canonical L6 contract for digest-only integration of human-acquired
+  observations and measurements across biological, planetary, cosmic, social,
+  cultural, industrial, and digital source families. The service makes source
+  bundles, integration graphs, analysis plans, and operator guides possible
+  without storing raw payloads or claiming complete knowledge, causal truth,
+  diagnosis, consciousness reproduction, or identity replacement.
+imports:
+  observation_source_catalog: ../schemas/observation_source_catalog.schema
+  observation_source_bundle: ../schemas/observation_source_bundle.schema
+  observation_integration_graph: ../schemas/observation_integration_graph.schema
+  observation_analysis_plan: ../schemas/observation_analysis_plan.schema
+  observation_operator_guide: ../schemas/observation_operator_guide.schema
+operations:
+  emit_taxonomy:
+    summary: Emit the open-world observation source taxonomy and required alignment axes.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+    output:
+      schema_ref: observation_source_catalog
+    guarantees:
+      - taxonomy must be open-world and must not claim complete human observation coverage
+      - source families must cover biological, environmental, geospatial, astronomical, physical, social, cultural, industrial, software, and archival domains
+      - raw taxonomy payload storage must remain false
+  bind_source_bundle:
+    summary: Bind declared feature summaries from heterogeneous observation domains into one source bundle.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - bundle_label
+          - source_manifests
+        properties:
+          bundle_label:
+            type: string
+            minLength: 1
+          source_manifests:
+            type: array
+            minItems: 4
+            items:
+              type: object
+              required:
+                - source_type
+                - source_ref
+                - measurement_ref
+                - instrument_ref
+                - collector_ref
+                - rights_ref
+                - consent_or_public_basis_ref
+                - license_ref
+                - feature_summary_ref
+                - feature_summary
+                - uncertainty_summary
+                - temporal_ref
+                - spatial_ref
+                - unit_system_ref
+                - entity_ref
+    output:
+      schema_ref: observation_source_bundle
+    guarantees:
+      - every source must bind provenance, rights, time, space, unit, uncertainty, and entity refs
+      - consent or public-basis refs and license refs must be present before integration
+      - raw source, feature, personal, and external dataset payload storage must remain false
+      - complete human knowledge, truth unification, consciousness reproduction, and identity replacement claims must remain false
+  build_integration_graph:
+    summary: Link source summaries through shared alignment-axis digests and uncertainty-aware cross-domain edges.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+        properties:
+          source_bundle:
+            schema_ref: observation_source_bundle
+    output:
+      schema_ref: observation_integration_graph
+    guarantees:
+      - graph digest must bind source bundle digest, nodes, edges, rights boundaries, and uncertainty propagation
+      - at least one cross-domain edge must be present
+      - raw graph payload storage and truth-unification claims must remain false
+  build_analysis_plan:
+    summary: Emit a lane-bound analysis plan for ingest, normalization, alignment, modeling, audit, and digest-only publication.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - integration_graph
+          - analysis_question
+        properties:
+          source_bundle:
+            schema_ref: observation_source_bundle
+          integration_graph:
+            schema_ref: observation_integration_graph
+          analysis_question:
+            type: string
+            minLength: 1
+    output:
+      schema_ref: observation_analysis_plan
+    guarantees:
+      - every analysis lane must be bound to source bundle and integration graph digests
+      - model planning must carry uncertainty and claim ceiling before any modeling claim
+      - clinical diagnosis, causal truth, complete human knowledge, consciousness, and identity claims must remain false
+  build_operator_guide:
+    summary: Emit plain-language operator cards and coding-agent task templates for safe use of the observation package.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - analysis_plan
+        properties:
+          source_bundle:
+            schema_ref: observation_source_bundle
+          analysis_plan:
+            schema_ref: observation_analysis_plan
+    output:
+      schema_ref: observation_operator_guide
+    guarantees:
+      - beginner operator and coding-agent handoffs must be explicit
+      - operator instructions must remain schema-bound and digest-only
+      - raw instruction, analysis, and source payload storage must remain false
+  validate_observation_package:
+    summary: Verify taxonomy, source bundle, graph, analysis plan, and guide digest binding plus safety ceilings.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - taxonomy
+          - source_bundle
+          - integration_graph
+          - analysis_plan
+          - operator_guide
+        properties:
+          taxonomy:
+            schema_ref: observation_source_catalog
+          source_bundle:
+            schema_ref: observation_source_bundle
+          integration_graph:
+            schema_ref: observation_integration_graph
+          analysis_plan:
+            schema_ref: observation_analysis_plan
+          operator_guide:
+            schema_ref: observation_operator_guide
+    output:
+      inline_schema:
+        type: object
+        required:
+          - ok
+          - taxonomy_digest_bound
+          - source_bundle_digest_bound
+          - integration_graph_digest_bound
+          - analysis_plan_digest_bound
+          - operator_guide_digest_bound
+          - raw_payload_redacted
+          - no_totality_or_truth_claim
+          - no_identity_or_consciousness_claim
+        properties:
+          ok:
+            type: boolean
+          taxonomy_digest_bound:
+            type: boolean
+          source_bundle_digest_bound:
+            type: boolean
+          integration_graph_digest_bound:
+            type: boolean
+          analysis_plan_digest_bound:
+            type: boolean
+          operator_guide_digest_bound:
+            type: boolean
+          raw_payload_redacted:
+            type: boolean
+          no_totality_or_truth_claim:
+            type: boolean
+          no_identity_or_consciousness_claim:
+            type: boolean
+events:
+  - name: observation_integration.taxonomy.bound
+    payload_schema: observation_source_catalog
+  - name: observation_integration.source_bundle.bound
+    payload_schema: observation_source_bundle
+  - name: observation_integration.graph.bound
+    payload_schema: observation_integration_graph
+  - name: observation_integration.analysis_plan.bound
+    payload_schema: observation_analysis_plan
+  - name: observation_integration.operator_guide.bound
+    payload_schema: observation_operator_guide

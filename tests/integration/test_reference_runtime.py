@@ -359,6 +359,70 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ],
         )
 
+    def test_observation_integration_demo_reports_cross_domain_package(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        result = runtime.run_observation_integration_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertEqual(6, result["validation"]["source_count"])
+        self.assertGreaterEqual(result["validation"]["family_coverage_count"], 6)
+        self.assertEqual(6, result["validation"]["analysis_lane_count"])
+        self.assertTrue(result["validation"]["taxonomy_digest_bound"])
+        self.assertTrue(result["validation"]["source_bundle_digest_bound"])
+        self.assertTrue(result["validation"]["integration_graph_digest_bound"])
+        self.assertTrue(result["validation"]["analysis_plan_digest_bound"])
+        self.assertTrue(result["validation"]["operator_guide_digest_bound"])
+        self.assertTrue(result["validation"]["alignment_axes_bound"])
+        self.assertTrue(result["validation"]["rights_and_consent_bound"])
+        self.assertTrue(result["validation"]["cross_domain_graph_bound"])
+        self.assertTrue(result["validation"]["all_analysis_lanes_bound"])
+        self.assertTrue(result["validation"]["operator_handoff_bound"])
+        self.assertTrue(result["validation"]["claim_ceiling_bound"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertTrue(result["validation"]["no_totality_or_truth_claim"])
+        self.assertTrue(result["validation"]["no_identity_or_consciousness_claim"])
+        self.assertEqual(
+            "cross-domain-feature-integration-plan-only",
+            result["analysis_plan"]["claim_ceiling"],
+        )
+        self.assertFalse(result["analysis_plan"]["clinical_diagnosis_claimed"])
+        self.assertFalse(result["analysis_plan"]["causal_truth_claimed"])
+        self.assertFalse(result["analysis_plan"]["truth_unification_claimed"])
+        self.assertFalse(result["analysis_plan"]["complete_human_knowledge_claimed"])
+        self.assertFalse(result["analysis_plan"]["consciousness_reproduction_claimed"])
+        self.assertFalse(result["analysis_plan"]["identity_replacement_claimed"])
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-observation-integration-taxonomy"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-observation-integration"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-observation-integration-graph"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-observation-integration-analysis"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-observation-integration-guide"
+            ],
+        )
+
     def test_imc_demo_reports_disclosure_floor_and_disconnect(self) -> None:
         runtime = OmoikaneReferenceOS()
 

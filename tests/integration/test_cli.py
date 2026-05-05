@@ -446,6 +446,38 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["replacement_plan"]["replacement_plan_bound"])
         self.assertTrue(result["connector_bundle"]["connector_bundle_bound"])
 
+    def test_observation_integration_demo_emits_universal_observation_package(self) -> None:
+        stdout = io.StringIO()
+
+        with patch(
+            "sys.argv",
+            ["omoikane", "observation-integration-demo", "--json"],
+        ), redirect_stdout(stdout):
+            main()
+
+        result = json.loads(stdout.getvalue())
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["taxonomy_digest_bound"])
+        self.assertTrue(result["validation"]["source_bundle_digest_bound"])
+        self.assertTrue(result["validation"]["integration_graph_digest_bound"])
+        self.assertTrue(result["validation"]["analysis_plan_digest_bound"])
+        self.assertTrue(result["validation"]["operator_guide_digest_bound"])
+        self.assertTrue(result["validation"]["alignment_axes_bound"])
+        self.assertTrue(result["validation"]["rights_and_consent_bound"])
+        self.assertTrue(result["validation"]["cross_domain_graph_bound"])
+        self.assertTrue(result["validation"]["all_analysis_lanes_bound"])
+        self.assertTrue(result["validation"]["operator_handoff_bound"])
+        self.assertTrue(result["validation"]["raw_payload_redacted"])
+        self.assertTrue(result["validation"]["no_totality_or_truth_claim"])
+        self.assertTrue(result["validation"]["no_identity_or_consciousness_claim"])
+        self.assertGreaterEqual(result["validation"]["family_coverage_count"], 6)
+        self.assertIn("eeg", result["source_bundle"]["source_types"])
+        self.assertIn("climate_record", result["source_bundle"]["source_types"])
+        self.assertIn("satellite_imagery", result["source_bundle"]["source_types"])
+        self.assertIn("telescope_image", result["source_bundle"]["source_types"])
+        self.assertFalse(result["validation"]["complete_human_knowledge_claimed"])
+        self.assertFalse(result["validation"]["truth_unification_claimed"])
+
     def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:
         stdout = io.StringIO()
 

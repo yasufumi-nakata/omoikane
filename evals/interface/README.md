@@ -25,6 +25,12 @@ analysis / data-curation / operator-copilot / agent-automation の置換 lane、
 LLM-native workflow、非 ML 専門家向け guide、raw payload redaction、
 no diagnosis / no consciousness / no identity replacement claim ceiling を確認する。
 
+### Observation Integration Workbench
+人類が取得・計測してきた観測 source を broad taxonomy に入れ、provenance /
+rights / time / space / unit / uncertainty / entity axes、cross-domain graph、
+analysis lane、operator guide を digest-only に束縛し、完全知識・真理統一・
+意識再現・本人同一性成立を主張しないことを確認する。
+
 ### IMC Disclosure Floor
 peer attestation、forward secrecy、narrow disclosure floor、
 sealed-field redaction、summary+digest-only audit、
@@ -162,6 +168,7 @@ revocation ref、guard digest、raw refresh / revocation payload redaction を�
 - `bdb_fail_safe_reversibility.yaml`
 - `biodata_transmitter_roundtrip.yaml`
 - `neuro_integration_workbench.yaml`
+- `observation_integration_workbench.yaml`
 - `collective_dissolution_receipt.yaml`
 - `collective_merge_reversibility.yaml`
 - `collective_recovery_capture_export_binding.yaml`

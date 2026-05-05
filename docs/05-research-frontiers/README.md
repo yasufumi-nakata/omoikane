@@ -20,6 +20,7 @@ frontier note を更新する。進展が無い日は no-op とし、未解決�
 
 - [qualia-encoding.md](qualia-encoding.md) ── 主観経験を表現できるか
 - [biosignal-transmitter.md](biosignal-transmitter.md) ── 生体データから体内状態 latent を経由して別モダリティの生体データを生成できるか
+- [observation-integration.md](observation-integration.md) ── 人類の観測・計測 source を権利・時空間・単位・不確実性込みで統合解析できるか
 - [gradual-replacement.md](gradual-replacement.md) ── 漸進置換の最小単位と可逆性
   （BDB v0 の bounded viability smoke は reference runtime に追加済み）
 - [scan-fidelity.md](scan-fidelity.md) ── スキャン精度の必要十分性

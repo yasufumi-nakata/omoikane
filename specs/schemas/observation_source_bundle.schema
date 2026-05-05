@@ -1,0 +1,269 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/observation_source_bundle.schema"
+title: ObservationSourceBundle
+description: >
+  Digest-only bundle for declared human, planetary, cosmic, social, and other
+  observation feature summaries with provenance, rights, time, space, unit,
+  uncertainty, and entity axes.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - source_bundle_ref
+  - created_at
+  - profile_id
+  - bundle_label
+  - source_count
+  - source_types
+  - measurement_families
+  - family_coverage_count
+  - sources
+  - source_digest_set
+  - alignment_axes_required
+  - alignment_axes_bound
+  - rights_and_consent_bound
+  - open_world_taxonomy
+  - taxonomy_gap_policy
+  - storage_policy
+  - claim_ceiling
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_source_payload_stored
+  - raw_feature_payload_stored
+  - raw_personal_payload_stored
+  - raw_external_dataset_payload_stored
+  - complete_human_knowledge_claimed
+  - truth_unification_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - source_bundle_digest
+properties:
+  schema_version:
+    const: "1.0"
+  source_bundle_ref:
+    type: string
+    pattern: "^source-bundle://universal-observation/uoi-bundle-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: universal-observation-source-bundle-v1
+  bundle_label:
+    type: string
+    minLength: 1
+  source_count:
+    type: integer
+    minimum: 4
+  source_types:
+    type: array
+    minItems: 4
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  measurement_families:
+    type: array
+    minItems: 4
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  family_coverage_count:
+    type: integer
+    minimum: 4
+  sources:
+    type: array
+    minItems: 4
+    items:
+      $ref: "#/$defs/source_manifest"
+  source_digest_set:
+    $ref: "#/$defs/sha256"
+  alignment_axes_required:
+    const:
+      - provenance
+      - rights
+      - time
+      - space
+      - unit
+      - uncertainty
+      - entity
+  alignment_axes_bound:
+    const: true
+  rights_and_consent_bound:
+    const: true
+  open_world_taxonomy:
+    const: true
+  taxonomy_gap_policy:
+    const: accept-declared-family-with-frontier-flag
+  storage_policy:
+    const: feature-digest+provenance+axis-summary-only
+  claim_ceiling:
+    const: cross-domain-feature-integration-plan-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/universal-observation-integration
+  raw_source_payload_stored:
+    const: false
+  raw_feature_payload_stored:
+    const: false
+  raw_personal_payload_stored:
+    const: false
+  raw_external_dataset_payload_stored:
+    const: false
+  complete_human_knowledge_claimed:
+    const: false
+  truth_unification_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  axis_refs:
+    type: object
+    additionalProperties: false
+    required:
+      - provenance
+      - rights
+      - time
+      - space
+      - unit
+      - uncertainty
+      - entity
+    properties:
+      provenance:
+        type: string
+        minLength: 1
+      rights:
+        type: string
+        minLength: 1
+      time:
+        type: string
+        minLength: 1
+      space:
+        type: string
+        minLength: 1
+      unit:
+        type: string
+        minLength: 1
+      uncertainty:
+        type: string
+        minLength: 1
+      entity:
+        type: string
+        minLength: 1
+  quality_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - completeness_proxy
+      - uncertainty_proxy
+      - rights_clarity_proxy
+      - integration_readiness
+    properties:
+      completeness_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      uncertainty_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      rights_clarity_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      integration_readiness:
+        type: number
+        minimum: 0
+        maximum: 1
+  source_manifest:
+    type: object
+    additionalProperties: false
+    required:
+      - source_type
+      - measurement_family
+      - source_ref
+      - measurement_ref
+      - instrument_ref
+      - collector_ref
+      - rights_ref
+      - consent_or_public_basis_ref
+      - license_ref
+      - feature_summary_ref
+      - feature_digest
+      - feature_name_digest
+      - uncertainty_digest
+      - axis_refs
+      - axis_digest
+      - quality_summary
+      - numeric_feature_count
+      - string_feature_count
+      - storage_policy
+      - claim_ceiling
+      - raw_payload_stored
+    properties:
+      source_type:
+        $ref: "#/$defs/source_type"
+      measurement_family:
+        type: string
+        minLength: 1
+      source_ref:
+        type: string
+        minLength: 1
+      measurement_ref:
+        type: string
+        minLength: 1
+      instrument_ref:
+        type: string
+        minLength: 1
+      collector_ref:
+        type: string
+        minLength: 1
+      rights_ref:
+        type: string
+        minLength: 1
+      consent_or_public_basis_ref:
+        type: string
+        minLength: 1
+      license_ref:
+        type: string
+        minLength: 1
+      feature_summary_ref:
+        type: string
+        minLength: 1
+      feature_digest:
+        $ref: "#/$defs/sha256"
+      feature_name_digest:
+        $ref: "#/$defs/sha256"
+      uncertainty_digest:
+        $ref: "#/$defs/sha256"
+      axis_refs:
+        $ref: "#/$defs/axis_refs"
+      axis_digest:
+        $ref: "#/$defs/sha256"
+      quality_summary:
+        $ref: "#/$defs/quality_summary"
+      numeric_feature_count:
+        type: integer
+        minimum: 0
+      string_feature_count:
+        type: integer
+        minimum: 0
+      storage_policy:
+        const: feature-digest+provenance+axis-summary-only
+      claim_ceiling:
+        const: cross-domain-feature-integration-plan-only
+      raw_payload_stored:
+        const: false

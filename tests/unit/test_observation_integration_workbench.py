@@ -1,0 +1,123 @@
+from __future__ import annotations
+
+import unittest
+
+from omoikane.interface.observation_integration_workbench import (
+    ObservationIntegrationWorkbench,
+)
+
+
+class ObservationIntegrationWorkbenchTests(unittest.TestCase):
+    def _source_manifest(self, source_type: str, suffix: str) -> dict:
+        return {
+            "source_type": source_type,
+            "source_ref": f"source://unit/{suffix}",
+            "measurement_ref": f"measurement://unit/{suffix}",
+            "instrument_ref": f"instrument://unit/{suffix}",
+            "collector_ref": f"collector://unit/{suffix}",
+            "rights_ref": f"rights://unit/{suffix}",
+            "consent_or_public_basis_ref": f"public-basis://unit/{suffix}",
+            "license_ref": f"license://unit/{suffix}",
+            "feature_summary_ref": f"feature-summary://unit/{suffix}",
+            "temporal_ref": f"time://unit/{suffix}",
+            "spatial_ref": f"space://unit/{suffix}",
+            "unit_system_ref": f"unit://unit/{suffix}",
+            "uncertainty_ref": f"uncertainty://unit/{suffix}",
+            "entity_ref": f"entity://unit/{suffix}",
+            "feature_summary": {
+                "signal_proxy": 0.5,
+                "coverage_ratio": 0.9,
+                "rights_clarity": 0.95,
+            },
+            "uncertainty_summary": {
+                "measurement_error_proxy": 0.1,
+                "sampling_gap_proxy": 0.05,
+            },
+        }
+
+    def _build_package(self) -> dict:
+        workbench = ObservationIntegrationWorkbench()
+        taxonomy = workbench.taxonomy()
+        source_bundle = workbench.bind_source_bundle(
+            "unit-observation-package",
+            [
+                self._source_manifest("eeg", "eeg"),
+                self._source_manifest("climate_record", "climate"),
+                self._source_manifest("satellite_imagery", "satellite"),
+                self._source_manifest("telescope_image", "astronomy"),
+            ],
+        )
+        graph = workbench.build_integration_graph(source_bundle)
+        plan = workbench.build_analysis_plan(
+            source_bundle,
+            graph,
+            "Align feature summaries across declared observation families.",
+        )
+        guide = workbench.build_operator_guide(source_bundle, plan)
+        return {
+            "workbench": workbench,
+            "taxonomy": taxonomy,
+            "source_bundle": source_bundle,
+            "graph": graph,
+            "plan": plan,
+            "guide": guide,
+        }
+
+    def test_binds_open_world_observation_package(self) -> None:
+        package = self._build_package()
+        validation = package["workbench"].validate_observation_package(
+            package["taxonomy"],
+            package["source_bundle"],
+            package["graph"],
+            package["plan"],
+            package["guide"],
+        )
+
+        self.assertTrue(validation["ok"])
+        self.assertTrue(validation["taxonomy_digest_bound"])
+        self.assertTrue(validation["source_bundle_digest_bound"])
+        self.assertTrue(validation["integration_graph_digest_bound"])
+        self.assertTrue(validation["analysis_plan_digest_bound"])
+        self.assertTrue(validation["operator_guide_digest_bound"])
+        self.assertTrue(validation["alignment_axes_bound"])
+        self.assertTrue(validation["rights_and_consent_bound"])
+        self.assertTrue(validation["cross_domain_graph_bound"])
+        self.assertTrue(validation["all_analysis_lanes_bound"])
+        self.assertTrue(validation["operator_handoff_bound"])
+        self.assertTrue(validation["raw_payload_redacted"])
+        self.assertTrue(validation["no_totality_or_truth_claim"])
+        self.assertTrue(validation["no_identity_or_consciousness_claim"])
+        self.assertGreaterEqual(validation["family_coverage_count"], 4)
+        self.assertEqual(
+            "cross-domain-feature-integration-plan-only",
+            validation["claim_ceiling"],
+        )
+
+    def test_requires_four_observation_domains(self) -> None:
+        workbench = ObservationIntegrationWorkbench()
+
+        with self.assertRaises(ValueError):
+            workbench.bind_source_bundle(
+                "too-small",
+                [
+                    self._source_manifest("eeg", "eeg"),
+                    self._source_manifest("climate_record", "climate"),
+                    self._source_manifest("satellite_imagery", "satellite"),
+                ],
+            )
+
+    def test_rejects_missing_rights_axis(self) -> None:
+        workbench = ObservationIntegrationWorkbench()
+        source = self._source_manifest("eeg", "eeg")
+        source["rights_ref"] = ""
+
+        with self.assertRaises(ValueError):
+            workbench.bind_source_bundle(
+                "missing-rights",
+                [
+                    source,
+                    self._source_manifest("climate_record", "climate"),
+                    self._source_manifest("satellite_imagery", "satellite"),
+                    self._source_manifest("telescope_image", "astronomy"),
+                ],
+            )

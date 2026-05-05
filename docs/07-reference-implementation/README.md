@@ -9,7 +9,7 @@ OmoikaneOS の `src/` 配下には、意識や人格成立を主張しない **r
 
 ## 境界
 
-- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 perception/reasoning/affect/attention/volition/imagination/language/metacognition failover、L6 BDB / BioData Transmitter / Neuro Integration Workbench の bounded viability contract を扱う
+- `src/omoikane/` は L0/L1/L2/L4/L5 と、L3 perception/reasoning/affect/attention/volition/imagination/language/metacognition failover、L6 BDB / BioData Transmitter / Neuro Integration Workbench / Observation Integration Workbench の bounded viability contract を扱う
 - EthicsEnforcer と ContinuityLedger の不可侵性は reference runtime でも守る
 - Qualia / SelfModel は代理表現に留め、「意識の実装」とは主張しない
 - 外部サービス依存は避け、標準ライブラリで再現可能にする
@@ -54,6 +54,7 @@ PYTHONPATH=src python3 -m omoikane.cli energy-budget-fabric-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json
 PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json
+PYTHONPATH=src python3 -m omoikane.cli observation-integration-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
 PYTHONPATH=src python3 -m omoikane.cli ewa-demo --json
@@ -178,6 +179,15 @@ plain-language cards と coding agent 向け task template を同じ operator gu
 `feature-alignment-and-analysis-plan-only` で、raw questionnaire / EEG /
 neuroimaging / organoid / analysis / connector payload、clinical diagnosis、
 consciousness reproduction、identity replacement は保持または主張しない。
+
+`observation-integration-demo` は L6 Observation Integration Workbench の reference contract
+(`interface.observation_integration_workbench.v0`) を JSON で可視化し、人類が取得・
+計測してきた source を broad taxonomy、source bundle、cross-domain integration graph、
+analysis plan、operator guide に束縛する。source manifest は feature digest、
+provenance、rights、time、space、unit、uncertainty、entity scope だけを持ち、
+raw observation / personal / external dataset / analysis payload は保持しない。claim ceiling は
+`cross-domain-feature-integration-plan-only` で、complete human knowledge、
+truth unification、consciousness reproduction、identity replacement は主張しない。
 
 
 `identity-demo` は L1 IdentityRegistry の reference contract

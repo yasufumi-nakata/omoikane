@@ -30,6 +30,20 @@
   で BDT Survey EEG Fusion receipt binding、expansion modality binding、replacement lane coverage、
   source-type lane coverage、connector bundle binding、raw payload redaction、claim ceiling をまとめて検証する
 
+### Observation Integration Workbench (OIW)
+- 人類が取得・計測してきた source を、human biodata、neuroscience、clinical health、
+  molecular omics、environmental earth、geospatial remote sensing、astronomical /
+  cosmological、physics、chemical / materials、ecology、agriculture、industrial IoT、
+  social / economic、cultural text / media、software telemetry、historical archival の
+  open-world taxonomy に束縛する
+- source は raw payload ではなく feature digest、provenance、rights、time、space、
+  unit、uncertainty、entity の alignment axes として扱う
+- cross-domain graph、analysis plan、operator guide を同じ source bundle digest に束縛する
+- 完全知識、真理統一、意識再現、本人同一性成立の主張はしない
+- reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli observation-integration-demo --json`
+  で taxonomy、source bundle、integration graph、analysis lane、operator handoff、
+  raw payload redaction、claim ceiling をまとめて検証する
+
 ### Biological-Digital Bridge (BDB)
 - BCI（脳-コンピュータ・インタフェース）
 - 神経インタフェース
@@ -123,6 +137,7 @@ if shared_reality.state_hash != local_belief.state_hash:
 - [collective-identity.md](collective-identity.md)
 - [imc-protocol.md](imc-protocol.md)
 - [neuro-integration-workbench.md](neuro-integration-workbench.md)
+- [observation-integration-workbench.md](observation-integration-workbench.md)
 - [sensory-loopback.md](sensory-loopback.md)
 - [wms-spec.md](wms-spec.md)
 - [ewa-safety.md](ewa-safety.md)

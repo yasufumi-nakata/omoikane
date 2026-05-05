@@ -1,0 +1,100 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/observation_source_catalog.schema"
+title: ObservationSourceCatalog
+description: >
+  Open-world taxonomy for human-acquired observation and measurement source
+  families. It routes declared feature summaries without claiming that all
+  human data has been collected.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - taxonomy_ref
+  - created_at
+  - profile_id
+  - measurement_families
+  - family_count
+  - source_type_count
+  - alignment_axes
+  - analysis_lanes
+  - open_world_taxonomy
+  - claim_ceiling
+  - storage_policy
+  - raw_taxonomy_payload_stored
+  - complete_human_knowledge_claimed
+  - taxonomy_digest
+properties:
+  schema_version:
+    const: "1.0"
+  taxonomy_ref:
+    type: string
+    pattern: "^taxonomy://universal-observation/uoi-taxonomy-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: universal-human-observation-taxonomy-v1
+  measurement_families:
+    type: array
+    minItems: 12
+    items:
+      type: object
+      additionalProperties: false
+      required:
+        - family_id
+        - source_types
+        - source_type_count
+      properties:
+        family_id:
+          type: string
+          minLength: 1
+        source_types:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/$defs/source_type"
+        source_type_count:
+          type: integer
+          minimum: 1
+  family_count:
+    type: integer
+    minimum: 12
+  source_type_count:
+    type: integer
+    minimum: 40
+  alignment_axes:
+    const:
+      - provenance
+      - rights
+      - time
+      - space
+      - unit
+      - uncertainty
+      - entity
+  analysis_lanes:
+    const:
+      - ingest
+      - normalize
+      - align
+      - model
+      - audit
+      - publish-digest
+  open_world_taxonomy:
+    const: true
+  claim_ceiling:
+    const: cross-domain-feature-integration-plan-only
+  storage_policy:
+    const: feature-digest+provenance+axis-summary-only
+  raw_taxonomy_payload_stored:
+    const: false
+  complete_human_knowledge_claimed:
+    const: false
+  taxonomy_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"

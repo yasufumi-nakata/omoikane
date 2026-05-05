@@ -1,0 +1,158 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/observation_integration_graph.schema"
+title: ObservationIntegrationGraph
+description: >
+  Digest-only graph that links heterogeneous observation source summaries by
+  shared provenance, rights, time, space, unit, uncertainty, and entity axes.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - integration_graph_ref
+  - created_at
+  - profile_id
+  - source_bundle_ref
+  - source_bundle_digest
+  - node_count
+  - edge_count
+  - nodes
+  - edges
+  - alignment_axes
+  - cross_domain_edge_bound
+  - uncertainty_propagation_bound
+  - rights_boundary_bound
+  - claim_ceiling
+  - storage_policy
+  - raw_graph_payload_stored
+  - truth_unification_claimed
+  - complete_human_knowledge_claimed
+  - integration_graph_digest
+properties:
+  schema_version:
+    const: "1.0"
+  integration_graph_ref:
+    type: string
+    pattern: "^graph://universal-observation/uoi-graph-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: universal-observation-integration-graph-v1
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+  node_count:
+    type: integer
+    minimum: 4
+  edge_count:
+    type: integer
+    minimum: 4
+  nodes:
+    type: array
+    minItems: 4
+    items:
+      $ref: "#/$defs/node"
+  edges:
+    type: array
+    minItems: 4
+    items:
+      $ref: "#/$defs/edge"
+  alignment_axes:
+    const:
+      - provenance
+      - rights
+      - time
+      - space
+      - unit
+      - uncertainty
+      - entity
+  cross_domain_edge_bound:
+    const: true
+  uncertainty_propagation_bound:
+    const: true
+  rights_boundary_bound:
+    const: true
+  claim_ceiling:
+    const: cross-domain-feature-integration-plan-only
+  storage_policy:
+    const: feature-digest+provenance+axis-summary-only
+  raw_graph_payload_stored:
+    const: false
+  truth_unification_claimed:
+    const: false
+  complete_human_knowledge_claimed:
+    const: false
+  integration_graph_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  node:
+    type: object
+    additionalProperties: false
+    required:
+      - node_ref
+      - source_ref
+      - source_type
+      - measurement_family
+      - feature_digest
+      - axis_digest
+    properties:
+      node_ref:
+        type: string
+        minLength: 1
+      source_ref:
+        type: string
+        minLength: 1
+      source_type:
+        $ref: "#/$defs/source_type"
+      measurement_family:
+        type: string
+        minLength: 1
+      feature_digest:
+        $ref: "#/$defs/sha256"
+      axis_digest:
+        $ref: "#/$defs/sha256"
+  edge:
+    type: object
+    additionalProperties: false
+    required:
+      - edge_ref
+      - from_source_type
+      - to_source_type
+      - shared_axes
+      - edge_role
+      - confidence_proxy
+      - raw_edge_payload_stored
+      - edge_digest
+    properties:
+      edge_ref:
+        type: string
+        minLength: 1
+      from_source_type:
+        $ref: "#/$defs/source_type"
+      to_source_type:
+        $ref: "#/$defs/source_type"
+      shared_axes:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      edge_role:
+        type: string
+        minLength: 1
+      confidence_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      raw_edge_payload_stored:
+        const: false
+      edge_digest:
+        $ref: "#/$defs/sha256"

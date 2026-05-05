@@ -145,6 +145,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `interface/bdb_fail_safe_reversibility.yaml`
 - `interface/biodata_transmitter_roundtrip.yaml`
 - `interface/neuro_integration_workbench.yaml`
+- `interface/observation_integration_workbench.yaml`
 - `interface/collective_dissolution_receipt.yaml`
 - `interface/collective_external_registry_sync.yaml`
 - `interface/collective_merge_reversibility.yaml`

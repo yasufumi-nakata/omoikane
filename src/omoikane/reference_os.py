@@ -98,6 +98,7 @@ from .interface.imc import (
     InterMindChannel,
 )
 from .interface.neuro_integration_workbench import NeuroIntegrationWorkbench
+from .interface.observation_integration_workbench import ObservationIntegrationWorkbench
 from .interface.sensory_loopback import (
     SENSORY_LOOPBACK_PUBLIC_SCHEMA_CONTRACT_PROFILE,
     SensoryLoopbackService,
@@ -254,6 +255,7 @@ class OmoikaneReferenceOS:
         self.bdb = BiologicalDigitalBridge()
         self.biodata_transmitter = BioDataTransmitter()
         self.neuro_integration_workbench = NeuroIntegrationWorkbench()
+        self.observation_integration_workbench = ObservationIntegrationWorkbench()
         self.ewa = ExternalWorldAgentController(self.ethics)
         self.imc = InterMindChannel()
         self.collective = CollectiveIdentityService()
@@ -11684,6 +11686,344 @@ json.dump(response, sys.stdout)
                     "payload_path": "connector_bundle",
                     "schema_path": "specs/schemas/neuro_integration_application_connector_bundle.schema",
                     "contract_role": "neuro-integration-application-connector-bundle",
+                },
+            ],
+            "ledger_profile": self.ledger.profile(),
+            "ledger_snapshot": self.ledger.snapshot(),
+            "ledger_verification": self.ledger.verify(),
+        }
+
+    def run_observation_integration_demo(self) -> Dict[str, Any]:
+        identity = self.identity.create(
+            human_consent_proof="consent://observation-integration-demo/v1",
+            metadata={"display_name": "Observation Integration Workbench Sandbox"},
+        )
+        taxonomy = self.observation_integration_workbench.taxonomy()
+        source_bundle = self.observation_integration_workbench.bind_source_bundle(
+            "humanity-declared-observation-feature-summaries",
+            [
+                {
+                    "source_type": "eeg",
+                    "source_ref": "source://observation-integration/human/eeg-window",
+                    "measurement_ref": "measurement://observation-integration/eeg/day-1",
+                    "instrument_ref": "instrument://observation-integration/eeg/32ch",
+                    "collector_ref": "collector://observation-integration/lab-a",
+                    "rights_ref": "rights://observation-integration/self-consent",
+                    "consent_or_public_basis_ref": "consent://observation-integration/eeg-feature-summary",
+                    "license_ref": "license://observation-integration/local-consent-only",
+                    "feature_summary_ref": "feature-summary://observation-integration/eeg/day-1",
+                    "temporal_ref": "time://observation-integration/2026-05-05T09:00Z",
+                    "spatial_ref": "space://observation-integration/lab-a/shielded-room",
+                    "unit_system_ref": "unit://observation-integration/eeg-bandpower-normalized",
+                    "uncertainty_ref": "uncertainty://observation-integration/eeg/artifact-model",
+                    "entity_ref": f"identity://{identity.identity_id}",
+                    "feature_summary": {
+                        "alpha_power": 0.38,
+                        "theta_power": 0.31,
+                        "beta_power": 0.34,
+                        "coverage_ratio": 0.93,
+                        "rights_clarity": 0.98,
+                    },
+                    "uncertainty_summary": {
+                        "artifact_rate": 0.08,
+                        "missing_channel_rate": 0.02,
+                    },
+                },
+                {
+                    "source_type": "fmri_bold",
+                    "source_ref": "source://observation-integration/neuro/fmri-window",
+                    "measurement_ref": "measurement://observation-integration/fmri/task-window",
+                    "instrument_ref": "instrument://observation-integration/fmri/3t",
+                    "collector_ref": "collector://observation-integration/imaging-center",
+                    "rights_ref": "rights://observation-integration/fmri-consent",
+                    "consent_or_public_basis_ref": "consent://observation-integration/fmri-feature-summary",
+                    "license_ref": "license://observation-integration/research-consent",
+                    "feature_summary_ref": "feature-summary://observation-integration/fmri/task-window",
+                    "temporal_ref": "time://observation-integration/2026-05-05T10:00Z",
+                    "spatial_ref": "space://observation-integration/imaging-center/scanner-1",
+                    "unit_system_ref": "unit://observation-integration/bold-percent-change",
+                    "uncertainty_ref": "uncertainty://observation-integration/fmri-motion-qc",
+                    "entity_ref": f"identity://{identity.identity_id}",
+                    "feature_summary": {
+                        "bold_percent_change": 0.42,
+                        "network_coupling": 0.57,
+                        "roi_count": 12.0,
+                        "coverage_ratio": 0.86,
+                        "rights_clarity": 0.96,
+                    },
+                    "uncertainty_summary": {
+                        "motion_proxy": 0.11,
+                        "registration_uncertainty": 0.09,
+                    },
+                },
+                {
+                    "source_type": "climate_record",
+                    "source_ref": "source://observation-integration/earth/climate-grid",
+                    "measurement_ref": "measurement://observation-integration/climate/monthly-grid",
+                    "instrument_ref": "instrument://observation-integration/reanalysis",
+                    "collector_ref": "collector://observation-integration/public-earth-archive",
+                    "rights_ref": "rights://observation-integration/open-earth-data",
+                    "consent_or_public_basis_ref": "public-basis://observation-integration/open-climate",
+                    "license_ref": "license://observation-integration/open-data",
+                    "feature_summary_ref": "feature-summary://observation-integration/climate/monthly-grid",
+                    "temporal_ref": "time://observation-integration/1980-2025/monthly",
+                    "spatial_ref": "space://observation-integration/global-grid-1deg",
+                    "unit_system_ref": "unit://observation-integration/kelvin-mm-pa",
+                    "uncertainty_ref": "uncertainty://observation-integration/reanalysis-spread",
+                    "entity_ref": "entity://earth-system/global-grid",
+                    "feature_summary": {
+                        "temperature_anomaly": 0.64,
+                        "precipitation_index": 0.47,
+                        "pressure_index": 0.51,
+                        "coverage_ratio": 0.97,
+                        "rights_clarity": 1.0,
+                    },
+                    "uncertainty_summary": {
+                        "ensemble_spread": 0.14,
+                        "station_gap_proxy": 0.06,
+                    },
+                },
+                {
+                    "source_type": "satellite_imagery",
+                    "source_ref": "source://observation-integration/geospatial/satellite-tile",
+                    "measurement_ref": "measurement://observation-integration/satellite/tile-042",
+                    "instrument_ref": "instrument://observation-integration/optical-satellite",
+                    "collector_ref": "collector://observation-integration/remote-sensing-archive",
+                    "rights_ref": "rights://observation-integration/public-geospatial",
+                    "consent_or_public_basis_ref": "public-basis://observation-integration/open-satellite",
+                    "license_ref": "license://observation-integration/open-imagery",
+                    "feature_summary_ref": "feature-summary://observation-integration/satellite/tile-042",
+                    "temporal_ref": "time://observation-integration/2025-seasonal-composite",
+                    "spatial_ref": "space://observation-integration/tile-042",
+                    "unit_system_ref": "unit://observation-integration/surface-reflectance",
+                    "uncertainty_ref": "uncertainty://observation-integration/cloud-mask",
+                    "entity_ref": "entity://earth-surface/tile-042",
+                    "feature_summary": {
+                        "vegetation_index": 0.58,
+                        "water_index": 0.32,
+                        "urban_texture_proxy": 0.26,
+                        "coverage_ratio": 0.89,
+                        "rights_clarity": 1.0,
+                    },
+                    "uncertainty_summary": {
+                        "cloud_fraction": 0.12,
+                        "georegistration_proxy": 0.04,
+                    },
+                },
+                {
+                    "source_type": "telescope_image",
+                    "source_ref": "source://observation-integration/astronomy/deep-field",
+                    "measurement_ref": "measurement://observation-integration/telescope/deep-field",
+                    "instrument_ref": "instrument://observation-integration/space-telescope",
+                    "collector_ref": "collector://observation-integration/astronomy-archive",
+                    "rights_ref": "rights://observation-integration/public-astronomy",
+                    "consent_or_public_basis_ref": "public-basis://observation-integration/open-astronomy",
+                    "license_ref": "license://observation-integration/open-astronomy",
+                    "feature_summary_ref": "feature-summary://observation-integration/astronomy/deep-field",
+                    "temporal_ref": "time://observation-integration/observing-cycle-31",
+                    "spatial_ref": "space://observation-integration/sky-field-a",
+                    "unit_system_ref": "unit://observation-integration/flux-redshift",
+                    "uncertainty_ref": "uncertainty://observation-integration/photometric-redshift",
+                    "entity_ref": "entity://cosmos/deep-field-a",
+                    "feature_summary": {
+                        "source_density": 0.73,
+                        "redshift_proxy": 0.49,
+                        "flux_variability_proxy": 0.21,
+                        "coverage_ratio": 0.84,
+                        "rights_clarity": 1.0,
+                    },
+                    "uncertainty_summary": {
+                        "photometric_error_proxy": 0.17,
+                        "foreground_contamination_proxy": 0.07,
+                    },
+                },
+                {
+                    "source_type": "survey",
+                    "source_ref": "source://observation-integration/social/census-summary",
+                    "measurement_ref": "measurement://observation-integration/social/census-aggregate",
+                    "instrument_ref": "instrument://observation-integration/census-form",
+                    "collector_ref": "collector://observation-integration/statistical-office",
+                    "rights_ref": "rights://observation-integration/aggregate-public-use",
+                    "consent_or_public_basis_ref": "public-basis://observation-integration/statistical-aggregate",
+                    "license_ref": "license://observation-integration/public-use-aggregate",
+                    "feature_summary_ref": "feature-summary://observation-integration/social/census-summary",
+                    "temporal_ref": "time://observation-integration/census-period",
+                    "spatial_ref": "space://observation-integration/admin-region-aggregate",
+                    "unit_system_ref": "unit://observation-integration/aggregate-rate-index",
+                    "uncertainty_ref": "uncertainty://observation-integration/sampling-disclosure-control",
+                    "entity_ref": "entity://society/admin-region-aggregate",
+                    "feature_summary": {
+                        "mobility_index": 0.44,
+                        "education_index": 0.61,
+                        "health_access_index": 0.53,
+                        "coverage_ratio": 0.91,
+                        "rights_clarity": 0.94,
+                    },
+                    "uncertainty_summary": {
+                        "sampling_error_proxy": 0.10,
+                        "disclosure_noise_proxy": 0.06,
+                    },
+                },
+            ],
+        )
+        integration_graph = self.observation_integration_workbench.build_integration_graph(
+            source_bundle
+        )
+        analysis_plan = self.observation_integration_workbench.build_analysis_plan(
+            source_bundle,
+            integration_graph,
+            "Integrate declared human, planetary, cosmic, and social feature summaries under one digest-only analysis plan.",
+        )
+        operator_guide = self.observation_integration_workbench.build_operator_guide(
+            source_bundle,
+            analysis_plan,
+        )
+        validation = self.observation_integration_workbench.validate_observation_package(
+            taxonomy,
+            source_bundle,
+            integration_graph,
+            analysis_plan,
+            operator_guide,
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="observation_integration.taxonomy.bound",
+            payload={
+                "taxonomy_ref": taxonomy["taxonomy_ref"],
+                "taxonomy_digest": taxonomy["taxonomy_digest"],
+                "family_count": taxonomy["family_count"],
+                "source_type_count": taxonomy["source_type_count"],
+                "open_world_taxonomy": taxonomy["open_world_taxonomy"],
+                "claim_ceiling": taxonomy["claim_ceiling"],
+                "raw_taxonomy_payload_stored": taxonomy["raw_taxonomy_payload_stored"],
+            },
+            actor="ObservationIntegrationWorkbench",
+            category="interface-observation-integration-taxonomy",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="observation_integration.source_bundle.bound",
+            payload={
+                "source_bundle_ref": source_bundle["source_bundle_ref"],
+                "source_bundle_digest": source_bundle["source_bundle_digest"],
+                "source_count": source_bundle["source_count"],
+                "family_coverage_count": source_bundle["family_coverage_count"],
+                "alignment_axes_bound": source_bundle["alignment_axes_bound"],
+                "rights_and_consent_bound": source_bundle["rights_and_consent_bound"],
+                "claim_ceiling": source_bundle["claim_ceiling"],
+                "raw_source_payload_stored": source_bundle["raw_source_payload_stored"],
+            },
+            actor="ObservationIntegrationWorkbench",
+            category="interface-observation-integration",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="observation_integration.graph.bound",
+            payload={
+                "integration_graph_ref": integration_graph["integration_graph_ref"],
+                "integration_graph_digest": integration_graph[
+                    "integration_graph_digest"
+                ],
+                "node_count": integration_graph["node_count"],
+                "edge_count": integration_graph["edge_count"],
+                "cross_domain_edge_bound": integration_graph[
+                    "cross_domain_edge_bound"
+                ],
+                "rights_boundary_bound": integration_graph["rights_boundary_bound"],
+                "raw_graph_payload_stored": integration_graph[
+                    "raw_graph_payload_stored"
+                ],
+            },
+            actor="ObservationIntegrationWorkbench",
+            category="interface-observation-integration-graph",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="observation_integration.analysis_plan.bound",
+            payload={
+                "analysis_plan_ref": analysis_plan["analysis_plan_ref"],
+                "analysis_plan_digest": analysis_plan["analysis_plan_digest"],
+                "all_analysis_lanes_bound": analysis_plan[
+                    "all_analysis_lanes_bound"
+                ],
+                "coverage_summary": analysis_plan["coverage_summary"],
+                "claim_ceiling": analysis_plan["claim_ceiling"],
+                "raw_analysis_payload_stored": analysis_plan[
+                    "raw_analysis_payload_stored"
+                ],
+            },
+            actor="ObservationIntegrationWorkbench",
+            category="interface-observation-integration-analysis",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="observation_integration.operator_guide.bound",
+            payload={
+                "operator_guide_ref": operator_guide["operator_guide_ref"],
+                "operator_guide_digest": operator_guide["operator_guide_digest"],
+                "beginner_operator_supported": operator_guide[
+                    "beginner_operator_supported"
+                ],
+                "coding_agent_ready": operator_guide["coding_agent_ready"],
+                "raw_instruction_payload_stored": operator_guide[
+                    "raw_instruction_payload_stored"
+                ],
+            },
+            actor="ObservationIntegrationWorkbench",
+            category="interface-observation-integration-guide",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        return {
+            "identity": {
+                "identity_id": identity.identity_id,
+                "lineage_id": identity.lineage_id,
+            },
+            "profile": self.observation_integration_workbench.reference_profile(),
+            "taxonomy": taxonomy,
+            "source_bundle": source_bundle,
+            "integration_graph": integration_graph,
+            "analysis_plan": analysis_plan,
+            "operator_guide": operator_guide,
+            "validation": validation,
+            "schema_contracts": [
+                {
+                    "payload_path": "taxonomy",
+                    "schema_path": "specs/schemas/observation_source_catalog.schema",
+                    "contract_role": "observation-source-taxonomy",
+                },
+                {
+                    "payload_path": "source_bundle",
+                    "schema_path": "specs/schemas/observation_source_bundle.schema",
+                    "contract_role": "observation-source-bundle",
+                },
+                {
+                    "payload_path": "integration_graph",
+                    "schema_path": "specs/schemas/observation_integration_graph.schema",
+                    "contract_role": "observation-integration-graph",
+                },
+                {
+                    "payload_path": "analysis_plan",
+                    "schema_path": "specs/schemas/observation_analysis_plan.schema",
+                    "contract_role": "observation-analysis-plan",
+                },
+                {
+                    "payload_path": "operator_guide",
+                    "schema_path": "specs/schemas/observation_operator_guide.schema",
+                    "contract_role": "observation-operator-guide",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

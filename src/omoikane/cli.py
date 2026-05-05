@@ -61,6 +61,12 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     neuro_integration_parser.add_argument("--json", action="store_true", help="Emit JSON only")
 
+    observation_integration_parser = subparsers.add_parser(
+        "observation-integration-demo",
+        help="Run the L6 universal observation source-bundle, integration graph, and analysis-plan scenario",
+    )
+    observation_integration_parser.add_argument("--json", action="store_true", help="Emit JSON only")
+
     imc_parser = subparsers.add_parser(
         "imc-demo",
         help="Run the L6 Inter-Mind Channel handshake, disclosure, and disconnect scenario",
@@ -508,6 +514,10 @@ def main() -> None:
 
     if args.command == "neuro-integration-demo":
         _print_result(runtime.run_neuro_integration_workbench_demo(), args.json)
+        return
+
+    if args.command == "observation-integration-demo":
+        _print_result(runtime.run_observation_integration_demo(), args.json)
         return
 
     if args.command == "imc-demo":
