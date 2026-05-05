@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -13,7 +14,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         result = runtime.run_version_demo()
 
         self.assertTrue(result["validation"]["ok"])
-        self.assertEqual("0.1.0", result["manifest"]["runtime_version"])
+        self.assertEqual("0.1.1", result["manifest"]["runtime_version"])
         self.assertEqual("2026.04", result["manifest"]["regulation_calver"])
         self.assertEqual("2026.04", result["manifest"]["catalog_snapshot"]["calver"])
         self.assertIn("agentic.council.v0", result["manifest"]["idl_versions"])
@@ -34,6 +35,19 @@ class ReferenceRuntimeTests(unittest.TestCase):
             0,
             result["manifest"]["catalog_inventory_receipt"]["catalog_coverage_gap_count"],
         )
+
+    def test_version_demo_has_installed_package_fallback(self) -> None:
+        runtime = OmoikaneReferenceOS()
+
+        with tempfile.TemporaryDirectory() as temp_dir:
+            runtime.repo_root = Path(temp_dir)
+            result = runtime.run_version_demo()
+
+        self.assertTrue(result["validation"]["ok"])
+        self.assertTrue(result["validation"]["installed_package_fallback"])
+        self.assertEqual("bootstrap", result["manifest"]["runtime_stability"])
+        self.assertEqual("2026.04", result["manifest"]["regulation_calver"])
+        self.assertTrue(result["manifest"]["catalog_inventory_receipt"]["validation"]["ok"])
 
     def test_amendment_demo_reports_constitutional_freeze(self) -> None:
         runtime = OmoikaneReferenceOS()

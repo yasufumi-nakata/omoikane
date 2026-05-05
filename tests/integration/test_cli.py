@@ -7,10 +7,20 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
-from omoikane.cli import main
+from omoikane.cli import _print_result, main
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def test_json_output_reconfigures_windows_stdout_to_utf8(self) -> None:
+        buffer = io.BytesIO()
+        stdout = io.TextIOWrapper(buffer, encoding="cp1252")
+
+        with redirect_stdout(stdout):
+            _print_result({"kami": "思兼"}, True)
+
+        stdout.flush()
+        self.assertEqual({"kami": "思兼"}, json.loads(buffer.getvalue().decode("utf-8")))
+
     def test_demo_emits_reference_scenario_json(self) -> None:
         stdout = io.StringIO()
 
@@ -253,7 +263,7 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
-        self.assertEqual("0.1.0", result["manifest"]["runtime_version"])
+        self.assertEqual("0.1.1", result["manifest"]["runtime_version"])
         self.assertEqual("2026.04", result["manifest"]["regulation_calver"])
         self.assertEqual("bootstrap", result["manifest"]["runtime_stability"])
         self.assertIn("agentic.council.v0", result["manifest"]["idl_versions"])

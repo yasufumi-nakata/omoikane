@@ -17,7 +17,7 @@ class VersioningServiceTests(unittest.TestCase):
 
         self.assertTrue(validation["ok"])
         self.assertEqual("release_manifest", manifest["kind"])
-        self.assertEqual("0.1.0", manifest["runtime_version"])
+        self.assertEqual("0.1.1", manifest["runtime_version"])
         self.assertEqual("2026.04", manifest["regulation_calver"])
         self.assertIn("agentic.council.v0", manifest["idl_versions"])
         self.assertIn("specs/schemas/release_manifest.schema", manifest["schema_versions"])

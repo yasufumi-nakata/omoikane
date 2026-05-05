@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
 from typing import Any, Dict
 
@@ -476,12 +477,32 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _write_utf8_stdout(text: str) -> None:
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        try:
+            reconfigure(encoding="utf-8")
+        except (OSError, ValueError):
+            pass
+
+    try:
+        sys.stdout.write(text)
+        sys.stdout.write("\n")
+    except UnicodeEncodeError:
+        buffer = getattr(sys.stdout, "buffer", None)
+        if buffer is None:
+            raise
+        buffer.write(f"{text}\n".encode("utf-8"))
+        buffer.flush()
+
+
 def _print_result(result: Dict[str, Any], as_json: bool) -> None:
+    output = json.dumps(result, ensure_ascii=False, indent=2)
     if as_json:
-        print(json.dumps(result, ensure_ascii=False, indent=2))
+        _write_utf8_stdout(output)
         return
 
-    print(json.dumps(result, ensure_ascii=False, indent=2))
+    _write_utf8_stdout(output)
 
 
 def main() -> None:
