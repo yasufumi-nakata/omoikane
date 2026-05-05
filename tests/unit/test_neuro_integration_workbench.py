@@ -424,6 +424,21 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             [source_bundle, second_source_bundle],
             guide,
         )
+        operator_runbook = workbench.build_operator_runbook(
+            source_bundle,
+            workspace,
+            analysis,
+            guide,
+            replacement_plan,
+            connector_bundle,
+            collection_protocol,
+            collection_run,
+            measurement_quality_gate,
+            cross_modal_analysis_plan,
+            cross_modal_analysis_run,
+            interpretation_synthesis,
+            longitudinal_timeline,
+        )
         return {
             "workbench": workbench,
             "apps": apps,
@@ -441,6 +456,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "cross_modal_analysis_run": cross_modal_analysis_run,
             "interpretation_synthesis": interpretation_synthesis,
             "longitudinal_timeline": longitudinal_timeline,
+            "operator_runbook": operator_runbook,
         }
 
     def test_binds_survey_eeg_seed_and_expansion_modalities(self) -> None:
@@ -460,6 +476,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             measurement_quality_gate=artifacts["measurement_quality_gate"],
             interpretation_synthesis=artifacts["interpretation_synthesis"],
             longitudinal_timeline=artifacts["longitudinal_timeline"],
+            operator_runbook=artifacts["operator_runbook"],
         )
 
         self.assertTrue(validation["ok"])
@@ -512,6 +529,12 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["longitudinal_axis_drifts_bound"])
         self.assertTrue(validation["longitudinal_payload_redacted"])
         self.assertTrue(validation["longitudinal_no_identity_or_upload_claim"])
+        self.assertTrue(validation["operator_runbook_bound"])
+        self.assertTrue(validation["operator_runbook_digest_bound"])
+        self.assertTrue(validation["operator_runbook_receipt_chain_bound"])
+        self.assertTrue(validation["operator_runbook_steps_bound"])
+        self.assertTrue(validation["operator_runbook_payload_redacted"])
+        self.assertTrue(validation["operator_runbook_no_identity_or_upload_claim"])
         self.assertTrue(validation["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(validation["upstream_receipt_payload_redacted"])
         self.assertTrue(validation["claim_ceiling_bound"])
@@ -660,6 +683,17 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(
             artifacts["longitudinal_timeline"]["upload_readiness_claimed"]
         )
+        self.assertTrue(artifacts["operator_runbook"]["operator_runbook_bound"])
+        self.assertEqual(9, artifacts["operator_runbook"]["workflow_step_count"])
+        self.assertEqual(9, validation["operator_runbook_step_count"])
+        self.assertEqual(
+            13,
+            validation["operator_runbook_receipt_binding_count"],
+        )
+        self.assertTrue(
+            artifacts["operator_runbook"]["all_required_receipts_bound"]
+        )
+        self.assertFalse(artifacts["operator_runbook"]["upload_readiness_claimed"])
         self.assertEqual(
             8,
             artifacts["replacement_plan"]["coverage_summary"]["covered_source_type_count"],
@@ -942,6 +976,42 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "axis_drift.axis_drift_digest mismatch",
+            validation["errors"],
+        )
+
+    def test_tampered_operator_runbook_step_digest_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_runbook = deepcopy(artifacts["operator_runbook"])
+        tampered_runbook["workflow_steps"][0]["runbook_step_digest"] = "0" * 64
+        tampered_runbook["operator_runbook_digest"] = sha256_text(
+            canonical_json(
+                artifacts["workbench"]._operator_runbook_digest_payload(
+                    tampered_runbook
+                )
+            )
+        )
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            artifacts["cross_modal_analysis_plan"],
+            artifacts["cross_modal_analysis_run"],
+            collection_protocol=artifacts["collection_protocol"],
+            collection_run=artifacts["collection_run"],
+            measurement_quality_gate=artifacts["measurement_quality_gate"],
+            interpretation_synthesis=artifacts["interpretation_synthesis"],
+            longitudinal_timeline=artifacts["longitudinal_timeline"],
+            operator_runbook=tampered_runbook,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "runbook_step.runbook_step_digest mismatch",
             validation["errors"],
         )
 

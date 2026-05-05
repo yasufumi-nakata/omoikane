@@ -24,6 +24,7 @@ imports:
   neuro_integration_cross_modal_analysis_run: ../schemas/neuro_integration_cross_modal_analysis_run.schema
   neuro_integration_interpretation_synthesis: ../schemas/neuro_integration_interpretation_synthesis.schema
   neuro_integration_longitudinal_timeline: ../schemas/neuro_integration_longitudinal_timeline.schema
+  neuro_integration_operator_runbook: ../schemas/neuro_integration_operator_runbook.schema
 operations:
   register_application:
     summary: Register one measurement, analysis, curation, operator-copilot, or agent-automation app as a replaceable workbench lane.
@@ -517,8 +518,64 @@ operations:
       - non-ML operator and coding-agent review readiness must remain explicit
       - raw source, timeline, axis, and operator payload storage must remain false
       - semantic thought content, diagnosis, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
+  build_operator_runbook:
+    summary: Bind the complete Neuro Integration Workbench receipt chain into ordered plain-language operator cards and coding-agent tasks without storing raw receipts or claiming diagnosis, identity replacement, or upload readiness.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - workspace
+          - analysis
+          - operator_guide
+          - replacement_plan
+          - connector_bundle
+          - collection_protocol
+          - collection_run
+          - measurement_quality_gate
+          - cross_modal_analysis_plan
+          - cross_modal_analysis_run
+          - interpretation_synthesis
+          - longitudinal_timeline
+        properties:
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          workspace:
+            schema_ref: neuro_integration_workspace
+          analysis:
+            schema_ref: neuro_integration_analysis_receipt
+          operator_guide:
+            schema_ref: neuro_integration_operator_guide
+          replacement_plan:
+            schema_ref: neuro_integration_application_replacement_plan
+          connector_bundle:
+            schema_ref: neuro_integration_application_connector_bundle
+          collection_protocol:
+            schema_ref: neuro_integration_collection_protocol
+          collection_run:
+            schema_ref: neuro_integration_collection_run
+          measurement_quality_gate:
+            schema_ref: neuro_integration_measurement_quality_gate
+          cross_modal_analysis_plan:
+            schema_ref: neuro_integration_cross_modal_analysis_plan
+          cross_modal_analysis_run:
+            schema_ref: neuro_integration_cross_modal_analysis_run
+          interpretation_synthesis:
+            schema_ref: neuro_integration_interpretation_synthesis
+          longitudinal_timeline:
+            schema_ref: neuro_integration_longitudinal_timeline
+          operator_runbook:
+            schema_ref: neuro_integration_operator_runbook
+    output:
+      schema_ref: neuro_integration_operator_runbook
+    guarantees:
+      - all required upstream receipt digests must be bound before the runbook is ready
+      - runbook steps must cover source import, workspace orientation, app replacement, collection, quality, cross-modal analysis, interpretation, and longitudinal review
+      - non-ML operator cards and coding-agent tasks must require no ML expertise
+      - raw receipt, runbook, operator, and agent-task payload storage must remain false
+      - semantic thought content, diagnosis, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, optional cross-modal analysis-run, optional interpretation-synthesis, and optional longitudinal-timeline digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, optional cross-modal analysis-run, optional interpretation-synthesis, optional longitudinal-timeline, and optional operator-runbook digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -612,6 +669,12 @@ operations:
           - longitudinal_axis_drifts_bound
           - longitudinal_payload_redacted
           - longitudinal_no_identity_or_upload_claim
+          - operator_runbook_bound
+          - operator_runbook_digest_bound
+          - operator_runbook_receipt_chain_bound
+          - operator_runbook_steps_bound
+          - operator_runbook_payload_redacted
+          - operator_runbook_no_identity_or_upload_claim
           - claim_ceiling_bound
           - raw_payload_redacted
           - no_diagnosis_or_identity_claim
@@ -713,6 +776,18 @@ operations:
             type: boolean
           longitudinal_no_identity_or_upload_claim:
             type: boolean
+          operator_runbook_bound:
+            type: boolean
+          operator_runbook_digest_bound:
+            type: boolean
+          operator_runbook_receipt_chain_bound:
+            type: boolean
+          operator_runbook_steps_bound:
+            type: boolean
+          operator_runbook_payload_redacted:
+            type: boolean
+          operator_runbook_no_identity_or_upload_claim:
+            type: boolean
           claim_ceiling_bound:
             type: boolean
           raw_payload_redacted:
@@ -751,6 +826,12 @@ operations:
           longitudinal_axis_drift_item_count:
             type: integer
             minimum: 0
+          operator_runbook_step_count:
+            type: integer
+            minimum: 0
+          operator_runbook_receipt_binding_count:
+            type: integer
+            minimum: 0
 events:
   - name: neuro_integration_workbench.source_bundle.bound
     payload_schema: neuro_integration_source_bundle
@@ -774,3 +855,5 @@ events:
     payload_schema: neuro_integration_interpretation_synthesis
   - name: neuro_integration_workbench.longitudinal_timeline.bound
     payload_schema: neuro_integration_longitudinal_timeline
+  - name: neuro_integration_workbench.operator_runbook.bound
+    payload_schema: neuro_integration_operator_runbook

@@ -27,6 +27,7 @@ NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID = (
 NIW_LONGITUDINAL_TIMELINE_PROFILE_ID = (
     "neuro-longitudinal-integration-timeline-v1"
 )
+NIW_OPERATOR_RUNBOOK_PROFILE_ID = "neuro-operator-runbook-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -57,6 +58,9 @@ NIW_INTERPRETATION_SYNTHESIS_POLICY = (
 )
 NIW_LONGITUDINAL_TIMELINE_POLICY = (
     "source-bundle-digest+axis-drift-summary-only"
+)
+NIW_OPERATOR_RUNBOOK_POLICY = (
+    "receipt-digest+plain-language-workflow-step-only"
 )
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
@@ -195,6 +199,7 @@ class NeuroIntegrationWorkbench:
             "longitudinal_timeline_profile_id": (
                 NIW_LONGITUDINAL_TIMELINE_PROFILE_ID
             ),
+            "operator_runbook_profile_id": NIW_OPERATOR_RUNBOOK_PROFILE_ID,
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
@@ -223,6 +228,7 @@ class NeuroIntegrationWorkbench:
                 NIW_INTERPRETATION_SYNTHESIS_POLICY
             ),
             "longitudinal_timeline_policy": NIW_LONGITUDINAL_TIMELINE_POLICY,
+            "operator_runbook_policy": NIW_OPERATOR_RUNBOOK_POLICY,
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -1821,6 +1827,337 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(timeline)
 
+    def build_operator_runbook(
+        self,
+        source_bundle: Dict[str, Any],
+        workspace: Dict[str, Any],
+        analysis: Dict[str, Any],
+        operator_guide: Dict[str, Any],
+        replacement_plan: Dict[str, Any],
+        connector_bundle: Dict[str, Any],
+        collection_protocol: Dict[str, Any],
+        collection_run: Dict[str, Any],
+        measurement_quality_gate: Dict[str, Any],
+        cross_modal_analysis_plan: Dict[str, Any],
+        cross_modal_analysis_run: Dict[str, Any],
+        interpretation_synthesis: Dict[str, Any],
+        longitudinal_timeline: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self._check_source_bundle(source_bundle)
+        self._check_workspace(workspace)
+        self._check_analysis(analysis)
+        self._check_operator_guide(operator_guide)
+        self._check_replacement_plan(replacement_plan)
+        self._check_connector_bundle(connector_bundle)
+        self._check_collection_protocol(collection_protocol)
+        self._check_collection_run(collection_run)
+        self._check_measurement_quality_gate(measurement_quality_gate)
+        self._check_cross_modal_analysis_plan(cross_modal_analysis_plan)
+        self._check_cross_modal_analysis_run(cross_modal_analysis_run)
+        self._check_interpretation_synthesis(interpretation_synthesis)
+        self._check_longitudinal_timeline(longitudinal_timeline)
+
+        if workspace["source_bundle_digest"] != source_bundle["source_bundle_digest"]:
+            raise ValueError("workspace.source_bundle_digest must match source bundle")
+        if analysis["workspace_digest"] != workspace["workspace_digest"]:
+            raise ValueError("analysis.workspace_digest must match workspace")
+        if operator_guide["analysis_digest"] != analysis["analysis_digest"]:
+            raise ValueError("operator_guide.analysis_digest must match analysis")
+        if replacement_plan["operator_guide_digest"] != operator_guide["guide_digest"]:
+            raise ValueError("replacement_plan.operator_guide_digest must match guide")
+        if connector_bundle["replacement_plan_digest"] != replacement_plan[
+            "replacement_plan_digest"
+        ]:
+            raise ValueError("connector_bundle.replacement_plan_digest must match plan")
+        if collection_protocol["connector_bundle_digest"] != connector_bundle[
+            "connector_bundle_digest"
+        ]:
+            raise ValueError("collection_protocol.connector_bundle_digest must match connector bundle")
+        if collection_run["collection_protocol_digest"] != collection_protocol[
+            "collection_protocol_digest"
+        ]:
+            raise ValueError("collection_run.collection_protocol_digest must match protocol")
+        if measurement_quality_gate["collection_run_digest"] != collection_run[
+            "collection_run_digest"
+        ]:
+            raise ValueError("measurement_quality_gate.collection_run_digest must match collection run")
+        if cross_modal_analysis_plan["connector_bundle_digest"] != connector_bundle[
+            "connector_bundle_digest"
+        ]:
+            raise ValueError("cross_modal_analysis_plan.connector_bundle_digest must match connector bundle")
+        if cross_modal_analysis_run["cross_modal_analysis_plan_digest"] != cross_modal_analysis_plan[
+            "cross_modal_analysis_plan_digest"
+        ]:
+            raise ValueError("cross_modal_analysis_run.cross_modal_analysis_plan_digest must match plan")
+        if interpretation_synthesis["cross_modal_analysis_run_digest"] != cross_modal_analysis_run[
+            "cross_modal_analysis_run_digest"
+        ]:
+            raise ValueError("interpretation_synthesis.cross_modal_analysis_run_digest must match run")
+        if longitudinal_timeline["operator_guide_digest"] != operator_guide["guide_digest"]:
+            raise ValueError("longitudinal_timeline.operator_guide_digest must match guide")
+
+        receipt_bindings = [
+            self._operator_runbook_receipt_binding(
+                "source-bundle",
+                source_bundle["source_bundle_ref"],
+                source_bundle["source_bundle_digest"],
+                source_bundle["profile_id"],
+                source_bundle["seed_survey_eeg_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "workspace",
+                workspace["workspace_ref"],
+                workspace["workspace_digest"],
+                workspace["profile_id"],
+                workspace["llm_native_workflow_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "survey-eeg-analysis",
+                analysis["analysis_ref"],
+                analysis["analysis_digest"],
+                analysis["profile_id"],
+                analysis["seed_survey_eeg_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "operator-guide",
+                operator_guide["guide_ref"],
+                operator_guide["guide_digest"],
+                operator_guide["profile_id"],
+                operator_guide["beginner_operator_supported"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "replacement-plan",
+                replacement_plan["replacement_plan_ref"],
+                replacement_plan["replacement_plan_digest"],
+                replacement_plan["profile_id"],
+                replacement_plan["replacement_plan_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "connector-bundle",
+                connector_bundle["connector_bundle_ref"],
+                connector_bundle["connector_bundle_digest"],
+                connector_bundle["profile_id"],
+                connector_bundle["connector_bundle_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "collection-protocol",
+                collection_protocol["collection_protocol_ref"],
+                collection_protocol["collection_protocol_digest"],
+                collection_protocol["profile_id"],
+                collection_protocol["collection_protocol_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "collection-run",
+                collection_run["collection_run_ref"],
+                collection_run["collection_run_digest"],
+                collection_run["profile_id"],
+                collection_run["collection_run_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "measurement-quality-gate",
+                measurement_quality_gate["measurement_quality_gate_ref"],
+                measurement_quality_gate["measurement_quality_gate_digest"],
+                measurement_quality_gate["profile_id"],
+                measurement_quality_gate["measurement_quality_gate_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "cross-modal-analysis-plan",
+                cross_modal_analysis_plan["cross_modal_analysis_plan_ref"],
+                cross_modal_analysis_plan["cross_modal_analysis_plan_digest"],
+                cross_modal_analysis_plan["profile_id"],
+                cross_modal_analysis_plan["cross_modal_analysis_plan_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "cross-modal-analysis-run",
+                cross_modal_analysis_run["cross_modal_analysis_run_ref"],
+                cross_modal_analysis_run["cross_modal_analysis_run_digest"],
+                cross_modal_analysis_run["profile_id"],
+                cross_modal_analysis_run["cross_modal_analysis_run_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "interpretation-synthesis",
+                interpretation_synthesis["interpretation_synthesis_ref"],
+                interpretation_synthesis["interpretation_synthesis_digest"],
+                interpretation_synthesis["profile_id"],
+                interpretation_synthesis["interpretation_synthesis_bound"],
+            ),
+            self._operator_runbook_receipt_binding(
+                "longitudinal-timeline",
+                longitudinal_timeline["longitudinal_timeline_ref"],
+                longitudinal_timeline["longitudinal_timeline_digest"],
+                longitudinal_timeline["profile_id"],
+                longitudinal_timeline["longitudinal_timeline_bound"],
+            ),
+        ]
+        source_types = list(source_bundle["source_types"])
+        steps = self._build_operator_runbook_steps(
+            source_types,
+            receipt_bindings,
+            source_bundle,
+            workspace,
+            analysis,
+            operator_guide,
+            replacement_plan,
+            connector_bundle,
+            collection_protocol,
+            collection_run,
+            measurement_quality_gate,
+            cross_modal_analysis_plan,
+            cross_modal_analysis_run,
+            interpretation_synthesis,
+            longitudinal_timeline,
+        )
+        step_digests = [step["runbook_step_digest"] for step in steps]
+        step_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_OPERATOR_RUNBOOK_PROFILE_ID,
+                    "step_digests": step_digests,
+                    "longitudinal_timeline_digest": longitudinal_timeline[
+                        "longitudinal_timeline_digest"
+                    ],
+                }
+            )
+        )
+        receipt_digest_set = self._operator_runbook_receipt_digest_set(
+            receipt_bindings
+        )
+        all_required_receipts_bound = all(
+            binding["bound"] for binding in receipt_bindings
+        )
+        all_steps_bound = len(steps) == 9 and all(
+            step["runbook_step_bound"] for step in steps
+        )
+        runbook_summary = {
+            "step_count": len(steps),
+            "bound_step_count": sum(
+                1 for step in steps if step["runbook_step_bound"]
+            ),
+            "source_type_count": len(source_types),
+            "replacement_lane_count": len(NIW_REQUIRED_REPLACEMENT_LANES),
+            "operator_card_count": len(steps),
+            "coding_agent_task_count": len(steps),
+            "receipt_binding_count": len(receipt_bindings),
+            "unsupported_step_count": sum(
+                1 for step in steps if step["runbook_step_bound"] is not True
+            ),
+        }
+        runbook = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "operator_runbook_ref": (
+                "operator-runbook://neuro-integration/"
+                f"{new_id('niw-runbook')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_OPERATOR_RUNBOOK_PROFILE_ID,
+            "identity_id": source_bundle["identity_id"],
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "workspace_ref": workspace["workspace_ref"],
+            "workspace_digest": workspace["workspace_digest"],
+            "analysis_ref": analysis["analysis_ref"],
+            "analysis_digest": analysis["analysis_digest"],
+            "operator_guide_ref": operator_guide["guide_ref"],
+            "operator_guide_digest": operator_guide["guide_digest"],
+            "replacement_plan_ref": replacement_plan["replacement_plan_ref"],
+            "replacement_plan_digest": replacement_plan["replacement_plan_digest"],
+            "connector_bundle_ref": connector_bundle["connector_bundle_ref"],
+            "connector_bundle_digest": connector_bundle["connector_bundle_digest"],
+            "collection_protocol_ref": collection_protocol[
+                "collection_protocol_ref"
+            ],
+            "collection_protocol_digest": collection_protocol[
+                "collection_protocol_digest"
+            ],
+            "collection_run_ref": collection_run["collection_run_ref"],
+            "collection_run_digest": collection_run["collection_run_digest"],
+            "measurement_quality_gate_ref": measurement_quality_gate[
+                "measurement_quality_gate_ref"
+            ],
+            "measurement_quality_gate_digest": measurement_quality_gate[
+                "measurement_quality_gate_digest"
+            ],
+            "cross_modal_analysis_plan_ref": cross_modal_analysis_plan[
+                "cross_modal_analysis_plan_ref"
+            ],
+            "cross_modal_analysis_plan_digest": cross_modal_analysis_plan[
+                "cross_modal_analysis_plan_digest"
+            ],
+            "cross_modal_analysis_run_ref": cross_modal_analysis_run[
+                "cross_modal_analysis_run_ref"
+            ],
+            "cross_modal_analysis_run_digest": cross_modal_analysis_run[
+                "cross_modal_analysis_run_digest"
+            ],
+            "interpretation_synthesis_ref": interpretation_synthesis[
+                "interpretation_synthesis_ref"
+            ],
+            "interpretation_synthesis_digest": interpretation_synthesis[
+                "interpretation_synthesis_digest"
+            ],
+            "longitudinal_timeline_ref": longitudinal_timeline[
+                "longitudinal_timeline_ref"
+            ],
+            "longitudinal_timeline_digest": longitudinal_timeline[
+                "longitudinal_timeline_digest"
+            ],
+            "source_types": source_types,
+            "source_type_count": len(source_types),
+            "required_replacement_lanes": list(NIW_REQUIRED_REPLACEMENT_LANES),
+            "receipt_bindings": receipt_bindings,
+            "receipt_digest_set": receipt_digest_set,
+            "workflow_steps": steps,
+            "workflow_step_count": len(steps),
+            "workflow_step_digests": step_digests,
+            "workflow_step_digest_set": step_digest_set,
+            "all_required_receipts_bound": all_required_receipts_bound,
+            "all_workflow_steps_bound": all_steps_bound,
+            "operator_cards_bound": all(
+                bool(step["operator_card"]) for step in steps
+            ),
+            "coding_agent_tasks_bound": all(
+                bool(step["coding_agent_task"]) for step in steps
+            ),
+            "beginner_operator_supported": (
+                workspace["beginner_operator_supported"]
+                and operator_guide["beginner_operator_supported"]
+            ),
+            "llm_native_workflow_bound": (
+                workspace["llm_native_workflow_bound"]
+                and operator_guide["llm_native_workflow_bound"]
+            ),
+            "coding_agent_ready": (
+                workspace["coding_agent_ready"]
+                and operator_guide["coding_agent_ready"]
+            ),
+            "operator_runbook_summary": runbook_summary,
+            "operator_runbook_bound": (
+                all_required_receipts_bound
+                and all_steps_bound
+                and workspace["beginner_operator_supported"]
+                and operator_guide["coding_agent_ready"]
+                and interpretation_synthesis["operator_action_ready"]
+                and longitudinal_timeline["operator_review_ready"]
+            ),
+            "storage_policy": NIW_OPERATOR_RUNBOOK_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_receipt_payload_stored": False,
+            "raw_runbook_payload_stored": False,
+            "raw_operator_payload_stored": False,
+            "raw_agent_task_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        runbook["operator_runbook_digest"] = sha256_text(
+            canonical_json(self._operator_runbook_digest_payload(runbook))
+        )
+        return deepcopy(runbook)
+
     def validate_integration_bundle(
         self,
         app_receipts: Sequence[Dict[str, Any]],
@@ -1837,6 +2174,7 @@ class NeuroIntegrationWorkbench:
         measurement_quality_gate: Dict[str, Any] | None = None,
         interpretation_synthesis: Dict[str, Any] | None = None,
         longitudinal_timeline: Dict[str, Any] | None = None,
+        operator_runbook: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -1924,6 +2262,15 @@ class NeuroIntegrationWorkbench:
                 errors.append(str(exc))
             if operator_guide is None:
                 errors.append("longitudinal_timeline requires operator_guide")
+        if operator_runbook is not None:
+            try:
+                self._check_operator_runbook(operator_runbook)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if longitudinal_timeline is None:
+                errors.append("operator_runbook requires longitudinal_timeline")
+            if interpretation_synthesis is None:
+                errors.append("operator_runbook requires interpretation_synthesis")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -2445,6 +2792,114 @@ class NeuroIntegrationWorkbench:
                 ),
             }
 
+        operator_runbook_checks: Dict[str, bool] = {}
+        if operator_runbook is not None:
+            operator_runbook_digest_bound = (
+                operator_runbook.get("operator_runbook_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._operator_runbook_digest_payload(operator_runbook)
+                    )
+                )
+            )
+            expected_replacements = {
+                "source_bundle_digest": source_bundle.get("source_bundle_digest"),
+                "workspace_digest": workspace.get("workspace_digest"),
+                "analysis_digest": analysis.get("analysis_digest"),
+                "operator_guide_digest": operator_guide.get("guide_digest"),
+                "replacement_plan_digest": (
+                    replacement_plan.get("replacement_plan_digest")
+                    if replacement_plan is not None
+                    else ""
+                ),
+                "connector_bundle_digest": (
+                    connector_bundle.get("connector_bundle_digest")
+                    if connector_bundle is not None
+                    else ""
+                ),
+                "collection_protocol_digest": (
+                    collection_protocol.get("collection_protocol_digest")
+                    if collection_protocol is not None
+                    else ""
+                ),
+                "collection_run_digest": (
+                    collection_run.get("collection_run_digest")
+                    if collection_run is not None
+                    else ""
+                ),
+                "measurement_quality_gate_digest": (
+                    measurement_quality_gate.get(
+                        "measurement_quality_gate_digest"
+                    )
+                    if measurement_quality_gate is not None
+                    else ""
+                ),
+                "cross_modal_analysis_plan_digest": (
+                    cross_modal_analysis_plan.get(
+                        "cross_modal_analysis_plan_digest"
+                    )
+                    if cross_modal_analysis_plan is not None
+                    else ""
+                ),
+                "cross_modal_analysis_run_digest": (
+                    cross_modal_analysis_run.get(
+                        "cross_modal_analysis_run_digest"
+                    )
+                    if cross_modal_analysis_run is not None
+                    else ""
+                ),
+                "interpretation_synthesis_digest": (
+                    interpretation_synthesis.get(
+                        "interpretation_synthesis_digest"
+                    )
+                    if interpretation_synthesis is not None
+                    else ""
+                ),
+                "longitudinal_timeline_digest": (
+                    longitudinal_timeline.get("longitudinal_timeline_digest")
+                    if longitudinal_timeline is not None
+                    else ""
+                ),
+            }
+            runbook_digest_chain_bound = all(
+                operator_runbook.get(field_name) == expected_digest
+                for field_name, expected_digest in expected_replacements.items()
+            )
+            operator_runbook_checks = {
+                "operator_runbook_digest_bound": operator_runbook_digest_bound,
+                "operator_runbook_bound": (
+                    operator_runbook.get("operator_runbook_bound") is True
+                    and runbook_digest_chain_bound
+                ),
+                "operator_runbook_receipt_chain_bound": (
+                    operator_runbook.get("all_required_receipts_bound") is True
+                    and runbook_digest_chain_bound
+                ),
+                "operator_runbook_steps_bound": (
+                    operator_runbook.get("all_workflow_steps_bound") is True
+                    and operator_runbook.get("workflow_step_count")
+                    == len(operator_runbook.get("workflow_steps", []))
+                ),
+                "operator_runbook_payload_redacted": (
+                    self._operator_runbook_payload_redacted(operator_runbook)
+                ),
+                "operator_runbook_no_identity_or_upload_claim": (
+                    operator_runbook.get("clinical_diagnosis_claimed") is False
+                    and operator_runbook.get(
+                        "semantic_thought_content_generated"
+                    )
+                    is False
+                    and operator_runbook.get(
+                        "consciousness_reproduction_claimed"
+                    )
+                    is False
+                    and operator_runbook.get("identity_replacement_claimed")
+                    is False
+                    and operator_runbook.get("upload_readiness_claimed")
+                    is False
+                ),
+            }
+
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
             "source_bundle_digest_bound": source_bundle_digest_bound,
@@ -2472,6 +2927,7 @@ class NeuroIntegrationWorkbench:
             **cross_modal_run_checks,
             **interpretation_synthesis_checks,
             **longitudinal_timeline_checks,
+            **operator_runbook_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -2549,6 +3005,19 @@ class NeuroIntegrationWorkbench:
                 if longitudinal_timeline is not None
                 else 0
             ),
+            "operator_runbook_step_count": (
+                operator_runbook.get("workflow_step_count", 0)
+                if operator_runbook is not None
+                else 0
+            ),
+            "operator_runbook_receipt_binding_count": (
+                operator_runbook.get("operator_runbook_summary", {}).get(
+                    "receipt_binding_count",
+                    0,
+                )
+                if operator_runbook is not None
+                else 0
+            ),
             "claim_ceiling": NIW_CLAIM_CEILING,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -2560,6 +3029,338 @@ class NeuroIntegrationWorkbench:
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
+
+    def _operator_runbook_receipt_binding(
+        self,
+        receipt_role: str,
+        receipt_ref: str,
+        receipt_digest: str,
+        profile_id: str,
+        bound: bool,
+    ) -> Dict[str, Any]:
+        binding = {
+            "receipt_role": receipt_role,
+            "receipt_ref": receipt_ref,
+            "receipt_digest": receipt_digest,
+            "profile_id": profile_id,
+            "bound": bool(bound),
+            "raw_receipt_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        binding["receipt_binding_digest"] = sha256_text(
+            canonical_json(
+                {
+                    "receipt_role": receipt_role,
+                    "receipt_ref": receipt_ref,
+                    "receipt_digest": receipt_digest,
+                    "profile_id": profile_id,
+                    "bound": bool(bound),
+                }
+            )
+        )
+        return binding
+
+    def _operator_runbook_receipt_digest_set(
+        self,
+        receipt_bindings: Sequence[Dict[str, Any]],
+    ) -> str:
+        return sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_OPERATOR_RUNBOOK_PROFILE_ID,
+                    "receipt_binding_digests": [
+                        binding["receipt_binding_digest"]
+                        for binding in receipt_bindings
+                    ],
+                    "receipt_roles": [
+                        binding["receipt_role"] for binding in receipt_bindings
+                    ],
+                }
+            )
+        )
+
+    def _build_operator_runbook_steps(
+        self,
+        source_types: Sequence[str],
+        receipt_bindings: Sequence[Dict[str, Any]],
+        source_bundle: Dict[str, Any],
+        workspace: Dict[str, Any],
+        analysis: Dict[str, Any],
+        operator_guide: Dict[str, Any],
+        replacement_plan: Dict[str, Any],
+        connector_bundle: Dict[str, Any],
+        collection_protocol: Dict[str, Any],
+        collection_run: Dict[str, Any],
+        measurement_quality_gate: Dict[str, Any],
+        cross_modal_analysis_plan: Dict[str, Any],
+        cross_modal_analysis_run: Dict[str, Any],
+        interpretation_synthesis: Dict[str, Any],
+        longitudinal_timeline: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        bindings_by_role = {
+            binding["receipt_role"]: binding for binding in receipt_bindings
+        }
+
+        def selected_bindings(*roles: str) -> List[Dict[str, Any]]:
+            return [bindings_by_role[role] for role in roles]
+
+        return [
+            self._operator_runbook_step(
+                position=1,
+                step_id="bind-seed-and-source-bundle",
+                stage_kind="source-import",
+                source_types=source_types,
+                receipt_bindings=selected_bindings(
+                    "source-bundle",
+                    "survey-eeg-analysis",
+                ),
+                operator_card=(
+                    "Start with questionnaire and EEG summaries, confirm the "
+                    "BioData survey+EEG fusion receipt is bound, then review "
+                    "expansion source summaries as context only."
+                ),
+                coding_agent_task=(
+                    "verify_seed_source_bundle_and_upstream_fusion_digests"
+                ),
+                required_checks=[
+                    "seed_survey_eeg_bound",
+                    "survey_eeg_fusion_receipt_bound",
+                    "raw_source_payload_redacted",
+                ],
+                bound=(
+                    source_bundle["seed_survey_eeg_bound"]
+                    and source_bundle["survey_eeg_fusion_receipt_bound"]
+                    and analysis["seed_survey_eeg_bound"]
+                    and analysis["upstream_fusion_binding"]["bound"]
+                ),
+            ),
+            self._operator_runbook_step(
+                position=2,
+                step_id="open-llm-native-workspace",
+                stage_kind="workspace-orientation",
+                source_types=source_types,
+                receipt_bindings=selected_bindings(
+                    "workspace",
+                    "operator-guide",
+                ),
+                operator_card=(
+                    "Use the plain-language workspace guide before running "
+                    "analysis; no machine-learning expertise is required for "
+                    "the bounded review steps."
+                ),
+                coding_agent_task="verify_workspace_guide_and_beginner_safe_mode",
+                required_checks=[
+                    "llm_native_workflow_bound",
+                    "beginner_operator_supported",
+                    "coding_agent_ready",
+                ],
+                bound=(
+                    workspace["llm_native_workflow_bound"]
+                    and workspace["beginner_operator_supported"]
+                    and operator_guide["coding_agent_ready"]
+                ),
+            ),
+            self._operator_runbook_step(
+                position=3,
+                step_id="replace-application-lanes",
+                stage_kind="application-replacement",
+                source_types=source_types,
+                receipt_bindings=selected_bindings(
+                    "replacement-plan",
+                    "connector-bundle",
+                ),
+                operator_card=(
+                    "Confirm each source type has measurement, analysis, "
+                    "curation, operator-copilot, and coding-agent lane coverage "
+                    "before treating external tools as replaceable."
+                ),
+                coding_agent_task=(
+                    "verify_replacement_lane_and_connector_coverage"
+                ),
+                required_checks=[
+                    "replacement_plan_bound",
+                    "source_type_lane_coverage_bound",
+                    "connector_bundle_bound",
+                ],
+                bound=(
+                    replacement_plan["replacement_plan_bound"]
+                    and replacement_plan["source_type_lane_coverage_bound"]
+                    and connector_bundle["connector_bundle_bound"]
+                ),
+            ),
+            self._operator_runbook_step(
+                position=4,
+                step_id="bind-collection-protocol",
+                stage_kind="collection-protocol",
+                source_types=source_types,
+                receipt_bindings=selected_bindings("collection-protocol"),
+                operator_card=(
+                    "Review collection windows, consent refs, and measurement "
+                    "connector refs for every biological summary before any "
+                    "analysis result is considered."
+                ),
+                coding_agent_task="verify_collection_protocol_step_digests",
+                required_checks=[
+                    "collection_protocol_bound",
+                    "seed_survey_eeg_collection_bound",
+                    "measurement_connector_coverage_bound",
+                ],
+                bound=collection_protocol["collection_protocol_bound"],
+            ),
+            self._operator_runbook_step(
+                position=5,
+                step_id="review-collection-run",
+                stage_kind="collection-run",
+                source_types=source_types,
+                receipt_bindings=selected_bindings("collection-run"),
+                operator_card=(
+                    "Review bounded per-source collection quality and risk "
+                    "summaries; do not request raw device streams."
+                ),
+                coding_agent_task="verify_collection_result_digest_set",
+                required_checks=[
+                    "collection_run_bound",
+                    "all_collection_results_bound",
+                    "operator_review_ready",
+                ],
+                bound=collection_run["collection_run_bound"],
+            ),
+            self._operator_runbook_step(
+                position=6,
+                step_id="gate-measurement-quality",
+                stage_kind="measurement-quality",
+                source_types=source_types,
+                receipt_bindings=selected_bindings("measurement-quality-gate"),
+                operator_card=(
+                    "Check calibration, artifact/QC, consent freshness, and "
+                    "quality authority refs before downstream analysis planning."
+                ),
+                coding_agent_task="verify_measurement_quality_gate_digests",
+                required_checks=[
+                    "measurement_quality_gate_bound",
+                    "all_quality_items_bound",
+                    "consent_freshness_bound",
+                ],
+                bound=measurement_quality_gate["measurement_quality_gate_bound"],
+            ),
+            self._operator_runbook_step(
+                position=7,
+                step_id="run-cross-modal-analysis",
+                stage_kind="cross-modal-analysis",
+                source_types=source_types,
+                receipt_bindings=selected_bindings(
+                    "cross-modal-analysis-plan",
+                    "cross-modal-analysis-run",
+                ),
+                operator_card=(
+                    "Use all current source-type pairs only as bounded feature "
+                    "compatibility screens, starting from questionnaire+EEG."
+                ),
+                coding_agent_task="verify_cross_modal_pair_plan_and_run_digests",
+                required_checks=[
+                    "cross_modal_analysis_plan_bound",
+                    "source_pair_coverage_bound",
+                    "cross_modal_analysis_run_bound",
+                ],
+                bound=(
+                    cross_modal_analysis_plan["cross_modal_analysis_plan_bound"]
+                    and cross_modal_analysis_run["cross_modal_analysis_run_bound"]
+                ),
+            ),
+            self._operator_runbook_step(
+                position=8,
+                step_id="review-interpretation-synthesis",
+                stage_kind="interpretation-review",
+                source_types=source_types,
+                receipt_bindings=selected_bindings("interpretation-synthesis"),
+                operator_card=(
+                    "Read plain-language synthesis cards as review context only; "
+                    "do not report diagnosis, semantic thought content, or upload "
+                    "readiness."
+                ),
+                coding_agent_task="verify_interpretation_synthesis_cards",
+                required_checks=[
+                    "interpretation_synthesis_bound",
+                    "operator_action_ready",
+                    "coding_agent_action_ready",
+                ],
+                bound=interpretation_synthesis["interpretation_synthesis_bound"],
+            ),
+            self._operator_runbook_step(
+                position=9,
+                step_id="review-longitudinal-stability",
+                stage_kind="longitudinal-review",
+                source_types=source_types,
+                receipt_bindings=selected_bindings("longitudinal-timeline"),
+                operator_card=(
+                    "Review repeated-window axis drift as a stability proxy only; "
+                    "it is not identity proof and not upload readiness evidence."
+                ),
+                coding_agent_task="verify_longitudinal_axis_drift_summaries",
+                required_checks=[
+                    "longitudinal_timeline_bound",
+                    "source_type_timeline_coverage_bound",
+                    "all_axis_drifts_bound",
+                ],
+                bound=longitudinal_timeline["longitudinal_timeline_bound"],
+            ),
+        ]
+
+    def _operator_runbook_step(
+        self,
+        *,
+        position: int,
+        step_id: str,
+        stage_kind: str,
+        source_types: Sequence[str],
+        receipt_bindings: Sequence[Dict[str, Any]],
+        operator_card: str,
+        coding_agent_task: str,
+        required_checks: Sequence[str],
+        bound: bool,
+    ) -> Dict[str, Any]:
+        receipt_digests = [
+            binding["receipt_digest"] for binding in receipt_bindings
+        ]
+        receipt_refs = [binding["receipt_ref"] for binding in receipt_bindings]
+        step = {
+            "runbook_step_ref": (
+                "runbook-step://neuro-integration/"
+                f"{new_id('niw-runbook-step')}"
+            ),
+            "position": position,
+            "step_id": step_id,
+            "stage_kind": stage_kind,
+            "source_types": list(source_types),
+            "input_receipt_refs": receipt_refs,
+            "input_receipt_digests": receipt_digests,
+            "operator_card": operator_card,
+            "coding_agent_task": coding_agent_task,
+            "required_checks": list(required_checks),
+            "requires_ml_expertise": False,
+            "runbook_step_bound": (
+                bool(bound)
+                and bool(receipt_digests)
+                and all(binding["bound"] for binding in receipt_bindings)
+            ),
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_receipt_payload_stored": False,
+            "raw_operator_payload_stored": False,
+            "raw_agent_task_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        step["runbook_step_digest"] = sha256_text(
+            canonical_json(self._operator_runbook_step_digest_payload(step))
+        )
+        return step
 
     def _build_longitudinal_axis_drift(
         self,
@@ -4972,6 +5773,121 @@ class NeuroIntegrationWorkbench:
             if item.get("axis_drift_digest") != expected_item_digest:
                 raise ValueError("axis_drift.axis_drift_digest mismatch")
 
+    def _check_operator_runbook(
+        self,
+        runbook: Dict[str, Any],
+    ) -> None:
+        if not isinstance(runbook, dict):
+            raise ValueError("operator_runbook must be a mapping")
+        if runbook.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("operator_runbook.schema_version mismatch")
+        if runbook.get("profile_id") != NIW_OPERATOR_RUNBOOK_PROFILE_ID:
+            raise ValueError("operator_runbook.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._operator_runbook_digest_payload(runbook))
+        )
+        if runbook.get("operator_runbook_digest") != expected_digest:
+            raise ValueError("operator_runbook.operator_runbook_digest mismatch")
+        if runbook.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("operator_runbook.claim_ceiling mismatch")
+        if runbook.get("storage_policy") != NIW_OPERATOR_RUNBOOK_POLICY:
+            raise ValueError("operator_runbook.storage_policy mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "semantic_thought_content_generated",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+            "upload_readiness_claimed",
+        ):
+            if runbook.get(field_name) is not False:
+                raise ValueError(f"operator_runbook.{field_name} must be false")
+        bindings = runbook.get("receipt_bindings")
+        if not isinstance(bindings, list) or not bindings:
+            raise ValueError("operator_runbook.receipt_bindings must be non-empty")
+        binding_digests = []
+        for binding in bindings:
+            if not isinstance(binding, dict):
+                raise ValueError(
+                    "operator_runbook.receipt_bindings must contain mappings"
+                )
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "semantic_thought_content_generated",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+                "upload_readiness_claimed",
+            ):
+                if binding.get(field_name) is not False:
+                    raise ValueError(f"receipt_binding.{field_name} must be false")
+            expected_binding_digest = sha256_text(
+                canonical_json(
+                    {
+                        "receipt_role": binding.get("receipt_role"),
+                        "receipt_ref": binding.get("receipt_ref"),
+                        "receipt_digest": binding.get("receipt_digest"),
+                        "profile_id": binding.get("profile_id"),
+                        "bound": binding.get("bound"),
+                    }
+                )
+            )
+            if binding.get("receipt_binding_digest") != expected_binding_digest:
+                raise ValueError("receipt_binding.receipt_binding_digest mismatch")
+            binding_digests.append(expected_binding_digest)
+        expected_receipt_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_OPERATOR_RUNBOOK_PROFILE_ID,
+                    "receipt_binding_digests": binding_digests,
+                    "receipt_roles": [
+                        binding.get("receipt_role") for binding in bindings
+                    ],
+                }
+            )
+        )
+        if runbook.get("receipt_digest_set") != expected_receipt_digest_set:
+            raise ValueError("operator_runbook.receipt_digest_set mismatch")
+        steps = runbook.get("workflow_steps")
+        if not isinstance(steps, list) or not steps:
+            raise ValueError("operator_runbook.workflow_steps must be non-empty")
+        if runbook.get("workflow_step_count") != len(steps):
+            raise ValueError("operator_runbook.workflow_step_count mismatch")
+        step_digests = []
+        for step in steps:
+            if not isinstance(step, dict):
+                raise ValueError(
+                    "operator_runbook.workflow_steps must contain mappings"
+                )
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "semantic_thought_content_generated",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+                "upload_readiness_claimed",
+            ):
+                if step.get(field_name) is not False:
+                    raise ValueError(f"runbook_step.{field_name} must be false")
+            expected_step_digest = sha256_text(
+                canonical_json(self._operator_runbook_step_digest_payload(step))
+            )
+            if step.get("runbook_step_digest") != expected_step_digest:
+                raise ValueError("runbook_step.runbook_step_digest mismatch")
+            step_digests.append(expected_step_digest)
+        if runbook.get("workflow_step_digests") != step_digests:
+            raise ValueError("operator_runbook.workflow_step_digests mismatch")
+        expected_step_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_OPERATOR_RUNBOOK_PROFILE_ID,
+                    "step_digests": step_digests,
+                    "longitudinal_timeline_digest": runbook.get(
+                        "longitudinal_timeline_digest"
+                    ),
+                }
+            )
+        )
+        if runbook.get("workflow_step_digest_set") != expected_step_digest_set:
+            raise ValueError("operator_runbook.workflow_step_digest_set mismatch")
+
     def _normalize_operator_profile(self, operator_profile: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(operator_profile, dict):
             raise ValueError("operator_profile must be a mapping")
@@ -5203,6 +6119,31 @@ class NeuroIntegrationWorkbench:
         )
         return timeline_raw_flags and item_raw_flags
 
+    def _operator_runbook_payload_redacted(
+        self,
+        runbook: Dict[str, Any],
+    ) -> bool:
+        runbook_raw_flags = all(
+            runbook.get(field_name) is False
+            for field_name in runbook
+            if field_name.startswith("raw_")
+        )
+        binding_raw_flags = all(
+            binding.get(field_name) is False
+            for binding in runbook.get("receipt_bindings", [])
+            if isinstance(binding, dict)
+            for field_name in binding
+            if field_name.startswith("raw_")
+        )
+        step_raw_flags = all(
+            step.get(field_name) is False
+            for step in runbook.get("workflow_steps", [])
+            if isinstance(step, dict)
+            for field_name in step
+            if field_name.startswith("raw_")
+        )
+        return runbook_raw_flags and binding_raw_flags and step_raw_flags
+
     def _upstream_receipt_digest_set(
         self,
         upstream_receipt_bindings: Sequence[Dict[str, Any]],
@@ -5335,6 +6276,27 @@ class NeuroIntegrationWorkbench:
             "requires_ml_expertise": item.get("requires_ml_expertise"),
             "claim_ceiling": item.get("claim_ceiling"),
             "semantic_thought_content_generated": item.get(
+                "semantic_thought_content_generated"
+            ),
+        }
+
+    def _operator_runbook_step_digest_payload(
+        self,
+        step: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "position": step.get("position"),
+            "step_id": step.get("step_id"),
+            "stage_kind": step.get("stage_kind"),
+            "source_types": step.get("source_types"),
+            "input_receipt_digests": step.get("input_receipt_digests"),
+            "operator_card": step.get("operator_card"),
+            "coding_agent_task": step.get("coding_agent_task"),
+            "required_checks": step.get("required_checks"),
+            "requires_ml_expertise": step.get("requires_ml_expertise"),
+            "runbook_step_bound": step.get("runbook_step_bound"),
+            "claim_ceiling": step.get("claim_ceiling"),
+            "semantic_thought_content_generated": step.get(
                 "semantic_thought_content_generated"
             ),
         }
@@ -5804,6 +6766,76 @@ class NeuroIntegrationWorkbench:
             "storage_policy": timeline.get("storage_policy"),
             "claim_ceiling": timeline.get("claim_ceiling"),
             "semantic_thought_content_generated": timeline.get(
+                "semantic_thought_content_generated"
+            ),
+        }
+
+    def _operator_runbook_digest_payload(
+        self,
+        runbook: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": runbook.get("profile_id"),
+            "identity_id": runbook.get("identity_id"),
+            "source_bundle_digest": runbook.get("source_bundle_digest"),
+            "workspace_digest": runbook.get("workspace_digest"),
+            "analysis_digest": runbook.get("analysis_digest"),
+            "operator_guide_digest": runbook.get("operator_guide_digest"),
+            "replacement_plan_digest": runbook.get("replacement_plan_digest"),
+            "connector_bundle_digest": runbook.get("connector_bundle_digest"),
+            "collection_protocol_digest": runbook.get(
+                "collection_protocol_digest"
+            ),
+            "collection_run_digest": runbook.get("collection_run_digest"),
+            "measurement_quality_gate_digest": runbook.get(
+                "measurement_quality_gate_digest"
+            ),
+            "cross_modal_analysis_plan_digest": runbook.get(
+                "cross_modal_analysis_plan_digest"
+            ),
+            "cross_modal_analysis_run_digest": runbook.get(
+                "cross_modal_analysis_run_digest"
+            ),
+            "interpretation_synthesis_digest": runbook.get(
+                "interpretation_synthesis_digest"
+            ),
+            "longitudinal_timeline_digest": runbook.get(
+                "longitudinal_timeline_digest"
+            ),
+            "source_types": runbook.get("source_types"),
+            "source_type_count": runbook.get("source_type_count"),
+            "required_replacement_lanes": runbook.get(
+                "required_replacement_lanes"
+            ),
+            "receipt_digest_set": runbook.get("receipt_digest_set"),
+            "workflow_step_count": runbook.get("workflow_step_count"),
+            "workflow_step_digest_set": runbook.get(
+                "workflow_step_digest_set"
+            ),
+            "all_required_receipts_bound": runbook.get(
+                "all_required_receipts_bound"
+            ),
+            "all_workflow_steps_bound": runbook.get(
+                "all_workflow_steps_bound"
+            ),
+            "operator_cards_bound": runbook.get("operator_cards_bound"),
+            "coding_agent_tasks_bound": runbook.get(
+                "coding_agent_tasks_bound"
+            ),
+            "beginner_operator_supported": runbook.get(
+                "beginner_operator_supported"
+            ),
+            "llm_native_workflow_bound": runbook.get(
+                "llm_native_workflow_bound"
+            ),
+            "coding_agent_ready": runbook.get("coding_agent_ready"),
+            "operator_runbook_summary": runbook.get(
+                "operator_runbook_summary"
+            ),
+            "operator_runbook_bound": runbook.get("operator_runbook_bound"),
+            "storage_policy": runbook.get("storage_policy"),
+            "claim_ceiling": runbook.get("claim_ceiling"),
+            "semantic_thought_content_generated": runbook.get(
                 "semantic_thought_content_generated"
             ),
         }

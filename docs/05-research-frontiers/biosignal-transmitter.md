@@ -73,6 +73,8 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   bounded context screen として扱うようにした。
 - 同日、NIW は longitudinal timeline receipt を追加し、2 つの source-bundle window を
   per-source axis drift / stability proxy として束縛するようにした。
+- 同日、NIW は operator runbook receipt を追加し、receipt chain 全体を 9 step の
+  plain-language operator card と coding-agent task に束縛するようにした。
 
 ## ブロッキング要因
 
@@ -144,6 +146,8 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - longitudinal timeline は repeated source-bundle window の axis drift / stability proxy
   だけを返し、人格同一性の連続性、clinical longitudinal validity、upload readiness の
   証明には昇格しない
+- operator runbook は既存 receipt の順序化と review task だけを返し、operator 判断、
+  臨床判断、semantic thought content、upload readiness の自動結論には昇格しない
 - open biodata lane は source type coverage を増やすが、各 modality の専門的妥当性、
   専用 axis derivation と bounded context recipe を持っても、longitudinal stability、
   clinical validity、regulatory readiness は source-specific research frontier として残す

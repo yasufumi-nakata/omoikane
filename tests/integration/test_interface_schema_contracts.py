@@ -279,6 +279,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/neuro_integration_longitudinal_timeline.schema",
             result["longitudinal_timeline"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_operator_runbook.schema",
+            result["operator_runbook"],
+        )
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["app_registry_digest_bound"])
         self.assertTrue(result["validation"]["source_bundle_digest_bound"])
@@ -338,6 +342,12 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["longitudinal_axis_drifts_bound"])
         self.assertTrue(result["validation"]["longitudinal_payload_redacted"])
         self.assertTrue(result["validation"]["longitudinal_no_identity_or_upload_claim"])
+        self.assertTrue(result["validation"]["operator_runbook_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_digest_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_receipt_chain_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_steps_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_payload_redacted"])
+        self.assertTrue(result["validation"]["operator_runbook_no_identity_or_upload_claim"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])

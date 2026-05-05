@@ -373,6 +373,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
             8,
             result["validation"]["longitudinal_axis_drift_item_count"],
         )
+        self.assertTrue(result["validation"]["operator_runbook_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_digest_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_receipt_chain_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_steps_bound"])
+        self.assertTrue(result["validation"]["operator_runbook_payload_redacted"])
+        self.assertTrue(result["validation"]["operator_runbook_no_identity_or_upload_claim"])
+        self.assertEqual(9, result["validation"]["operator_runbook_step_count"])
+        self.assertEqual(
+            13,
+            result["validation"]["operator_runbook_receipt_binding_count"],
+        )
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
@@ -463,6 +474,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
             ],
         )
         self.assertFalse(result["longitudinal_timeline"]["upload_readiness_claimed"])
+        self.assertTrue(result["operator_runbook"]["operator_runbook_bound"])
+        self.assertEqual(9, result["operator_runbook"]["workflow_step_count"])
+        self.assertFalse(result["operator_runbook"]["upload_readiness_claimed"])
         self.assertEqual(8, result["validation"]["covered_source_type_count"])
         self.assertFalse(result["analysis"]["clinical_diagnosis_claimed"])
         self.assertFalse(result["analysis"]["consciousness_reproduction_claimed"])
@@ -525,6 +539,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-neuro-integration-workbench-longitudinal"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-neuro-integration-workbench-runbook"
             ],
         )
 

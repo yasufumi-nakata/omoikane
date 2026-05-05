@@ -37,10 +37,13 @@ reference runtime surface」を作ることである。これは mind uploading 
   receipt として束縛する
 - 複数 source-bundle window を longitudinal timeline receipt に束縛し、各 source type の
   bounded axis drift / stability proxy を非 ML operator と coding agent が確認できるようにする
+- source import、workspace orientation、application replacement、collection、quality gate、
+  cross-modal analysis、interpretation、longitudinal review を operator runbook receipt に
+  束縛し、非 ML operator と coding agent が同じ順序で確認できるようにする
 - 非 ML 専門家向けの plain-language cards と coding agent 向け task template を同じ guide receipt に入れる
 - raw questionnaire / EEG / neuroimaging / organoid / analysis / connector / credential /
   endpoint / collection / collection-result / quality / calibration / artifact / consent /
-  interpretation / agent-task payload は保存しない
+  interpretation / runbook / agent-task payload は保存しない
 - claim ceiling は `feature-alignment-and-analysis-plan-only` に固定する
 
 ## Reference Runtime v0
@@ -76,9 +79,12 @@ reference runtime surface」を作ることである。これは mind uploading 
     coding-agent task に束縛し、非 ML operator が確認できる解釈 receipt を作る
 17. 同じ 8 source type を持つ 2 つの source-bundle window を longitudinal timeline に束縛し、
     per-source axis drift / stability proxy を作る
-18. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
+18. receipt chain 全体を 9 step の operator runbook に束縛し、非 ML operator card と
+    coding-agent task を同じ digest-only 手順にまとめる
+19. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
     replacement plan、connector bundle、collection protocol、collection run、quality gate、
-    cross-modal analysis plan、analysis run、interpretation synthesis、longitudinal timeline を記録する
+    cross-modal analysis plan、analysis run、interpretation synthesis、longitudinal timeline、
+    operator runbook を記録する
 
 ## 不変条件
 
@@ -96,8 +102,9 @@ reference runtime surface」を作ることである。これは mind uploading 
 12. **bounded result summaries** ── result は pair digest と bounded axis summary に限り、診断や因果推論には昇格しない
 13. **operator interpretation synthesis** ── 解釈は analysis result digest と quality item digest に基づく plain-language action summary に限り、upload readiness には昇格しない
 14. **longitudinal stability, not identity** ── repeated source windows は axis drift / stability proxy として扱い、本人同一性や upload readiness の証明にはしない
-15. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw quality / raw plan / raw result / raw interpretation / raw timeline payload を保存しない
-16. **claim ceiling** ── semantic thought content、clinical diagnosis、consciousness reproduction、identity replacement、upload readiness はすべて false のまま維持する
+15. **operator runbook, not autonomous conclusion** ── runbook は既存 receipt の順序化と review task に限り、診断・同一性・upload readiness の結論にはしない
+16. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw quality / raw plan / raw result / raw interpretation / raw timeline / raw runbook payload を保存しない
+17. **claim ceiling** ── semantic thought content、clinical diagnosis、consciousness reproduction、identity replacement、upload readiness はすべて false のまま維持する
 
 ## 関連
 

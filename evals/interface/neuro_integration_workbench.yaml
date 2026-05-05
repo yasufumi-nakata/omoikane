@@ -7,7 +7,7 @@ description: >
   biosensor、behavioral task、omics、clinical metadata も同じ source bundle に入れ、
   計測・解析・データ整備・operator copilot・agent automation の置換 lane を
   LLM-native かつ非 ML 専門家向けにまとめ、2 window の longitudinal timeline として
-  axis drift review まで束縛できることを確認する。
+  axis drift review まで束縛し、operator runbook として手順化できることを確認する。
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json
@@ -86,6 +86,14 @@ expected:
   longitudinal_window_count: 2
   longitudinal_stable_source_type_count: 8
   longitudinal_axis_drift_item_count: 8
+  operator_runbook_bound: true
+  operator_runbook_digest_bound: true
+  operator_runbook_receipt_chain_bound: true
+  operator_runbook_steps_bound: true
+  operator_runbook_payload_redacted: true
+  operator_runbook_no_identity_or_upload_claim: true
+  operator_runbook_step_count: 9
+  operator_runbook_receipt_binding_count: 13
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

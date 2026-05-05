@@ -11609,6 +11609,21 @@ json.dump(response, sys.stdout)
                 operator_guide,
             )
         )
+        operator_runbook = self.neuro_integration_workbench.build_operator_runbook(
+            source_bundle,
+            workspace,
+            analysis,
+            operator_guide,
+            replacement_plan,
+            connector_bundle,
+            collection_protocol,
+            collection_run,
+            measurement_quality_gate,
+            cross_modal_analysis_plan,
+            cross_modal_analysis_run,
+            interpretation_synthesis,
+            longitudinal_timeline,
+        )
         validation = self.neuro_integration_workbench.validate_integration_bundle(
             app_receipts,
             source_bundle,
@@ -11624,6 +11639,7 @@ json.dump(response, sys.stdout)
             measurement_quality_gate=measurement_quality_gate,
             interpretation_synthesis=interpretation_synthesis,
             longitudinal_timeline=longitudinal_timeline,
+            operator_runbook=operator_runbook,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -12146,6 +12162,60 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.operator_runbook.bound",
+            payload={
+                "operator_runbook_ref": operator_runbook[
+                    "operator_runbook_ref"
+                ],
+                "operator_runbook_digest": operator_runbook[
+                    "operator_runbook_digest"
+                ],
+                "receipt_digest_set": operator_runbook[
+                    "receipt_digest_set"
+                ],
+                "workflow_step_digest_set": operator_runbook[
+                    "workflow_step_digest_set"
+                ],
+                "workflow_step_count": operator_runbook[
+                    "workflow_step_count"
+                ],
+                "receipt_binding_count": operator_runbook[
+                    "operator_runbook_summary"
+                ]["receipt_binding_count"],
+                "all_required_receipts_bound": operator_runbook[
+                    "all_required_receipts_bound"
+                ],
+                "all_workflow_steps_bound": operator_runbook[
+                    "all_workflow_steps_bound"
+                ],
+                "beginner_operator_supported": operator_runbook[
+                    "beginner_operator_supported"
+                ],
+                "coding_agent_ready": operator_runbook[
+                    "coding_agent_ready"
+                ],
+                "operator_runbook_bound": operator_runbook[
+                    "operator_runbook_bound"
+                ],
+                "claim_ceiling": operator_runbook["claim_ceiling"],
+                "raw_runbook_payload_stored": operator_runbook[
+                    "raw_runbook_payload_stored"
+                ],
+                "semantic_thought_content_generated": operator_runbook[
+                    "semantic_thought_content_generated"
+                ],
+                "upload_readiness_claimed": operator_runbook[
+                    "upload_readiness_claimed"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-runbook",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -12168,6 +12238,7 @@ json.dump(response, sys.stdout)
             "cross_modal_analysis_run": cross_modal_analysis_run,
             "interpretation_synthesis": interpretation_synthesis,
             "longitudinal_timeline": longitudinal_timeline,
+            "operator_runbook": operator_runbook,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -12244,6 +12315,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "longitudinal_timeline",
                     "schema_path": "specs/schemas/neuro_integration_longitudinal_timeline.schema",
                     "contract_role": "neuro-integration-longitudinal-timeline",
+                },
+                {
+                    "payload_path": "operator_runbook",
+                    "schema_path": "specs/schemas/neuro_integration_operator_runbook.schema",
+                    "contract_role": "neuro-integration-operator-runbook",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

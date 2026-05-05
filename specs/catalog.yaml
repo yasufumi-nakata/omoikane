@@ -2599,6 +2599,16 @@ entries:
       - agents/guardians/integrity-guardian.yaml
     rationale: Required to bind repeated neuro integration source-bundle windows into bounded per-source axis drift summaries without storing raw timeline payloads or claiming identity replacement or upload readiness.
   - priority: P1
+    kind: schema
+    file: specs/schemas/neuro_integration_operator_runbook.schema
+    consumers:
+      - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+      - docs/02-subsystems/interface/neuro-integration-workbench.md
+      - reference-runtime
+      - evals/interface/neuro_integration_workbench.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind the complete neuro integration receipt chain into ordered plain-language operator steps and coding-agent tasks without storing raw receipt payloads or claiming diagnosis, identity replacement, or upload readiness.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.neuro_integration_workbench.v0.idl
     consumers:
@@ -2613,7 +2623,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects survey+EEG seed binding, expansion modality binding, replacement lane coverage, LLM-native beginner workflow, raw payload redaction, semantic thought content non-generation, and no diagnosis / no consciousness / no identity replacement claim ceiling.
+    rationale: Protects survey+EEG seed binding, expansion modality binding, replacement lane coverage, LLM-native beginner workflow, operator runbook binding, raw payload redaction, semantic thought content non-generation, and no diagnosis / no consciousness / no identity replacement claim ceiling.
   - priority: P1
     kind: schema
     file: specs/schemas/bdb_session.schema
