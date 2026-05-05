@@ -183,7 +183,9 @@ coding-agent review readiness を digest-only で返す。measurement quality ga
 freshness、operator review、quality authority refs を collection run results に束縛する。
 cross-modal analysis plan は
 現在の 8 source type 全 28 ペアに bounded recipe と connector support を割り当て、
-questionnaire + EEG seed から fMRI / brain organoid context へ分析計画を広げる。analysis run は
+questionnaire + EEG seed から fMRI / brain organoid context に加え、biosignal autonomic、
+behavioral performance、omics physiology / clinical、clinical metadata modulator context へ
+分析計画を広げる。analysis run は
 全 pair の bounded result summary、operator review readiness、coding-agent review readiness を
 digest-only で返す。interpretation synthesis は measurement quality gate と analysis run を
 plain-language synthesis cards と coding-agent tasks に束縛し、非 ML operator が確認できる

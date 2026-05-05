@@ -4,7 +4,8 @@ title: NeuroIntegrationCrossModalAnalysisPlan
 description: >
   Digest-only plan that enumerates bounded cross-modal analysis recipes for every
   current Neuro Integration Workbench source-type pair while binding each pair to
-  connector refs and preserving the feature-alignment claim ceiling.
+  connector refs, including modality-specific open biodata context screens, and
+  preserving the feature-alignment claim ceiling.
 type: object
 additionalProperties: false
 required:
@@ -191,6 +192,11 @@ $defs:
       - survey-eeg-feature-alignment
       - neural-electrical-hemodynamic-context
       - organoid-context-comparison
+      - biosignal-autonomic-context-screen
+      - behavioral-performance-context-screen
+      - omics-physiology-context-screen
+      - omics-clinical-context-screen
+      - clinical-context-modulator-screen
       - feature-summary-cross-modal-screen
   connector_support:
     type: object

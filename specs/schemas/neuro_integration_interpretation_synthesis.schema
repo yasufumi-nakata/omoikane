@@ -198,6 +198,10 @@ $defs:
       - seed-interpretation-bound
       - neuroimaging-context-interpretation-bound
       - in-vitro-context-interpretation-bound
+      - biosignal-context-interpretation-bound
+      - behavioral-context-interpretation-bound
+      - omics-context-interpretation-bound
+      - clinical-context-interpretation-bound
       - generic-biodata-interpretation-bound
       - cross-modal-context-interpretation-bound
   analysis_recipe_id:
@@ -205,6 +209,11 @@ $defs:
       - survey-eeg-feature-alignment
       - neural-electrical-hemodynamic-context
       - organoid-context-comparison
+      - biosignal-autonomic-context-screen
+      - behavioral-performance-context-screen
+      - omics-physiology-context-screen
+      - omics-clinical-context-screen
+      - clinical-context-modulator-screen
       - feature-summary-cross-modal-screen
   interpretation_axis_summary:
     type: object

@@ -404,7 +404,7 @@ operations:
       - raw source, quality, calibration, artifact, and consent payload storage must remain false
       - diagnosis, consciousness reproduction, and identity replacement claims must remain false
   build_cross_modal_analysis_plan:
-    summary: Emit a digest-only plan for every current source-type pair so questionnaire, EEG, fMRI, organoid, biosensor, behavioral, omics, clinical metadata, and future biological summaries can be analyzed through bounded recipes.
+    summary: Emit a digest-only plan for every current source-type pair so questionnaire, EEG, fMRI, organoid, biosensor, behavioral, omics, clinical metadata, and future biological summaries can be analyzed through bounded seed, modality-specific context, and fallback recipes.
     input:
       inline_schema:
         type: object
@@ -429,6 +429,7 @@ operations:
       schema_ref: neuro_integration_cross_modal_analysis_plan
     guarantees:
       - every current source-type pair must have a bounded analysis recipe
+      - biosensor, behavioral task, omics, and clinical metadata pairs must use modality-specific context recipes before falling back to generic feature-summary screens
       - the questionnaire plus EEG pair must reuse the seed Survey EEG Fusion analysis receipt
       - each analysis pair must bind measurement, analysis, curation, operator-copilot, and agent-automation connector refs
       - non-ML operator and coding-agent execution must require no ML expertise

@@ -161,11 +161,20 @@ $defs:
       - survey-eeg-feature-alignment
       - neural-electrical-hemodynamic-context
       - organoid-context-comparison
+      - biosignal-autonomic-context-screen
+      - behavioral-performance-context-screen
+      - omics-physiology-context-screen
+      - omics-clinical-context-screen
+      - clinical-context-modulator-screen
       - feature-summary-cross-modal-screen
   result_status:
     enum:
       - seed-survey-eeg-result-bound
       - in-vitro-context-result-bound
+      - biosignal-context-result-bound
+      - behavioral-context-result-bound
+      - omics-context-result-bound
+      - clinical-context-result-bound
       - cross-modal-context-result-bound
   result_axis_summary:
     type: object

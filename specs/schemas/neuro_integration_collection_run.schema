@@ -168,6 +168,10 @@ $defs:
       - seed-eeg-collection-bound
       - neuroimaging-collection-context-bound
       - in-vitro-collection-context-bound
+      - biosignal-collection-context-bound
+      - behavioral-collection-context-bound
+      - omics-collection-context-bound
+      - clinical-metadata-collection-context-bound
       - generic-biodata-collection-bound
   collection_quality_summary:
     type: object

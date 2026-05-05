@@ -378,6 +378,20 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertIn("behavioral_task", result["source_bundle"]["source_types"])
         self.assertIn("omics", result["source_bundle"]["source_types"])
         self.assertIn("clinical_metadata", result["source_bundle"]["source_types"])
+        source_axes = {
+            source["source_type"]: source["analysis_axes"]
+            for source in result["source_bundle"]["sources"]
+        }
+        self.assertIn("autonomic_balance_proxy", source_axes["biosensor"])
+        self.assertIn(
+            "task_performance_quality_proxy",
+            source_axes["behavioral_task"],
+        )
+        self.assertIn("molecular_burden_proxy", source_axes["omics"])
+        self.assertIn(
+            "clinical_context_risk_proxy",
+            source_axes["clinical_metadata"],
+        )
         self.assertEqual(1, result["source_bundle"]["upstream_receipt_count"])
         self.assertTrue(result["analysis"]["upstream_fusion_binding"]["bound"])
         self.assertTrue(result["replacement_plan"]["replacement_plan_bound"])
@@ -390,12 +404,41 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(
             result["cross_modal_analysis_plan"]["cross_modal_analysis_plan_bound"]
         )
+        recipe_ids = {
+            item["analysis_recipe_id"]
+            for item in result["cross_modal_analysis_plan"]["recipe_catalog"]
+        }
+        self.assertTrue(
+            {
+                "biosignal-autonomic-context-screen",
+                "behavioral-performance-context-screen",
+                "omics-physiology-context-screen",
+                "omics-clinical-context-screen",
+                "clinical-context-modulator-screen",
+            }.issubset(recipe_ids)
+        )
         self.assertTrue(
             result["cross_modal_analysis_run"]["cross_modal_analysis_run_bound"]
         )
+        result_statuses = {
+            item["result_status"]
+            for item in result["cross_modal_analysis_run"]["pair_results"]
+        }
+        self.assertIn("biosignal-context-result-bound", result_statuses)
+        self.assertIn("behavioral-context-result-bound", result_statuses)
+        self.assertIn("omics-context-result-bound", result_statuses)
+        self.assertIn("clinical-context-result-bound", result_statuses)
         self.assertTrue(
             result["interpretation_synthesis"]["interpretation_synthesis_bound"]
         )
+        interpretation_statuses = {
+            card["interpretation_status"]
+            for card in result["interpretation_synthesis"]["synthesis_cards"]
+        }
+        self.assertIn("biosignal-context-interpretation-bound", interpretation_statuses)
+        self.assertIn("behavioral-context-interpretation-bound", interpretation_statuses)
+        self.assertIn("omics-context-interpretation-bound", interpretation_statuses)
+        self.assertIn("clinical-context-interpretation-bound", interpretation_statuses)
         self.assertEqual(8, result["validation"]["covered_source_type_count"])
         self.assertFalse(result["analysis"]["clinical_diagnosis_claimed"])
         self.assertFalse(result["analysis"]["consciousness_reproduction_claimed"])

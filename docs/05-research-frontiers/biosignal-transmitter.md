@@ -68,6 +68,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - 同日、NIW reference demo は biosensor、behavioral task、omics、clinical metadata を
   questionnaire / EEG / fMRI / brain organoid と同じ source bundle、collection、
   quality gate、cross-modal analysis、interpretation synthesis pipeline に通すよう拡張した。
+- 同日、NIW は open biodata source の axis derivation と analysis recipes を追加し、
+  biosensor / behavioral task / omics / clinical metadata を generic feature fallback ではなく
+  bounded context screen として扱うようにした。
 
 ## ブロッキング要因
 
@@ -127,6 +130,7 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
   score を束縛するが、実測機器の校正手順そのもの、artifact rejection algorithm の妥当性、
   IRB/法務承認、session burden safety、医療グレード品質保証は別途研究課題として扱う
 - cross-modal analysis plan は全 source-type pair の分析計画 coverage だけを検証し、
+  open biodata source には modality-specific context recipes を割り当てるが、
   modality-specific causal inference、large-scale cohort validity、clinical utility、
   upload-readiness は別途研究課題として扱う
 - cross-modal analysis run は bounded compatibility / uncertainty summary だけを返し、
@@ -136,8 +140,8 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
   non-ML operator next action と coding-agent task を作るだけで、診断、因果推論、
   semantic thought content、subjective equivalence、upload readiness には昇格しない
 - open biodata lane は source type coverage を増やすが、各 modality の専門的妥当性、
-  longitudinal stability、clinical validity、regulatory readiness は source-specific
-  research frontier として残す
+  専用 axis derivation と bounded context recipe を持っても、longitudinal stability、
+  clinical validity、regulatory readiness は source-specific research frontier として残す
 - Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
   BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない

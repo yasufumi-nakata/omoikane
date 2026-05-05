@@ -28,7 +28,8 @@ reference runtime surface」を作ることである。これは mind uploading 
 - collection run result を calibration、artifact/QC、consent freshness、operator review、
   quality authority refs に measurement quality gate として束縛する
 - source bundle 内の全 source-type pair に bounded analysis recipe を割り当て、
-  questionnaire + EEG seed から fMRI / 脳オルガノイド等へ cross-modal analysis を広げる
+  questionnaire + EEG seed から fMRI / 脳オルガノイド / biosensor / behavioral task /
+  omics / clinical metadata へ cross-modal analysis を広げる
 - cross-modal analysis plan の全 pair について bounded result summary と operator /
   coding-agent review readiness を digest-only run receipt に束縛する
 - measurement quality gate と cross-modal analysis run を、非 ML operator 向けの
@@ -64,7 +65,9 @@ reference runtime surface」を作ることである。これは mind uploading 
 13. collection run result を calibration、artifact/QC、consent freshness、operator review、
     quality authority refs に measurement quality gate として束縛する
 14. 現在の 8 source type 全 28 ペアに survey+EEG alignment、EEG+fMRI context、
-    organoid context、generic feature-summary screen の bounded recipe を割り当てる
+    organoid context、biosignal autonomic context、behavioral performance context、
+    omics physiology / clinical context、clinical metadata modulator、generic fallback の
+    bounded recipe を割り当てる
 15. 各 pair の bounded result summary を生成し、operator と coding agent の review-ready
     receipt として束縛する
 16. quality gate と analysis run に基づき、各 pair を plain-language synthesis card と
@@ -85,7 +88,7 @@ reference runtime surface」を作ることである。これは mind uploading 
 8. **collection protocol coverage** ── 現在束縛された各 source は consent ref、feature digest、measurement connector ref、collection window ref を持つ
 9. **collection run summaries** ── collection run は step digest、quality summary、risk proxy、review readiness に限り、live device quality certification には昇格しない
 10. **measurement quality gate** ── calibration / artifact QC / consent freshness は refs と bounded scores に限り、医療グレード QC には昇格しない
-11. **cross-modal pair coverage** ── 現在の source type 全ペアは bounded recipe と 5 lane connector support を持つ
+11. **cross-modal pair coverage** ── 現在の source type 全ペアは bounded recipe と 5 lane connector support を持ち、open biodata source は generic fallback だけでなく modality-specific context recipe を持つ
 12. **bounded result summaries** ── result は pair digest と bounded axis summary に限り、診断や因果推論には昇格しない
 13. **operator interpretation synthesis** ── 解釈は analysis result digest と quality item digest に基づく plain-language action summary に限り、upload readiness には昇格しない
 14. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw quality / raw plan / raw result / raw interpretation payload を保存しない

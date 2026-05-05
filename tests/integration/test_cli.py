@@ -488,6 +488,20 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("behavioral_task", result["source_bundle"]["source_types"])
         self.assertIn("omics", result["source_bundle"]["source_types"])
         self.assertIn("clinical_metadata", result["source_bundle"]["source_types"])
+        source_axes = {
+            source["source_type"]: source["analysis_axes"]
+            for source in result["source_bundle"]["sources"]
+        }
+        self.assertIn("autonomic_balance_proxy", source_axes["biosensor"])
+        self.assertIn(
+            "task_performance_quality_proxy",
+            source_axes["behavioral_task"],
+        )
+        self.assertIn("molecular_burden_proxy", source_axes["omics"])
+        self.assertIn(
+            "clinical_context_risk_proxy",
+            source_axes["clinical_metadata"],
+        )
         self.assertTrue(result["analysis"]["upstream_fusion_binding"]["bound"])
         self.assertTrue(result["replacement_plan"]["replacement_plan_bound"])
         self.assertTrue(result["connector_bundle"]["connector_bundle_bound"])
@@ -499,12 +513,37 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(
             result["cross_modal_analysis_plan"]["cross_modal_analysis_plan_bound"]
         )
+        recipe_ids = {
+            item["analysis_recipe_id"]
+            for item in result["cross_modal_analysis_plan"]["recipe_catalog"]
+        }
+        self.assertIn("biosignal-autonomic-context-screen", recipe_ids)
+        self.assertIn("behavioral-performance-context-screen", recipe_ids)
+        self.assertIn("omics-physiology-context-screen", recipe_ids)
+        self.assertIn("omics-clinical-context-screen", recipe_ids)
+        self.assertIn("clinical-context-modulator-screen", recipe_ids)
         self.assertTrue(
             result["cross_modal_analysis_run"]["cross_modal_analysis_run_bound"]
         )
+        result_statuses = {
+            item["result_status"]
+            for item in result["cross_modal_analysis_run"]["pair_results"]
+        }
+        self.assertIn("biosignal-context-result-bound", result_statuses)
+        self.assertIn("behavioral-context-result-bound", result_statuses)
+        self.assertIn("omics-context-result-bound", result_statuses)
+        self.assertIn("clinical-context-result-bound", result_statuses)
         self.assertTrue(
             result["interpretation_synthesis"]["interpretation_synthesis_bound"]
         )
+        interpretation_statuses = {
+            card["interpretation_status"]
+            for card in result["interpretation_synthesis"]["synthesis_cards"]
+        }
+        self.assertIn("biosignal-context-interpretation-bound", interpretation_statuses)
+        self.assertIn("behavioral-context-interpretation-bound", interpretation_statuses)
+        self.assertIn("omics-context-interpretation-bound", interpretation_statuses)
+        self.assertIn("clinical-context-interpretation-bound", interpretation_statuses)
 
     def test_observation_integration_demo_emits_universal_observation_package(self) -> None:
         stdout = io.StringIO()

@@ -2567,7 +2567,7 @@ entries:
       - reference-runtime
       - evals/interface/neuro_integration_workbench.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to prove every current neuro integration source-type pair has a bounded analysis recipe and connector support before claiming cross-modal analysis readiness.
+    rationale: Required to prove every current neuro integration source-type pair has a bounded analysis recipe and connector support, including modality-specific open biodata context screens, before claiming cross-modal analysis readiness.
   - priority: P1
     kind: schema
     file: specs/schemas/neuro_integration_cross_modal_analysis_run.schema

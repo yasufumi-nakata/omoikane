@@ -54,6 +54,12 @@ NIW_INTERPRETATION_SYNTHESIS_POLICY = (
 )
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
+NIW_OPEN_BIODATA_SOURCE_TYPES = (
+    "biosensor",
+    "behavioral_task",
+    "omics",
+    "clinical_metadata",
+)
 NIW_REQUIRED_REPLACEMENT_LANES = (
     "measurement",
     "analysis",
@@ -95,6 +101,11 @@ NIW_ANALYSIS_RECIPE_IDS = (
     "survey-eeg-feature-alignment",
     "neural-electrical-hemodynamic-context",
     "organoid-context-comparison",
+    "biosignal-autonomic-context-screen",
+    "behavioral-performance-context-screen",
+    "omics-physiology-context-screen",
+    "omics-clinical-context-screen",
+    "clinical-context-modulator-screen",
     "feature-summary-cross-modal-screen",
 )
 NIW_SOURCE_TYPE_ALIASES = {
@@ -180,6 +191,7 @@ class NeuroIntegrationWorkbench:
             ),
             "seed_source_types": list(NIW_SEED_SOURCE_TYPES),
             "expansion_source_types": list(NIW_EXPANSION_SOURCE_TYPES),
+            "open_biodata_source_types": list(NIW_OPEN_BIODATA_SOURCE_TYPES),
             "source_families": dict(NIW_SOURCE_FAMILIES),
             "required_replacement_lanes": list(NIW_REQUIRED_REPLACEMENT_LANES),
             "operator_skill_floors": list(NIW_OPERATOR_SKILL_FLOORS),
@@ -2710,6 +2722,16 @@ class NeuroIntegrationWorkbench:
             return "neural-electrical-hemodynamic-context"
         if "brain_organoid" in pair:
             return "organoid-context-comparison"
+        if pair == {"omics", "clinical_metadata"}:
+            return "omics-clinical-context-screen"
+        if "clinical_metadata" in pair:
+            return "clinical-context-modulator-screen"
+        if "omics" in pair:
+            return "omics-physiology-context-screen"
+        if "behavioral_task" in pair:
+            return "behavioral-performance-context-screen"
+        if "biosensor" in pair:
+            return "biosignal-autonomic-context-screen"
         return "feature-summary-cross-modal-screen"
 
     def _analysis_target_constructs(
@@ -2736,6 +2758,36 @@ class NeuroIntegrationWorkbench:
                 "viability-boundary-context",
                 "no-personhood-or-identity-inference",
             ]
+        if recipe_id == "biosignal-autonomic-context-screen":
+            return [
+                "autonomic-state-context",
+                "body-signal-quality-context",
+                "no-clinical-diagnosis-inference",
+            ]
+        if recipe_id == "behavioral-performance-context-screen":
+            return [
+                "task-performance-context",
+                "attention-and-fatigue-context",
+                "no-ability-or-diagnosis-inference",
+            ]
+        if recipe_id == "omics-physiology-context-screen":
+            return [
+                "molecular-physiology-context",
+                "sampling-quality-context",
+                "no-causal-diagnosis-inference",
+            ]
+        if recipe_id == "omics-clinical-context-screen":
+            return [
+                "molecular-clinical-context",
+                "screening-and-sampling-context",
+                "no-diagnostic-or-treatment-inference",
+            ]
+        if recipe_id == "clinical-context-modulator-screen":
+            return [
+                "clinical-context-modulator",
+                "medication-and-sleep-context",
+                "no-clinical-diagnosis-inference",
+            ]
         return [
             f"{left_source_type}-feature-summary-context",
             f"{right_source_type}-feature-summary-context",
@@ -2753,6 +2805,16 @@ class NeuroIntegrationWorkbench:
             return "Do EEG load proxies and fMRI BOLD context point to compatible neural activity summaries?"
         if recipe_id == "organoid-context-comparison":
             return "How should the organoid summary be kept as in-vitro context without treating it as the person?"
+        if recipe_id == "biosignal-autonomic-context-screen":
+            return "How does the biosensor summary contextualize autonomic state without making a clinical claim?"
+        if recipe_id == "behavioral-performance-context-screen":
+            return "How does the behavioral task summary contextualize performance, attention, or fatigue?"
+        if recipe_id == "omics-physiology-context-screen":
+            return "How does the omics summary contextualize physiology while preserving sampling uncertainty?"
+        if recipe_id == "omics-clinical-context-screen":
+            return "How do omics and clinical metadata summaries contextualize each other without diagnosis or treatment claims?"
+        if recipe_id == "clinical-context-modulator-screen":
+            return "How should clinical metadata modulate interpretation without becoming a diagnosis?"
         return (
             f"What bounded relationship can be screened between {left_source_type} "
             f"and {right_source_type} feature summaries?"
@@ -2765,6 +2827,16 @@ class NeuroIntegrationWorkbench:
             return "plan_eeg_fmri_feature_context_screen"
         if recipe_id == "organoid-context-comparison":
             return "plan_organoid_context_boundary_screen"
+        if recipe_id == "biosignal-autonomic-context-screen":
+            return "plan_biosignal_autonomic_context_screen"
+        if recipe_id == "behavioral-performance-context-screen":
+            return "plan_behavioral_performance_context_screen"
+        if recipe_id == "omics-physiology-context-screen":
+            return "plan_omics_physiology_context_screen"
+        if recipe_id == "omics-clinical-context-screen":
+            return "plan_omics_clinical_context_screen"
+        if recipe_id == "clinical-context-modulator-screen":
+            return "plan_clinical_context_modulator_screen"
         return "plan_generic_feature_summary_screen"
 
     def _build_analysis_recipe_catalog(
@@ -2811,6 +2883,17 @@ class NeuroIntegrationWorkbench:
             result_status = "seed-survey-eeg-result-bound"
         elif pair["analysis_recipe_id"] == "organoid-context-comparison":
             result_status = "in-vitro-context-result-bound"
+        elif pair["analysis_recipe_id"] == "biosignal-autonomic-context-screen":
+            result_status = "biosignal-context-result-bound"
+        elif pair["analysis_recipe_id"] == "behavioral-performance-context-screen":
+            result_status = "behavioral-context-result-bound"
+        elif pair["analysis_recipe_id"] in (
+            "omics-physiology-context-screen",
+            "omics-clinical-context-screen",
+        ):
+            result_status = "omics-context-result-bound"
+        elif pair["analysis_recipe_id"] == "clinical-context-modulator-screen":
+            result_status = "clinical-context-result-bound"
         else:
             result_status = "cross-modal-context-result-bound"
         result = {
@@ -3274,6 +3357,7 @@ class NeuroIntegrationWorkbench:
             "biosensor": "human-biosignal-feature-window-ingest",
             "behavioral_task": "behavioral-task-feature-summary-ingest",
             "omics": "molecular-omics-feature-summary-ingest",
+            "clinical_metadata": "clinical-context-feature-summary-ingest",
         }.get(source_type, "generic-biodata-feature-summary-ingest")
 
     def _collection_operator_summary(self, source_type: str) -> str:
@@ -3285,6 +3369,14 @@ class NeuroIntegrationWorkbench:
             return "Collect only fMRI BOLD feature summaries, motion QC refs, and consent refs."
         if source_type == "brain_organoid":
             return "Collect organoid summaries only as in-vitro neural tissue context."
+        if source_type == "biosensor":
+            return "Collect biosensor summaries as autonomic context without raw wearable streams."
+        if source_type == "behavioral_task":
+            return "Collect behavioral task summaries as performance context without raw event logs."
+        if source_type == "omics":
+            return "Collect omics summaries as molecular context with sampling quality refs."
+        if source_type == "clinical_metadata":
+            return "Collect clinical metadata summaries as interpretation context, not diagnosis."
         return "Collect a digest-bound biological feature summary without raw payloads."
 
     def _collection_agent_next_action(self, source_type: str) -> str:
@@ -3293,6 +3385,10 @@ class NeuroIntegrationWorkbench:
             "eeg": "verify_eeg_feature_window_artifact_flags_and_digest",
             "fmri_bold": "verify_fmri_summary_motion_qc_and_digest",
             "brain_organoid": "verify_organoid_context_boundary_and_digest",
+            "biosensor": "verify_biosensor_feature_window_quality_and_digest",
+            "behavioral_task": "verify_behavioral_task_summary_timing_and_digest",
+            "omics": "verify_omics_sampling_quality_and_digest",
+            "clinical_metadata": "verify_clinical_metadata_context_without_diagnosis",
         }.get(source_type, "verify_generic_biodata_summary_digest")
 
     def _collection_result_status(self, source_type: str) -> str:
@@ -3301,6 +3397,10 @@ class NeuroIntegrationWorkbench:
             "eeg": "seed-eeg-collection-bound",
             "fmri_bold": "neuroimaging-collection-context-bound",
             "brain_organoid": "in-vitro-collection-context-bound",
+            "biosensor": "biosignal-collection-context-bound",
+            "behavioral_task": "behavioral-collection-context-bound",
+            "omics": "omics-collection-context-bound",
+            "clinical_metadata": "clinical-metadata-collection-context-bound",
         }.get(source_type, "generic-biodata-collection-bound")
 
     def _collection_result_operator_summary(
@@ -3317,6 +3417,14 @@ class NeuroIntegrationWorkbench:
             label = "fMRI BOLD summary collection"
         elif source_type == "brain_organoid":
             label = "Organoid context collection"
+        elif source_type == "biosensor":
+            label = "Biosensor autonomic-context collection"
+        elif source_type == "behavioral_task":
+            label = "Behavioral task context collection"
+        elif source_type == "omics":
+            label = "Omics molecular-context collection"
+        elif source_type == "clinical_metadata":
+            label = "Clinical metadata context collection"
         else:
             label = "Biological feature-summary collection"
         return (
@@ -3330,6 +3438,10 @@ class NeuroIntegrationWorkbench:
             "eeg": "review_eeg_collection_artifact_context",
             "fmri_bold": "review_fmri_collection_motion_context",
             "brain_organoid": "review_organoid_collection_boundary",
+            "biosensor": "review_biosensor_collection_quality_context",
+            "behavioral_task": "review_behavioral_task_collection_context",
+            "omics": "review_omics_collection_sampling_context",
+            "clinical_metadata": "review_clinical_metadata_collection_context",
         }.get(source_type, "review_generic_biodata_collection_quality")
 
     def _quality_gate_status(self, source_type: str) -> str:
@@ -3338,6 +3450,10 @@ class NeuroIntegrationWorkbench:
             "eeg": "seed-eeg-quality-gate-bound",
             "fmri_bold": "neuroimaging-quality-context-bound",
             "brain_organoid": "in-vitro-quality-context-bound",
+            "biosensor": "biosignal-quality-context-bound",
+            "behavioral_task": "behavioral-quality-context-bound",
+            "omics": "omics-quality-context-bound",
+            "clinical_metadata": "clinical-metadata-quality-context-bound",
         }.get(source_type, "generic-biodata-quality-gate-bound")
 
     def _quality_gate_operator_summary(
@@ -3354,6 +3470,14 @@ class NeuroIntegrationWorkbench:
             label = "fMRI measurement quality"
         elif source_type == "brain_organoid":
             label = "Organoid context quality"
+        elif source_type == "biosensor":
+            label = "Biosensor signal quality"
+        elif source_type == "behavioral_task":
+            label = "Behavioral task quality"
+        elif source_type == "omics":
+            label = "Omics sampling quality"
+        elif source_type == "clinical_metadata":
+            label = "Clinical metadata context quality"
         else:
             label = "Biological measurement quality"
         return (
@@ -3367,6 +3491,10 @@ class NeuroIntegrationWorkbench:
             "eeg": "review_eeg_calibration_artifact_and_consent_refs",
             "fmri_bold": "review_fmri_motion_calibration_and_consent_refs",
             "brain_organoid": "review_organoid_provenance_quality_boundary",
+            "biosensor": "review_biosensor_calibration_artifact_and_consent_refs",
+            "behavioral_task": "review_behavioral_task_timing_accuracy_and_consent_refs",
+            "omics": "review_omics_sampling_calibration_and_consent_refs",
+            "clinical_metadata": "review_clinical_metadata_context_quality_without_diagnosis",
         }.get(source_type, "review_generic_biodata_quality_refs")
 
     def _axis_mean(self, axes: Dict[str, Any]) -> float:
@@ -3391,6 +3519,35 @@ class NeuroIntegrationWorkbench:
                 "Organoid data is bound only as in-vitro neural tissue context; "
                 f"compatibility {compatibility:.3f} is not a personhood or identity signal."
             )
+        if recipe_id == "biosignal-autonomic-context-screen":
+            return (
+                "Biosensor data is bounded as autonomic context; "
+                f"compatibility {compatibility:.3f} and uncertainty {uncertainty:.3f} "
+                "are not clinical signals."
+            )
+        if recipe_id == "behavioral-performance-context-screen":
+            return (
+                "Behavioral task data is bounded as performance context; "
+                f"compatibility {compatibility:.3f} and uncertainty {uncertainty:.3f} "
+                "do not establish ability, diagnosis, or identity."
+            )
+        if recipe_id == "omics-physiology-context-screen":
+            return (
+                "Omics data is bounded as molecular physiology context; "
+                f"compatibility {compatibility:.3f} keeps sampling uncertainty "
+                f"{uncertainty:.3f} visible."
+            )
+        if recipe_id == "omics-clinical-context-screen":
+            return (
+                "Omics and clinical metadata are bounded as context only; "
+                f"compatibility {compatibility:.3f} is not a diagnosis or treatment recommendation."
+            )
+        if recipe_id == "clinical-context-modulator-screen":
+            return (
+                "Clinical metadata modulates interpretation context only; "
+                f"compatibility {compatibility:.3f} and uncertainty {uncertainty:.3f} "
+                "must not be reported as diagnosis."
+            )
         return (
             "This source pair has a bounded feature-summary compatibility score "
             f"of {compatibility:.3f} with uncertainty {uncertainty:.3f}."
@@ -3403,6 +3560,16 @@ class NeuroIntegrationWorkbench:
             return "review_eeg_fmri_context_without_diagnosis"
         if recipe_id == "organoid-context-comparison":
             return "review_organoid_context_boundary"
+        if recipe_id == "biosignal-autonomic-context-screen":
+            return "review_biosensor_autonomic_context_without_diagnosis"
+        if recipe_id == "behavioral-performance-context-screen":
+            return "review_behavioral_performance_context_without_ability_claim"
+        if recipe_id == "omics-physiology-context-screen":
+            return "review_omics_sampling_context_without_causal_claim"
+        if recipe_id == "omics-clinical-context-screen":
+            return "review_omics_clinical_context_without_treatment_claim"
+        if recipe_id == "clinical-context-modulator-screen":
+            return "review_clinical_context_modulator_without_diagnosis"
         return "review_generic_cross_modal_result_summary"
 
     def _interpretation_status(
@@ -3415,6 +3582,14 @@ class NeuroIntegrationWorkbench:
             return "seed-interpretation-bound"
         if "brain_organoid" in source_type_set:
             return "in-vitro-context-interpretation-bound"
+        if "clinical_metadata" in source_type_set:
+            return "clinical-context-interpretation-bound"
+        if "omics" in source_type_set:
+            return "omics-context-interpretation-bound"
+        if "behavioral_task" in source_type_set:
+            return "behavioral-context-interpretation-bound"
+        if "biosensor" in source_type_set:
+            return "biosignal-context-interpretation-bound"
         if "fmri_bold" in source_type_set:
             return "neuroimaging-context-interpretation-bound"
         if recipe_id == "feature-summary-cross-modal-screen":
@@ -3438,6 +3613,27 @@ class NeuroIntegrationWorkbench:
                 f"{label} is context only; confidence proxy {confidence:.3f} "
                 "does not indicate personhood, identity, or subjective sameness."
             )
+        if "clinical_metadata" in source_types:
+            return (
+                f"{label} uses clinical metadata only as interpretation context; "
+                f"confidence proxy {confidence:.3f} and uncertainty {uncertainty:.3f} "
+                "must not be treated as diagnosis."
+            )
+        if "omics" in source_types:
+            return (
+                f"{label} is molecular context only; confidence proxy "
+                f"{confidence:.3f} keeps sampling uncertainty {uncertainty:.3f} visible."
+            )
+        if "behavioral_task" in source_types:
+            return (
+                f"{label} is behavioral performance context; confidence proxy "
+                f"{confidence:.3f} does not establish ability or diagnosis."
+            )
+        if "biosensor" in source_types:
+            return (
+                f"{label} is autonomic biosignal context; confidence proxy "
+                f"{confidence:.3f} remains bounded by uncertainty {uncertainty:.3f}."
+            )
         return (
             f"{label} has a bounded interpretation confidence proxy "
             f"{confidence:.3f}; keep uncertainty {uncertainty:.3f} visible."
@@ -3454,6 +3650,14 @@ class NeuroIntegrationWorkbench:
             return "ask_operator_to_review_uncertainty_and_quality_refs"
         if "brain_organoid" in source_types:
             return "confirm_organoid_context_boundary_before_reporting"
+        if "clinical_metadata" in source_types:
+            return "confirm_clinical_context_is_not_reported_as_diagnosis"
+        if "omics" in source_types:
+            return "confirm_omics_sampling_context_before_reporting"
+        if "behavioral_task" in source_types:
+            return "confirm_behavioral_task_context_before_reporting"
+        if "biosensor" in source_types:
+            return "confirm_biosensor_context_before_reporting"
         return "accept_bounded_summary_for_non_ml_review"
 
     def _interpretation_agent_task(
@@ -3466,6 +3670,16 @@ class NeuroIntegrationWorkbench:
             return f"prepare_plain_language_seed_review_for_{source_label}"
         if recipe_id == "organoid-context-comparison":
             return f"prepare_context_boundary_review_for_{source_label}"
+        if recipe_id == "biosignal-autonomic-context-screen":
+            return f"prepare_biosignal_context_review_for_{source_label}"
+        if recipe_id == "behavioral-performance-context-screen":
+            return f"prepare_behavioral_context_review_for_{source_label}"
+        if recipe_id == "omics-physiology-context-screen":
+            return f"prepare_omics_context_review_for_{source_label}"
+        if recipe_id == "omics-clinical-context-screen":
+            return f"prepare_omics_clinical_context_review_for_{source_label}"
+        if recipe_id == "clinical-context-modulator-screen":
+            return f"prepare_clinical_context_modulator_review_for_{source_label}"
         return f"prepare_bounded_interpretation_review_for_{source_label}"
 
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
@@ -3563,6 +3777,131 @@ class NeuroIntegrationWorkbench:
             return {
                 "in_vitro_activity_proxy": self._round_score((burst_rate + synchrony) / 2.0),
                 "organoid_viability_proxy": self._round_score(viability),
+            }
+        if source_type == "biosensor":
+            heart_rate_variability = self._bounded_feature(
+                feature_summary,
+                "heart_rate_variability",
+                0.5,
+            )
+            skin_conductance = self._bounded_feature(
+                feature_summary,
+                "skin_conductance",
+                0.5,
+            )
+            respiration_regular = self._bounded_feature(
+                feature_summary,
+                "respiration_regular",
+                0.5,
+            )
+            temperature_stability = self._bounded_feature(
+                feature_summary,
+                "temperature_stability",
+                0.5,
+            )
+            physiological_stability = self._round_score(
+                (
+                    heart_rate_variability
+                    + respiration_regular
+                    + temperature_stability
+                )
+                / 3.0
+            )
+            return {
+                "autonomic_balance_proxy": physiological_stability,
+                "autonomic_arousal_proxy": self._round_score(skin_conductance),
+                "respiration_regular_proxy": self._round_score(respiration_regular),
+                "body_signal_quality_proxy": self._round_score(
+                    (physiological_stability + (1.0 - skin_conductance)) / 2.0
+                ),
+            }
+        if source_type == "behavioral_task":
+            reaction_time_stability = self._bounded_feature(
+                feature_summary,
+                "reaction_time_stability",
+                0.5,
+            )
+            attention_accuracy = self._bounded_feature(
+                feature_summary,
+                "attention_accuracy",
+                0.5,
+            )
+            fatigue_error = self._bounded_feature(
+                feature_summary,
+                "fatigue_error_proxy",
+                0.5,
+            )
+            return {
+                "behavioral_attention_proxy": self._round_score(attention_accuracy),
+                "response_stability_proxy": self._round_score(
+                    reaction_time_stability
+                ),
+                "fatigue_burden_proxy": self._round_score(fatigue_error),
+                "task_performance_quality_proxy": self._round_score(
+                    (
+                        reaction_time_stability
+                        + attention_accuracy
+                        + (1.0 - fatigue_error)
+                    )
+                    / 3.0
+                ),
+            }
+        if source_type == "omics":
+            inflammation = self._bounded_feature(
+                feature_summary,
+                "inflammation_marker_proxy",
+                0.5,
+            )
+            metabolic_stability = self._bounded_feature(
+                feature_summary,
+                "metabolic_stability_proxy",
+                0.5,
+            )
+            sampling_quality = self._bounded_feature(
+                feature_summary,
+                "sampling_quality_proxy",
+                0.5,
+            )
+            return {
+                "inflammation_context_proxy": self._round_score(inflammation),
+                "metabolic_stability_proxy": self._round_score(metabolic_stability),
+                "molecular_sampling_quality_proxy": self._round_score(
+                    sampling_quality
+                ),
+                "molecular_burden_proxy": self._round_score(
+                    (inflammation + (1.0 - metabolic_stability)) / 2.0
+                ),
+            }
+        if source_type == "clinical_metadata":
+            medication_context = self._bounded_feature(
+                feature_summary,
+                "medication_context_proxy",
+                0.5,
+            )
+            sleep_history = self._bounded_feature(
+                feature_summary,
+                "sleep_history_proxy",
+                0.5,
+            )
+            screening_completeness = self._bounded_feature(
+                feature_summary,
+                "screening_completeness",
+                0.5,
+            )
+            return {
+                "medication_context_proxy": self._round_score(medication_context),
+                "sleep_context_proxy": self._round_score(sleep_history),
+                "clinical_screening_completeness_proxy": self._round_score(
+                    screening_completeness
+                ),
+                "clinical_context_risk_proxy": self._round_score(
+                    (
+                        medication_context
+                        + sleep_history
+                        + (1.0 - screening_completeness)
+                    )
+                    / 3.0
+                ),
             }
         numeric_values = [
             float(value) for value in feature_summary.values() if isinstance(value, (int, float))

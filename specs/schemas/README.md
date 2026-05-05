@@ -64,7 +64,7 @@
 - `neuro_integration_measurement_quality_gate.schema`
   - collection run result を calibration / artifact QC / consent freshness / operator review / quality authority refs に束縛し、analysis planning 前の measurement quality gate を検証する
 - `neuro_integration_cross_modal_analysis_plan.schema`
-  - source bundle 内の全 source-type pair に bounded analysis recipe と connector support を割り当て、questionnaire + EEG seed から fMRI / 脳オルガノイド等へ広げる cross-modal analysis plan を検証する
+  - source bundle 内の全 source-type pair に bounded analysis recipe と connector support を割り当て、questionnaire + EEG seed から fMRI / 脳オルガノイド / biosensor / behavioral task / omics / clinical metadata へ広げる cross-modal analysis plan を検証する
 - `neuro_integration_cross_modal_analysis_run.schema`
   - cross-modal analysis plan の全 pair について bounded result summary、operator review readiness、coding-agent review readiness を digest-only で検証する
 - `neuro_integration_interpretation_synthesis.schema`

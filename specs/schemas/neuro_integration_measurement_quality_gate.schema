@@ -177,6 +177,10 @@ $defs:
       - seed-eeg-quality-gate-bound
       - neuroimaging-quality-context-bound
       - in-vitro-quality-context-bound
+      - biosignal-quality-context-bound
+      - behavioral-quality-context-bound
+      - omics-quality-context-bound
+      - clinical-metadata-quality-context-bound
       - generic-biodata-quality-gate-bound
   quality_axis_summary:
     type: object

@@ -456,6 +456,20 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertIn("behavioral_task", artifacts["source_bundle"]["source_types"])
         self.assertIn("omics", artifacts["source_bundle"]["source_types"])
         self.assertIn("clinical_metadata", artifacts["source_bundle"]["source_types"])
+        source_axes = {
+            source["source_type"]: source["analysis_axes"]
+            for source in artifacts["source_bundle"]["sources"]
+        }
+        self.assertIn("autonomic_balance_proxy", source_axes["biosensor"])
+        self.assertIn(
+            "task_performance_quality_proxy",
+            source_axes["behavioral_task"],
+        )
+        self.assertIn("molecular_burden_proxy", source_axes["omics"])
+        self.assertIn(
+            "clinical_context_risk_proxy",
+            source_axes["clinical_metadata"],
+        )
         self.assertEqual(1, artifacts["source_bundle"]["upstream_receipt_count"])
         self.assertTrue(artifacts["analysis"]["upstream_fusion_binding"]["bound"])
         self.assertTrue(artifacts["replacement_plan"]["replacement_plan_bound"])
@@ -502,6 +516,19 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             28,
             artifacts["cross_modal_analysis_plan"]["analysis_pair_count"],
         )
+        recipe_counts = {
+            item["analysis_recipe_id"]: item["pair_count"]
+            for item in artifacts["cross_modal_analysis_plan"]["recipe_catalog"]
+        }
+        self.assertEqual(1, recipe_counts["survey-eeg-feature-alignment"])
+        self.assertEqual(1, recipe_counts["neural-electrical-hemodynamic-context"])
+        self.assertEqual(7, recipe_counts["organoid-context-comparison"])
+        self.assertEqual(3, recipe_counts["biosignal-autonomic-context-screen"])
+        self.assertEqual(4, recipe_counts["behavioral-performance-context-screen"])
+        self.assertEqual(5, recipe_counts["omics-physiology-context-screen"])
+        self.assertEqual(1, recipe_counts["omics-clinical-context-screen"])
+        self.assertEqual(5, recipe_counts["clinical-context-modulator-screen"])
+        self.assertEqual(1, recipe_counts["feature-summary-cross-modal-screen"])
         self.assertTrue(
             artifacts["cross_modal_analysis_run"][
                 "cross_modal_analysis_run_bound"
@@ -511,6 +538,21 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             28,
             artifacts["cross_modal_analysis_run"]["result_count"],
         )
+        result_statuses = {
+            result["result_status"]
+            for result in artifacts["cross_modal_analysis_run"]["pair_results"]
+        }
+        self.assertTrue(
+            {
+                "seed-survey-eeg-result-bound",
+                "in-vitro-context-result-bound",
+                "biosignal-context-result-bound",
+                "behavioral-context-result-bound",
+                "omics-context-result-bound",
+                "clinical-context-result-bound",
+                "cross-modal-context-result-bound",
+            }.issubset(result_statuses)
+        )
         self.assertTrue(
             artifacts["interpretation_synthesis"][
                 "interpretation_synthesis_bound"
@@ -519,6 +561,21 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertEqual(
             28,
             artifacts["interpretation_synthesis"]["synthesis_card_count"],
+        )
+        interpretation_statuses = {
+            card["interpretation_status"]
+            for card in artifacts["interpretation_synthesis"]["synthesis_cards"]
+        }
+        self.assertTrue(
+            {
+                "seed-interpretation-bound",
+                "neuroimaging-context-interpretation-bound",
+                "in-vitro-context-interpretation-bound",
+                "biosignal-context-interpretation-bound",
+                "behavioral-context-interpretation-bound",
+                "omics-context-interpretation-bound",
+                "clinical-context-interpretation-bound",
+            }.issubset(interpretation_statuses)
         )
         self.assertEqual(28, validation["interpretation_card_count"])
         self.assertEqual(

@@ -59,6 +59,12 @@ expected:
   cross_modal_source_pair_coverage_bound: true
   cross_modal_analysis_payload_redacted: true
   analysis_pair_count: 28
+  modality_specific_open_biodata_recipes:
+    - biosignal-autonomic-context-screen
+    - behavioral-performance-context-screen
+    - omics-physiology-context-screen
+    - omics-clinical-context-screen
+    - clinical-context-modulator-screen
   cross_modal_analysis_run_bound: true
   cross_modal_analysis_run_digest_bound: true
   cross_modal_pair_results_bound: true
