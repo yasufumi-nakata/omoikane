@@ -21,6 +21,9 @@ NIW_COLLECTION_RUN_PROFILE_ID = "neuro-collection-run-v1"
 NIW_MEASUREMENT_QUALITY_GATE_PROFILE_ID = "neuro-measurement-quality-gate-v1"
 NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID = "neuro-cross-modal-analysis-plan-v1"
 NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID = "neuro-cross-modal-analysis-run-v1"
+NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID = (
+    "neuro-operator-interpretation-synthesis-v1"
+)
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -45,6 +48,9 @@ NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY = (
 )
 NIW_CROSS_MODAL_ANALYSIS_RUN_POLICY = (
     "pair-digest+bounded-result-summary+operator-review-only"
+)
+NIW_INTERPRETATION_SYNTHESIS_POLICY = (
+    "analysis-result-digest+plain-language-action-summary-only"
 )
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
@@ -166,6 +172,9 @@ class NeuroIntegrationWorkbench:
             "cross_modal_analysis_run_profile_id": (
                 NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID
             ),
+            "interpretation_synthesis_profile_id": (
+                NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID
+            ),
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
@@ -189,6 +198,9 @@ class NeuroIntegrationWorkbench:
                 NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY
             ),
             "cross_modal_analysis_run_policy": NIW_CROSS_MODAL_ANALYSIS_RUN_POLICY,
+            "interpretation_synthesis_policy": (
+                NIW_INTERPRETATION_SYNTHESIS_POLICY
+            ),
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -1461,6 +1473,163 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(run)
 
+    def synthesize_operator_interpretation(
+        self,
+        source_bundle: Dict[str, Any],
+        operator_guide: Dict[str, Any],
+        measurement_quality_gate: Dict[str, Any],
+        cross_modal_analysis_run: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self._check_source_bundle(source_bundle)
+        self._check_operator_guide(operator_guide)
+        self._check_measurement_quality_gate(measurement_quality_gate)
+        self._check_cross_modal_analysis_run(cross_modal_analysis_run)
+        if (
+            measurement_quality_gate["source_bundle_digest"]
+            != source_bundle["source_bundle_digest"]
+        ):
+            raise ValueError("measurement_quality_gate must bind source_bundle")
+        if (
+            cross_modal_analysis_run["source_bundle_digest"]
+            != source_bundle["source_bundle_digest"]
+        ):
+            raise ValueError("cross_modal_analysis_run must bind source_bundle")
+
+        quality_by_source_type = {
+            item["source_type"]: item
+            for item in measurement_quality_gate["quality_items"]
+        }
+        synthesis_cards = [
+            self._build_interpretation_card(pair_result, quality_by_source_type)
+            for pair_result in cross_modal_analysis_run["pair_results"]
+        ]
+        synthesis_card_digests = [
+            card["synthesis_card_digest"] for card in synthesis_cards
+        ]
+        synthesis_card_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID,
+                    "cross_modal_analysis_run_digest": cross_modal_analysis_run[
+                        "cross_modal_analysis_run_digest"
+                    ],
+                    "synthesis_card_digests": synthesis_card_digests,
+                }
+            )
+        )
+        all_cards_bound = all(
+            card["synthesis_card_bound"] for card in synthesis_cards
+        )
+        seed_synthesis_bound = any(
+            set(card["source_types"]) == set(NIW_SEED_SOURCE_TYPES)
+            and card["interpretation_status"] == "seed-interpretation-bound"
+            and card["synthesis_card_bound"]
+            for card in synthesis_cards
+        )
+        expansion_synthesis_bound = any(
+            any(source_type in NIW_EXPANSION_SOURCE_TYPES for source_type in card["source_types"])
+            and card["synthesis_card_bound"]
+            for card in synthesis_cards
+        )
+        result_summary = cross_modal_analysis_run["result_summary"]
+        quality_summary = measurement_quality_gate["quality_summary"]
+        synthesis_summary = {
+            "synthesis_card_count": len(synthesis_cards),
+            "bounded_card_count": sum(
+                1 for card in synthesis_cards if card["synthesis_card_bound"]
+            ),
+            "analysis_result_count": cross_modal_analysis_run["result_count"],
+            "quality_item_count": measurement_quality_gate["quality_item_count"],
+            "average_interpretation_confidence_proxy": self._round_score(
+                (
+                    result_summary["average_compatibility_score"]
+                    + quality_summary["average_measurement_quality_score"]
+                    + (1.0 - result_summary["max_uncertainty_proxy"])
+                )
+                / 3.0
+            ),
+            "max_uncertainty_proxy": result_summary["max_uncertainty_proxy"],
+        }
+        synthesis = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "interpretation_synthesis_ref": (
+                "interpretation-synthesis://neuro-integration/"
+                f"{new_id('niw-synthesis')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID,
+            "identity_id": source_bundle["identity_id"],
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "operator_guide_ref": operator_guide["guide_ref"],
+            "operator_guide_digest": operator_guide["guide_digest"],
+            "measurement_quality_gate_ref": measurement_quality_gate[
+                "measurement_quality_gate_ref"
+            ],
+            "measurement_quality_gate_digest": measurement_quality_gate[
+                "measurement_quality_gate_digest"
+            ],
+            "cross_modal_analysis_run_ref": cross_modal_analysis_run[
+                "cross_modal_analysis_run_ref"
+            ],
+            "cross_modal_analysis_run_digest": cross_modal_analysis_run[
+                "cross_modal_analysis_run_digest"
+            ],
+            "source_types": list(source_bundle["source_types"]),
+            "source_type_count": source_bundle["source_count"],
+            "synthesis_card_count": len(synthesis_cards),
+            "synthesis_cards": synthesis_cards,
+            "synthesis_card_digests": synthesis_card_digests,
+            "synthesis_card_digest_set": synthesis_card_digest_set,
+            "all_synthesis_cards_bound": all_cards_bound,
+            "seed_survey_eeg_synthesis_bound": seed_synthesis_bound,
+            "expansion_synthesis_bound": expansion_synthesis_bound,
+            "operator_action_ready": (
+                operator_guide["beginner_operator_supported"]
+                and cross_modal_analysis_run["operator_review_ready"]
+                and measurement_quality_gate["operator_review_ready"]
+                and all_cards_bound
+            ),
+            "coding_agent_action_ready": (
+                operator_guide["coding_agent_ready"]
+                and cross_modal_analysis_run["coding_agent_review_ready"]
+                and measurement_quality_gate["coding_agent_review_ready"]
+                and all_cards_bound
+            ),
+            "beginner_operator_supported": operator_guide[
+                "beginner_operator_supported"
+            ],
+            "llm_native_workflow_bound": operator_guide[
+                "llm_native_workflow_bound"
+            ],
+            "synthesis_summary": synthesis_summary,
+            "interpretation_synthesis_bound": (
+                source_bundle["seed_survey_eeg_bound"]
+                and measurement_quality_gate["measurement_quality_gate_bound"]
+                and cross_modal_analysis_run["cross_modal_analysis_run_bound"]
+                and all_cards_bound
+                and seed_synthesis_bound
+                and expansion_synthesis_bound
+            ),
+            "storage_policy": NIW_INTERPRETATION_SYNTHESIS_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_source_payload_stored": False,
+            "raw_quality_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "raw_interpretation_payload_stored": False,
+            "raw_agent_task_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        synthesis["interpretation_synthesis_digest"] = sha256_text(
+            canonical_json(self._interpretation_synthesis_digest_payload(synthesis))
+        )
+        return deepcopy(synthesis)
+
     def validate_integration_bundle(
         self,
         app_receipts: Sequence[Dict[str, Any]],
@@ -1475,6 +1644,7 @@ class NeuroIntegrationWorkbench:
         collection_protocol: Dict[str, Any] | None = None,
         collection_run: Dict[str, Any] | None = None,
         measurement_quality_gate: Dict[str, Any] | None = None,
+        interpretation_synthesis: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -1546,6 +1716,15 @@ class NeuroIntegrationWorkbench:
                 errors.append(str(exc))
             if collection_run is None:
                 errors.append("measurement_quality_gate requires collection_run")
+        if interpretation_synthesis is not None:
+            try:
+                self._check_interpretation_synthesis(interpretation_synthesis)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if measurement_quality_gate is None:
+                errors.append("interpretation_synthesis requires measurement_quality_gate")
+            if cross_modal_analysis_run is None:
+                errors.append("interpretation_synthesis requires cross_modal_analysis_run")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -1943,6 +2122,72 @@ class NeuroIntegrationWorkbench:
                     )
                 ),
             }
+        interpretation_synthesis_checks: Dict[str, bool] = {}
+        if interpretation_synthesis is not None:
+            interpretation_synthesis_digest_bound = (
+                interpretation_synthesis.get("interpretation_synthesis_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._interpretation_synthesis_digest_payload(
+                            interpretation_synthesis
+                        )
+                    )
+                )
+            )
+            expected_guide_digest = operator_guide.get("guide_digest")
+            expected_gate_digest = (
+                measurement_quality_gate.get("measurement_quality_gate_digest")
+                if measurement_quality_gate is not None
+                else ""
+            )
+            expected_run_digest = (
+                cross_modal_analysis_run.get("cross_modal_analysis_run_digest")
+                if cross_modal_analysis_run is not None
+                else ""
+            )
+            interpretation_synthesis_checks = {
+                "interpretation_synthesis_digest_bound": (
+                    interpretation_synthesis_digest_bound
+                ),
+                "interpretation_synthesis_bound": (
+                    interpretation_synthesis.get(
+                        "interpretation_synthesis_bound"
+                    )
+                    is True
+                    and interpretation_synthesis.get("source_bundle_digest")
+                    == source_bundle.get("source_bundle_digest")
+                    and interpretation_synthesis.get("operator_guide_digest")
+                    == expected_guide_digest
+                    and interpretation_synthesis.get(
+                        "measurement_quality_gate_digest"
+                    )
+                    == expected_gate_digest
+                    and interpretation_synthesis.get(
+                        "cross_modal_analysis_run_digest"
+                    )
+                    == expected_run_digest
+                ),
+                "interpretation_synthesis_cards_bound": (
+                    interpretation_synthesis.get("all_synthesis_cards_bound")
+                    is True
+                    and interpretation_synthesis.get("synthesis_card_count")
+                    == (
+                        cross_modal_analysis_run.get("result_count", 0)
+                        if cross_modal_analysis_run is not None
+                        else 0
+                    )
+                ),
+                "interpretation_operator_action_ready": (
+                    interpretation_synthesis.get("operator_action_ready") is True
+                    and interpretation_synthesis.get("coding_agent_action_ready")
+                    is True
+                ),
+                "interpretation_payload_redacted": (
+                    self._interpretation_synthesis_payload_redacted(
+                        interpretation_synthesis
+                    )
+                ),
+            }
 
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
@@ -1969,6 +2214,7 @@ class NeuroIntegrationWorkbench:
             **measurement_quality_gate_checks,
             **cross_modal_plan_checks,
             **cross_modal_run_checks,
+            **interpretation_synthesis_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -2018,6 +2264,11 @@ class NeuroIntegrationWorkbench:
             "analysis_result_count": (
                 cross_modal_analysis_run.get("result_count", 0)
                 if cross_modal_analysis_run is not None
+                else 0
+            ),
+            "interpretation_card_count": (
+                interpretation_synthesis.get("synthesis_card_count", 0)
+                if interpretation_synthesis is not None
                 else 0
             ),
             "claim_ceiling": NIW_CLAIM_CEILING,
@@ -2926,6 +3177,94 @@ class NeuroIntegrationWorkbench:
         )
         return item
 
+    def _build_interpretation_card(
+        self,
+        pair_result: Dict[str, Any],
+        quality_by_source_type: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        source_types = list(pair_result["source_types"])
+        quality_items = [
+            quality_by_source_type[source_type]
+            for source_type in source_types
+            if source_type in quality_by_source_type
+        ]
+        average_quality = self._round_score(
+            sum(
+                item["quality_axis_summary"]["measurement_quality_score"]
+                for item in quality_items
+            )
+            / max(len(quality_items), 1)
+        )
+        compatibility = pair_result["result_axis_summary"][
+            "bounded_compatibility_score"
+        ]
+        uncertainty = pair_result["result_axis_summary"]["uncertainty_proxy"]
+        confidence = self._round_score(
+            (average_quality + compatibility + (1.0 - uncertainty)) / 3.0
+        )
+        interpretation_status = self._interpretation_status(
+            source_types,
+            pair_result["analysis_recipe_id"],
+        )
+        card = {
+            "synthesis_card_ref": (
+                "synthesis-card://neuro-integration/"
+                f"{new_id('niw-synthesis-card')}"
+            ),
+            "result_ref": pair_result["result_ref"],
+            "result_digest": pair_result["result_digest"],
+            "source_types": source_types,
+            "analysis_recipe_id": pair_result["analysis_recipe_id"],
+            "interpretation_status": interpretation_status,
+            "plain_language_summary": self._interpretation_plain_summary(
+                source_types,
+                confidence,
+                uncertainty,
+            ),
+            "operator_next_action": self._interpretation_operator_action(
+                source_types,
+                uncertainty,
+            ),
+            "coding_agent_task": self._interpretation_agent_task(
+                source_types,
+                pair_result["analysis_recipe_id"],
+            ),
+            "quality_item_digests": [
+                item["quality_item_digest"] for item in quality_items
+            ],
+            "interpretation_axis_summary": {
+                "bounded_compatibility_score": compatibility,
+                "average_measurement_quality_score": average_quality,
+                "uncertainty_proxy": uncertainty,
+                "interpretation_confidence_proxy": confidence,
+            },
+            "evidence_refs": [
+                pair_result["result_ref"],
+                *pair_result["evidence_refs"],
+                *[item["quality_item_ref"] for item in quality_items],
+                *[item["quality_authority_ref"] for item in quality_items],
+            ],
+            "requires_ml_expertise": False,
+            "synthesis_card_bound": (
+                pair_result["result_bound"]
+                and len(quality_items) == len(source_types)
+                and all(item["quality_item_bound"] for item in quality_items)
+                and confidence >= 0.5
+            ),
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_interpretation_payload_stored": False,
+            "raw_quality_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        card["synthesis_card_digest"] = sha256_text(
+            canonical_json(self._synthesis_card_digest_payload(card))
+        )
+        return card
+
     def _collection_method_id(self, source_type: str) -> str:
         return {
             "questionnaire": "self-report-questionnaire-feature-window",
@@ -3065,6 +3404,69 @@ class NeuroIntegrationWorkbench:
         if recipe_id == "organoid-context-comparison":
             return "review_organoid_context_boundary"
         return "review_generic_cross_modal_result_summary"
+
+    def _interpretation_status(
+        self,
+        source_types: Sequence[str],
+        recipe_id: str,
+    ) -> str:
+        source_type_set = set(source_types)
+        if source_type_set == set(NIW_SEED_SOURCE_TYPES):
+            return "seed-interpretation-bound"
+        if "brain_organoid" in source_type_set:
+            return "in-vitro-context-interpretation-bound"
+        if "fmri_bold" in source_type_set:
+            return "neuroimaging-context-interpretation-bound"
+        if recipe_id == "feature-summary-cross-modal-screen":
+            return "generic-biodata-interpretation-bound"
+        return "cross-modal-context-interpretation-bound"
+
+    def _interpretation_plain_summary(
+        self,
+        source_types: Sequence[str],
+        confidence: float,
+        uncertainty: float,
+    ) -> str:
+        label = " + ".join(source_types)
+        if set(source_types) == set(NIW_SEED_SOURCE_TYPES):
+            return (
+                f"{label} can be reviewed as the seed alignment with confidence "
+                f"proxy {confidence:.3f} and uncertainty {uncertainty:.3f}."
+            )
+        if "brain_organoid" in source_types:
+            return (
+                f"{label} is context only; confidence proxy {confidence:.3f} "
+                "does not indicate personhood, identity, or subjective sameness."
+            )
+        return (
+            f"{label} has a bounded interpretation confidence proxy "
+            f"{confidence:.3f}; keep uncertainty {uncertainty:.3f} visible."
+        )
+
+    def _interpretation_operator_action(
+        self,
+        source_types: Sequence[str],
+        uncertainty: float,
+    ) -> str:
+        if set(source_types) == set(NIW_SEED_SOURCE_TYPES):
+            return "review_seed_questionnaire_eeg_card_before_expansion_context"
+        if uncertainty >= 0.35:
+            return "ask_operator_to_review_uncertainty_and_quality_refs"
+        if "brain_organoid" in source_types:
+            return "confirm_organoid_context_boundary_before_reporting"
+        return "accept_bounded_summary_for_non_ml_review"
+
+    def _interpretation_agent_task(
+        self,
+        source_types: Sequence[str],
+        recipe_id: str,
+    ) -> str:
+        source_label = "_".join(source_types)
+        if recipe_id == "survey-eeg-feature-alignment":
+            return f"prepare_plain_language_seed_review_for_{source_label}"
+        if recipe_id == "organoid-context-comparison":
+            return f"prepare_context_boundary_review_for_{source_label}"
+        return f"prepare_bounded_interpretation_review_for_{source_label}"
 
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(source_manifest, dict):
@@ -3727,6 +4129,82 @@ class NeuroIntegrationWorkbench:
         if run.get("result_digest_set") != expected_result_digest_set:
             raise ValueError("cross_modal_analysis_run.result_digest_set mismatch")
 
+    def _check_interpretation_synthesis(
+        self,
+        synthesis: Dict[str, Any],
+    ) -> None:
+        if not isinstance(synthesis, dict):
+            raise ValueError("interpretation_synthesis must be a mapping")
+        if synthesis.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("interpretation_synthesis.schema_version mismatch")
+        if synthesis.get("profile_id") != NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID:
+            raise ValueError("interpretation_synthesis.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._interpretation_synthesis_digest_payload(synthesis))
+        )
+        if synthesis.get("interpretation_synthesis_digest") != expected_digest:
+            raise ValueError(
+                "interpretation_synthesis.interpretation_synthesis_digest mismatch"
+            )
+        if synthesis.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("interpretation_synthesis.claim_ceiling mismatch")
+        if synthesis.get("storage_policy") != NIW_INTERPRETATION_SYNTHESIS_POLICY:
+            raise ValueError("interpretation_synthesis.storage_policy mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+            "upload_readiness_claimed",
+        ):
+            if synthesis.get(field_name) is not False:
+                raise ValueError(f"interpretation_synthesis.{field_name} must be false")
+        cards = synthesis.get("synthesis_cards")
+        if not isinstance(cards, list) or not cards:
+            raise ValueError(
+                "interpretation_synthesis.synthesis_cards must be a non-empty list"
+            )
+        if any(not isinstance(card, dict) for card in cards):
+            raise ValueError(
+                "interpretation_synthesis.synthesis_cards must contain mappings"
+            )
+        if synthesis.get("synthesis_card_count") != len(cards):
+            raise ValueError(
+                "interpretation_synthesis.synthesis_card_count must match cards"
+            )
+        card_digests = []
+        for card in cards:
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+                "upload_readiness_claimed",
+            ):
+                if card.get(field_name) is not False:
+                    raise ValueError(f"synthesis_card.{field_name} must be false")
+            expected_card_digest = sha256_text(
+                canonical_json(self._synthesis_card_digest_payload(card))
+            )
+            if card.get("synthesis_card_digest") != expected_card_digest:
+                raise ValueError("synthesis_card.synthesis_card_digest mismatch")
+            card_digests.append(expected_card_digest)
+        if synthesis.get("synthesis_card_digests") != card_digests:
+            raise ValueError("interpretation_synthesis.synthesis_card_digests mismatch")
+        expected_card_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID,
+                    "cross_modal_analysis_run_digest": synthesis.get(
+                        "cross_modal_analysis_run_digest"
+                    ),
+                    "synthesis_card_digests": card_digests,
+                }
+            )
+        )
+        if synthesis.get("synthesis_card_digest_set") != expected_card_digest_set:
+            raise ValueError(
+                "interpretation_synthesis.synthesis_card_digest_set mismatch"
+            )
+
     def _normalize_operator_profile(self, operator_profile: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(operator_profile, dict):
             raise ValueError("operator_profile must be a mapping")
@@ -3922,6 +4400,24 @@ class NeuroIntegrationWorkbench:
         )
         return run_raw_flags and result_raw_flags
 
+    def _interpretation_synthesis_payload_redacted(
+        self,
+        synthesis: Dict[str, Any],
+    ) -> bool:
+        synthesis_raw_flags = all(
+            synthesis.get(field_name) is False
+            for field_name in synthesis
+            if field_name.startswith("raw_")
+        )
+        card_raw_flags = all(
+            card.get(field_name) is False
+            for card in synthesis.get("synthesis_cards", [])
+            if isinstance(card, dict)
+            for field_name in card
+            if field_name.startswith("raw_")
+        )
+        return synthesis_raw_flags and card_raw_flags
+
     def _upstream_receipt_digest_set(
         self,
         upstream_receipt_bindings: Sequence[Dict[str, Any]],
@@ -4017,6 +4513,25 @@ class NeuroIntegrationWorkbench:
             "requires_ml_expertise": result.get("requires_ml_expertise"),
             "result_bound": result.get("result_bound"),
             "claim_ceiling": result.get("claim_ceiling"),
+        }
+
+    def _synthesis_card_digest_payload(self, card: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "result_digest": card.get("result_digest"),
+            "source_types": card.get("source_types"),
+            "analysis_recipe_id": card.get("analysis_recipe_id"),
+            "interpretation_status": card.get("interpretation_status"),
+            "plain_language_summary": card.get("plain_language_summary"),
+            "operator_next_action": card.get("operator_next_action"),
+            "coding_agent_task": card.get("coding_agent_task"),
+            "quality_item_digests": card.get("quality_item_digests"),
+            "interpretation_axis_summary": card.get(
+                "interpretation_axis_summary"
+            ),
+            "evidence_refs": card.get("evidence_refs"),
+            "requires_ml_expertise": card.get("requires_ml_expertise"),
+            "synthesis_card_bound": card.get("synthesis_card_bound"),
+            "claim_ceiling": card.get("claim_ceiling"),
         }
 
     def _collection_step_digest_payload(self, step: Dict[str, Any]) -> Dict[str, Any]:
@@ -4390,4 +4905,52 @@ class NeuroIntegrationWorkbench:
                 "cross_modal_analysis_run_bound"
             ),
             "claim_ceiling": run.get("claim_ceiling"),
+        }
+
+    def _interpretation_synthesis_digest_payload(
+        self,
+        synthesis: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": synthesis.get("profile_id"),
+            "identity_id": synthesis.get("identity_id"),
+            "source_bundle_digest": synthesis.get("source_bundle_digest"),
+            "operator_guide_digest": synthesis.get("operator_guide_digest"),
+            "measurement_quality_gate_digest": synthesis.get(
+                "measurement_quality_gate_digest"
+            ),
+            "cross_modal_analysis_run_digest": synthesis.get(
+                "cross_modal_analysis_run_digest"
+            ),
+            "source_types": synthesis.get("source_types"),
+            "source_type_count": synthesis.get("source_type_count"),
+            "synthesis_card_count": synthesis.get("synthesis_card_count"),
+            "synthesis_card_digest_set": synthesis.get(
+                "synthesis_card_digest_set"
+            ),
+            "all_synthesis_cards_bound": synthesis.get(
+                "all_synthesis_cards_bound"
+            ),
+            "seed_survey_eeg_synthesis_bound": synthesis.get(
+                "seed_survey_eeg_synthesis_bound"
+            ),
+            "expansion_synthesis_bound": synthesis.get(
+                "expansion_synthesis_bound"
+            ),
+            "operator_action_ready": synthesis.get("operator_action_ready"),
+            "coding_agent_action_ready": synthesis.get(
+                "coding_agent_action_ready"
+            ),
+            "beginner_operator_supported": synthesis.get(
+                "beginner_operator_supported"
+            ),
+            "llm_native_workflow_bound": synthesis.get(
+                "llm_native_workflow_bound"
+            ),
+            "synthesis_summary": synthesis.get("synthesis_summary"),
+            "interpretation_synthesis_bound": synthesis.get(
+                "interpretation_synthesis_bound"
+            ),
+            "storage_policy": synthesis.get("storage_policy"),
+            "claim_ceiling": synthesis.get("claim_ceiling"),
         }

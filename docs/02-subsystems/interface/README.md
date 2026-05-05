@@ -34,13 +34,16 @@
   cross-modal analysis plan を束縛する
 - cross-modal analysis plan の全 pair から bounded result summary を生成し、operator /
   coding-agent review readiness を raw result payload なしで束縛する
+- measurement quality gate と cross-modal analysis run から plain-language synthesis cards と
+  coding-agent task を作り、非 ML operator が確認できる interpretation synthesis に束縛する
 - 非 ML 専門家向け plain-language guide と coding agent 向け task template を同じ receipt に入れる
 - fMRI と脳オルガノイドは expansion context であり、意識再現や本人同一性の証明にはしない
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
   で BDT Survey EEG Fusion receipt binding、expansion modality binding、replacement lane coverage、
   source-type lane coverage、connector bundle binding、collection protocol binding、
   collection run binding、measurement quality gate binding、cross-modal analysis pair coverage、
-  bounded result summary binding、raw payload redaction、claim ceiling をまとめて検証する
+  bounded result summary binding、interpretation synthesis binding、raw payload redaction、
+  claim ceiling をまとめて検証する
 
 ### Observation Integration Workbench (OIW)
 - 人類が取得・計測してきた source を、human biodata、neuroscience、clinical health、

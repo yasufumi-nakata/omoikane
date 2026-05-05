@@ -469,6 +469,12 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["no_semantic_thought_content_claim"])
         self.assertFalse(result["validation"]["semantic_thought_content_generated"])
         self.assertEqual(6, result["validation"]["analysis_result_count"])
+        self.assertTrue(result["validation"]["interpretation_synthesis_bound"])
+        self.assertTrue(result["validation"]["interpretation_synthesis_digest_bound"])
+        self.assertTrue(result["validation"]["interpretation_synthesis_cards_bound"])
+        self.assertTrue(result["validation"]["interpretation_operator_action_ready"])
+        self.assertTrue(result["validation"]["interpretation_payload_redacted"])
+        self.assertEqual(6, result["validation"]["interpretation_card_count"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
@@ -491,6 +497,9 @@ class CliIntegrationTests(unittest.TestCase):
         )
         self.assertTrue(
             result["cross_modal_analysis_run"]["cross_modal_analysis_run_bound"]
+        )
+        self.assertTrue(
+            result["interpretation_synthesis"]["interpretation_synthesis_bound"]
         )
 
     def test_observation_integration_demo_emits_universal_observation_package(self) -> None:

@@ -22,6 +22,7 @@ imports:
   neuro_integration_measurement_quality_gate: ../schemas/neuro_integration_measurement_quality_gate.schema
   neuro_integration_cross_modal_analysis_plan: ../schemas/neuro_integration_cross_modal_analysis_plan.schema
   neuro_integration_cross_modal_analysis_run: ../schemas/neuro_integration_cross_modal_analysis_run.schema
+  neuro_integration_interpretation_synthesis: ../schemas/neuro_integration_interpretation_synthesis.schema
 operations:
   register_application:
     summary: Register one measurement, analysis, curation, operator-copilot, or agent-automation app as a replaceable workbench lane.
@@ -456,8 +457,36 @@ operations:
       - operator and coding-agent review readiness must be explicit
       - raw source, analysis, connector, and result payload storage must remain false
       - diagnosis, consciousness reproduction, and identity replacement claims must remain false
+  synthesize_operator_interpretation:
+    summary: Bind measurement quality and cross-modal analysis results into plain-language cards and coding-agent tasks for non-ML review.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - operator_guide
+          - measurement_quality_gate
+          - cross_modal_analysis_run
+        properties:
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          operator_guide:
+            schema_ref: neuro_integration_operator_guide
+          measurement_quality_gate:
+            schema_ref: neuro_integration_measurement_quality_gate
+          cross_modal_analysis_run:
+            schema_ref: neuro_integration_cross_modal_analysis_run
+    output:
+      schema_ref: neuro_integration_interpretation_synthesis
+    guarantees:
+      - every cross-modal analysis result must produce one plain-language synthesis card
+      - each synthesis card must bind measurement quality item digests before operator action
+      - questionnaire plus EEG seed interpretation must remain explicit before expansion context
+      - non-ML operator next actions and coding-agent tasks must require no ML expertise
+      - raw source, analysis, quality, interpretation, and agent-task payload storage must remain false
+      - diagnosis, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, and optional cross-modal analysis-run digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, optional cross-modal analysis-run, and optional interpretation-synthesis digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -495,6 +524,8 @@ operations:
             schema_ref: neuro_integration_cross_modal_analysis_plan
           cross_modal_analysis_run:
             schema_ref: neuro_integration_cross_modal_analysis_run
+          interpretation_synthesis:
+            schema_ref: neuro_integration_interpretation_synthesis
     output:
       inline_schema:
         type: object
@@ -536,6 +567,11 @@ operations:
           - cross_modal_analysis_run_digest_bound
           - cross_modal_pair_results_bound
           - cross_modal_result_payload_redacted
+          - interpretation_synthesis_bound
+          - interpretation_synthesis_digest_bound
+          - interpretation_synthesis_cards_bound
+          - interpretation_operator_action_ready
+          - interpretation_payload_redacted
           - claim_ceiling_bound
           - raw_payload_redacted
           - no_diagnosis_or_identity_claim
@@ -615,6 +651,16 @@ operations:
             type: boolean
           cross_modal_result_payload_redacted:
             type: boolean
+          interpretation_synthesis_bound:
+            type: boolean
+          interpretation_synthesis_digest_bound:
+            type: boolean
+          interpretation_synthesis_cards_bound:
+            type: boolean
+          interpretation_operator_action_ready:
+            type: boolean
+          interpretation_payload_redacted:
+            type: boolean
           claim_ceiling_bound:
             type: boolean
           raw_payload_redacted:
@@ -641,6 +687,9 @@ operations:
           analysis_result_count:
             type: integer
             minimum: 0
+          interpretation_card_count:
+            type: integer
+            minimum: 0
 events:
   - name: neuro_integration_workbench.source_bundle.bound
     payload_schema: neuro_integration_source_bundle
@@ -660,3 +709,5 @@ events:
     payload_schema: neuro_integration_cross_modal_analysis_plan
   - name: neuro_integration_workbench.cross_modal_analysis_run.bound
     payload_schema: neuro_integration_cross_modal_analysis_run
+  - name: neuro_integration_workbench.interpretation_synthesis.bound
+    payload_schema: neuro_integration_interpretation_synthesis

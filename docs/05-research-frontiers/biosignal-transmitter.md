@@ -1,7 +1,7 @@
 ---
 status: in-progress
 priority: T0
-last_revisit: 2026-05-05
+last_revisit: 2026-05-06
 researcher: yasufumi
 ---
 
@@ -62,6 +62,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   全ペアへ bounded recipe と connector support を割り当てる。
 - 続いて NIW は cross-modal analysis run を追加し、全 pair の bounded result summary と
   operator / coding-agent review readiness を digest-only receipt として束縛する。
+- 2026-05-06 時点で NIW は interpretation synthesis receipt を追加し、measurement quality
+  gate と cross-modal analysis run を plain-language synthesis cards と coding-agent tasks に
+  束縛する。
 
 ## ブロッキング要因
 
@@ -126,6 +129,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - cross-modal analysis run は bounded compatibility / uncertainty summary だけを返し、
   medical-grade result、semantic thought content、subjective equivalence、upload readiness には
   昇格しない
+- interpretation synthesis は quality item digest と analysis result digest から
+  non-ML operator next action と coding-agent task を作るだけで、診断、因果推論、
+  semantic thought content、subjective equivalence、upload readiness には昇格しない
 - Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
   BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない

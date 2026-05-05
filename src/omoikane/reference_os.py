@@ -11487,6 +11487,14 @@ json.dump(response, sys.stdout)
                 cross_modal_analysis_plan,
             )
         )
+        interpretation_synthesis = (
+            self.neuro_integration_workbench.synthesize_operator_interpretation(
+                source_bundle,
+                operator_guide,
+                measurement_quality_gate,
+                cross_modal_analysis_run,
+            )
+        )
         validation = self.neuro_integration_workbench.validate_integration_bundle(
             app_receipts,
             source_bundle,
@@ -11500,6 +11508,7 @@ json.dump(response, sys.stdout)
             collection_protocol=collection_protocol,
             collection_run=collection_run,
             measurement_quality_gate=measurement_quality_gate,
+            interpretation_synthesis=interpretation_synthesis,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11925,6 +11934,60 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.interpretation_synthesis.bound",
+            payload={
+                "interpretation_synthesis_ref": interpretation_synthesis[
+                    "interpretation_synthesis_ref"
+                ],
+                "interpretation_synthesis_digest": interpretation_synthesis[
+                    "interpretation_synthesis_digest"
+                ],
+                "source_bundle_digest": interpretation_synthesis[
+                    "source_bundle_digest"
+                ],
+                "measurement_quality_gate_digest": interpretation_synthesis[
+                    "measurement_quality_gate_digest"
+                ],
+                "cross_modal_analysis_run_digest": interpretation_synthesis[
+                    "cross_modal_analysis_run_digest"
+                ],
+                "synthesis_card_digest_set": interpretation_synthesis[
+                    "synthesis_card_digest_set"
+                ],
+                "synthesis_card_count": interpretation_synthesis[
+                    "synthesis_card_count"
+                ],
+                "all_synthesis_cards_bound": interpretation_synthesis[
+                    "all_synthesis_cards_bound"
+                ],
+                "seed_survey_eeg_synthesis_bound": interpretation_synthesis[
+                    "seed_survey_eeg_synthesis_bound"
+                ],
+                "expansion_synthesis_bound": interpretation_synthesis[
+                    "expansion_synthesis_bound"
+                ],
+                "operator_action_ready": interpretation_synthesis[
+                    "operator_action_ready"
+                ],
+                "coding_agent_action_ready": interpretation_synthesis[
+                    "coding_agent_action_ready"
+                ],
+                "interpretation_synthesis_bound": interpretation_synthesis[
+                    "interpretation_synthesis_bound"
+                ],
+                "claim_ceiling": interpretation_synthesis["claim_ceiling"],
+                "raw_interpretation_payload_stored": interpretation_synthesis[
+                    "raw_interpretation_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-interpretation",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -11945,6 +12008,7 @@ json.dump(response, sys.stdout)
             "measurement_quality_gate": measurement_quality_gate,
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
+            "interpretation_synthesis": interpretation_synthesis,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -12011,6 +12075,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "cross_modal_analysis_run",
                     "schema_path": "specs/schemas/neuro_integration_cross_modal_analysis_run.schema",
                     "contract_role": "neuro-integration-cross-modal-analysis-run",
+                },
+                {
+                    "payload_path": "interpretation_synthesis",
+                    "schema_path": "specs/schemas/neuro_integration_interpretation_synthesis.schema",
+                    "contract_role": "neuro-integration-interpretation-synthesis",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

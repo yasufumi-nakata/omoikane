@@ -184,12 +184,15 @@ cross-modal analysis plan は
 現在の source type 全ペアに bounded recipe と connector support を割り当て、
 questionnaire + EEG seed から fMRI / brain organoid context へ分析計画を広げる。analysis run は
 全 pair の bounded result summary、operator review readiness、coding-agent review readiness を
-digest-only で返す。
+digest-only で返す。interpretation synthesis は measurement quality gate と analysis run を
+plain-language synthesis cards と coding-agent tasks に束縛し、非 ML operator が確認できる
+bounded next action だけを返す。
 非 ML 専門家向け plain-language cards と coding agent 向け task template を同じ operator guide に入れる。claim ceiling は
 `feature-alignment-and-analysis-plan-only` で、raw questionnaire / EEG /
 neuroimaging / organoid / analysis / connector / collection / collection-result /
-quality / calibration / artifact / consent / plan / result payload、semantic thought content、clinical diagnosis、
-consciousness reproduction、identity replacement は保持または主張しない。
+quality / calibration / artifact / consent / plan / result / interpretation / agent-task
+payload、semantic thought content、clinical diagnosis、consciousness reproduction、
+identity replacement、upload readiness は保持または主張しない。
 
 `observation-integration-demo` は L6 Observation Integration Workbench の reference contract
 (`interface.observation_integration_workbench.v0`) を JSON で可視化し、人類が取得・

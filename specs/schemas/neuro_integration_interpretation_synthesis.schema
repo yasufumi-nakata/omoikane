@@ -1,0 +1,325 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_interpretation_synthesis.schema"
+title: NeuroIntegrationInterpretationSynthesis
+description: >
+  Digest-only plain-language interpretation synthesis receipt for non-ML
+  operators and coding agents after measurement quality gating and cross-modal
+  analysis execution.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - interpretation_synthesis_ref
+  - created_at
+  - profile_id
+  - identity_id
+  - source_bundle_ref
+  - source_bundle_digest
+  - operator_guide_ref
+  - operator_guide_digest
+  - measurement_quality_gate_ref
+  - measurement_quality_gate_digest
+  - cross_modal_analysis_run_ref
+  - cross_modal_analysis_run_digest
+  - source_types
+  - source_type_count
+  - synthesis_card_count
+  - synthesis_cards
+  - synthesis_card_digests
+  - synthesis_card_digest_set
+  - all_synthesis_cards_bound
+  - seed_survey_eeg_synthesis_bound
+  - expansion_synthesis_bound
+  - operator_action_ready
+  - coding_agent_action_ready
+  - beginner_operator_supported
+  - llm_native_workflow_bound
+  - synthesis_summary
+  - interpretation_synthesis_bound
+  - storage_policy
+  - claim_ceiling
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_source_payload_stored
+  - raw_quality_payload_stored
+  - raw_analysis_payload_stored
+  - raw_interpretation_payload_stored
+  - raw_agent_task_payload_stored
+  - clinical_diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - upload_readiness_claimed
+  - interpretation_synthesis_digest
+properties:
+  schema_version:
+    const: "1.0"
+  interpretation_synthesis_ref:
+    type: string
+    pattern: "^interpretation-synthesis://neuro-integration/niw-synthesis-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: neuro-operator-interpretation-synthesis-v1
+  identity_id:
+    type: string
+    minLength: 1
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+  operator_guide_ref:
+    type: string
+    pattern: "^operator-guide://neuro-integration/niw-guide-[a-f0-9]{12}$"
+  operator_guide_digest:
+    $ref: "#/$defs/sha256"
+  measurement_quality_gate_ref:
+    type: string
+    pattern: "^quality-gate://neuro-integration/niw-quality-gate-[a-f0-9]{12}$"
+  measurement_quality_gate_digest:
+    $ref: "#/$defs/sha256"
+  cross_modal_analysis_run_ref:
+    type: string
+    pattern: "^cross-modal-analysis-run://neuro-integration/niw-cross-modal-run-[a-f0-9]{12}$"
+  cross_modal_analysis_run_digest:
+    $ref: "#/$defs/sha256"
+  source_types:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  source_type_count:
+    type: integer
+    minimum: 2
+  synthesis_card_count:
+    type: integer
+    minimum: 1
+  synthesis_cards:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/synthesis_card"
+  synthesis_card_digests:
+    type: array
+    minItems: 1
+    items:
+      $ref: "#/$defs/sha256"
+  synthesis_card_digest_set:
+    $ref: "#/$defs/sha256"
+  all_synthesis_cards_bound:
+    const: true
+  seed_survey_eeg_synthesis_bound:
+    const: true
+  expansion_synthesis_bound:
+    const: true
+  operator_action_ready:
+    const: true
+  coding_agent_action_ready:
+    const: true
+  beginner_operator_supported:
+    const: true
+  llm_native_workflow_bound:
+    const: true
+  synthesis_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - synthesis_card_count
+      - bounded_card_count
+      - analysis_result_count
+      - quality_item_count
+      - average_interpretation_confidence_proxy
+      - max_uncertainty_proxy
+    properties:
+      synthesis_card_count:
+        type: integer
+        minimum: 1
+      bounded_card_count:
+        type: integer
+        minimum: 1
+      analysis_result_count:
+        type: integer
+        minimum: 1
+      quality_item_count:
+        type: integer
+        minimum: 1
+      average_interpretation_confidence_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      max_uncertainty_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+  interpretation_synthesis_bound:
+    const: true
+  storage_policy:
+    const: analysis-result-digest+plain-language-action-summary-only
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/neurodata-integration
+  raw_source_payload_stored:
+    const: false
+  raw_quality_payload_stored:
+    const: false
+  raw_analysis_payload_stored:
+    const: false
+  raw_interpretation_payload_stored:
+    const: false
+  raw_agent_task_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  upload_readiness_claimed:
+    const: false
+  interpretation_synthesis_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  interpretation_status:
+    enum:
+      - seed-interpretation-bound
+      - neuroimaging-context-interpretation-bound
+      - in-vitro-context-interpretation-bound
+      - generic-biodata-interpretation-bound
+      - cross-modal-context-interpretation-bound
+  analysis_recipe_id:
+    enum:
+      - survey-eeg-feature-alignment
+      - neural-electrical-hemodynamic-context
+      - organoid-context-comparison
+      - feature-summary-cross-modal-screen
+  interpretation_axis_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - bounded_compatibility_score
+      - average_measurement_quality_score
+      - uncertainty_proxy
+      - interpretation_confidence_proxy
+    properties:
+      bounded_compatibility_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      average_measurement_quality_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      uncertainty_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      interpretation_confidence_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+  synthesis_card:
+    type: object
+    additionalProperties: false
+    required:
+      - synthesis_card_ref
+      - result_ref
+      - result_digest
+      - source_types
+      - analysis_recipe_id
+      - interpretation_status
+      - plain_language_summary
+      - operator_next_action
+      - coding_agent_task
+      - quality_item_digests
+      - interpretation_axis_summary
+      - evidence_refs
+      - requires_ml_expertise
+      - synthesis_card_bound
+      - claim_ceiling
+      - raw_interpretation_payload_stored
+      - raw_quality_payload_stored
+      - raw_analysis_payload_stored
+      - clinical_diagnosis_claimed
+      - consciousness_reproduction_claimed
+      - identity_replacement_claimed
+      - upload_readiness_claimed
+      - synthesis_card_digest
+    properties:
+      synthesis_card_ref:
+        type: string
+        pattern: "^synthesis-card://neuro-integration/niw-synthesis-card-[a-f0-9]{12}$"
+      result_ref:
+        type: string
+        pattern: "^analysis-result://neuro-integration/niw-analysis-result-[a-f0-9]{12}$"
+      result_digest:
+        $ref: "#/$defs/sha256"
+      source_types:
+        type: array
+        minItems: 2
+        maxItems: 2
+        uniqueItems: true
+        items:
+          $ref: "#/$defs/source_type"
+      analysis_recipe_id:
+        $ref: "#/$defs/analysis_recipe_id"
+      interpretation_status:
+        $ref: "#/$defs/interpretation_status"
+      plain_language_summary:
+        type: string
+        minLength: 1
+      operator_next_action:
+        type: string
+        minLength: 1
+      coding_agent_task:
+        type: string
+        minLength: 1
+      quality_item_digests:
+        type: array
+        minItems: 2
+        maxItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      interpretation_axis_summary:
+        $ref: "#/$defs/interpretation_axis_summary"
+      evidence_refs:
+        type: array
+        minItems: 6
+        items:
+          type: string
+          minLength: 1
+      requires_ml_expertise:
+        const: false
+      synthesis_card_bound:
+        const: true
+      claim_ceiling:
+        const: feature-alignment-and-analysis-plan-only
+      raw_interpretation_payload_stored:
+        const: false
+      raw_quality_payload_stored:
+        const: false
+      raw_analysis_payload_stored:
+        const: false
+      clinical_diagnosis_claimed:
+        const: false
+      consciousness_reproduction_claimed:
+        const: false
+      identity_replacement_claimed:
+        const: false
+      upload_readiness_claimed:
+        const: false
+      synthesis_card_digest:
+        $ref: "#/$defs/sha256"

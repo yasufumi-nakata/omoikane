@@ -31,9 +31,13 @@ reference runtime surface」を作ることである。これは mind uploading 
   questionnaire + EEG seed から fMRI / 脳オルガノイド等へ cross-modal analysis を広げる
 - cross-modal analysis plan の全 pair について bounded result summary と operator /
   coding-agent review readiness を digest-only run receipt に束縛する
+- measurement quality gate と cross-modal analysis run を、非 ML operator 向けの
+  plain-language synthesis cards と coding-agent task に interpretation synthesis
+  receipt として束縛する
 - 非 ML 専門家向けの plain-language cards と coding agent 向け task template を同じ guide receipt に入れる
 - raw questionnaire / EEG / neuroimaging / organoid / analysis / connector / credential /
-  endpoint / collection / collection-result / quality / calibration / artifact / consent payload は保存しない
+  endpoint / collection / collection-result / quality / calibration / artifact / consent /
+  interpretation / agent-task payload は保存しない
 - claim ceiling は `feature-alignment-and-analysis-plan-only` に固定する
 
 ## Reference Runtime v0
@@ -63,9 +67,11 @@ reference runtime surface」を作ることである。これは mind uploading 
     organoid context、generic feature-summary screen の bounded recipe を割り当てる
 15. 各 pair の bounded result summary を生成し、operator と coding agent の review-ready
     receipt として束縛する
-16. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
+16. quality gate と analysis run に基づき、各 pair を plain-language synthesis card と
+    coding-agent task に束縛し、非 ML operator が確認できる解釈 receipt を作る
+17. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
     replacement plan、connector bundle、collection protocol、collection run、quality gate、
-    cross-modal analysis plan、analysis run を記録する
+    cross-modal analysis plan、analysis run、interpretation synthesis を記録する
 
 ## 不変条件
 
@@ -81,8 +87,9 @@ reference runtime surface」を作ることである。これは mind uploading 
 10. **measurement quality gate** ── calibration / artifact QC / consent freshness は refs と bounded scores に限り、医療グレード QC には昇格しない
 11. **cross-modal pair coverage** ── 現在の source type 全ペアは bounded recipe と 5 lane connector support を持つ
 12. **bounded result summaries** ── result は pair digest と bounded axis summary に限り、診断や因果推論には昇格しない
-13. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw quality / raw plan / raw result payload を保存しない
-14. **claim ceiling** ── semantic thought content、clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
+13. **operator interpretation synthesis** ── 解釈は analysis result digest と quality item digest に基づく plain-language action summary に限り、upload readiness には昇格しない
+14. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw quality / raw plan / raw result / raw interpretation payload を保存しない
+15. **claim ceiling** ── semantic thought content、clinical diagnosis、consciousness reproduction、identity replacement、upload readiness はすべて false のまま維持する
 
 ## 関連
 

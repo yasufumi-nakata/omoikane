@@ -63,6 +63,12 @@ expected:
   cross_modal_pair_results_bound: true
   cross_modal_result_payload_redacted: true
   analysis_result_count: 6
+  interpretation_synthesis_bound: true
+  interpretation_synthesis_digest_bound: true
+  interpretation_synthesis_cards_bound: true
+  interpretation_operator_action_ready: true
+  interpretation_payload_redacted: true
+  interpretation_card_count: 6
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

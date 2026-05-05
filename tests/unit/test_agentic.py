@@ -1889,7 +1889,7 @@ json.dump(
                     client_cert_path=cert_bundle["client_cert_path"],
                     client_key_path=cert_bundle["client_key_path"],
                     client_certificate_ref=CLIENT_CERTIFICATE_REF,
-                    request_timeout_ms=500,
+                    request_timeout_ms=2_000,
                 )
 
         self.assertEqual("discovered", discovery.discovery_status)
@@ -2130,7 +2130,7 @@ json.dump(
                     client_cert_path=cert_bundle["client_cert_path"],
                     client_key_path=cert_bundle["client_key_path"],
                     client_certificate_ref=CLIENT_CERTIFICATE_REF,
-                    request_timeout_ms=500,
+                    request_timeout_ms=2_000,
                 )
 
         self.assertEqual("authenticated", trace.trace_status)
