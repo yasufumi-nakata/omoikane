@@ -304,6 +304,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             result["taxonomy"],
         )
         self._assert_schema_valid(
+            "specs/schemas/observation_measurement_analysis_catalog.schema",
+            result["method_catalog"],
+        )
+        self._assert_schema_valid(
             "specs/schemas/observation_source_bundle.schema",
             result["source_bundle"],
         )
@@ -321,6 +325,7 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["taxonomy_digest_bound"])
+        self.assertTrue(result["validation"]["method_catalog_digest_bound"])
         self.assertTrue(result["validation"]["source_bundle_digest_bound"])
         self.assertTrue(result["validation"]["integration_graph_digest_bound"])
         self.assertTrue(result["validation"]["analysis_plan_digest_bound"])
@@ -329,6 +334,9 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["rights_and_consent_bound"])
         self.assertTrue(result["validation"]["cross_domain_graph_bound"])
         self.assertTrue(result["validation"]["all_analysis_lanes_bound"])
+        self.assertTrue(result["validation"]["measurement_method_catalog_bound"])
+        self.assertTrue(result["validation"]["analysis_method_catalog_bound"])
+        self.assertTrue(result["validation"]["planned_methods_bound"])
         self.assertTrue(result["validation"]["operator_handoff_bound"])
         self.assertTrue(result["validation"]["claim_ceiling_bound"])
         self.assertTrue(result["validation"]["raw_payload_redacted"])
@@ -338,6 +346,9 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["validation"]["truth_unification_claimed"])
         self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
         self.assertFalse(result["validation"]["identity_replacement_claimed"])
+        self.assertFalse(result["method_catalog"]["complete_human_method_coverage_claimed"])
+        self.assertFalse(result["method_catalog"]["raw_method_payload_stored"])
+        self.assertFalse(result["method_catalog"]["raw_algorithm_payload_stored"])
 
     def test_l3_cognitive_demos_match_public_schemas(self) -> None:
         demos = [

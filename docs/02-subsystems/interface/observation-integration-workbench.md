@@ -8,6 +8,8 @@ uncertainty、entity の alignment axes に縮約して扱う。
 文化・ソフトウェアなどの観測 source を、同じ検証可能な source bundle、integration
 graph、analysis plan、operator guide に乗せ、後続の Builder / Researcher / Guardian が
 安全に解析順序を組み立てられる reference runtime surface を作ることである。
+さらに、過去に行われた測定方法と解析方法も open-world method catalog として扱い、
+測定法・解析法の名前や分類は digest-bound な ref に縮約する。
 
 ## 役割
 
@@ -18,10 +20,16 @@ graph、analysis plan、operator guide に乗せ、後続の Builder / Researche
   を open-world taxonomy として束縛する
 - source manifest は feature digest、provenance ref、rights ref、time range、
   spatial ref、unit profile、uncertainty model、entity scope だけを受け取る
+- questionnaire / interview / biosignal recording / imaging / sequencing / sensor /
+  registry / experiment / simulation などの測定方法 family を method catalog に束縛する
+- descriptive statistics / signal processing / spatial-temporal analysis /
+  statistical inference / machine learning / graph analysis / omics bioinformatics /
+  image analysis / simulation / qualitative analysis / privacy rights audit などの
+  解析方法 family を method catalog に束縛する
 - source family が違う node を cross-domain edge に束ね、graph digest と rights
   boundary を保持する
 - ingest、normalize、align、model、audit、publish-digest の analysis lane を同じ
-  graph digest に束縛する
+  graph digest と method catalog digest に束縛する
 - 非専門 operator 向け card と coding agent 向け task template を同じ guide receipt に入れる
 - raw observation / personal / external dataset / analysis / instruction payload は保存しない
 - claim ceiling は `cross-domain-feature-integration-plan-only` に固定する
@@ -32,21 +40,24 @@ graph、analysis plan、operator guide に乗せ、後続の Builder / Researche
 1 人の identity に対して次を実行する。
 
 1. observation taxonomy を作り、source family と alignment axes を digest-bound にする
-2. EEG、fMRI BOLD、climate record、satellite imagery、telescope image、survey を
+2. measurement / analysis method catalog を作り、過去の測定法と解析法を open-world に分類する
+3. EEG、fMRI BOLD、climate record、satellite imagery、telescope image、survey を
    6 つの異なる family として source bundle に束縛する
-3. source bundle から cross-domain integration graph を作り、uncertainty propagation と
+4. source bundle から cross-domain integration graph を作り、uncertainty propagation と
    rights boundary を固定する
-4. analysis question を ingest / normalize / align / model / audit / publish-digest lane に分解する
-5. beginner operator card と coding-agent task template を operator guide に束縛する
-6. taxonomy、source bundle、graph、analysis plan、guide を ContinuityLedger に記録する
+5. analysis question を ingest / normalize / align / model / audit / publish-digest lane に分解し、
+   各 lane を measurement method ref と analysis method ref に束縛する
+6. beginner operator card と coding-agent task template を operator guide に束縛する
+7. taxonomy、method catalog、source bundle、graph、analysis plan、guide を ContinuityLedger に記録する
 
 ## 不変条件
 
 1. **open-world taxonomy** ── catalog 外 source type は未知として扱えるが、family と alignment axes の束縛を外さない
 2. **digest-only source bundle** ── raw observation payload、個人 payload、外部 dataset payload を保存しない
-3. **rights-first graph** ── cross-domain edge は rights boundary と uncertainty propagation を持つ
-4. **plan, not truth** ── 統合結果は解析計画であり、完全知識や真理統一の主張ではない
-5. **claim ceiling** ── consciousness reproduction と identity replacement は false のまま維持する
+3. **method catalog, not method capture** ── 測定法と解析法は method id / ref / digest に縮約し、raw algorithm や code payload を保存しない
+4. **rights-first graph** ── cross-domain edge は rights boundary と uncertainty propagation を持つ
+5. **plan, not truth** ── 統合結果は解析計画であり、完全知識や真理統一の主張ではない
+6. **claim ceiling** ── consciousness reproduction と identity replacement は false のまま維持する
 
 ## 研究課題
 

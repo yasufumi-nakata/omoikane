@@ -11,6 +11,7 @@ summary: >
   diagnosis, consciousness reproduction, or identity replacement.
 imports:
   observation_source_catalog: ../schemas/observation_source_catalog.schema
+  observation_measurement_analysis_catalog: ../schemas/observation_measurement_analysis_catalog.schema
   observation_source_bundle: ../schemas/observation_source_bundle.schema
   observation_integration_graph: ../schemas/observation_integration_graph.schema
   observation_analysis_plan: ../schemas/observation_analysis_plan.schema
@@ -28,6 +29,19 @@ operations:
       - taxonomy must be open-world and must not claim complete human observation coverage
       - source families must cover biological, environmental, geospatial, astronomical, physical, social, cultural, industrial, software, and archival domains
       - raw taxonomy payload storage must remain false
+  emit_measurement_analysis_catalog:
+    summary: Emit the open-world measurement-method and analysis-method taxonomy.
+    input:
+      inline_schema:
+        type: object
+        additionalProperties: false
+    output:
+      schema_ref: observation_measurement_analysis_catalog
+    guarantees:
+      - measurement methods must stay separate from Neuro Integration replacement lanes
+      - analysis methods must use observation analysis_method_id vocabulary, not Neuro analysis_recipe_id enums
+      - method catalog coverage is open-world and must not claim complete human method coverage
+      - raw method and raw algorithm payload storage must remain false
   bind_source_bundle:
     summary: Bind declared feature summaries from heterogeneous observation domains into one source bundle.
     input:
@@ -98,6 +112,8 @@ operations:
             schema_ref: observation_source_bundle
           integration_graph:
             schema_ref: observation_integration_graph
+          method_catalog:
+            schema_ref: observation_measurement_analysis_catalog
           analysis_question:
             type: string
             minLength: 1
@@ -144,6 +160,8 @@ operations:
             schema_ref: observation_source_bundle
           integration_graph:
             schema_ref: observation_integration_graph
+          method_catalog:
+            schema_ref: observation_measurement_analysis_catalog
           analysis_plan:
             schema_ref: observation_analysis_plan
           operator_guide:
@@ -166,6 +184,8 @@ operations:
             type: boolean
           taxonomy_digest_bound:
             type: boolean
+          method_catalog_digest_bound:
+            type: boolean
           source_bundle_digest_bound:
             type: boolean
           integration_graph_digest_bound:
@@ -183,6 +203,8 @@ operations:
 events:
   - name: observation_integration.taxonomy.bound
     payload_schema: observation_source_catalog
+  - name: observation_integration.method_catalog.bound
+    payload_schema: observation_measurement_analysis_catalog
   - name: observation_integration.source_bundle.bound
     payload_schema: observation_source_bundle
   - name: observation_integration.graph.bound

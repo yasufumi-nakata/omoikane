@@ -38,6 +38,7 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
     def _build_package(self) -> dict:
         workbench = ObservationIntegrationWorkbench()
         taxonomy = workbench.taxonomy()
+        method_catalog = workbench.method_catalog()
         source_bundle = workbench.bind_source_bundle(
             "unit-observation-package",
             [
@@ -52,11 +53,13 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
             source_bundle,
             graph,
             "Align feature summaries across declared observation families.",
+            method_catalog=method_catalog,
         )
         guide = workbench.build_operator_guide(source_bundle, plan)
         return {
             "workbench": workbench,
             "taxonomy": taxonomy,
+            "method_catalog": method_catalog,
             "source_bundle": source_bundle,
             "graph": graph,
             "plan": plan,
@@ -71,10 +74,12 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
             package["graph"],
             package["plan"],
             package["guide"],
+            method_catalog=package["method_catalog"],
         )
 
         self.assertTrue(validation["ok"])
         self.assertTrue(validation["taxonomy_digest_bound"])
+        self.assertTrue(validation["method_catalog_digest_bound"])
         self.assertTrue(validation["source_bundle_digest_bound"])
         self.assertTrue(validation["integration_graph_digest_bound"])
         self.assertTrue(validation["analysis_plan_digest_bound"])
@@ -83,15 +88,42 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["rights_and_consent_bound"])
         self.assertTrue(validation["cross_domain_graph_bound"])
         self.assertTrue(validation["all_analysis_lanes_bound"])
+        self.assertTrue(validation["measurement_method_catalog_bound"])
+        self.assertTrue(validation["analysis_method_catalog_bound"])
+        self.assertTrue(validation["planned_methods_bound"])
         self.assertTrue(validation["operator_handoff_bound"])
         self.assertTrue(validation["raw_payload_redacted"])
         self.assertTrue(validation["no_totality_or_truth_claim"])
         self.assertTrue(validation["no_identity_or_consciousness_claim"])
         self.assertGreaterEqual(validation["family_coverage_count"], 4)
+        self.assertGreaterEqual(validation["measurement_method_family_count"], 8)
+        self.assertGreaterEqual(validation["analysis_method_family_count"], 10)
         self.assertEqual(
             "cross-domain-feature-integration-plan-only",
             validation["claim_ceiling"],
         )
+
+    def test_method_catalog_is_open_world_and_digest_bound(self) -> None:
+        workbench = ObservationIntegrationWorkbench()
+        method_catalog = workbench.method_catalog()
+
+        self.assertTrue(method_catalog["open_world_method_taxonomy"])
+        self.assertFalse(method_catalog["raw_method_payload_stored"])
+        self.assertFalse(method_catalog["raw_algorithm_payload_stored"])
+        self.assertFalse(method_catalog["complete_human_method_coverage_claimed"])
+        self.assertGreaterEqual(method_catalog["measurement_method_family_count"], 8)
+        self.assertGreaterEqual(method_catalog["analysis_method_family_count"], 10)
+
+        tampered = dict(method_catalog)
+        tampered["analysis_method_count"] = 0
+
+        with self.assertRaises(ValueError):
+            workbench.build_analysis_plan(
+                self._build_package()["source_bundle"],
+                self._build_package()["graph"],
+                "Tampered method catalog should be rejected.",
+                method_catalog=tampered,
+            )
 
     def test_requires_four_observation_domains(self) -> None:
         workbench = ObservationIntegrationWorkbench()

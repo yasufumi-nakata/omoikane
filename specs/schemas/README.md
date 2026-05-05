@@ -63,6 +63,8 @@
   - cross-modal analysis plan の全 pair について bounded result summary、operator review readiness、coding-agent review readiness を digest-only で検証する
 - `observation_source_catalog.schema`
   - 人類が取得・計測してきた観測 family / source type taxonomy、alignment axes、analysis lanes を digest-only catalog として束縛し、完全知識や真理統一を主張しない
+- `observation_measurement_analysis_catalog.schema`
+  - 過去に行われた測定方法と解析方法を open-world method catalog として束縛し、raw method / algorithm payload と完全網羅 claim を保存しない
 - `observation_source_bundle.schema`
   - 複数 domain の source manifest を provenance / rights / time / space / unit / uncertainty / entity axes に束縛し、raw observation payload を保存しない
 - `observation_integration_graph.schema`

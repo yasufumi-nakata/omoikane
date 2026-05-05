@@ -16,11 +16,19 @@ required:
   - source_bundle_digest
   - integration_graph_ref
   - integration_graph_digest
+  - method_catalog_ref
+  - method_catalog_digest
+  - method_catalog_profile_id
+  - measurement_method_family_count
+  - measurement_method_count
+  - analysis_method_family_count
+  - analysis_method_count
   - required_analysis_lanes
   - analysis_lanes
   - all_analysis_lanes_bound
   - coverage_summary
   - planned_analyses
+  - planned_methods_bound
   - claim_ceiling
   - storage_policy
   - conflict_refs
@@ -28,6 +36,8 @@ required:
   - raw_analysis_payload_stored
   - raw_model_payload_stored
   - raw_source_payload_stored
+  - raw_method_payload_stored
+  - raw_algorithm_payload_stored
   - clinical_diagnosis_claimed
   - causal_truth_claimed
   - truth_unification_claimed
@@ -59,6 +69,25 @@ properties:
     minLength: 1
   integration_graph_digest:
     $ref: "#/$defs/sha256"
+  method_catalog_ref:
+    type: string
+    pattern: "^method-catalog://universal-observation/uoi-method-catalog-[a-f0-9]{12}$"
+  method_catalog_digest:
+    $ref: "#/$defs/sha256"
+  method_catalog_profile_id:
+    const: universal-observation-method-catalog-v1
+  measurement_method_family_count:
+    type: integer
+    minimum: 8
+  measurement_method_count:
+    type: integer
+    minimum: 40
+  analysis_method_family_count:
+    type: integer
+    minimum: 10
+  analysis_method_count:
+    type: integer
+    minimum: 40
   required_analysis_lanes:
     const:
       - ingest
@@ -114,6 +143,8 @@ properties:
         - analysis_id
         - goal
         - lane_id
+        - measurement_method_ref
+        - analysis_method_ref
       properties:
         analysis_id:
           type: string
@@ -123,6 +154,14 @@ properties:
           minLength: 1
         lane_id:
           $ref: "#/$defs/lane_id"
+        measurement_method_ref:
+          type: string
+          pattern: "^measurement-method://universal-observation/[a-z0-9_-]+/[a-z0-9_-]+$"
+        analysis_method_ref:
+          type: string
+          pattern: "^analysis-method://universal-observation/[a-z0-9_-]+/[a-z0-9_-]+$"
+  planned_methods_bound:
+    const: true
   claim_ceiling:
     const: cross-domain-feature-integration-plan-only
   storage_policy:
@@ -139,6 +178,10 @@ properties:
   raw_model_payload_stored:
     const: false
   raw_source_payload_stored:
+    const: false
+  raw_method_payload_stored:
+    const: false
+  raw_algorithm_payload_stored:
     const: false
   clinical_diagnosis_claimed:
     const: false

@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from copy import deepcopy
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 UOI_SCHEMA_VERSION = "1.0"
 UOI_TAXONOMY_PROFILE_ID = "universal-human-observation-taxonomy-v1"
+UOI_METHOD_CATALOG_PROFILE_ID = "universal-observation-method-catalog-v1"
 UOI_BUNDLE_PROFILE_ID = "universal-observation-source-bundle-v1"
 UOI_GRAPH_PROFILE_ID = "universal-observation-integration-graph-v1"
 UOI_PLAN_PROFILE_ID = "universal-observation-analysis-plan-v1"
@@ -139,6 +140,152 @@ UOI_MEASUREMENT_FAMILIES = {
         "archaeological_context",
     ),
 }
+UOI_MEASUREMENT_METHOD_FAMILIES = {
+    "self_report_and_survey": (
+        "questionnaire",
+        "interview",
+        "diary",
+        "psychometric_scale",
+        "ecological_momentary_assessment",
+    ),
+    "electrophysiology_and_biosignal": (
+        "eeg_recording",
+        "ecg_recording",
+        "emg_recording",
+        "ppg_recording",
+        "eda_recording",
+        "respiration_belt",
+        "polysomnography",
+    ),
+    "imaging_and_remote_sensing": (
+        "microscopy",
+        "xray_imaging",
+        "ct_imaging",
+        "mri_scan",
+        "fmri_scan",
+        "ultrasound",
+        "optical_satellite",
+        "radar",
+        "lidar",
+        "telescope_imaging",
+    ),
+    "sequencing_and_omics": (
+        "dna_sequencing",
+        "rna_seq",
+        "single_cell_profiling",
+        "mass_spectrometry",
+        "metabolomics_assay",
+        "microbiome_profiling",
+    ),
+    "sensor_and_iot": (
+        "accelerometer",
+        "gyroscope",
+        "gps_trace",
+        "weather_station",
+        "ocean_buoy",
+        "particle_detector",
+        "industrial_sensor",
+        "energy_meter",
+    ),
+    "archival_and_administrative": (
+        "census",
+        "registry_extract",
+        "transaction_log",
+        "manuscript_cataloging",
+        "oral_history",
+        "museum_cataloging",
+    ),
+    "experimental_and_behavioral": (
+        "randomized_trial",
+        "lab_task",
+        "field_experiment",
+        "psychophysics",
+        "longitudinal_cohort",
+        "behavioral_tracking",
+    ),
+    "computational_and_simulation": (
+        "simulation_run",
+        "model_output",
+        "synthetic_benchmark",
+        "digital_trace",
+        "log_instrumentation",
+    ),
+}
+UOI_ANALYSIS_METHOD_FAMILIES = {
+    "descriptive_statistics": (
+        "summary_statistics",
+        "distribution_profile",
+        "stratified_table",
+        "visualization_digest",
+    ),
+    "signal_processing": (
+        "filtering",
+        "spectral_analysis",
+        "time_frequency_analysis",
+        "artifact_detection",
+        "event_related_average",
+    ),
+    "spatial_temporal_analysis": (
+        "geospatial_overlay",
+        "interpolation",
+        "time_series_decomposition",
+        "spatiotemporal_model",
+        "data_assimilation",
+    ),
+    "statistical_inference": (
+        "regression",
+        "anova",
+        "mixed_effects_model",
+        "survival_analysis",
+        "causal_sensitivity",
+    ),
+    "machine_learning": (
+        "supervised_model",
+        "unsupervised_clustering",
+        "representation_learning",
+        "anomaly_detection",
+        "cross_validation",
+    ),
+    "network_and_graph": (
+        "graph_alignment",
+        "community_detection",
+        "centrality_analysis",
+        "knowledge_graph_linking",
+    ),
+    "omics_bioinformatics": (
+        "sequence_alignment",
+        "variant_calling",
+        "differential_expression",
+        "pathway_enrichment",
+        "multi_omics_integration",
+    ),
+    "image_media_analysis": (
+        "segmentation",
+        "object_detection",
+        "image_registration",
+        "feature_extraction",
+        "multimodal_annotation",
+    ),
+    "simulation_and_model_checking": (
+        "mechanistic_model",
+        "monte_carlo",
+        "uncertainty_quantification",
+        "sensitivity_analysis",
+    ),
+    "qualitative_text_analysis": (
+        "coding",
+        "thematic_analysis",
+        "topic_modeling",
+        "provenance_annotation",
+    ),
+    "privacy_rights_audit": (
+        "consent_check",
+        "license_audit",
+        "disclosure_risk_review",
+        "deidentification_review",
+        "guardian_conflict_review",
+    ),
+}
 UOI_SOURCE_TYPE_ALIASES = {
     "fmri": "fmri_bold",
     "functional_mri": "fmri_bold",
@@ -162,6 +309,7 @@ class ObservationIntegrationWorkbench:
         return {
             "schema_version": UOI_SCHEMA_VERSION,
             "taxonomy_profile_id": UOI_TAXONOMY_PROFILE_ID,
+            "method_catalog_profile_id": UOI_METHOD_CATALOG_PROFILE_ID,
             "source_bundle_profile_id": UOI_BUNDLE_PROFILE_ID,
             "integration_graph_profile_id": UOI_GRAPH_PROFILE_ID,
             "analysis_plan_profile_id": UOI_PLAN_PROFILE_ID,
@@ -169,6 +317,14 @@ class ObservationIntegrationWorkbench:
             "measurement_families": {
                 family: list(source_types)
                 for family, source_types in UOI_MEASUREMENT_FAMILIES.items()
+            },
+            "measurement_method_families": {
+                family: list(method_ids)
+                for family, method_ids in UOI_MEASUREMENT_METHOD_FAMILIES.items()
+            },
+            "analysis_method_families": {
+                family: list(method_ids)
+                for family, method_ids in UOI_ANALYSIS_METHOD_FAMILIES.items()
             },
             "required_alignment_axes": list(UOI_REQUIRED_ALIGNMENT_AXES),
             "required_analysis_lanes": list(UOI_REQUIRED_ANALYSIS_LANES),
@@ -213,6 +369,50 @@ class ObservationIntegrationWorkbench:
             canonical_json(self._taxonomy_digest_payload(taxonomy))
         )
         return deepcopy(taxonomy)
+
+    def method_catalog(self) -> Dict[str, Any]:
+        measurement_method_families = self._method_family_items(
+            UOI_MEASUREMENT_METHOD_FAMILIES
+        )
+        analysis_method_families = self._method_family_items(
+            UOI_ANALYSIS_METHOD_FAMILIES
+        )
+        catalog = {
+            "schema_version": UOI_SCHEMA_VERSION,
+            "method_catalog_ref": (
+                f"method-catalog://universal-observation/"
+                f"{new_id('uoi-method-catalog')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": UOI_METHOD_CATALOG_PROFILE_ID,
+            "measurement_method_families": measurement_method_families,
+            "measurement_method_family_count": len(measurement_method_families),
+            "measurement_method_count": sum(
+                item["method_count"] for item in measurement_method_families
+            ),
+            "analysis_method_families": analysis_method_families,
+            "analysis_method_family_count": len(analysis_method_families),
+            "analysis_method_count": sum(
+                item["method_count"] for item in analysis_method_families
+            ),
+            "required_alignment_axes": list(UOI_REQUIRED_ALIGNMENT_AXES),
+            "required_analysis_lanes": list(UOI_REQUIRED_ANALYSIS_LANES),
+            "open_world_method_taxonomy": True,
+            "method_gap_policy": "accept-declared-method-with-frontier-flag",
+            "claim_ceiling": UOI_CLAIM_CEILING,
+            "storage_policy": UOI_STORAGE_POLICY,
+            "raw_method_payload_stored": False,
+            "raw_algorithm_payload_stored": False,
+            "complete_human_method_coverage_claimed": False,
+            "complete_human_knowledge_claimed": False,
+            "truth_unification_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        catalog["method_catalog_digest"] = sha256_text(
+            canonical_json(self._method_catalog_digest_payload(catalog))
+        )
+        return deepcopy(catalog)
 
     def bind_source_bundle(
         self,
@@ -353,10 +553,14 @@ class ObservationIntegrationWorkbench:
         source_bundle: Dict[str, Any],
         integration_graph: Dict[str, Any],
         analysis_question: str,
+        method_catalog: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         self._check_source_bundle(source_bundle)
         self._check_integration_graph(integration_graph)
         self._require_non_empty_string(analysis_question, "analysis_question")
+        if method_catalog is None:
+            method_catalog = self.method_catalog()
+        self._check_method_catalog(method_catalog)
         if integration_graph["source_bundle_digest"] != source_bundle["source_bundle_digest"]:
             raise ValueError("integration_graph.source_bundle_digest must match source bundle")
         lanes = [
@@ -380,6 +584,50 @@ class ObservationIntegrationWorkbench:
             source["quality_summary"]["uncertainty_proxy"]
             for source in source_bundle["sources"]
         ]
+        planned_analyses = [
+            {
+                "analysis_id": "provenance-rights-preflight",
+                "goal": "Confirm source, consent or public-basis, license, and retention boundaries before analysis.",
+                "lane_id": "ingest",
+                "measurement_method_ref": "measurement-method://universal-observation/archival_and_administrative/registry_extract",
+                "analysis_method_ref": "analysis-method://universal-observation/privacy_rights_audit/consent_check",
+            },
+            {
+                "analysis_id": "unit-coordinate-normalization",
+                "goal": "Normalize units, time windows, spatial frames, and entity identifiers without retaining raw records.",
+                "lane_id": "normalize",
+                "measurement_method_ref": "measurement-method://universal-observation/sensor_and_iot/weather_station",
+                "analysis_method_ref": "analysis-method://universal-observation/spatial_temporal_analysis/interpolation",
+            },
+            {
+                "analysis_id": "cross-domain-alignment-graph",
+                "goal": "Use shared axis digests to align heterogeneous measurement families.",
+                "lane_id": "align",
+                "measurement_method_ref": "measurement-method://universal-observation/imaging_and_remote_sensing/optical_satellite",
+                "analysis_method_ref": "analysis-method://universal-observation/network_and_graph/graph_alignment",
+            },
+            {
+                "analysis_id": "uncertainty-aware-model-plan",
+                "goal": "Propagate uncertainty and evidence ceilings before any modeling claim.",
+                "lane_id": "model",
+                "measurement_method_ref": "measurement-method://universal-observation/computational_and_simulation/model_output",
+                "analysis_method_ref": "analysis-method://universal-observation/simulation_and_model_checking/uncertainty_quantification",
+            },
+            {
+                "analysis_id": "guardian-review-and-conflict-sink",
+                "goal": "Route unresolved equivalence, causality, privacy, or identity claims to explicit conflict refs.",
+                "lane_id": "audit",
+                "measurement_method_ref": "measurement-method://universal-observation/experimental_and_behavioral/longitudinal_cohort",
+                "analysis_method_ref": "analysis-method://universal-observation/privacy_rights_audit/guardian_conflict_review",
+            },
+            {
+                "analysis_id": "digest-only-publication",
+                "goal": "Publish only receipt digests, coverage summaries, and claim ceilings.",
+                "lane_id": "publish-digest",
+                "measurement_method_ref": "measurement-method://universal-observation/archival_and_administrative/manuscript_cataloging",
+                "analysis_method_ref": "analysis-method://universal-observation/descriptive_statistics/visualization_digest",
+            },
+        ]
         plan = {
             "schema_version": UOI_SCHEMA_VERSION,
             "analysis_plan_ref": f"analysis-plan://universal-observation/{new_id('uoi-plan')}",
@@ -390,6 +638,17 @@ class ObservationIntegrationWorkbench:
             "source_bundle_digest": source_bundle["source_bundle_digest"],
             "integration_graph_ref": integration_graph["integration_graph_ref"],
             "integration_graph_digest": integration_graph["integration_graph_digest"],
+            "method_catalog_ref": method_catalog["method_catalog_ref"],
+            "method_catalog_digest": method_catalog["method_catalog_digest"],
+            "method_catalog_profile_id": method_catalog["profile_id"],
+            "measurement_method_family_count": method_catalog[
+                "measurement_method_family_count"
+            ],
+            "measurement_method_count": method_catalog["measurement_method_count"],
+            "analysis_method_family_count": method_catalog[
+                "analysis_method_family_count"
+            ],
+            "analysis_method_count": method_catalog["analysis_method_count"],
             "required_analysis_lanes": list(UOI_REQUIRED_ANALYSIS_LANES),
             "analysis_lanes": lanes,
             "all_analysis_lanes_bound": all(lane["status"] == "bound" for lane in lanes),
@@ -403,38 +662,11 @@ class ObservationIntegrationWorkbench:
                 ),
                 "maximum_uncertainty_proxy": self._round_score(max(uncertainty_values)),
             },
-            "planned_analyses": [
-                {
-                    "analysis_id": "provenance-rights-preflight",
-                    "goal": "Confirm source, consent or public-basis, license, and retention boundaries before analysis.",
-                    "lane_id": "ingest",
-                },
-                {
-                    "analysis_id": "unit-coordinate-normalization",
-                    "goal": "Normalize units, time windows, spatial frames, and entity identifiers without retaining raw records.",
-                    "lane_id": "normalize",
-                },
-                {
-                    "analysis_id": "cross-domain-alignment-graph",
-                    "goal": "Use shared axis digests to align heterogeneous measurement families.",
-                    "lane_id": "align",
-                },
-                {
-                    "analysis_id": "uncertainty-aware-model-plan",
-                    "goal": "Propagate uncertainty and evidence ceilings before any modeling claim.",
-                    "lane_id": "model",
-                },
-                {
-                    "analysis_id": "guardian-review-and-conflict-sink",
-                    "goal": "Route unresolved equivalence, causality, privacy, or identity claims to explicit conflict refs.",
-                    "lane_id": "audit",
-                },
-                {
-                    "analysis_id": "digest-only-publication",
-                    "goal": "Publish only receipt digests, coverage summaries, and claim ceilings.",
-                    "lane_id": "publish-digest",
-                },
-            ],
+            "planned_analyses": planned_analyses,
+            "planned_methods_bound": all(
+                item["measurement_method_ref"] and item["analysis_method_ref"]
+                for item in planned_analyses
+            ),
             "claim_ceiling": UOI_CLAIM_CEILING,
             "storage_policy": UOI_STORAGE_POLICY,
             "conflict_refs": self._conflict_refs(),
@@ -442,6 +674,8 @@ class ObservationIntegrationWorkbench:
             "raw_analysis_payload_stored": False,
             "raw_model_payload_stored": False,
             "raw_source_payload_stored": False,
+            "raw_method_payload_stored": False,
+            "raw_algorithm_payload_stored": False,
             "clinical_diagnosis_claimed": False,
             "causal_truth_claimed": False,
             "truth_unification_claimed": False,
@@ -528,11 +762,35 @@ class ObservationIntegrationWorkbench:
         integration_graph: Dict[str, Any],
         analysis_plan: Dict[str, Any],
         operator_guide: Dict[str, Any],
+        method_catalog: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
+        artifacts = [
+            taxonomy,
+            source_bundle,
+            integration_graph,
+            analysis_plan,
+            operator_guide,
+        ]
+        if method_catalog is not None:
+            artifacts.append(method_catalog)
+        method_catalog_digest_bound = bool(
+            analysis_plan.get("method_catalog_digest")
+            and analysis_plan.get("method_catalog_profile_id")
+            == UOI_METHOD_CATALOG_PROFILE_ID
+        )
+        if method_catalog is not None:
+            method_catalog_digest_bound = method_catalog.get("method_catalog_digest") == (
+                sha256_text(
+                    canonical_json(self._method_catalog_digest_payload(method_catalog))
+                )
+            ) and analysis_plan.get("method_catalog_digest") == method_catalog.get(
+                "method_catalog_digest"
+            )
         checks = {
             "taxonomy_digest_bound": taxonomy.get("taxonomy_digest")
             == sha256_text(canonical_json(self._taxonomy_digest_payload(taxonomy))),
+            "method_catalog_digest_bound": method_catalog_digest_bound,
             "source_bundle_digest_bound": source_bundle.get("source_bundle_digest")
             == sha256_text(canonical_json(self._bundle_digest_payload(source_bundle))),
             "integration_graph_digest_bound": integration_graph.get(
@@ -550,51 +808,40 @@ class ObservationIntegrationWorkbench:
             is True,
             "all_analysis_lanes_bound": analysis_plan.get("all_analysis_lanes_bound")
             is True,
+            "measurement_method_catalog_bound": analysis_plan.get(
+                "measurement_method_family_count", 0
+            )
+            >= len(UOI_MEASUREMENT_METHOD_FAMILIES)
+            and analysis_plan.get("measurement_method_count", 0)
+            >= sum(len(methods) for methods in UOI_MEASUREMENT_METHOD_FAMILIES.values()),
+            "analysis_method_catalog_bound": analysis_plan.get(
+                "analysis_method_family_count", 0
+            )
+            >= len(UOI_ANALYSIS_METHOD_FAMILIES)
+            and analysis_plan.get("analysis_method_count", 0)
+            >= sum(len(methods) for methods in UOI_ANALYSIS_METHOD_FAMILIES.values()),
+            "planned_methods_bound": analysis_plan.get("planned_methods_bound") is True,
             "operator_handoff_bound": operator_guide.get("coding_agent_ready") is True
             and operator_guide.get("beginner_operator_supported") is True,
             "claim_ceiling_bound": all(
                 artifact.get("claim_ceiling") == UOI_CLAIM_CEILING
-                for artifact in (
-                    taxonomy,
-                    source_bundle,
-                    integration_graph,
-                    analysis_plan,
-                    operator_guide,
-                )
+                for artifact in artifacts
             ),
             "raw_payload_redacted": all(
                 artifact.get(field_name) is False
-                for artifact in (
-                    taxonomy,
-                    source_bundle,
-                    integration_graph,
-                    analysis_plan,
-                    operator_guide,
-                )
+                for artifact in artifacts
                 for field_name in artifact
                 if field_name.startswith("raw_")
             ),
             "no_totality_or_truth_claim": all(
                 artifact.get("complete_human_knowledge_claimed", False) is False
                 and artifact.get("truth_unification_claimed", False) is False
-                for artifact in (
-                    taxonomy,
-                    source_bundle,
-                    integration_graph,
-                    analysis_plan,
-                    operator_guide,
-                )
+                for artifact in artifacts
             ),
             "no_identity_or_consciousness_claim": all(
                 artifact.get("consciousness_reproduction_claimed", False) is False
                 and artifact.get("identity_replacement_claimed", False) is False
-                for artifact in (
-                    taxonomy,
-                    source_bundle,
-                    integration_graph,
-                    analysis_plan,
-                    operator_guide,
-                )
+                for artifact in artifacts
             ),
         }
         for name, ok in checks.items():
@@ -607,14 +854,36 @@ class ObservationIntegrationWorkbench:
             "source_count": source_bundle.get("source_count", 0),
             "family_coverage_count": source_bundle.get("family_coverage_count", 0),
             "analysis_lane_count": len(analysis_plan.get("analysis_lanes", [])),
+            "measurement_method_family_count": analysis_plan.get(
+                "measurement_method_family_count", 0
+            ),
+            "measurement_method_count": analysis_plan.get("measurement_method_count", 0),
+            "analysis_method_family_count": analysis_plan.get(
+                "analysis_method_family_count", 0
+            ),
+            "analysis_method_count": analysis_plan.get("analysis_method_count", 0),
             "claim_ceiling": UOI_CLAIM_CEILING,
             "raw_source_payload_stored": False,
             "raw_analysis_payload_stored": False,
+            "raw_method_payload_stored": False,
             "complete_human_knowledge_claimed": False,
             "truth_unification_claimed": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
+
+    def _method_family_items(
+        self,
+        method_families: Dict[str, Sequence[str]],
+    ) -> List[Dict[str, Any]]:
+        return [
+            {
+                "family_id": family_id,
+                "method_ids": list(method_ids),
+                "method_count": len(method_ids),
+            }
+            for family_id, method_ids in method_families.items()
+        ]
 
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(source_manifest, dict):
@@ -769,6 +1038,14 @@ class ObservationIntegrationWorkbench:
         ):
             raise ValueError("analysis_plan_digest mismatch")
 
+    def _check_method_catalog(self, method_catalog: Dict[str, Any]) -> None:
+        if method_catalog.get("profile_id") != UOI_METHOD_CATALOG_PROFILE_ID:
+            raise ValueError("method_catalog.profile_id mismatch")
+        if method_catalog.get("method_catalog_digest") != sha256_text(
+            canonical_json(self._method_catalog_digest_payload(method_catalog))
+        ):
+            raise ValueError("method_catalog_digest mismatch")
+
     def _taxonomy_digest_payload(self, taxonomy: Dict[str, Any]) -> Dict[str, Any]:
         return {
             key: taxonomy[key]
@@ -817,6 +1094,32 @@ class ObservationIntegrationWorkbench:
             )
         }
 
+    def _method_catalog_digest_payload(self, catalog: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            key: catalog[key]
+            for key in (
+                "schema_version",
+                "profile_id",
+                "measurement_method_families",
+                "measurement_method_family_count",
+                "measurement_method_count",
+                "analysis_method_families",
+                "analysis_method_family_count",
+                "analysis_method_count",
+                "required_alignment_axes",
+                "required_analysis_lanes",
+                "open_world_method_taxonomy",
+                "method_gap_policy",
+                "claim_ceiling",
+                "storage_policy",
+                "raw_method_payload_stored",
+                "raw_algorithm_payload_stored",
+                "complete_human_method_coverage_claimed",
+                "complete_human_knowledge_claimed",
+                "truth_unification_claimed",
+            )
+        }
+
     def _graph_digest_payload(self, graph: Dict[str, Any]) -> Dict[str, Any]:
         return {
             key: graph[key]
@@ -849,16 +1152,25 @@ class ObservationIntegrationWorkbench:
                 "analysis_question",
                 "source_bundle_digest",
                 "integration_graph_digest",
+                "method_catalog_digest",
+                "method_catalog_profile_id",
+                "measurement_method_family_count",
+                "measurement_method_count",
+                "analysis_method_family_count",
+                "analysis_method_count",
                 "required_analysis_lanes",
                 "analysis_lanes",
                 "all_analysis_lanes_bound",
                 "coverage_summary",
                 "planned_analyses",
+                "planned_methods_bound",
                 "claim_ceiling",
                 "storage_policy",
                 "raw_analysis_payload_stored",
                 "raw_model_payload_stored",
                 "raw_source_payload_stored",
+                "raw_method_payload_stored",
+                "raw_algorithm_payload_stored",
                 "clinical_diagnosis_claimed",
                 "causal_truth_claimed",
                 "truth_unification_claimed",

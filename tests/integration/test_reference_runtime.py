@@ -397,6 +397,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertGreaterEqual(result["validation"]["family_coverage_count"], 6)
         self.assertEqual(6, result["validation"]["analysis_lane_count"])
         self.assertTrue(result["validation"]["taxonomy_digest_bound"])
+        self.assertTrue(result["validation"]["method_catalog_digest_bound"])
         self.assertTrue(result["validation"]["source_bundle_digest_bound"])
         self.assertTrue(result["validation"]["integration_graph_digest_bound"])
         self.assertTrue(result["validation"]["analysis_plan_digest_bound"])
@@ -405,6 +406,9 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["rights_and_consent_bound"])
         self.assertTrue(result["validation"]["cross_domain_graph_bound"])
         self.assertTrue(result["validation"]["all_analysis_lanes_bound"])
+        self.assertTrue(result["validation"]["measurement_method_catalog_bound"])
+        self.assertTrue(result["validation"]["analysis_method_catalog_bound"])
+        self.assertTrue(result["validation"]["planned_methods_bound"])
         self.assertTrue(result["validation"]["operator_handoff_bound"])
         self.assertTrue(result["validation"]["claim_ceiling_bound"])
         self.assertTrue(result["validation"]["raw_payload_redacted"])
@@ -416,6 +420,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         )
         self.assertFalse(result["analysis_plan"]["clinical_diagnosis_claimed"])
         self.assertFalse(result["analysis_plan"]["causal_truth_claimed"])
+        self.assertFalse(result["analysis_plan"]["raw_method_payload_stored"])
+        self.assertFalse(result["analysis_plan"]["raw_algorithm_payload_stored"])
         self.assertFalse(result["analysis_plan"]["truth_unification_claimed"])
         self.assertFalse(result["analysis_plan"]["complete_human_knowledge_claimed"])
         self.assertFalse(result["analysis_plan"]["consciousness_reproduction_claimed"])
@@ -430,6 +436,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-observation-integration"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-observation-integration-method-catalog"
             ],
         )
         self.assertEqual(

@@ -1,0 +1,134 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/observation_measurement_analysis_catalog.schema"
+title: ObservationMeasurementAnalysisCatalog
+description: >
+  Open-world catalog for historical and declared measurement methods plus
+  analysis methods. It keeps method coverage as ids, refs, counts, and digest
+  summaries without storing raw methods, algorithms, datasets, or code payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - method_catalog_ref
+  - created_at
+  - profile_id
+  - measurement_method_families
+  - measurement_method_family_count
+  - measurement_method_count
+  - analysis_method_families
+  - analysis_method_family_count
+  - analysis_method_count
+  - required_alignment_axes
+  - required_analysis_lanes
+  - open_world_method_taxonomy
+  - method_gap_policy
+  - claim_ceiling
+  - storage_policy
+  - raw_method_payload_stored
+  - raw_algorithm_payload_stored
+  - complete_human_method_coverage_claimed
+  - complete_human_knowledge_claimed
+  - truth_unification_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - method_catalog_digest
+properties:
+  schema_version:
+    const: "1.0"
+  method_catalog_ref:
+    type: string
+    pattern: "^method-catalog://universal-observation/uoi-method-catalog-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: universal-observation-method-catalog-v1
+  measurement_method_families:
+    type: array
+    minItems: 8
+    items:
+      $ref: "#/$defs/method_family"
+  measurement_method_family_count:
+    type: integer
+    minimum: 8
+  measurement_method_count:
+    type: integer
+    minimum: 40
+  analysis_method_families:
+    type: array
+    minItems: 10
+    items:
+      $ref: "#/$defs/method_family"
+  analysis_method_family_count:
+    type: integer
+    minimum: 10
+  analysis_method_count:
+    type: integer
+    minimum: 40
+  required_alignment_axes:
+    const:
+      - provenance
+      - rights
+      - time
+      - space
+      - unit
+      - uncertainty
+      - entity
+  required_analysis_lanes:
+    const:
+      - ingest
+      - normalize
+      - align
+      - model
+      - audit
+      - publish-digest
+  open_world_method_taxonomy:
+    const: true
+  method_gap_policy:
+    const: accept-declared-method-with-frontier-flag
+  claim_ceiling:
+    const: cross-domain-feature-integration-plan-only
+  storage_policy:
+    const: feature-digest+provenance+axis-summary-only
+  raw_method_payload_stored:
+    const: false
+  raw_algorithm_payload_stored:
+    const: false
+  complete_human_method_coverage_claimed:
+    const: false
+  complete_human_knowledge_claimed:
+    const: false
+  truth_unification_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  method_catalog_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  method_id:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,79}$"
+  method_family:
+    type: object
+    additionalProperties: false
+    required:
+      - family_id
+      - method_ids
+      - method_count
+    properties:
+      family_id:
+        type: string
+        minLength: 1
+      method_ids:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/method_id"
+      method_count:
+        type: integer
+        minimum: 1

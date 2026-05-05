@@ -4051,6 +4051,7 @@ entries:
     consumers:
       - reference-runtime
       - specs/schemas/observation_source_catalog.schema
+      - specs/schemas/observation_measurement_analysis_catalog.schema
       - specs/schemas/observation_source_bundle.schema
       - specs/schemas/observation_integration_graph.schema
       - specs/schemas/observation_analysis_plan.schema
@@ -4058,7 +4059,7 @@ entries:
       - evals/interface/observation_integration_workbench.yaml
       - docs/02-subsystems/interface/observation-integration-workbench.md
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to expose the digest-only L6 observation integration workbench contract for human-acquired measurements without claiming complete knowledge, truth unification, consciousness reproduction, or identity replacement.
+    rationale: Required to expose the digest-only L6 observation integration workbench contract for human-acquired measurements and analysis methods without claiming complete knowledge, truth unification, consciousness reproduction, or identity replacement.
   - priority: P1
     kind: schema
     file: specs/schemas/observation_source_catalog.schema
@@ -4069,6 +4070,17 @@ entries:
       - evals/interface/observation_integration_workbench.yaml
       - docs/02-subsystems/interface/observation-integration-workbench.md
     rationale: Required to serialize the open-world taxonomy of observation families, source types, alignment axes, and analysis lanes while keeping the complete-human-knowledge claim false.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/observation_measurement_analysis_catalog.schema
+    consumers:
+      - specs/interfaces/interface.observation_integration_workbench.v0.idl
+      - reference-runtime
+      - specs/schemas/observation_analysis_plan.schema
+      - tests/integration/test_interface_schema_contracts.py
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+    rationale: Required to serialize historical and declared measurement-method families plus analysis-method families as an open-world digest-only catalog without storing raw method, raw algorithm, raw dataset, or code payloads.
   - priority: P1
     kind: schema
     file: specs/schemas/observation_source_bundle.schema
@@ -4098,11 +4110,12 @@ entries:
     consumers:
       - specs/interfaces/interface.observation_integration_workbench.v0.idl
       - reference-runtime
+      - specs/schemas/observation_measurement_analysis_catalog.schema
       - specs/schemas/observation_operator_guide.schema
       - tests/integration/test_interface_schema_contracts.py
       - evals/interface/observation_integration_workbench.yaml
       - docs/02-subsystems/interface/observation-integration-workbench.md
-    rationale: Required to bind ingest, normalize, align, model, audit, and publish-digest lanes to the integration graph as an analysis plan, not a causal truth or consciousness claim.
+    rationale: Required to bind ingest, normalize, align, model, audit, and publish-digest lanes plus measurement and analysis method refs to the integration graph as an analysis plan, not a causal truth or consciousness claim.
   - priority: P1
     kind: schema
     file: specs/schemas/observation_operator_guide.schema

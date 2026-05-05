@@ -11812,6 +11812,7 @@ json.dump(response, sys.stdout)
             metadata={"display_name": "Observation Integration Workbench Sandbox"},
         )
         taxonomy = self.observation_integration_workbench.taxonomy()
+        method_catalog = self.observation_integration_workbench.method_catalog()
         source_bundle = self.observation_integration_workbench.bind_source_bundle(
             "humanity-declared-observation-feature-summaries",
             [
@@ -11986,6 +11987,7 @@ json.dump(response, sys.stdout)
             source_bundle,
             integration_graph,
             "Integrate declared human, planetary, cosmic, and social feature summaries under one digest-only analysis plan.",
+            method_catalog=method_catalog,
         )
         operator_guide = self.observation_integration_workbench.build_operator_guide(
             source_bundle,
@@ -11997,6 +11999,7 @@ json.dump(response, sys.stdout)
             integration_graph,
             analysis_plan,
             operator_guide,
+            method_catalog=method_catalog,
         )
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -12012,6 +12015,39 @@ json.dump(response, sys.stdout)
             },
             actor="ObservationIntegrationWorkbench",
             category="interface-observation-integration-taxonomy",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="observation_integration.method_catalog.bound",
+            payload={
+                "method_catalog_ref": method_catalog["method_catalog_ref"],
+                "method_catalog_digest": method_catalog["method_catalog_digest"],
+                "measurement_method_family_count": method_catalog[
+                    "measurement_method_family_count"
+                ],
+                "measurement_method_count": method_catalog[
+                    "measurement_method_count"
+                ],
+                "analysis_method_family_count": method_catalog[
+                    "analysis_method_family_count"
+                ],
+                "analysis_method_count": method_catalog["analysis_method_count"],
+                "open_world_method_taxonomy": method_catalog[
+                    "open_world_method_taxonomy"
+                ],
+                "claim_ceiling": method_catalog["claim_ceiling"],
+                "raw_method_payload_stored": method_catalog[
+                    "raw_method_payload_stored"
+                ],
+                "raw_algorithm_payload_stored": method_catalog[
+                    "raw_algorithm_payload_stored"
+                ],
+            },
+            actor="ObservationIntegrationWorkbench",
+            category="interface-observation-integration-method-catalog",
             layer="L6",
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
@@ -12065,6 +12101,14 @@ json.dump(response, sys.stdout)
             payload={
                 "analysis_plan_ref": analysis_plan["analysis_plan_ref"],
                 "analysis_plan_digest": analysis_plan["analysis_plan_digest"],
+                "method_catalog_digest": analysis_plan["method_catalog_digest"],
+                "measurement_method_family_count": analysis_plan[
+                    "measurement_method_family_count"
+                ],
+                "analysis_method_family_count": analysis_plan[
+                    "analysis_method_family_count"
+                ],
+                "planned_methods_bound": analysis_plan["planned_methods_bound"],
                 "all_analysis_lanes_bound": analysis_plan[
                     "all_analysis_lanes_bound"
                 ],
@@ -12107,6 +12151,7 @@ json.dump(response, sys.stdout)
             },
             "profile": self.observation_integration_workbench.reference_profile(),
             "taxonomy": taxonomy,
+            "method_catalog": method_catalog,
             "source_bundle": source_bundle,
             "integration_graph": integration_graph,
             "analysis_plan": analysis_plan,
@@ -12117,6 +12162,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "taxonomy",
                     "schema_path": "specs/schemas/observation_source_catalog.schema",
                     "contract_role": "observation-source-taxonomy",
+                },
+                {
+                    "payload_path": "method_catalog",
+                    "schema_path": "specs/schemas/observation_measurement_analysis_catalog.schema",
+                    "contract_role": "observation-measurement-analysis-catalog",
                 },
                 {
                     "payload_path": "source_bundle",

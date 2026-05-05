@@ -43,11 +43,15 @@
   open-world taxonomy に束縛する
 - source は raw payload ではなく feature digest、provenance、rights、time、space、
   unit、uncertainty、entity の alignment axes として扱う
+- questionnaire / biosignal recording / imaging / sequencing / sensor / registry /
+  experiment / simulation などの測定方法と、statistics / signal processing /
+  spatial-temporal / inference / machine learning / graph / omics / image /
+  simulation / qualitative / rights-audit 解析方法を method catalog に束縛する
 - cross-domain graph、analysis plan、operator guide を同じ source bundle digest に束縛する
 - 完全知識、真理統一、意識再現、本人同一性成立の主張はしない
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli observation-integration-demo --json`
   で taxonomy、source bundle、integration graph、analysis lane、operator handoff、
-  raw payload redaction、claim ceiling をまとめて検証する
+  method catalog、raw payload redaction、claim ceiling をまとめて検証する
 
 ### Biological-Digital Bridge (BDB)
 - BCI（脳-コンピュータ・インタフェース）

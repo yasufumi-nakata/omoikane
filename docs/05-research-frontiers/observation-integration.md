@@ -20,6 +20,8 @@ provenance、rights、time、space、unit、uncertainty、entity scope を同じ
 quality-control practice がある。OmoikaneOS reference runtime v0 は、
 raw data ではなく feature digest と alignment axes だけを受け取る
 Observation Integration Workbench として、解析計画 surface までを固定した。
+2026-05-05 の拡張では、測定方法と解析方法も open-world method catalog として
+digest-bound にし、method id / family / count / analysis lane refs だけを保持する。
 
 ## ブロッキング要因
 
@@ -28,13 +30,16 @@ Observation Integration Workbench として、解析計画 surface までを固�
 - 古い資料や集合統計では provenance chain と同意範囲が十分に残っていないことがある
 - 同じ entity に見える対象が、実際には測定系や分類 ontology の違いで一致しない
 - cross-domain model が causal truth と誤読される危険がある
+- 解析方法名が似ていても、domain、前処理、権利条件、uncertainty model が違えば
+  同じ method として扱えないことがある
 
 ## 暫定運用方針
 
 Observation Integration Workbench は、complete human knowledge、truth unification、
 consciousness reproduction、identity replacement をすべて false に固定する。
 外部 source は raw payload として保存せず、source manifest、feature digest、
-alignment axis summary、rights ref、uncertainty model ref だけを取り込む。
+alignment axis summary、rights ref、uncertainty model ref、measurement method ref、
+analysis method ref だけを取り込む。
 矛盾や不完全性は `https://mind-upload.com/frontiers/universal-observation-integration`
 の conflict sink に分離する。
 
