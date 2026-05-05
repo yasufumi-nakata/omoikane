@@ -11119,55 +11119,48 @@ json.dump(response, sys.stdout)
             human_consent_proof="consent://neuro-integration-workbench-demo/v1",
             metadata={"display_name": "Neuro Integration Workbench Sandbox"},
         )
+        neuro_source_types = [
+            "questionnaire",
+            "eeg",
+            "fmri_bold",
+            "brain_organoid",
+            "biosensor",
+            "behavioral_task",
+            "omics",
+            "clinical_metadata",
+        ]
         measurement_app = self.neuro_integration_workbench.register_application(
             app_name="Unified BioMeasure",
             app_kind="measurement",
-            supported_source_types=[
-                "questionnaire",
-                "eeg",
-                "fmri_bold",
-                "brain_organoid",
-                "biosensor",
-            ],
+            supported_source_types=neuro_source_types,
             workflow_roles=["measurement"],
             operator_skill_floor="non_ml_operator",
         )
         analysis_app = self.neuro_integration_workbench.register_application(
             app_name="Survey EEG Fusion Studio",
             app_kind="analysis",
-            supported_source_types=[
-                "questionnaire",
-                "eeg",
-                "fmri_bold",
-                "brain_organoid",
-            ],
+            supported_source_types=neuro_source_types,
             workflow_roles=["analysis"],
             operator_skill_floor="non_ml_operator",
         )
         curation_app = self.neuro_integration_workbench.register_application(
             app_name="Digest Curation Ledger",
             app_kind="data-curation",
-            supported_source_types=[
-                "questionnaire",
-                "eeg",
-                "fmri_bold",
-                "brain_organoid",
-                "behavioral_task",
-            ],
+            supported_source_types=neuro_source_types,
             workflow_roles=["data-curation"],
             operator_skill_floor="non_ml_operator",
         )
         copilot_app = self.neuro_integration_workbench.register_application(
             app_name="Plain Language Neuro Copilot",
             app_kind="operator-copilot",
-            supported_source_types=["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+            supported_source_types=neuro_source_types,
             workflow_roles=["operator-copilot"],
             operator_skill_floor="non_ml_operator",
         )
         agent_app = self.neuro_integration_workbench.register_application(
             app_name="Coding Agent Analysis Runner",
             app_kind="agent-automation",
-            supported_source_types=["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+            supported_source_types=neuro_source_types,
             workflow_roles=["agent-automation"],
             operator_skill_floor="coding_agent",
         )
@@ -11313,6 +11306,63 @@ json.dump(response, sys.stdout)
                         "culture_day": 42.0,
                     },
                 },
+                {
+                    "source_type": "biosensor",
+                    "source_ref": "source://neuro-workbench/biosensor/wearable-window",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "consent_ref": "consent://neuro-workbench/biosensor-redacted",
+                    "license_ref": "license://neuro-workbench/local-consent-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/biosensor/wearable-window",
+                    "feature_summary": {
+                        "heart_rate_variability": 0.58,
+                        "skin_conductance": 0.43,
+                        "respiration_regular": 0.72,
+                        "temperature_stability": 0.68,
+                    },
+                },
+                {
+                    "source_type": "behavioral_task",
+                    "source_ref": "source://neuro-workbench/behavioral-task/attention-window",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "consent_ref": "consent://neuro-workbench/behavioral-task-redacted",
+                    "license_ref": "license://neuro-workbench/local-consent-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/behavioral-task/attention-window",
+                    "feature_summary": {
+                        "reaction_time_stability": 0.63,
+                        "attention_accuracy": 0.76,
+                        "fatigue_error_proxy": 0.27,
+                    },
+                },
+                {
+                    "source_type": "omics",
+                    "source_ref": "source://neuro-workbench/omics/blood-panel",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "consent_ref": "consent://neuro-workbench/omics-redacted",
+                    "license_ref": "license://neuro-workbench/local-consent-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/omics/blood-panel",
+                    "feature_summary": {
+                        "inflammation_marker_proxy": 0.34,
+                        "metabolic_stability_proxy": 0.69,
+                        "sampling_quality_proxy": 0.87,
+                    },
+                },
+                {
+                    "source_type": "clinical_metadata",
+                    "source_ref": "source://neuro-workbench/clinical-metadata/context",
+                    "app_ref": measurement_app["app_ref"],
+                    "participant_ref": "participant://neuro-workbench/self",
+                    "consent_ref": "consent://neuro-workbench/clinical-metadata-redacted",
+                    "license_ref": "license://neuro-workbench/local-consent-only",
+                    "feature_summary_ref": "feature-summary://neuro-workbench/clinical-metadata/context",
+                    "feature_summary": {
+                        "medication_context_proxy": 0.2,
+                        "sleep_history_proxy": 0.52,
+                        "screening_completeness": 0.9,
+                    },
+                },
             ],
             upstream_receipts=[biodata_survey_eeg_fusion],
         )
@@ -11322,7 +11372,8 @@ json.dump(response, sys.stdout)
             source_bundle=source_bundle,
             analysis_goal=(
                 "Integrate questionnaire and EEG first, then attach fMRI and "
-                "brain organoid feature summaries under one LLM-native workflow."
+                "brain organoid, biosensor, behavioral, omics, and clinical "
+                "metadata feature summaries under one LLM-native workflow."
             ),
             operator_profile={
                 "skill_level": "non_ml_operator",

@@ -47,7 +47,7 @@ reference runtime surface」を作ることである。これは mind uploading 
 
 1. measurement、analysis、data-curation、operator-copilot、agent-automation の 5 app receipt を登録する
 2. BioData Transmitter で survey+EEG fusion receipt を作り、receipt digest / fused window digest を検証する
-3. questionnaire、EEG、fMRI BOLD、brain organoid の feature summary と upstream fusion receipt digest を digest-only source bundle に束縛する
+3. questionnaire、EEG、fMRI BOLD、brain organoid、biosensor、behavioral task、omics、clinical metadata の feature summary と upstream fusion receipt digest を digest-only source bundle に束縛する
 4. 非 ML 専門家 operator profile と source bundle / app digest set を workspace に束縛する
 5. questionnaire distress / attention proxy と EEG cortical load / alpha suppression proxy の bounded alignment を作る
 6. fMRI と脳オルガノイドは expansion lane として analysis receipt に残す
@@ -63,7 +63,7 @@ reference runtime surface」を作ることである。これは mind uploading 
     receipt として束縛する
 13. collection run result を calibration、artifact/QC、consent freshness、operator review、
     quality authority refs に measurement quality gate として束縛する
-14. 現在の source type 全ペアに survey+EEG alignment、EEG+fMRI context、
+14. 現在の 8 source type 全 28 ペアに survey+EEG alignment、EEG+fMRI context、
     organoid context、generic feature-summary screen の bounded recipe を割り当てる
 15. 各 pair の bounded result summary を生成し、operator と coding agent の review-ready
     receipt として束縛する

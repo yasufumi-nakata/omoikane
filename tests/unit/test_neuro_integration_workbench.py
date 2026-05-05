@@ -47,35 +47,45 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
 
     def _build_demo_artifacts(self) -> dict:
         workbench = NeuroIntegrationWorkbench()
+        source_types = [
+            "questionnaire",
+            "eeg",
+            "fmri_bold",
+            "brain_organoid",
+            "biosensor",
+            "behavioral_task",
+            "omics",
+            "clinical_metadata",
+        ]
         apps = [
             workbench.register_application(
                 "Measure",
                 "measurement",
-                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+                source_types,
                 ["measurement"],
             ),
             workbench.register_application(
                 "Analyze",
                 "analysis",
-                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+                source_types,
                 ["analysis"],
             ),
             workbench.register_application(
                 "Curate",
                 "data-curation",
-                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+                source_types,
                 ["data-curation"],
             ),
             workbench.register_application(
                 "Guide",
                 "operator-copilot",
-                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+                source_types,
                 ["operator-copilot"],
             ),
             workbench.register_application(
                 "Agent",
                 "agent-automation",
-                ["questionnaire", "eeg", "fmri_bold", "brain_organoid"],
+                source_types,
                 ["agent-automation"],
                 operator_skill_floor="coding_agent",
             ),
@@ -142,6 +152,63 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
                         "viability_score": 0.9,
                     },
                 },
+                {
+                    "source_type": "biosensor",
+                    "source_ref": "source://unit/biosensor",
+                    "app_ref": apps[0]["app_ref"],
+                    "participant_ref": "participant://unit/self",
+                    "consent_ref": "consent://unit/biosensor",
+                    "license_ref": "license://unit/local",
+                    "feature_summary_ref": "feature-summary://unit/biosensor",
+                    "feature_summary": {
+                        "heart_rate_variability": 0.58,
+                        "skin_conductance": 0.42,
+                        "respiration_regular": 0.71,
+                        "temperature_stability": 0.67,
+                    },
+                },
+                {
+                    "source_type": "behavioral_task",
+                    "source_ref": "source://unit/behavioral-task",
+                    "app_ref": apps[0]["app_ref"],
+                    "participant_ref": "participant://unit/self",
+                    "consent_ref": "consent://unit/behavioral-task",
+                    "license_ref": "license://unit/local",
+                    "feature_summary_ref": "feature-summary://unit/behavioral-task",
+                    "feature_summary": {
+                        "reaction_time_stability": 0.62,
+                        "attention_accuracy": 0.74,
+                        "fatigue_error_proxy": 0.28,
+                    },
+                },
+                {
+                    "source_type": "omics",
+                    "source_ref": "source://unit/omics",
+                    "app_ref": apps[0]["app_ref"],
+                    "participant_ref": "participant://unit/self",
+                    "consent_ref": "consent://unit/omics",
+                    "license_ref": "license://unit/local",
+                    "feature_summary_ref": "feature-summary://unit/omics",
+                    "feature_summary": {
+                        "inflammation_marker_proxy": 0.33,
+                        "metabolic_stability_proxy": 0.68,
+                        "sampling_quality_proxy": 0.86,
+                    },
+                },
+                {
+                    "source_type": "clinical_metadata",
+                    "source_ref": "source://unit/clinical-metadata",
+                    "app_ref": apps[0]["app_ref"],
+                    "participant_ref": "participant://unit/self",
+                    "consent_ref": "consent://unit/clinical-metadata",
+                    "license_ref": "license://unit/local",
+                    "feature_summary_ref": "feature-summary://unit/clinical-metadata",
+                    "feature_summary": {
+                        "medication_context_proxy": 0.2,
+                        "sleep_history_proxy": 0.52,
+                        "screening_completeness": 0.9,
+                    },
+                },
             ],
             upstream_receipts=[
                 self._build_upstream_fusion_receipt("identity://neuro-unit")
@@ -151,7 +218,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "identity://neuro-unit",
             apps,
             source_bundle,
-            "Fuse survey and EEG, then attach fMRI and organoid context.",
+            "Fuse survey and EEG, then attach fMRI, organoid, and biodata context.",
             {
                 "skill_level": "non_ml_operator",
                 "prefers_plain_language": True,
@@ -385,6 +452,10 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertIn("eeg", artifacts["source_bundle"]["source_types"])
         self.assertIn("fmri_bold", artifacts["source_bundle"]["source_types"])
         self.assertIn("brain_organoid", artifacts["source_bundle"]["source_types"])
+        self.assertIn("biosensor", artifacts["source_bundle"]["source_types"])
+        self.assertIn("behavioral_task", artifacts["source_bundle"]["source_types"])
+        self.assertIn("omics", artifacts["source_bundle"]["source_types"])
+        self.assertIn("clinical_metadata", artifacts["source_bundle"]["source_types"])
         self.assertEqual(1, artifacts["source_bundle"]["upstream_receipt_count"])
         self.assertTrue(artifacts["analysis"]["upstream_fusion_binding"]["bound"])
         self.assertTrue(artifacts["replacement_plan"]["replacement_plan_bound"])
@@ -400,8 +471,8 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
                 for step in artifacts["collection_protocol"]["collection_steps"]
             )
         )
-        self.assertEqual(4, artifacts["collection_protocol"]["collection_step_count"])
-        self.assertEqual(4, validation["collection_step_count"])
+        self.assertEqual(8, artifacts["collection_protocol"]["collection_step_count"])
+        self.assertEqual(8, validation["collection_step_count"])
         self.assertTrue(artifacts["collection_run"]["collection_run_bound"])
         self.assertFalse(artifacts["collection_run"]["semantic_thought_content_generated"])
         self.assertTrue(
@@ -410,25 +481,25 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
                 for result in artifacts["collection_run"]["collection_results"]
             )
         )
-        self.assertEqual(4, artifacts["collection_run"]["result_count"])
-        self.assertEqual(4, validation["collection_result_count"])
+        self.assertEqual(8, artifacts["collection_run"]["result_count"])
+        self.assertEqual(8, validation["collection_result_count"])
         self.assertTrue(
             artifacts["measurement_quality_gate"][
                 "measurement_quality_gate_bound"
             ]
         )
         self.assertEqual(
-            4,
+            8,
             artifacts["measurement_quality_gate"]["quality_item_count"],
         )
-        self.assertEqual(4, validation["measurement_quality_item_count"])
+        self.assertEqual(8, validation["measurement_quality_item_count"])
         self.assertTrue(
             artifacts["cross_modal_analysis_plan"][
                 "cross_modal_analysis_plan_bound"
             ]
         )
         self.assertEqual(
-            6,
+            28,
             artifacts["cross_modal_analysis_plan"]["analysis_pair_count"],
         )
         self.assertTrue(
@@ -437,7 +508,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            6,
+            28,
             artifacts["cross_modal_analysis_run"]["result_count"],
         )
         self.assertTrue(
@@ -446,12 +517,12 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             ]
         )
         self.assertEqual(
-            6,
+            28,
             artifacts["interpretation_synthesis"]["synthesis_card_count"],
         )
-        self.assertEqual(6, validation["interpretation_card_count"])
+        self.assertEqual(28, validation["interpretation_card_count"])
         self.assertEqual(
-            4,
+            8,
             artifacts["replacement_plan"]["coverage_summary"]["covered_source_type_count"],
         )
         self.assertEqual(

@@ -5,9 +5,9 @@ service: NeuroIntegrationWorkbenchService
 summary: >
   Canonical L6 contract for an LLM-native multi-application workbench that
   starts with questionnaire plus EEG feature integration and can attach fMRI,
-  brain organoid, biosensor, behavioral, omics, and future biological data
-  sources without claiming diagnosis, consciousness reproduction, or identity
-  replacement.
+  brain organoid, biosensor, behavioral, omics, clinical metadata, and future
+  biological data sources without claiming diagnosis, consciousness
+  reproduction, or identity replacement.
 imports:
   biodata_survey_eeg_fusion_receipt: ../schemas/biodata_survey_eeg_fusion_receipt.schema
   neuro_integration_app_registry_receipt: ../schemas/neuro_integration_app_registry_receipt.schema
@@ -65,7 +65,7 @@ operations:
       - non-ML operators and coding agents must both have explicit operator-skill floor metadata
       - raw application and credential payload storage must remain false
   bind_source_bundle:
-    summary: Bind questionnaire, EEG, and optional fMRI / organoid / future biological feature summaries into one digest-only source bundle.
+    summary: Bind questionnaire, EEG, fMRI, organoid, biosensor, behavioral, omics, clinical metadata, and future biological feature summaries into one digest-only source bundle.
     input:
       inline_schema:
         type: object
@@ -100,6 +100,7 @@ operations:
       - questionnaire and EEG must be present before the seed analysis can pass
       - BioData survey+EEG fusion receipts must be carried as digest-only upstream bindings
       - fMRI and brain organoid sources must be expansion context, not identity proof
+      - biosensor, behavioral task, omics, clinical metadata, and future biological sources must remain feature-summary context
       - every source must bind consent, license, app, participant, and feature digest refs
       - raw questionnaire, EEG, neuroimaging, organoid, and source payload storage must remain false
       - consciousness reproduction and identity replacement claims must remain false
@@ -303,7 +304,7 @@ operations:
     guarantees:
       - every source in the source bundle must have one digest-bound collection step
       - questionnaire and EEG collection must be bound before downstream analysis claims pass
-      - fMRI, brain organoid, and future biological sources must bind measurement connectors as expansion collection context
+      - fMRI, brain organoid, biosensor, behavioral task, omics, clinical metadata, and future biological sources must bind measurement connectors as expansion collection context
       - non-ML operator and coding-agent collection handoffs must require no ML expertise
       - raw source, collection, connector, and credential payload storage must remain false
       - semantic thought content, diagnosis, consciousness reproduction, and identity replacement claims must remain false
@@ -403,7 +404,7 @@ operations:
       - raw source, quality, calibration, artifact, and consent payload storage must remain false
       - diagnosis, consciousness reproduction, and identity replacement claims must remain false
   build_cross_modal_analysis_plan:
-    summary: Emit a digest-only plan for every current source-type pair so questionnaire, EEG, fMRI, organoid, and future biological summaries can be analyzed through bounded recipes.
+    summary: Emit a digest-only plan for every current source-type pair so questionnaire, EEG, fMRI, organoid, biosensor, behavioral, omics, clinical metadata, and future biological summaries can be analyzed through bounded recipes.
     input:
       inline_schema:
         type: object

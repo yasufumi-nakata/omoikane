@@ -65,6 +65,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - 2026-05-06 時点で NIW は interpretation synthesis receipt を追加し、measurement quality
   gate と cross-modal analysis run を plain-language synthesis cards と coding-agent tasks に
   束縛する。
+- 同日、NIW reference demo は biosensor、behavioral task、omics、clinical metadata を
+  questionnaire / EEG / fMRI / brain organoid と同じ source bundle、collection、
+  quality gate、cross-modal analysis、interpretation synthesis pipeline に通すよう拡張した。
 
 ## ブロッキング要因
 
@@ -132,6 +135,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - interpretation synthesis は quality item digest と analysis result digest から
   non-ML operator next action と coding-agent task を作るだけで、診断、因果推論、
   semantic thought content、subjective equivalence、upload readiness には昇格しない
+- open biodata lane は source type coverage を増やすが、各 modality の専門的妥当性、
+  longitudinal stability、clinical validity、regulatory readiness は source-specific
+  research frontier として残す
 - Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
   BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない

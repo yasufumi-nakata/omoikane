@@ -16,7 +16,7 @@
 
 ### Neuro Integration Workbench (NIW)
 - アンケートと EEG を seed pair として、fMRI BOLD、脳オルガノイド、biosensor、
-  behavioral task、omics、future biological source を同じ source bundle に追加する
+  behavioral task、omics、clinical metadata、future biological source を同じ source bundle に追加する
 - BDT の Survey EEG Fusion receipt を upstream digest として受け取り、NIW の source bundle /
   analysis receipt に再束縛する
 - 計測アプリ、解析アプリ、データ整備アプリ、operator copilot、coding-agent automation を
@@ -43,7 +43,7 @@
   source-type lane coverage、connector bundle binding、collection protocol binding、
   collection run binding、measurement quality gate binding、cross-modal analysis pair coverage、
   bounded result summary binding、interpretation synthesis binding、raw payload redaction、
-  claim ceiling をまとめて検証する
+  claim ceiling を 8 source type / 28 pair の open biodata coverage として検証する
 
 ### Observation Integration Workbench (OIW)
 - 人類が取得・計測してきた source を、human biodata、neuroscience、clinical health、

@@ -169,7 +169,8 @@ raw continuity event payload は保存しない。
 (`interface.neuro_integration_workbench.v0`) を JSON で可視化し、questionnaire と EEG を
 seed pair として束縛したうえで、BioData Transmitter の Survey EEG Fusion receipt digest
 を upstream binding として受け取り、fMRI BOLD と brain organoid feature summary を
-expansion lane として同じ source bundle に追加する。measurement / analysis /
+expansion lane として、biosensor、behavioral task、omics、clinical metadata を
+open biodata lane として同じ source bundle に追加する。measurement / analysis /
 data-curation / operator-copilot / agent-automation の 5 replacement lane を
 workspace digest に束縛し、各 source type が 5 lane すべてで app digest に覆われる
 application replacement plan も返す。さらに replacement plan に対して connector refs、
@@ -181,7 +182,7 @@ step から bounded quality / risk summary、semantic thought content 非生成�
 coding-agent review readiness を digest-only で返す。measurement quality gate は calibration、artifact/QC、consent
 freshness、operator review、quality authority refs を collection run results に束縛する。
 cross-modal analysis plan は
-現在の source type 全ペアに bounded recipe と connector support を割り当て、
+現在の 8 source type 全 28 ペアに bounded recipe と connector support を割り当て、
 questionnaire + EEG seed から fMRI / brain organoid context へ分析計画を広げる。analysis run は
 全 pair の bounded result summary、operator review readiness、coding-agent review readiness を
 digest-only で返す。interpretation synthesis は measurement quality gate と analysis run を

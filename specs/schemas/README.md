@@ -46,7 +46,7 @@
 - `neuro_integration_app_registry_receipt.schema`
   - 計測・解析・データ整備・operator copilot・agent automation の置換 lane を app digest と operator skill floor に束縛する
 - `neuro_integration_source_bundle.schema`
-  - questionnaire + EEG を seed pair として束縛し、fMRI / 脳オルガノイド / future biological source を raw payload 無しの expansion lane として保持する
+  - questionnaire + EEG を seed pair として束縛し、fMRI / 脳オルガノイド / biosensor / behavioral task / omics / clinical metadata / future biological source を raw payload 無しの expansion lane として保持する
 - `neuro_integration_workspace.schema`
   - app digest set、source bundle digest、非 ML operator profile、LLM-native workflow、置換 lane coverage、claim ceiling を workspace digest に束縛する
 - `neuro_integration_analysis_receipt.schema`

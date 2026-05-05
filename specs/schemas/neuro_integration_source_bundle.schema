@@ -3,8 +3,9 @@ $id: "https://omoikane.dev/specs/schemas/neuro_integration_source_bundle.schema"
 title: NeuroIntegrationSourceBundle
 description: >
   Digest-only source bundle that binds questionnaire and EEG feature summaries
-  first, then attaches fMRI, brain organoid, and future biological source
-  summaries without storing raw payloads.
+  first, then attaches fMRI, brain organoid, biosensor, behavioral, omics,
+  clinical metadata, and future biological source summaries without storing raw
+  payloads.
 type: object
 additionalProperties: false
 required:

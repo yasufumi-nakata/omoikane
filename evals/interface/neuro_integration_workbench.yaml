@@ -4,6 +4,7 @@ level: L6
 description: >
   NeuroIntegrationWorkbench がアンケートと EEG を seed pair として束縛し、
   fMRI と脳オルガノイド feature summary を expansion lane として追加し、
+  biosensor、behavioral task、omics、clinical metadata も同じ source bundle に入れ、
   計測・解析・データ整備・operator copilot・agent automation の置換 lane を
   LLM-native かつ非 ML 専門家向けにまとめられることを確認する。
 inputs:
@@ -28,7 +29,7 @@ expected:
   application_replacement_plan_bound: true
   replacement_plan_digest_bound: true
   source_type_lane_coverage_bound: true
-  covered_source_type_count: 4
+  covered_source_type_count: 8
   replacement_plan_payload_redacted: true
   application_connector_bundle_bound: true
   connector_bundle_digest_bound: true
@@ -41,34 +42,34 @@ expected:
   seed_collection_bound: true
   collection_payload_redacted: true
   collection_semantic_thought_claim_redacted: true
-  collection_step_count: 4
+  collection_step_count: 8
   collection_run_bound: true
   collection_run_digest_bound: true
   collection_results_bound: true
   collection_result_payload_redacted: true
   collection_result_semantic_thought_claim_redacted: true
-  collection_result_count: 4
+  collection_result_count: 8
   measurement_quality_gate_bound: true
   measurement_quality_gate_digest_bound: true
   measurement_quality_items_bound: true
   measurement_quality_payload_redacted: true
-  measurement_quality_item_count: 4
+  measurement_quality_item_count: 8
   cross_modal_analysis_plan_bound: true
   cross_modal_analysis_plan_digest_bound: true
   cross_modal_source_pair_coverage_bound: true
   cross_modal_analysis_payload_redacted: true
-  analysis_pair_count: 6
+  analysis_pair_count: 28
   cross_modal_analysis_run_bound: true
   cross_modal_analysis_run_digest_bound: true
   cross_modal_pair_results_bound: true
   cross_modal_result_payload_redacted: true
-  analysis_result_count: 6
+  analysis_result_count: 28
   interpretation_synthesis_bound: true
   interpretation_synthesis_digest_bound: true
   interpretation_synthesis_cards_bound: true
   interpretation_operator_action_ready: true
   interpretation_payload_redacted: true
-  interpretation_card_count: 6
+  interpretation_card_count: 28
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true
