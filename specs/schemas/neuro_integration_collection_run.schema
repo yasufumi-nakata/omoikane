@@ -40,6 +40,7 @@ required:
   - raw_connector_payload_stored
   - raw_result_payload_stored
   - clinical_diagnosis_claimed
+  - semantic_thought_content_generated
   - consciousness_reproduction_claimed
   - identity_replacement_claimed
   - collection_run_digest
@@ -146,6 +147,8 @@ properties:
     const: false
   clinical_diagnosis_claimed:
     const: false
+  semantic_thought_content_generated:
+    const: false
   consciousness_reproduction_claimed:
     const: false
   identity_replacement_claimed:
@@ -230,6 +233,7 @@ $defs:
       - raw_connector_payload_stored
       - raw_result_payload_stored
       - clinical_diagnosis_claimed
+      - semantic_thought_content_generated
       - consciousness_reproduction_claimed
       - identity_replacement_claimed
       - collection_result_digest
@@ -303,6 +307,8 @@ $defs:
       raw_result_payload_stored:
         const: false
       clinical_diagnosis_claimed:
+        const: false
+      semantic_thought_content_generated:
         const: false
       consciousness_reproduction_claimed:
         const: false

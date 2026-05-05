@@ -3,6 +3,7 @@ from __future__ import annotations
 from copy import deepcopy
 import unittest
 
+from omoikane.common import canonical_json, sha256_text
 from omoikane.interface.neuro_integration_workbench import NeuroIntegrationWorkbench
 
 
@@ -337,10 +338,14 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["source_collection_coverage_bound"])
         self.assertTrue(validation["seed_collection_bound"])
         self.assertTrue(validation["collection_payload_redacted"])
+        self.assertTrue(validation["collection_semantic_thought_claim_redacted"])
         self.assertTrue(validation["collection_run_bound"])
         self.assertTrue(validation["collection_run_digest_bound"])
         self.assertTrue(validation["collection_results_bound"])
         self.assertTrue(validation["collection_result_payload_redacted"])
+        self.assertTrue(
+            validation["collection_result_semantic_thought_claim_redacted"]
+        )
         self.assertTrue(validation["measurement_quality_gate_bound"])
         self.assertTrue(validation["measurement_quality_gate_digest_bound"])
         self.assertTrue(validation["measurement_quality_items_bound"])
@@ -358,6 +363,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["claim_ceiling_bound"])
         self.assertTrue(validation["raw_payload_redacted"])
         self.assertTrue(validation["no_diagnosis_or_identity_claim"])
+        self.assertTrue(validation["no_semantic_thought_content_claim"])
         self.assertEqual(
             "feature-alignment-and-analysis-plan-only",
             artifacts["analysis"]["claim_ceiling"],
@@ -372,9 +378,25 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(artifacts["connector_bundle"]["connector_bundle_bound"])
         self.assertEqual(5, artifacts["connector_bundle"]["connector_count"])
         self.assertTrue(artifacts["collection_protocol"]["collection_protocol_bound"])
+        self.assertFalse(
+            artifacts["collection_protocol"]["semantic_thought_content_generated"]
+        )
+        self.assertTrue(
+            all(
+                step["semantic_thought_content_generated"] is False
+                for step in artifacts["collection_protocol"]["collection_steps"]
+            )
+        )
         self.assertEqual(4, artifacts["collection_protocol"]["collection_step_count"])
         self.assertEqual(4, validation["collection_step_count"])
         self.assertTrue(artifacts["collection_run"]["collection_run_bound"])
+        self.assertFalse(artifacts["collection_run"]["semantic_thought_content_generated"])
+        self.assertTrue(
+            all(
+                result["semantic_thought_content_generated"] is False
+                for result in artifacts["collection_run"]["collection_results"]
+            )
+        )
         self.assertEqual(4, artifacts["collection_run"]["result_count"])
         self.assertEqual(4, validation["collection_result_count"])
         self.assertTrue(
@@ -414,6 +436,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["analysis"]["upstream_fusion_binding"]["receipt_role"],
         )
         self.assertFalse(artifacts["analysis"]["raw_questionnaire_payload_stored"])
+        self.assertFalse(validation["semantic_thought_content_generated"])
         self.assertFalse(artifacts["analysis"]["consciousness_reproduction_claimed"])
         self.assertFalse(artifacts["analysis"]["identity_replacement_claimed"])
 
@@ -572,6 +595,57 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "measurement_quality_gate.quality_item_digests mismatch",
+            validation["errors"],
+        )
+
+    def test_collection_run_semantic_thought_generation_claim_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_run = deepcopy(artifacts["collection_run"])
+        tampered_run["semantic_thought_content_generated"] = True
+        tampered_run["collection_run_digest"] = sha256_text(
+            canonical_json(
+                artifacts["workbench"]._collection_run_digest_payload(tampered_run)
+            )
+        )
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            collection_protocol=artifacts["collection_protocol"],
+            collection_run=tampered_run,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "collection_run.semantic_thought_content_generated must be false",
+            validation["errors"],
+        )
+
+    def test_collection_result_semantic_thought_generation_claim_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_run = deepcopy(artifacts["collection_run"])
+        tampered_run["collection_results"][0]["semantic_thought_content_generated"] = True
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            collection_protocol=artifacts["collection_protocol"],
+            collection_run=tampered_run,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "collection_result.semantic_thought_content_generated must be false",
             validation["errors"],
         )
 

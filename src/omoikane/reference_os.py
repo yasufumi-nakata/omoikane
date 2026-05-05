@@ -11742,6 +11742,9 @@ json.dump(response, sys.stdout)
                 "raw_collection_payload_stored": collection_protocol[
                     "raw_collection_payload_stored"
                 ],
+                "semantic_thought_content_generated": collection_protocol[
+                    "semantic_thought_content_generated"
+                ],
             },
             actor="NeuroIntegrationWorkbench",
             category="interface-neuro-integration-workbench-collection-protocol",
@@ -11783,6 +11786,9 @@ json.dump(response, sys.stdout)
                 "claim_ceiling": collection_run["claim_ceiling"],
                 "raw_result_payload_stored": collection_run[
                     "raw_result_payload_stored"
+                ],
+                "semantic_thought_content_generated": collection_run[
+                    "semantic_thought_content_generated"
                 ],
             },
             actor="NeuroIntegrationWorkbench",

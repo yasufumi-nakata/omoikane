@@ -2537,7 +2537,7 @@ entries:
       - reference-runtime
       - evals/interface/neuro_integration_workbench.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to bind each biological source summary to consent refs, measurement connector refs, and collection-window refs before analysis planning without storing raw collection payloads.
+    rationale: Required to bind each biological source summary to consent refs, measurement connector refs, and collection-window refs before analysis planning without storing raw collection payloads or generating semantic thought content.
   - priority: P1
     kind: schema
     file: specs/schemas/neuro_integration_collection_run.schema
@@ -2547,7 +2547,7 @@ entries:
       - reference-runtime
       - evals/interface/neuro_integration_workbench.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to bind bounded per-source collection result summaries to the collection protocol before analysis planning without storing raw source, collection, connector, or result payloads.
+    rationale: Required to bind bounded per-source collection result summaries to the collection protocol before analysis planning without storing raw source, collection, connector, or result payloads or generating semantic thought content.
   - priority: P1
     kind: schema
     file: specs/schemas/neuro_integration_measurement_quality_gate.schema
@@ -2593,7 +2593,7 @@ entries:
     consumers:
       - reference-runtime
       - agents/builders/eval-builder.yaml
-    rationale: Protects survey+EEG seed binding, expansion modality binding, replacement lane coverage, LLM-native beginner workflow, raw payload redaction, and no diagnosis / no consciousness / no identity replacement claim ceiling.
+    rationale: Protects survey+EEG seed binding, expansion modality binding, replacement lane coverage, LLM-native beginner workflow, raw payload redaction, semantic thought content non-generation, and no diagnosis / no consciousness / no identity replacement claim ceiling.
   - priority: P1
     kind: schema
     file: specs/schemas/bdb_session.schema

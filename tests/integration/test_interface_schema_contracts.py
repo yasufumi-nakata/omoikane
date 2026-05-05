@@ -295,10 +295,18 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["source_collection_coverage_bound"])
         self.assertTrue(result["validation"]["seed_collection_bound"])
         self.assertTrue(result["validation"]["collection_payload_redacted"])
+        self.assertTrue(
+            result["validation"]["collection_semantic_thought_claim_redacted"]
+        )
         self.assertTrue(result["validation"]["collection_run_bound"])
         self.assertTrue(result["validation"]["collection_run_digest_bound"])
         self.assertTrue(result["validation"]["collection_results_bound"])
         self.assertTrue(result["validation"]["collection_result_payload_redacted"])
+        self.assertTrue(
+            result["validation"][
+                "collection_result_semantic_thought_claim_redacted"
+            ]
+        )
         self.assertTrue(result["validation"]["measurement_quality_gate_bound"])
         self.assertTrue(result["validation"]["measurement_quality_gate_digest_bound"])
         self.assertTrue(result["validation"]["measurement_quality_items_bound"])
@@ -317,7 +325,9 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["claim_ceiling_bound"])
         self.assertTrue(result["validation"]["raw_payload_redacted"])
         self.assertTrue(result["validation"]["no_diagnosis_or_identity_claim"])
+        self.assertTrue(result["validation"]["no_semantic_thought_content_claim"])
         self.assertFalse(result["validation"]["clinical_diagnosis_claimed"])
+        self.assertFalse(result["validation"]["semantic_thought_content_generated"])
         self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
         self.assertFalse(result["validation"]["identity_replacement_claimed"])
 

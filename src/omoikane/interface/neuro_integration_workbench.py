@@ -1022,6 +1022,7 @@ class NeuroIntegrationWorkbench:
             "raw_connector_payload_stored": False,
             "raw_credential_payload_stored": False,
             "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
@@ -1166,6 +1167,7 @@ class NeuroIntegrationWorkbench:
             "raw_connector_payload_stored": False,
             "raw_result_payload_stored": False,
             "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
@@ -1612,8 +1614,13 @@ class NeuroIntegrationWorkbench:
         )
         no_diagnosis_or_identity_claim = all(
             artifact.get("clinical_diagnosis_claimed", False) is False
+            and artifact.get("semantic_thought_content_generated", False) is False
             and artifact.get("consciousness_reproduction_claimed") is False
             and artifact.get("identity_replacement_claimed") is False
+            for artifact in (source_bundle, workspace, analysis, operator_guide)
+        )
+        no_semantic_thought_content_claim = all(
+            artifact.get("semantic_thought_content_generated", False) is False
             for artifact in (source_bundle, workspace, analysis, operator_guide)
         )
         replacement_plan_checks: Dict[str, bool] = {}
@@ -1726,6 +1733,15 @@ class NeuroIntegrationWorkbench:
                 "collection_payload_redacted": (
                     self._collection_protocol_payload_redacted(collection_protocol)
                 ),
+                "collection_semantic_thought_claim_redacted": (
+                    collection_protocol.get("semantic_thought_content_generated")
+                    is False
+                    and all(
+                        step.get("semantic_thought_content_generated") is False
+                        for step in collection_protocol.get("collection_steps", [])
+                        if isinstance(step, dict)
+                    )
+                ),
             }
         collection_run_checks: Dict[str, bool] = {}
         if collection_run is not None:
@@ -1765,6 +1781,15 @@ class NeuroIntegrationWorkbench:
                 ),
                 "collection_result_payload_redacted": (
                     self._collection_run_payload_redacted(collection_run)
+                ),
+                "collection_result_semantic_thought_claim_redacted": (
+                    collection_run.get("semantic_thought_content_generated")
+                    is False
+                    and all(
+                        result.get("semantic_thought_content_generated") is False
+                        for result in collection_run.get("collection_results", [])
+                        if isinstance(result, dict)
+                    )
                 ),
             }
         measurement_quality_gate_checks: Dict[str, bool] = {}
@@ -1936,6 +1961,7 @@ class NeuroIntegrationWorkbench:
             "claim_ceiling_bound": claim_ceiling_bound,
             "raw_payload_redacted": raw_payload_redacted,
             "no_diagnosis_or_identity_claim": no_diagnosis_or_identity_claim,
+            "no_semantic_thought_content_claim": no_semantic_thought_content_claim,
             **replacement_plan_checks,
             **connector_bundle_checks,
             **collection_protocol_checks,
@@ -2001,6 +2027,7 @@ class NeuroIntegrationWorkbench:
             "raw_organoid_payload_stored": False,
             "raw_analysis_payload_stored": False,
             "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
@@ -2635,6 +2662,7 @@ class NeuroIntegrationWorkbench:
             "raw_collection_payload_stored": False,
             "raw_connector_payload_stored": False,
             "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
@@ -2694,6 +2722,7 @@ class NeuroIntegrationWorkbench:
             "raw_connector_payload_stored": False,
             "raw_result_payload_stored": False,
             "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
@@ -3385,6 +3414,7 @@ class NeuroIntegrationWorkbench:
         for step in steps:
             for field_name in (
                 "clinical_diagnosis_claimed",
+                "semantic_thought_content_generated",
                 "consciousness_reproduction_claimed",
                 "identity_replacement_claimed",
             ):
@@ -3414,6 +3444,7 @@ class NeuroIntegrationWorkbench:
             raise ValueError("collection_protocol.collection_step_digest_set mismatch")
         for field_name in (
             "clinical_diagnosis_claimed",
+            "semantic_thought_content_generated",
             "consciousness_reproduction_claimed",
             "identity_replacement_claimed",
         ):
@@ -3438,6 +3469,7 @@ class NeuroIntegrationWorkbench:
             raise ValueError("collection_run.storage_policy mismatch")
         for field_name in (
             "clinical_diagnosis_claimed",
+            "semantic_thought_content_generated",
             "consciousness_reproduction_claimed",
             "identity_replacement_claimed",
         ):
@@ -3458,6 +3490,7 @@ class NeuroIntegrationWorkbench:
         for result in results:
             for field_name in (
                 "clinical_diagnosis_claimed",
+                "semantic_thought_content_generated",
                 "consciousness_reproduction_claimed",
                 "identity_replacement_claimed",
             ):
@@ -4009,6 +4042,9 @@ class NeuroIntegrationWorkbench:
             "requires_ml_expertise": step.get("requires_ml_expertise"),
             "collection_step_bound": step.get("collection_step_bound"),
             "claim_ceiling": step.get("claim_ceiling"),
+            "semantic_thought_content_generated": step.get(
+                "semantic_thought_content_generated"
+            ),
         }
 
     def _collection_result_digest_payload(
@@ -4040,6 +4076,9 @@ class NeuroIntegrationWorkbench:
             "requires_ml_expertise": result.get("requires_ml_expertise"),
             "collection_result_bound": result.get("collection_result_bound"),
             "claim_ceiling": result.get("claim_ceiling"),
+            "semantic_thought_content_generated": result.get(
+                "semantic_thought_content_generated"
+            ),
         }
 
     def _quality_item_digest_payload(
@@ -4216,6 +4255,9 @@ class NeuroIntegrationWorkbench:
             ),
             "storage_policy": protocol.get("storage_policy"),
             "claim_ceiling": protocol.get("claim_ceiling"),
+            "semantic_thought_content_generated": protocol.get(
+                "semantic_thought_content_generated"
+            ),
         }
 
     def _collection_run_digest_payload(
@@ -4247,6 +4289,9 @@ class NeuroIntegrationWorkbench:
             "collection_summary": run.get("collection_summary"),
             "collection_run_bound": run.get("collection_run_bound"),
             "claim_ceiling": run.get("claim_ceiling"),
+            "semantic_thought_content_generated": run.get(
+                "semantic_thought_content_generated"
+            ),
         }
 
     def _measurement_quality_gate_digest_payload(

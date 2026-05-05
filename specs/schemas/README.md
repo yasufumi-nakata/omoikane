@@ -58,9 +58,9 @@
 - `neuro_integration_application_connector_bundle.schema`
   - replacement plan の各 lane に external connector ref、credential ref、data contract ref、LLM tool ref を digest-only で束縛し、raw connector / credential / endpoint payload を保存しないことを検証する
 - `neuro_integration_collection_protocol.schema`
-  - 各 biological source summary を consent ref、measurement connector ref、collection window ref に digest-only で束縛し、raw collection / source / connector payload を保存しないことを検証する
+  - 各 biological source summary を consent ref、measurement connector ref、collection window ref に digest-only で束縛し、raw collection / source / connector payload と semantic thought content を保存・生成しないことを検証する
 - `neuro_integration_collection_run.schema`
-  - collection protocol の各 step から bounded collection result summary と operator / coding-agent review readiness を digest-only で検証する
+  - collection protocol の各 step から bounded collection result summary、semantic thought content 非生成、operator / coding-agent review readiness を digest-only で検証する
 - `neuro_integration_measurement_quality_gate.schema`
   - collection run result を calibration / artifact QC / consent freshness / operator review / quality authority refs に束縛し、analysis planning 前の measurement quality gate を検証する
 - `neuro_integration_cross_modal_analysis_plan.schema`

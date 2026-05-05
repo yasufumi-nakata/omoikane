@@ -40,11 +40,13 @@ expected:
   source_collection_coverage_bound: true
   seed_collection_bound: true
   collection_payload_redacted: true
+  collection_semantic_thought_claim_redacted: true
   collection_step_count: 4
   collection_run_bound: true
   collection_run_digest_bound: true
   collection_results_bound: true
   collection_result_payload_redacted: true
+  collection_result_semantic_thought_claim_redacted: true
   collection_result_count: 4
   measurement_quality_gate_bound: true
   measurement_quality_gate_digest_bound: true
@@ -73,8 +75,10 @@ expected:
   raw_organoid_payload_stored: false
   raw_analysis_payload_stored: false
   clinical_diagnosis_claimed: false
+  semantic_thought_content_generated: false
   consciousness_reproduction_claimed: false
   identity_replacement_claimed: false
+  no_semantic_thought_content_claim: true
 metric: boolean
 threshold: 1.0
 ethics_check: true

@@ -305,7 +305,7 @@ operations:
       - fMRI, brain organoid, and future biological sources must bind measurement connectors as expansion collection context
       - non-ML operator and coding-agent collection handoffs must require no ML expertise
       - raw source, collection, connector, and credential payload storage must remain false
-      - diagnosis, consciousness reproduction, and identity replacement claims must remain false
+      - semantic thought content, diagnosis, consciousness reproduction, and identity replacement claims must remain false
   execute_collection_protocol:
     summary: Execute a collection protocol into bounded per-source collection result summaries for operator and coding-agent review.
     input:
@@ -330,7 +330,7 @@ operations:
       - result summaries must bind collection step digests, feature digests, connector refs, and collection-window refs
       - operator and coding-agent review readiness must be explicit and require no ML expertise
       - raw source, collection, connector, and result payload storage must remain false
-      - diagnosis, consciousness reproduction, and identity replacement claims must remain false
+      - semantic thought content, diagnosis, consciousness reproduction, and identity replacement claims must remain false
   bind_measurement_quality_gate:
     summary: Bind collection run results to calibration, artifact/QC, consent freshness, operator review, and quality authority refs before analysis planning.
     input:
@@ -514,10 +514,12 @@ operations:
           - source_collection_coverage_bound
           - seed_collection_bound
           - collection_payload_redacted
+          - collection_semantic_thought_claim_redacted
           - collection_run_bound
           - collection_run_digest_bound
           - collection_results_bound
           - collection_result_payload_redacted
+          - collection_result_semantic_thought_claim_redacted
           - measurement_quality_gate_bound
           - measurement_quality_gate_digest_bound
           - measurement_quality_items_bound
@@ -537,6 +539,7 @@ operations:
           - claim_ceiling_bound
           - raw_payload_redacted
           - no_diagnosis_or_identity_claim
+          - no_semantic_thought_content_claim
         properties:
           ok:
             type: boolean
@@ -568,6 +571,8 @@ operations:
             type: boolean
           collection_payload_redacted:
             type: boolean
+          collection_semantic_thought_claim_redacted:
+            type: boolean
           collection_run_bound:
             type: boolean
           collection_run_digest_bound:
@@ -575,6 +580,8 @@ operations:
           collection_results_bound:
             type: boolean
           collection_result_payload_redacted:
+            type: boolean
+          collection_result_semantic_thought_claim_redacted:
             type: boolean
           measurement_quality_gate_bound:
             type: boolean
@@ -613,6 +620,8 @@ operations:
           raw_payload_redacted:
             type: boolean
           no_diagnosis_or_identity_claim:
+            type: boolean
+          no_semantic_thought_content_claim:
             type: boolean
           connector_count:
             type: integer

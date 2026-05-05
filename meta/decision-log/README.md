@@ -401,3 +401,4 @@ status: decided | superseded
 - [2026-05-05_neuro-integration-cross-modal-analysis-run.md](2026-05-05_neuro-integration-cross-modal-analysis-run.md)
 - [2026-05-05_biodata-survey-eeg-fusion.md](2026-05-05_biodata-survey-eeg-fusion.md)
 - [2026-05-05_l3-cognitive-public-schema-contract.md](2026-05-05_l3-cognitive-public-schema-contract.md)
+- [2026-05-06_neuro-integration-semantic-thought-ceiling.md](2026-05-06_neuro-integration-semantic-thought-ceiling.md)

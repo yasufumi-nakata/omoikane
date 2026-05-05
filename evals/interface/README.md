@@ -23,7 +23,8 @@ questionnaire と EEG を seed pair として source bundle に束縛し、fMRI 
 brain organoid feature summary を expansion lane として加え、measurement /
 analysis / data-curation / operator-copilot / agent-automation の置換 lane、
 LLM-native workflow、非 ML 専門家向け guide、raw payload redaction、
-no diagnosis / no consciousness / no identity replacement claim ceiling を確認する。
+semantic thought content 非生成、no diagnosis / no consciousness /
+no identity replacement claim ceiling を確認する。
 
 ### Observation Integration Workbench
 人類が取得・計測してきた観測 source を broad taxonomy に入れ、provenance /

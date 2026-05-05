@@ -23,7 +23,8 @@ reference runtime surface」を作ることである。これは mind uploading 
 - 各 biological source summary を consent ref、measurement connector ref、collection window ref に
   束縛する collection protocol receipt を作り、収集面を analysis plan より前に固定する
 - collection protocol の各 step から bounded collection result summary を生成し、
-  operator / coding-agent review readiness を collection run receipt に束縛する
+  semantic thought content 非生成と operator / coding-agent review readiness を
+  collection run receipt に束縛する
 - collection run result を calibration、artifact/QC、consent freshness、operator review、
   quality authority refs に measurement quality gate として束縛する
 - source bundle 内の全 source-type pair に bounded analysis recipe を割り当て、
@@ -81,7 +82,7 @@ reference runtime surface」を作ることである。これは mind uploading 
 11. **cross-modal pair coverage** ── 現在の source type 全ペアは bounded recipe と 5 lane connector support を持つ
 12. **bounded result summaries** ── result は pair digest と bounded axis summary に限り、診断や因果推論には昇格しない
 13. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw collection / raw quality / raw plan / raw result payload を保存しない
-14. **claim ceiling** ── clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
+14. **claim ceiling** ── semantic thought content、clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
 
 ## 関連
 
