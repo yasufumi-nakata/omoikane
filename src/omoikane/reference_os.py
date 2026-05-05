@@ -146,8 +146,22 @@ from .substrate.adapter import ClassicalSiliconAdapter
 class OmoikaneReferenceOS:
     """Safe, non-conscious reference implementation scaffold."""
 
+    @staticmethod
+    def _is_repo_root(path: Path) -> bool:
+        return (
+            (path / "pyproject.toml").is_file()
+            and (path / "specs" / "catalog.yaml").is_file()
+        )
+
+    @classmethod
+    def _resolve_repo_root(cls) -> Path:
+        cwd = Path.cwd()
+        if cls._is_repo_root(cwd):
+            return cwd
+        return Path(__file__).resolve().parents[2]
+
     def __init__(self) -> None:
-        self.repo_root = Path(__file__).resolve().parents[2]
+        self.repo_root = self._resolve_repo_root()
         self.substrate = ClassicalSiliconAdapter()
         self.broker = SubstrateBrokerService.reference_service(self.substrate)
         self.identity = IdentityRegistry()

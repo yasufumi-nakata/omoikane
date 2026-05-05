@@ -263,7 +263,7 @@ class CliIntegrationTests(unittest.TestCase):
 
         result = json.loads(stdout.getvalue())
         self.assertTrue(result["validation"]["ok"])
-        self.assertEqual("0.1.1", result["manifest"]["runtime_version"])
+        self.assertEqual("0.1.2", result["manifest"]["runtime_version"])
         self.assertEqual("2026.04", result["manifest"]["regulation_calver"])
         self.assertEqual("bootstrap", result["manifest"]["runtime_stability"])
         self.assertIn("agentic.council.v0", result["manifest"]["idl_versions"])
