@@ -190,11 +190,14 @@ behavioral performance、omics physiology / clinical、clinical metadata modulat
 digest-only で返す。interpretation synthesis は measurement quality gate と analysis run を
 plain-language synthesis cards と coding-agent tasks に束縛し、非 ML operator が確認できる
 bounded next action だけを返す。
+longitudinal timeline は同じ 8 source type を持つ 2 つの digest-only source-bundle
+window を per-source axis drift / stability proxy に束縛し、縦断的 review を
+identity proof や upload readiness に昇格しない。
 非 ML 専門家向け plain-language cards と coding agent 向け task template を同じ operator guide に入れる。claim ceiling は
 `feature-alignment-and-analysis-plan-only` で、raw questionnaire / EEG /
 neuroimaging / organoid / analysis / connector / collection / collection-result /
 quality / calibration / artifact / consent / plan / result / interpretation / agent-task
-payload、semantic thought content、clinical diagnosis、consciousness reproduction、
+payload / timeline payload、semantic thought content、clinical diagnosis、consciousness reproduction、
 identity replacement、upload readiness は保持または主張しない。
 
 `observation-integration-demo` は L6 Observation Integration Workbench の reference contract

@@ -475,6 +475,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["interpretation_operator_action_ready"])
         self.assertTrue(result["validation"]["interpretation_payload_redacted"])
         self.assertEqual(28, result["validation"]["interpretation_card_count"])
+        self.assertTrue(result["validation"]["longitudinal_timeline_bound"])
+        self.assertTrue(result["validation"]["longitudinal_timeline_digest_bound"])
+        self.assertTrue(result["validation"]["longitudinal_source_type_coverage_bound"])
+        self.assertTrue(result["validation"]["longitudinal_axis_drifts_bound"])
+        self.assertTrue(result["validation"]["longitudinal_payload_redacted"])
+        self.assertTrue(result["validation"]["longitudinal_no_identity_or_upload_claim"])
+        self.assertEqual(2, result["validation"]["longitudinal_window_count"])
+        self.assertEqual(8, result["validation"]["longitudinal_stable_source_type_count"])
+        self.assertEqual(8, result["validation"]["longitudinal_axis_drift_item_count"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
@@ -544,6 +553,15 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("behavioral-context-interpretation-bound", interpretation_statuses)
         self.assertIn("omics-context-interpretation-bound", interpretation_statuses)
         self.assertIn("clinical-context-interpretation-bound", interpretation_statuses)
+        self.assertTrue(result["longitudinal_timeline"]["longitudinal_timeline_bound"])
+        self.assertEqual(2, result["longitudinal_timeline"]["window_count"])
+        self.assertEqual(
+            8,
+            result["longitudinal_timeline"]["timeline_summary"][
+                "axis_drift_item_count"
+            ],
+        )
+        self.assertFalse(result["longitudinal_timeline"]["upload_readiness_claimed"])
 
     def test_observation_integration_demo_emits_universal_observation_package(self) -> None:
         stdout = io.StringIO()

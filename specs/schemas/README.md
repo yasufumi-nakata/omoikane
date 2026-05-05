@@ -69,6 +69,8 @@
   - cross-modal analysis plan の全 pair について bounded result summary、operator review readiness、coding-agent review readiness を digest-only で検証する
 - `neuro_integration_interpretation_synthesis.schema`
   - measurement quality gate と cross-modal analysis run を plain-language cards と coding-agent tasks に束縛し、非 ML operator 向け解釈を digest-only で検証する
+- `neuro_integration_longitudinal_timeline.schema`
+  - 複数 source-bundle window を per-source axis drift summary に束縛し、縦断的な biodata stability review を raw timeline payload 無しで検証する
 - `observation_source_catalog.schema`
   - 人類が取得・計測してきた観測 family / source type taxonomy、alignment axes、analysis lanes を digest-only catalog として束縛し、完全知識や真理統一を主張しない
 - `observation_measurement_analysis_catalog.schema`

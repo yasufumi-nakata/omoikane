@@ -45,6 +45,62 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "identity_replacement_claimed": False,
         }
 
+    def _build_second_window_source_bundle(
+        self,
+        workbench: NeuroIntegrationWorkbench,
+        source_bundle: dict,
+    ) -> dict:
+        second_bundle = deepcopy(source_bundle)
+        second_bundle["source_bundle_ref"] = (
+            "source-bundle://neuro-integration/niw-source-bundle-222222222222"
+        )
+        second_bundle["created_at"] = "2026-05-06T00:00:00+00:00"
+        for source in second_bundle["sources"]:
+            source_type = source["source_type"]
+            source["source_ref"] = f"source://unit/{source_type}/window-2"
+            source["feature_summary_ref"] = (
+                f"feature-summary://unit/{source_type}/window-2"
+            )
+            source["analysis_axes"] = {
+                axis_name: round(max(0.0, min(1.0, axis_value + 0.02)), 3)
+                for axis_name, axis_value in source["analysis_axes"].items()
+            }
+            source["construct_coverage"] = sorted(source["analysis_axes"])
+            source["feature_digest"] = sha256_text(
+                canonical_json(
+                    {
+                        "source_type": source_type,
+                        "window": "unit-window-2",
+                        "analysis_axes": source["analysis_axes"],
+                    }
+                )
+            )
+            source["feature_name_digest"] = sha256_text(
+                canonical_json(
+                    {"feature_names": sorted(source["analysis_axes"])}
+                )
+            )
+            source["numeric_feature_count"] = max(
+                source["numeric_feature_count"],
+                len(source["analysis_axes"]),
+            )
+        second_bundle["source_digest_set"] = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": second_bundle["profile_id"],
+                    "source_digests": [
+                        source["feature_digest"]
+                        for source in second_bundle["sources"]
+                    ],
+                    "source_types": second_bundle["source_types"],
+                }
+            )
+        )
+        second_bundle["source_bundle_digest"] = sha256_text(
+            canonical_json(workbench._source_bundle_digest_payload(second_bundle))
+        )
+        return second_bundle
+
     def _build_demo_artifacts(self) -> dict:
         workbench = NeuroIntegrationWorkbench()
         source_types = [
@@ -359,10 +415,20 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             measurement_quality_gate,
             cross_modal_analysis_run,
         )
+        second_source_bundle = self._build_second_window_source_bundle(
+            workbench,
+            source_bundle,
+        )
+        longitudinal_timeline = workbench.build_longitudinal_integration_timeline(
+            "identity://neuro-unit",
+            [source_bundle, second_source_bundle],
+            guide,
+        )
         return {
             "workbench": workbench,
             "apps": apps,
             "source_bundle": source_bundle,
+            "second_source_bundle": second_source_bundle,
             "workspace": workspace,
             "analysis": analysis,
             "guide": guide,
@@ -374,6 +440,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
             "interpretation_synthesis": interpretation_synthesis,
+            "longitudinal_timeline": longitudinal_timeline,
         }
 
     def test_binds_survey_eeg_seed_and_expansion_modalities(self) -> None:
@@ -392,6 +459,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             collection_run=artifacts["collection_run"],
             measurement_quality_gate=artifacts["measurement_quality_gate"],
             interpretation_synthesis=artifacts["interpretation_synthesis"],
+            longitudinal_timeline=artifacts["longitudinal_timeline"],
         )
 
         self.assertTrue(validation["ok"])
@@ -438,6 +506,12 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["interpretation_synthesis_cards_bound"])
         self.assertTrue(validation["interpretation_operator_action_ready"])
         self.assertTrue(validation["interpretation_payload_redacted"])
+        self.assertTrue(validation["longitudinal_timeline_bound"])
+        self.assertTrue(validation["longitudinal_timeline_digest_bound"])
+        self.assertTrue(validation["longitudinal_source_type_coverage_bound"])
+        self.assertTrue(validation["longitudinal_axis_drifts_bound"])
+        self.assertTrue(validation["longitudinal_payload_redacted"])
+        self.assertTrue(validation["longitudinal_no_identity_or_upload_claim"])
         self.assertTrue(validation["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(validation["upstream_receipt_payload_redacted"])
         self.assertTrue(validation["claim_ceiling_bound"])
@@ -578,6 +652,14 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             }.issubset(interpretation_statuses)
         )
         self.assertEqual(28, validation["interpretation_card_count"])
+        self.assertTrue(artifacts["longitudinal_timeline"]["longitudinal_timeline_bound"])
+        self.assertEqual(2, artifacts["longitudinal_timeline"]["window_count"])
+        self.assertEqual(2, validation["longitudinal_window_count"])
+        self.assertEqual(8, validation["longitudinal_stable_source_type_count"])
+        self.assertEqual(8, validation["longitudinal_axis_drift_item_count"])
+        self.assertFalse(
+            artifacts["longitudinal_timeline"]["upload_readiness_claimed"]
+        )
         self.assertEqual(
             8,
             artifacts["replacement_plan"]["coverage_summary"]["covered_source_type_count"],
@@ -825,6 +907,41 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "interpretation_synthesis.synthesis_card_digests mismatch",
+            validation["errors"],
+        )
+
+    def test_tampered_longitudinal_axis_drift_digest_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_timeline = deepcopy(artifacts["longitudinal_timeline"])
+        tampered_timeline["source_type_axis_drifts"][0]["axis_drift_digest"] = "0" * 64
+        tampered_timeline["longitudinal_timeline_digest"] = sha256_text(
+            canonical_json(
+                artifacts["workbench"]._longitudinal_timeline_digest_payload(
+                    tampered_timeline
+                )
+            )
+        )
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            artifacts["cross_modal_analysis_plan"],
+            artifacts["cross_modal_analysis_run"],
+            collection_protocol=artifacts["collection_protocol"],
+            collection_run=artifacts["collection_run"],
+            measurement_quality_gate=artifacts["measurement_quality_gate"],
+            interpretation_synthesis=artifacts["interpretation_synthesis"],
+            longitudinal_timeline=tampered_timeline,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "axis_drift.axis_drift_digest mismatch",
             validation["errors"],
         )
 

@@ -23,6 +23,7 @@ imports:
   neuro_integration_cross_modal_analysis_plan: ../schemas/neuro_integration_cross_modal_analysis_plan.schema
   neuro_integration_cross_modal_analysis_run: ../schemas/neuro_integration_cross_modal_analysis_run.schema
   neuro_integration_interpretation_synthesis: ../schemas/neuro_integration_interpretation_synthesis.schema
+  neuro_integration_longitudinal_timeline: ../schemas/neuro_integration_longitudinal_timeline.schema
 operations:
   register_application:
     summary: Register one measurement, analysis, curation, operator-copilot, or agent-automation app as a replaceable workbench lane.
@@ -487,8 +488,37 @@ operations:
       - non-ML operator next actions and coding-agent tasks must require no ML expertise
       - raw source, analysis, quality, interpretation, and agent-task payload storage must remain false
       - diagnosis, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
+  build_longitudinal_integration_timeline:
+    summary: Bind repeated digest-only source bundles into per-source axis drift summaries for longitudinal non-ML review without claiming diagnosis, identity replacement, or upload readiness.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - identity_id
+          - source_bundles
+          - operator_guide
+        properties:
+          identity_id:
+            type: string
+            minLength: 1
+          source_bundles:
+            type: array
+            minItems: 2
+            items:
+              schema_ref: neuro_integration_source_bundle
+          operator_guide:
+            schema_ref: neuro_integration_operator_guide
+    output:
+      schema_ref: neuro_integration_longitudinal_timeline
+    guarantees:
+      - at least two source bundle windows must be bound to the same identity
+      - questionnaire plus EEG must remain present in every longitudinal window
+      - every stable source type must expose bounded axis drift and stability proxy summaries
+      - non-ML operator and coding-agent review readiness must remain explicit
+      - raw source, timeline, axis, and operator payload storage must remain false
+      - semantic thought content, diagnosis, consciousness reproduction, identity replacement, and upload-readiness claims must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, optional cross-modal analysis-run, and optional interpretation-synthesis digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional measurement-quality-gate, optional cross-modal analysis-plan, optional cross-modal analysis-run, optional interpretation-synthesis, and optional longitudinal-timeline digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -528,6 +558,8 @@ operations:
             schema_ref: neuro_integration_cross_modal_analysis_run
           interpretation_synthesis:
             schema_ref: neuro_integration_interpretation_synthesis
+          longitudinal_timeline:
+            schema_ref: neuro_integration_longitudinal_timeline
     output:
       inline_schema:
         type: object
@@ -574,6 +606,12 @@ operations:
           - interpretation_synthesis_cards_bound
           - interpretation_operator_action_ready
           - interpretation_payload_redacted
+          - longitudinal_timeline_bound
+          - longitudinal_timeline_digest_bound
+          - longitudinal_source_type_coverage_bound
+          - longitudinal_axis_drifts_bound
+          - longitudinal_payload_redacted
+          - longitudinal_no_identity_or_upload_claim
           - claim_ceiling_bound
           - raw_payload_redacted
           - no_diagnosis_or_identity_claim
@@ -663,6 +701,18 @@ operations:
             type: boolean
           interpretation_payload_redacted:
             type: boolean
+          longitudinal_timeline_bound:
+            type: boolean
+          longitudinal_timeline_digest_bound:
+            type: boolean
+          longitudinal_source_type_coverage_bound:
+            type: boolean
+          longitudinal_axis_drifts_bound:
+            type: boolean
+          longitudinal_payload_redacted:
+            type: boolean
+          longitudinal_no_identity_or_upload_claim:
+            type: boolean
           claim_ceiling_bound:
             type: boolean
           raw_payload_redacted:
@@ -692,6 +742,15 @@ operations:
           interpretation_card_count:
             type: integer
             minimum: 0
+          longitudinal_window_count:
+            type: integer
+            minimum: 0
+          longitudinal_stable_source_type_count:
+            type: integer
+            minimum: 0
+          longitudinal_axis_drift_item_count:
+            type: integer
+            minimum: 0
 events:
   - name: neuro_integration_workbench.source_bundle.bound
     payload_schema: neuro_integration_source_bundle
@@ -713,3 +772,5 @@ events:
     payload_schema: neuro_integration_cross_modal_analysis_run
   - name: neuro_integration_workbench.interpretation_synthesis.bound
     payload_schema: neuro_integration_interpretation_synthesis
+  - name: neuro_integration_workbench.longitudinal_timeline.bound
+    payload_schema: neuro_integration_longitudinal_timeline

@@ -1,0 +1,326 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_longitudinal_timeline.schema"
+title: NeuroIntegrationLongitudinalTimeline
+description: >
+  Digest-only longitudinal timeline receipt that binds repeated Neuro
+  Integration Workbench source bundles into bounded per-source axis drift
+  summaries for non-ML operator and coding-agent review without claiming
+  diagnosis, consciousness reproduction, identity replacement, or upload
+  readiness.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - longitudinal_timeline_ref
+  - created_at
+  - profile_id
+  - identity_id
+  - operator_guide_ref
+  - operator_guide_digest
+  - source_bundle_refs
+  - source_bundle_digests
+  - window_count
+  - source_types
+  - stable_source_types
+  - missing_source_types_by_window
+  - source_type_axis_drifts
+  - timeline_summary
+  - all_windows_bound
+  - seed_survey_eeg_timeline_bound
+  - source_type_timeline_coverage_bound
+  - upstream_fusion_timeline_bound
+  - all_axis_drifts_bound
+  - operator_review_ready
+  - coding_agent_review_ready
+  - longitudinal_timeline_bound
+  - storage_policy
+  - claim_ceiling
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_source_payload_stored
+  - raw_timeline_payload_stored
+  - raw_axis_payload_stored
+  - raw_operator_payload_stored
+  - clinical_diagnosis_claimed
+  - semantic_thought_content_generated
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - upload_readiness_claimed
+  - longitudinal_timeline_digest
+properties:
+  schema_version:
+    const: "1.0"
+  longitudinal_timeline_ref:
+    type: string
+    pattern: "^longitudinal-timeline://neuro-integration/niw-timeline-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: neuro-longitudinal-integration-timeline-v1
+  identity_id:
+    type: string
+    minLength: 1
+  operator_guide_ref:
+    type: string
+    pattern: "^operator-guide://neuro-integration/niw-guide-[a-f0-9]{12}$"
+  operator_guide_digest:
+    $ref: "#/$defs/sha256"
+  source_bundle_refs:
+    type: array
+    minItems: 2
+    items:
+      type: string
+      minLength: 1
+  source_bundle_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  window_count:
+    type: integer
+    minimum: 2
+  source_types:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  stable_source_types:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  missing_source_types_by_window:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/missing_source_types"
+  source_type_axis_drifts:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/source_type_axis_drift"
+  timeline_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - window_count
+      - source_type_count
+      - stable_source_type_count
+      - axis_drift_item_count
+      - max_axis_drift_proxy
+      - average_stability_score
+      - drift_review_required
+    properties:
+      window_count:
+        type: integer
+        minimum: 2
+      source_type_count:
+        type: integer
+        minimum: 2
+      stable_source_type_count:
+        type: integer
+        minimum: 2
+      axis_drift_item_count:
+        type: integer
+        minimum: 2
+      max_axis_drift_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+      average_stability_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      drift_review_required:
+        type: boolean
+  all_windows_bound:
+    const: true
+  seed_survey_eeg_timeline_bound:
+    const: true
+  source_type_timeline_coverage_bound:
+    const: true
+  upstream_fusion_timeline_bound:
+    const: true
+  all_axis_drifts_bound:
+    const: true
+  operator_review_ready:
+    const: true
+  coding_agent_review_ready:
+    const: true
+  longitudinal_timeline_bound:
+    const: true
+  storage_policy:
+    const: source-bundle-digest+axis-drift-summary-only
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/neurodata-integration
+  raw_source_payload_stored:
+    const: false
+  raw_timeline_payload_stored:
+    const: false
+  raw_axis_payload_stored:
+    const: false
+  raw_operator_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  semantic_thought_content_generated:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  upload_readiness_claimed:
+    const: false
+  longitudinal_timeline_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  missing_source_types:
+    type: object
+    additionalProperties: false
+    required:
+      - window_index
+      - source_bundle_ref
+      - missing_source_types
+      - bound
+    properties:
+      window_index:
+        type: integer
+        minimum: 0
+      source_bundle_ref:
+        type: string
+        minLength: 1
+      missing_source_types:
+        type: array
+        items:
+          $ref: "#/$defs/source_type"
+      bound:
+        const: true
+  source_type_axis_drift:
+    type: object
+    additionalProperties: false
+    required:
+      - source_type
+      - source_family
+      - window_count
+      - source_refs
+      - feature_digests
+      - common_analysis_axes
+      - axis_delta_summary
+      - axis_drift_summary
+      - axis_drift_bound
+      - operator_summary
+      - agent_next_action
+      - requires_ml_expertise
+      - claim_ceiling
+      - raw_axis_payload_stored
+      - raw_source_payload_stored
+      - clinical_diagnosis_claimed
+      - semantic_thought_content_generated
+      - consciousness_reproduction_claimed
+      - identity_replacement_claimed
+      - upload_readiness_claimed
+      - axis_drift_digest
+    properties:
+      source_type:
+        $ref: "#/$defs/source_type"
+      source_family:
+        type: string
+        minLength: 1
+      window_count:
+        type: integer
+        minimum: 2
+      source_refs:
+        type: array
+        minItems: 2
+        items:
+          type: string
+          minLength: 1
+      feature_digests:
+        type: array
+        minItems: 2
+        items:
+          $ref: "#/$defs/sha256"
+      common_analysis_axes:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      axis_delta_summary:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          type: number
+          minimum: 0
+          maximum: 1
+      axis_drift_summary:
+        type: object
+        additionalProperties: false
+        required:
+          - common_axis_count
+          - max_axis_delta
+          - average_axis_delta
+          - stability_score
+          - drift_review_required
+        properties:
+          common_axis_count:
+            type: integer
+            minimum: 1
+          max_axis_delta:
+            type: number
+            minimum: 0
+            maximum: 1
+          average_axis_delta:
+            type: number
+            minimum: 0
+            maximum: 1
+          stability_score:
+            type: number
+            minimum: 0
+            maximum: 1
+          drift_review_required:
+            type: boolean
+      axis_drift_bound:
+        const: true
+      operator_summary:
+        type: string
+        minLength: 1
+      agent_next_action:
+        type: string
+        minLength: 1
+      requires_ml_expertise:
+        const: false
+      claim_ceiling:
+        const: feature-alignment-and-analysis-plan-only
+      raw_axis_payload_stored:
+        const: false
+      raw_source_payload_stored:
+        const: false
+      clinical_diagnosis_claimed:
+        const: false
+      semantic_thought_content_generated:
+        const: false
+      consciousness_reproduction_claimed:
+        const: false
+      identity_replacement_claimed:
+        const: false
+      upload_readiness_claimed:
+        const: false
+      axis_drift_digest:
+        $ref: "#/$defs/sha256"

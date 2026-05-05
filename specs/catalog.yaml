@@ -2589,6 +2589,16 @@ entries:
       - agents/guardians/integrity-guardian.yaml
     rationale: Required to bind measurement quality and cross-modal analysis results into plain-language operator cards and coding-agent tasks without storing raw interpretation payloads or claiming upload readiness.
   - priority: P1
+    kind: schema
+    file: specs/schemas/neuro_integration_longitudinal_timeline.schema
+    consumers:
+      - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+      - docs/02-subsystems/interface/neuro-integration-workbench.md
+      - reference-runtime
+      - evals/interface/neuro_integration_workbench.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind repeated neuro integration source-bundle windows into bounded per-source axis drift summaries without storing raw timeline payloads or claiming identity replacement or upload readiness.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.neuro_integration_workbench.v0.idl
     consumers:

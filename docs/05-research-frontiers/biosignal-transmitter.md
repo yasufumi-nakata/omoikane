@@ -71,6 +71,8 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - 同日、NIW は open biodata source の axis derivation と analysis recipes を追加し、
   biosensor / behavioral task / omics / clinical metadata を generic feature fallback ではなく
   bounded context screen として扱うようにした。
+- 同日、NIW は longitudinal timeline receipt を追加し、2 つの source-bundle window を
+  per-source axis drift / stability proxy として束縛するようにした。
 
 ## ブロッキング要因
 
@@ -139,6 +141,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - interpretation synthesis は quality item digest と analysis result digest から
   non-ML operator next action と coding-agent task を作るだけで、診断、因果推論、
   semantic thought content、subjective equivalence、upload readiness には昇格しない
+- longitudinal timeline は repeated source-bundle window の axis drift / stability proxy
+  だけを返し、人格同一性の連続性、clinical longitudinal validity、upload readiness の
+  証明には昇格しない
 - open biodata lane は source type coverage を増やすが、各 modality の専門的妥当性、
   専用 axis derivation と bounded context recipe を持っても、longitudinal stability、
   clinical validity、regulatory readiness は source-specific research frontier として残す

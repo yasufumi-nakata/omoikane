@@ -24,6 +24,9 @@ NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID = "neuro-cross-modal-analysis-run-v1"
 NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID = (
     "neuro-operator-interpretation-synthesis-v1"
 )
+NIW_LONGITUDINAL_TIMELINE_PROFILE_ID = (
+    "neuro-longitudinal-integration-timeline-v1"
+)
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -51,6 +54,9 @@ NIW_CROSS_MODAL_ANALYSIS_RUN_POLICY = (
 )
 NIW_INTERPRETATION_SYNTHESIS_POLICY = (
     "analysis-result-digest+plain-language-action-summary-only"
+)
+NIW_LONGITUDINAL_TIMELINE_POLICY = (
+    "source-bundle-digest+axis-drift-summary-only"
 )
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
@@ -186,6 +192,9 @@ class NeuroIntegrationWorkbench:
             "interpretation_synthesis_profile_id": (
                 NIW_INTERPRETATION_SYNTHESIS_PROFILE_ID
             ),
+            "longitudinal_timeline_profile_id": (
+                NIW_LONGITUDINAL_TIMELINE_PROFILE_ID
+            ),
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
@@ -213,6 +222,7 @@ class NeuroIntegrationWorkbench:
             "interpretation_synthesis_policy": (
                 NIW_INTERPRETATION_SYNTHESIS_POLICY
             ),
+            "longitudinal_timeline_policy": NIW_LONGITUDINAL_TIMELINE_POLICY,
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -1642,6 +1652,175 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(synthesis)
 
+    def build_longitudinal_integration_timeline(
+        self,
+        identity_id: str,
+        source_bundles: Sequence[Dict[str, Any]],
+        operator_guide: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self._require_non_empty_string(identity_id, "identity_id")
+        if len(source_bundles) < 2:
+            raise ValueError("source_bundles must include at least two windows")
+        bundles = [deepcopy(source_bundle) for source_bundle in source_bundles]
+        for bundle in bundles:
+            self._check_source_bundle(bundle)
+            if bundle.get("identity_id") != identity_id:
+                raise ValueError("source_bundle.identity_id must match identity_id")
+        self._check_operator_guide(operator_guide)
+
+        bundle_source_type_sets = [
+            set(bundle["source_types"]) for bundle in bundles
+        ]
+        represented_source_types = sorted(
+            {
+                source_type
+                for source_types in bundle_source_type_sets
+                for source_type in source_types
+            }
+        )
+        stable_source_types = [
+            source_type
+            for source_type in represented_source_types
+            if all(source_type in source_types for source_types in bundle_source_type_sets)
+        ]
+        missing_source_types_by_window = []
+        for index, bundle in enumerate(bundles):
+            missing = [
+                source_type
+                for source_type in represented_source_types
+                if source_type not in bundle["source_types"]
+            ]
+            missing_source_types_by_window.append(
+                {
+                    "window_index": index,
+                    "source_bundle_ref": bundle["source_bundle_ref"],
+                    "missing_source_types": missing,
+                    "bound": not missing,
+                }
+            )
+
+        sources_by_window = [
+            {
+                source["source_type"]: source
+                for source in bundle["sources"]
+                if isinstance(source, dict)
+            }
+            for bundle in bundles
+        ]
+        source_type_axis_drifts = [
+            self._build_longitudinal_axis_drift(
+                source_type,
+                sources_by_window,
+                len(bundles),
+            )
+            for source_type in stable_source_types
+        ]
+        max_axis_drift_proxy = self._round_score(
+            max(
+                (
+                    item["axis_drift_summary"]["max_axis_delta"]
+                    for item in source_type_axis_drifts
+                ),
+                default=0.0,
+            )
+        )
+        average_stability_score = self._round_score(
+            sum(
+                item["axis_drift_summary"]["stability_score"]
+                for item in source_type_axis_drifts
+            )
+            / max(len(source_type_axis_drifts), 1)
+        )
+        all_windows_bound = all(
+            bundle.get("raw_source_payload_stored") is False
+            and bundle.get("consciousness_reproduction_claimed") is False
+            and bundle.get("identity_replacement_claimed") is False
+            for bundle in bundles
+        )
+        seed_timeline_bound = all(
+            all(source_type in bundle["source_types"] for source_type in NIW_SEED_SOURCE_TYPES)
+            for bundle in bundles
+        )
+        source_type_timeline_coverage_bound = all(
+            item["bound"] for item in missing_source_types_by_window
+        )
+        upstream_fusion_timeline_bound = all(
+            bundle.get("survey_eeg_fusion_receipt_bound") is True
+            for bundle in bundles
+        )
+        all_axis_drifts_bound = (
+            len(source_type_axis_drifts) == len(stable_source_types)
+            and all(item["axis_drift_bound"] for item in source_type_axis_drifts)
+        )
+        summary = {
+            "window_count": len(bundles),
+            "source_type_count": len(represented_source_types),
+            "stable_source_type_count": len(stable_source_types),
+            "axis_drift_item_count": len(source_type_axis_drifts),
+            "max_axis_drift_proxy": max_axis_drift_proxy,
+            "average_stability_score": average_stability_score,
+            "drift_review_required": max_axis_drift_proxy >= 0.25,
+        }
+        timeline = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "longitudinal_timeline_ref": (
+                "longitudinal-timeline://neuro-integration/"
+                f"{new_id('niw-timeline')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_LONGITUDINAL_TIMELINE_PROFILE_ID,
+            "identity_id": identity_id,
+            "operator_guide_ref": operator_guide["guide_ref"],
+            "operator_guide_digest": operator_guide["guide_digest"],
+            "source_bundle_refs": [
+                bundle["source_bundle_ref"] for bundle in bundles
+            ],
+            "source_bundle_digests": [
+                bundle["source_bundle_digest"] for bundle in bundles
+            ],
+            "window_count": len(bundles),
+            "source_types": represented_source_types,
+            "stable_source_types": stable_source_types,
+            "missing_source_types_by_window": missing_source_types_by_window,
+            "source_type_axis_drifts": source_type_axis_drifts,
+            "timeline_summary": summary,
+            "all_windows_bound": all_windows_bound,
+            "seed_survey_eeg_timeline_bound": seed_timeline_bound,
+            "source_type_timeline_coverage_bound": (
+                source_type_timeline_coverage_bound
+            ),
+            "upstream_fusion_timeline_bound": upstream_fusion_timeline_bound,
+            "all_axis_drifts_bound": all_axis_drifts_bound,
+            "operator_review_ready": operator_guide["beginner_operator_supported"],
+            "coding_agent_review_ready": operator_guide["coding_agent_ready"],
+            "longitudinal_timeline_bound": (
+                all_windows_bound
+                and seed_timeline_bound
+                and source_type_timeline_coverage_bound
+                and upstream_fusion_timeline_bound
+                and all_axis_drifts_bound
+                and operator_guide["beginner_operator_supported"]
+                and operator_guide["coding_agent_ready"]
+            ),
+            "storage_policy": NIW_LONGITUDINAL_TIMELINE_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_source_payload_stored": False,
+            "raw_timeline_payload_stored": False,
+            "raw_axis_payload_stored": False,
+            "raw_operator_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        timeline["longitudinal_timeline_digest"] = sha256_text(
+            canonical_json(self._longitudinal_timeline_digest_payload(timeline))
+        )
+        return deepcopy(timeline)
+
     def validate_integration_bundle(
         self,
         app_receipts: Sequence[Dict[str, Any]],
@@ -1657,6 +1836,7 @@ class NeuroIntegrationWorkbench:
         collection_run: Dict[str, Any] | None = None,
         measurement_quality_gate: Dict[str, Any] | None = None,
         interpretation_synthesis: Dict[str, Any] | None = None,
+        longitudinal_timeline: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -1737,6 +1917,13 @@ class NeuroIntegrationWorkbench:
                 errors.append("interpretation_synthesis requires measurement_quality_gate")
             if cross_modal_analysis_run is None:
                 errors.append("interpretation_synthesis requires cross_modal_analysis_run")
+        if longitudinal_timeline is not None:
+            try:
+                self._check_longitudinal_timeline(longitudinal_timeline)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if operator_guide is None:
+                errors.append("longitudinal_timeline requires operator_guide")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -2200,6 +2387,63 @@ class NeuroIntegrationWorkbench:
                     )
                 ),
             }
+        longitudinal_timeline_checks: Dict[str, bool] = {}
+        if longitudinal_timeline is not None:
+            longitudinal_timeline_digest_bound = (
+                longitudinal_timeline.get("longitudinal_timeline_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._longitudinal_timeline_digest_payload(
+                            longitudinal_timeline
+                        )
+                    )
+                )
+            )
+            longitudinal_timeline_checks = {
+                "longitudinal_timeline_digest_bound": (
+                    longitudinal_timeline_digest_bound
+                ),
+                "longitudinal_timeline_bound": (
+                    longitudinal_timeline.get("longitudinal_timeline_bound")
+                    is True
+                    and longitudinal_timeline.get("identity_id")
+                    == source_bundle.get("identity_id")
+                    and source_bundle.get("source_bundle_digest")
+                    in longitudinal_timeline.get("source_bundle_digests", [])
+                    and longitudinal_timeline.get("operator_guide_digest")
+                    == operator_guide.get("guide_digest")
+                ),
+                "longitudinal_source_type_coverage_bound": (
+                    longitudinal_timeline.get(
+                        "source_type_timeline_coverage_bound"
+                    )
+                    is True
+                ),
+                "longitudinal_axis_drifts_bound": (
+                    longitudinal_timeline.get("all_axis_drifts_bound") is True
+                ),
+                "longitudinal_payload_redacted": (
+                    self._longitudinal_timeline_payload_redacted(
+                        longitudinal_timeline
+                    )
+                ),
+                "longitudinal_no_identity_or_upload_claim": (
+                    longitudinal_timeline.get("clinical_diagnosis_claimed")
+                    is False
+                    and longitudinal_timeline.get(
+                        "semantic_thought_content_generated"
+                    )
+                    is False
+                    and longitudinal_timeline.get(
+                        "consciousness_reproduction_claimed"
+                    )
+                    is False
+                    and longitudinal_timeline.get("identity_replacement_claimed")
+                    is False
+                    and longitudinal_timeline.get("upload_readiness_claimed")
+                    is False
+                ),
+            }
 
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
@@ -2227,6 +2471,7 @@ class NeuroIntegrationWorkbench:
             **cross_modal_plan_checks,
             **cross_modal_run_checks,
             **interpretation_synthesis_checks,
+            **longitudinal_timeline_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -2283,6 +2528,27 @@ class NeuroIntegrationWorkbench:
                 if interpretation_synthesis is not None
                 else 0
             ),
+            "longitudinal_window_count": (
+                longitudinal_timeline.get("window_count", 0)
+                if longitudinal_timeline is not None
+                else 0
+            ),
+            "longitudinal_stable_source_type_count": (
+                longitudinal_timeline.get("timeline_summary", {}).get(
+                    "stable_source_type_count",
+                    0,
+                )
+                if longitudinal_timeline is not None
+                else 0
+            ),
+            "longitudinal_axis_drift_item_count": (
+                longitudinal_timeline.get("timeline_summary", {}).get(
+                    "axis_drift_item_count",
+                    0,
+                )
+                if longitudinal_timeline is not None
+                else 0
+            ),
             "claim_ceiling": NIW_CLAIM_CEILING,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -2294,6 +2560,107 @@ class NeuroIntegrationWorkbench:
             "consciousness_reproduction_claimed": False,
             "identity_replacement_claimed": False,
         }
+
+    def _build_longitudinal_axis_drift(
+        self,
+        source_type: str,
+        sources_by_window: Sequence[Dict[str, Dict[str, Any]]],
+        expected_window_count: int,
+    ) -> Dict[str, Any]:
+        sources = [
+            window[source_type]
+            for window in sources_by_window
+            if source_type in window
+        ]
+        axis_sets = [set(source["analysis_axes"]) for source in sources]
+        common_axes = sorted(set.intersection(*axis_sets)) if axis_sets else []
+        axis_deltas: Dict[str, float] = {}
+        for axis_name in common_axes:
+            values = [
+                float(source["analysis_axes"].get(axis_name, 0.0))
+                for source in sources
+            ]
+            axis_deltas[axis_name] = self._round_score(
+                max(values) - min(values) if values else 0.0
+            )
+        max_axis_delta = self._round_score(max(axis_deltas.values(), default=0.0))
+        average_axis_delta = self._round_score(
+            sum(axis_deltas.values()) / max(len(axis_deltas), 1)
+        )
+        drift_summary = {
+            "common_axis_count": len(common_axes),
+            "max_axis_delta": max_axis_delta,
+            "average_axis_delta": average_axis_delta,
+            "stability_score": self._round_score(1.0 - max_axis_delta),
+            "drift_review_required": max_axis_delta >= 0.25,
+        }
+        item = {
+            "source_type": source_type,
+            "source_family": self._source_family(source_type),
+            "window_count": len(sources),
+            "source_refs": [source["source_ref"] for source in sources],
+            "feature_digests": [source["feature_digest"] for source in sources],
+            "common_analysis_axes": common_axes,
+            "axis_delta_summary": axis_deltas,
+            "axis_drift_summary": drift_summary,
+            "axis_drift_bound": (
+                len(sources) == expected_window_count
+                and bool(common_axes)
+                and all(source["raw_payload_stored"] is False for source in sources)
+            ),
+            "operator_summary": self._longitudinal_operator_summary(
+                source_type,
+                drift_summary["stability_score"],
+                max_axis_delta,
+            ),
+            "agent_next_action": self._longitudinal_agent_next_action(
+                source_type,
+                max_axis_delta,
+            ),
+            "requires_ml_expertise": False,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_axis_payload_stored": False,
+            "raw_source_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "semantic_thought_content_generated": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+            "upload_readiness_claimed": False,
+        }
+        item["axis_drift_digest"] = sha256_text(
+            canonical_json(self._axis_drift_digest_payload(item))
+        )
+        return item
+
+    def _longitudinal_operator_summary(
+        self,
+        source_type: str,
+        stability_score: float,
+        max_axis_delta: float,
+    ) -> str:
+        label = {
+            "questionnaire": "Questionnaire",
+            "eeg": "EEG",
+            "fmri_bold": "fMRI BOLD",
+            "brain_organoid": "Organoid",
+            "biosensor": "Biosensor",
+            "behavioral_task": "Behavioral task",
+            "omics": "Omics",
+            "clinical_metadata": "Clinical metadata",
+        }.get(source_type, "Biological source")
+        return (
+            f"{label} timeline stability proxy is {stability_score:.3f}; "
+            f"max axis drift {max_axis_delta:.3f} is review context only."
+        )
+
+    def _longitudinal_agent_next_action(
+        self,
+        source_type: str,
+        max_axis_delta: float,
+    ) -> str:
+        if max_axis_delta >= 0.25:
+            return f"review_{source_type}_timeline_drift_and_quality_refs"
+        return f"record_{source_type}_timeline_stability_summary"
 
     def _normalize_upstream_receipt(
         self,
@@ -4544,6 +4911,67 @@ class NeuroIntegrationWorkbench:
                 "interpretation_synthesis.synthesis_card_digest_set mismatch"
             )
 
+    def _check_longitudinal_timeline(
+        self,
+        timeline: Dict[str, Any],
+    ) -> None:
+        if not isinstance(timeline, dict):
+            raise ValueError("longitudinal_timeline must be a mapping")
+        if timeline.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("longitudinal_timeline.schema_version mismatch")
+        if timeline.get("profile_id") != NIW_LONGITUDINAL_TIMELINE_PROFILE_ID:
+            raise ValueError("longitudinal_timeline.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._longitudinal_timeline_digest_payload(timeline))
+        )
+        if timeline.get("longitudinal_timeline_digest") != expected_digest:
+            raise ValueError(
+                "longitudinal_timeline.longitudinal_timeline_digest mismatch"
+            )
+        if timeline.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("longitudinal_timeline.claim_ceiling mismatch")
+        if timeline.get("storage_policy") != NIW_LONGITUDINAL_TIMELINE_POLICY:
+            raise ValueError("longitudinal_timeline.storage_policy mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "semantic_thought_content_generated",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+            "upload_readiness_claimed",
+        ):
+            if timeline.get(field_name) is not False:
+                raise ValueError(f"longitudinal_timeline.{field_name} must be false")
+        if timeline.get("window_count", 0) < 2:
+            raise ValueError("longitudinal_timeline.window_count must be at least two")
+        if len(timeline.get("source_bundle_refs", [])) != timeline.get("window_count"):
+            raise ValueError("longitudinal_timeline.source_bundle_refs mismatch")
+        if len(timeline.get("source_bundle_digests", [])) != timeline.get("window_count"):
+            raise ValueError("longitudinal_timeline.source_bundle_digests mismatch")
+        items = timeline.get("source_type_axis_drifts")
+        if not isinstance(items, list) or not items:
+            raise ValueError(
+                "longitudinal_timeline.source_type_axis_drifts must be a non-empty list"
+            )
+        for item in items:
+            if not isinstance(item, dict):
+                raise ValueError(
+                    "longitudinal_timeline.source_type_axis_drifts must contain mappings"
+                )
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "semantic_thought_content_generated",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+                "upload_readiness_claimed",
+            ):
+                if item.get(field_name) is not False:
+                    raise ValueError(f"axis_drift.{field_name} must be false")
+            expected_item_digest = sha256_text(
+                canonical_json(self._axis_drift_digest_payload(item))
+            )
+            if item.get("axis_drift_digest") != expected_item_digest:
+                raise ValueError("axis_drift.axis_drift_digest mismatch")
+
     def _normalize_operator_profile(self, operator_profile: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(operator_profile, dict):
             raise ValueError("operator_profile must be a mapping")
@@ -4757,6 +5185,24 @@ class NeuroIntegrationWorkbench:
         )
         return synthesis_raw_flags and card_raw_flags
 
+    def _longitudinal_timeline_payload_redacted(
+        self,
+        timeline: Dict[str, Any],
+    ) -> bool:
+        timeline_raw_flags = all(
+            timeline.get(field_name) is False
+            for field_name in timeline
+            if field_name.startswith("raw_")
+        )
+        item_raw_flags = all(
+            item.get(field_name) is False
+            for item in timeline.get("source_type_axis_drifts", [])
+            if isinstance(item, dict)
+            for field_name in item
+            if field_name.startswith("raw_")
+        )
+        return timeline_raw_flags and item_raw_flags
+
     def _upstream_receipt_digest_set(
         self,
         upstream_receipt_bindings: Sequence[Dict[str, Any]],
@@ -4871,6 +5317,26 @@ class NeuroIntegrationWorkbench:
             "requires_ml_expertise": card.get("requires_ml_expertise"),
             "synthesis_card_bound": card.get("synthesis_card_bound"),
             "claim_ceiling": card.get("claim_ceiling"),
+        }
+
+    def _axis_drift_digest_payload(self, item: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "source_type": item.get("source_type"),
+            "source_family": item.get("source_family"),
+            "window_count": item.get("window_count"),
+            "source_refs": item.get("source_refs"),
+            "feature_digests": item.get("feature_digests"),
+            "common_analysis_axes": item.get("common_analysis_axes"),
+            "axis_delta_summary": item.get("axis_delta_summary"),
+            "axis_drift_summary": item.get("axis_drift_summary"),
+            "axis_drift_bound": item.get("axis_drift_bound"),
+            "operator_summary": item.get("operator_summary"),
+            "agent_next_action": item.get("agent_next_action"),
+            "requires_ml_expertise": item.get("requires_ml_expertise"),
+            "claim_ceiling": item.get("claim_ceiling"),
+            "semantic_thought_content_generated": item.get(
+                "semantic_thought_content_generated"
+            ),
         }
 
     def _collection_step_digest_payload(self, step: Dict[str, Any]) -> Dict[str, Any]:
@@ -5292,4 +5758,52 @@ class NeuroIntegrationWorkbench:
             ),
             "storage_policy": synthesis.get("storage_policy"),
             "claim_ceiling": synthesis.get("claim_ceiling"),
+        }
+
+    def _longitudinal_timeline_digest_payload(
+        self,
+        timeline: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": timeline.get("profile_id"),
+            "identity_id": timeline.get("identity_id"),
+            "operator_guide_digest": timeline.get("operator_guide_digest"),
+            "source_bundle_digests": timeline.get("source_bundle_digests"),
+            "window_count": timeline.get("window_count"),
+            "source_types": timeline.get("source_types"),
+            "stable_source_types": timeline.get("stable_source_types"),
+            "missing_source_types_by_window": timeline.get(
+                "missing_source_types_by_window"
+            ),
+            "source_type_axis_drifts": [
+                {
+                    "source_type": item.get("source_type"),
+                    "axis_drift_digest": item.get("axis_drift_digest"),
+                    "axis_drift_bound": item.get("axis_drift_bound"),
+                }
+                for item in timeline.get("source_type_axis_drifts", [])
+                if isinstance(item, dict)
+            ],
+            "timeline_summary": timeline.get("timeline_summary"),
+            "all_windows_bound": timeline.get("all_windows_bound"),
+            "seed_survey_eeg_timeline_bound": timeline.get(
+                "seed_survey_eeg_timeline_bound"
+            ),
+            "source_type_timeline_coverage_bound": timeline.get(
+                "source_type_timeline_coverage_bound"
+            ),
+            "upstream_fusion_timeline_bound": timeline.get(
+                "upstream_fusion_timeline_bound"
+            ),
+            "all_axis_drifts_bound": timeline.get("all_axis_drifts_bound"),
+            "operator_review_ready": timeline.get("operator_review_ready"),
+            "coding_agent_review_ready": timeline.get("coding_agent_review_ready"),
+            "longitudinal_timeline_bound": timeline.get(
+                "longitudinal_timeline_bound"
+            ),
+            "storage_policy": timeline.get("storage_policy"),
+            "claim_ceiling": timeline.get("claim_ceiling"),
+            "semantic_thought_content_generated": timeline.get(
+                "semantic_thought_content_generated"
+            ),
         }

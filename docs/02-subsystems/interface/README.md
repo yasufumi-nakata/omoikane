@@ -37,6 +37,8 @@
   coding-agent review readiness を raw result payload なしで束縛する
 - measurement quality gate と cross-modal analysis run から plain-language synthesis cards と
   coding-agent task を作り、非 ML operator が確認できる interpretation synthesis に束縛する
+- repeated source-bundle windows を longitudinal timeline に束縛し、source type ごとの
+  axis drift / stability proxy を raw timeline payload なしで確認する
 - 非 ML 専門家向け plain-language guide と coding agent 向け task template を同じ receipt に入れる
 - fMRI と脳オルガノイドは expansion context であり、意識再現や本人同一性の証明にはしない
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
@@ -44,8 +46,8 @@
   source-type lane coverage、connector bundle binding、collection protocol binding、
   collection run binding、measurement quality gate binding、cross-modal analysis pair coverage、
   bounded result summary binding、interpretation synthesis binding、raw payload redaction、
-  claim ceiling と modality-specific open biodata recipe coverage を 8 source type /
-  28 pair として検証する
+  longitudinal timeline binding、claim ceiling と modality-specific open biodata recipe coverage を
+  8 source type / 28 pair / 2 window として検証する
 
 ### Observation Integration Workbench (OIW)
 - 人類が取得・計測してきた source を、human biodata、neuroscience、clinical health、

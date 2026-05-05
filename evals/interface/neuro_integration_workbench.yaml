@@ -6,7 +6,8 @@ description: >
   fMRI と脳オルガノイド feature summary を expansion lane として追加し、
   biosensor、behavioral task、omics、clinical metadata も同じ source bundle に入れ、
   計測・解析・データ整備・operator copilot・agent automation の置換 lane を
-  LLM-native かつ非 ML 専門家向けにまとめられることを確認する。
+  LLM-native かつ非 ML 専門家向けにまとめ、2 window の longitudinal timeline として
+  axis drift review まで束縛できることを確認する。
 inputs:
   - source: reference-runtime
     command: PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json
@@ -76,6 +77,15 @@ expected:
   interpretation_operator_action_ready: true
   interpretation_payload_redacted: true
   interpretation_card_count: 28
+  longitudinal_timeline_bound: true
+  longitudinal_timeline_digest_bound: true
+  longitudinal_source_type_coverage_bound: true
+  longitudinal_axis_drifts_bound: true
+  longitudinal_payload_redacted: true
+  longitudinal_no_identity_or_upload_claim: true
+  longitudinal_window_count: 2
+  longitudinal_stable_source_type_count: 8
+  longitudinal_axis_drift_item_count: 8
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import asdict
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -11366,6 +11367,61 @@ json.dump(response, sys.stdout)
             ],
             upstream_receipts=[biodata_survey_eeg_fusion],
         )
+        longitudinal_source_bundle = deepcopy(source_bundle)
+        longitudinal_source_bundle["source_bundle_ref"] = (
+            f"source-bundle://neuro-integration/{new_id('niw-source-bundle')}"
+        )
+        longitudinal_source_bundle["created_at"] = utc_now_iso()
+        for source in longitudinal_source_bundle["sources"]:
+            source_type = source["source_type"]
+            source["source_ref"] = (
+                f"source://neuro-workbench/{source_type}/day-2-summary"
+            )
+            source["feature_summary_ref"] = (
+                f"feature-summary://neuro-workbench/{source_type}/day-2"
+            )
+            adjusted_axes = {
+                axis_name: round(max(0.0, min(1.0, float(axis_value) + 0.03)), 3)
+                for axis_name, axis_value in source["analysis_axes"].items()
+                if isinstance(axis_value, (int, float))
+            }
+            source["analysis_axes"] = adjusted_axes
+            source["construct_coverage"] = sorted(adjusted_axes)
+            source["feature_digest"] = sha256_text(
+                canonical_json(
+                    {
+                        "source_type": source_type,
+                        "window_ref": "day-2",
+                        "analysis_axes": adjusted_axes,
+                    }
+                )
+            )
+            source["feature_name_digest"] = sha256_text(
+                canonical_json({"feature_names": sorted(adjusted_axes)})
+            )
+            source["numeric_feature_count"] = max(
+                source["numeric_feature_count"],
+                len(adjusted_axes),
+            )
+        longitudinal_source_bundle["source_digest_set"] = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": longitudinal_source_bundle["profile_id"],
+                    "source_digests": [
+                        source["feature_digest"]
+                        for source in longitudinal_source_bundle["sources"]
+                    ],
+                    "source_types": longitudinal_source_bundle["source_types"],
+                }
+            )
+        )
+        longitudinal_source_bundle["source_bundle_digest"] = sha256_text(
+            canonical_json(
+                self.neuro_integration_workbench._source_bundle_digest_payload(
+                    longitudinal_source_bundle
+                )
+            )
+        )
         workspace = self.neuro_integration_workbench.open_workspace(
             identity_id=identity.identity_id,
             app_receipts=app_receipts,
@@ -11546,6 +11602,13 @@ json.dump(response, sys.stdout)
                 cross_modal_analysis_run,
             )
         )
+        longitudinal_timeline = (
+            self.neuro_integration_workbench.build_longitudinal_integration_timeline(
+                identity.identity_id,
+                [source_bundle, longitudinal_source_bundle],
+                operator_guide,
+            )
+        )
         validation = self.neuro_integration_workbench.validate_integration_bundle(
             app_receipts,
             source_bundle,
@@ -11560,6 +11623,7 @@ json.dump(response, sys.stdout)
             collection_run=collection_run,
             measurement_quality_gate=measurement_quality_gate,
             interpretation_synthesis=interpretation_synthesis,
+            longitudinal_timeline=longitudinal_timeline,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -12039,6 +12103,49 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.longitudinal_timeline.bound",
+            payload={
+                "longitudinal_timeline_ref": longitudinal_timeline[
+                    "longitudinal_timeline_ref"
+                ],
+                "longitudinal_timeline_digest": longitudinal_timeline[
+                    "longitudinal_timeline_digest"
+                ],
+                "source_bundle_digests": longitudinal_timeline[
+                    "source_bundle_digests"
+                ],
+                "window_count": longitudinal_timeline["window_count"],
+                "stable_source_type_count": longitudinal_timeline[
+                    "timeline_summary"
+                ]["stable_source_type_count"],
+                "axis_drift_item_count": longitudinal_timeline[
+                    "timeline_summary"
+                ]["axis_drift_item_count"],
+                "source_type_timeline_coverage_bound": longitudinal_timeline[
+                    "source_type_timeline_coverage_bound"
+                ],
+                "all_axis_drifts_bound": longitudinal_timeline[
+                    "all_axis_drifts_bound"
+                ],
+                "longitudinal_timeline_bound": longitudinal_timeline[
+                    "longitudinal_timeline_bound"
+                ],
+                "claim_ceiling": longitudinal_timeline["claim_ceiling"],
+                "raw_timeline_payload_stored": longitudinal_timeline[
+                    "raw_timeline_payload_stored"
+                ],
+                "upload_readiness_claimed": longitudinal_timeline[
+                    "upload_readiness_claimed"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-longitudinal",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -12060,6 +12167,7 @@ json.dump(response, sys.stdout)
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
             "interpretation_synthesis": interpretation_synthesis,
+            "longitudinal_timeline": longitudinal_timeline,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -12131,6 +12239,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "interpretation_synthesis",
                     "schema_path": "specs/schemas/neuro_integration_interpretation_synthesis.schema",
                     "contract_role": "neuro-integration-interpretation-synthesis",
+                },
+                {
+                    "payload_path": "longitudinal_timeline",
+                    "schema_path": "specs/schemas/neuro_integration_longitudinal_timeline.schema",
+                    "contract_role": "neuro-integration-longitudinal-timeline",
                 },
             ],
             "ledger_profile": self.ledger.profile(),
