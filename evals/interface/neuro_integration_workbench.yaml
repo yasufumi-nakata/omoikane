@@ -40,6 +40,11 @@ expected:
   cross_modal_source_pair_coverage_bound: true
   cross_modal_analysis_payload_redacted: true
   analysis_pair_count: 6
+  cross_modal_analysis_run_bound: true
+  cross_modal_analysis_run_digest_bound: true
+  cross_modal_pair_results_bound: true
+  cross_modal_result_payload_redacted: true
+  analysis_result_count: 6
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

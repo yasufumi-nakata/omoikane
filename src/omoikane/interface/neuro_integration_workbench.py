@@ -17,6 +17,7 @@ NIW_REPLACEMENT_PLAN_PROFILE_ID = "neuro-application-replacement-plan-v1"
 NIW_CONNECTOR_PROFILE_ID = "neuro-application-connector-v1"
 NIW_CONNECTOR_BUNDLE_PROFILE_ID = "neuro-application-connector-bundle-v1"
 NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID = "neuro-cross-modal-analysis-plan-v1"
+NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID = "neuro-cross-modal-analysis-run-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -29,6 +30,9 @@ NIW_REPLACEMENT_PLAN_POLICY = "app-digest+source-family-lane-coverage-only"
 NIW_CONNECTOR_BUNDLE_POLICY = "connector-ref+credential-ref+contract-digest-only"
 NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY = (
     "source-pair-feature-digest+connector-ref-analysis-plan-only"
+)
+NIW_CROSS_MODAL_ANALYSIS_RUN_POLICY = (
+    "pair-digest+bounded-result-summary+operator-review-only"
 )
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
@@ -142,6 +146,9 @@ class NeuroIntegrationWorkbench:
             "cross_modal_analysis_plan_profile_id": (
                 NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID
             ),
+            "cross_modal_analysis_run_profile_id": (
+                NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID
+            ),
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
@@ -159,6 +166,7 @@ class NeuroIntegrationWorkbench:
             "cross_modal_analysis_plan_policy": (
                 NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY
             ),
+            "cross_modal_analysis_run_policy": NIW_CROSS_MODAL_ANALYSIS_RUN_POLICY,
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -896,6 +904,134 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(plan)
 
+    def execute_cross_modal_analysis_plan(
+        self,
+        source_bundle: Dict[str, Any],
+        connector_bundle: Dict[str, Any],
+        cross_modal_analysis_plan: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self._check_source_bundle(source_bundle)
+        self._check_connector_bundle(connector_bundle)
+        self._check_cross_modal_analysis_plan(cross_modal_analysis_plan)
+        if cross_modal_analysis_plan["source_bundle_digest"] != source_bundle[
+            "source_bundle_digest"
+        ]:
+            raise ValueError("cross_modal_analysis_plan.source_bundle_digest must match source bundle")
+        if cross_modal_analysis_plan["connector_bundle_digest"] != connector_bundle[
+            "connector_bundle_digest"
+        ]:
+            raise ValueError(
+                "cross_modal_analysis_plan.connector_bundle_digest must match connector bundle"
+            )
+        sources_by_type = {
+            source["source_type"]: source for source in source_bundle["sources"]
+        }
+        pair_results = [
+            self._build_cross_modal_pair_result(pair, sources_by_type)
+            for pair in cross_modal_analysis_plan["analysis_pairs"]
+        ]
+        result_digests = [result["result_digest"] for result in pair_results]
+        result_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID,
+                    "result_digests": result_digests,
+                    "cross_modal_analysis_plan_digest": cross_modal_analysis_plan[
+                        "cross_modal_analysis_plan_digest"
+                    ],
+                }
+            )
+        )
+        all_pair_results_bound = (
+            len(pair_results) == cross_modal_analysis_plan["analysis_pair_count"]
+            and all(result["result_bound"] for result in pair_results)
+        )
+        seed_survey_eeg_result_bound = any(
+            result["source_types"] == list(NIW_SEED_SOURCE_TYPES)
+            and result["analysis_recipe_id"] == "survey-eeg-feature-alignment"
+            and result["result_bound"]
+            for result in pair_results
+        )
+        summary = {
+            "result_count": len(pair_results),
+            "bounded_result_count": sum(
+                1 for result in pair_results if result["result_bound"]
+            ),
+            "average_compatibility_score": self._round_score(
+                sum(
+                    result["result_axis_summary"]["bounded_compatibility_score"]
+                    for result in pair_results
+                )
+                / max(len(pair_results), 1)
+            ),
+            "max_uncertainty_proxy": self._round_score(
+                max(
+                    (
+                        result["result_axis_summary"]["uncertainty_proxy"]
+                        for result in pair_results
+                    ),
+                    default=0.0,
+                )
+            ),
+        }
+        run = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "cross_modal_analysis_run_ref": (
+                "cross-modal-analysis-run://neuro-integration/"
+                f"{new_id('niw-cross-modal-run')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID,
+            "identity_id": source_bundle["identity_id"],
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "connector_bundle_ref": connector_bundle["connector_bundle_ref"],
+            "connector_bundle_digest": connector_bundle["connector_bundle_digest"],
+            "cross_modal_analysis_plan_ref": cross_modal_analysis_plan[
+                "cross_modal_analysis_plan_ref"
+            ],
+            "cross_modal_analysis_plan_digest": cross_modal_analysis_plan[
+                "cross_modal_analysis_plan_digest"
+            ],
+            "analysis_pair_count": cross_modal_analysis_plan["analysis_pair_count"],
+            "result_count": len(pair_results),
+            "pair_results": pair_results,
+            "result_digests": result_digests,
+            "result_digest_set": result_digest_set,
+            "all_pair_results_bound": all_pair_results_bound,
+            "seed_survey_eeg_result_bound": seed_survey_eeg_result_bound,
+            "operator_review_ready": cross_modal_analysis_plan[
+                "non_ml_operator_ready"
+            ]
+            and all_pair_results_bound,
+            "coding_agent_review_ready": cross_modal_analysis_plan[
+                "coding_agent_ready"
+            ]
+            and all_pair_results_bound,
+            "result_summary": summary,
+            "cross_modal_analysis_run_bound": (
+                cross_modal_analysis_plan["cross_modal_analysis_plan_bound"]
+                and connector_bundle["connector_bundle_bound"]
+                and all_pair_results_bound
+                and seed_survey_eeg_result_bound
+            ),
+            "storage_policy": NIW_CROSS_MODAL_ANALYSIS_RUN_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_source_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "raw_connector_payload_stored": False,
+            "raw_result_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        run["cross_modal_analysis_run_digest"] = sha256_text(
+            canonical_json(self._cross_modal_analysis_run_digest_payload(run))
+        )
+        return deepcopy(run)
+
     def validate_integration_bundle(
         self,
         app_receipts: Sequence[Dict[str, Any]],
@@ -906,6 +1042,7 @@ class NeuroIntegrationWorkbench:
         replacement_plan: Dict[str, Any] | None = None,
         connector_bundle: Dict[str, Any] | None = None,
         cross_modal_analysis_plan: Dict[str, Any] | None = None,
+        cross_modal_analysis_run: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -949,6 +1086,13 @@ class NeuroIntegrationWorkbench:
                 errors.append(str(exc))
             if connector_bundle is None:
                 errors.append("cross_modal_analysis_plan requires connector_bundle")
+        if cross_modal_analysis_run is not None:
+            try:
+                self._check_cross_modal_analysis_run(cross_modal_analysis_run)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if cross_modal_analysis_plan is None:
+                errors.append("cross_modal_analysis_run requires cross_modal_analysis_plan")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -1143,6 +1287,55 @@ class NeuroIntegrationWorkbench:
                     )
                 ),
             }
+        cross_modal_run_checks: Dict[str, bool] = {}
+        if cross_modal_analysis_run is not None:
+            cross_modal_analysis_run_digest_bound = (
+                cross_modal_analysis_run.get("cross_modal_analysis_run_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._cross_modal_analysis_run_digest_payload(
+                            cross_modal_analysis_run
+                        )
+                    )
+                )
+            )
+            expected_plan_digest = (
+                cross_modal_analysis_plan.get("cross_modal_analysis_plan_digest")
+                if cross_modal_analysis_plan is not None
+                else ""
+            )
+            expected_connector_digest = (
+                connector_bundle.get("connector_bundle_digest")
+                if connector_bundle is not None
+                else ""
+            )
+            cross_modal_run_checks = {
+                "cross_modal_analysis_run_digest_bound": (
+                    cross_modal_analysis_run_digest_bound
+                ),
+                "cross_modal_analysis_run_bound": (
+                    cross_modal_analysis_run.get("cross_modal_analysis_run_bound")
+                    is True
+                    and cross_modal_analysis_run.get("source_bundle_digest")
+                    == source_bundle.get("source_bundle_digest")
+                    and cross_modal_analysis_run.get(
+                        "cross_modal_analysis_plan_digest"
+                    )
+                    == expected_plan_digest
+                    and cross_modal_analysis_run.get("connector_bundle_digest")
+                    == expected_connector_digest
+                ),
+                "cross_modal_pair_results_bound": (
+                    cross_modal_analysis_run.get("all_pair_results_bound") is True
+                    and cross_modal_analysis_run.get("result_count")
+                    == cross_modal_analysis_run.get("analysis_pair_count")
+                ),
+                "cross_modal_result_payload_redacted": (
+                    self._cross_modal_analysis_run_payload_redacted(
+                        cross_modal_analysis_run
+                    )
+                ),
+            }
 
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
@@ -1164,6 +1357,7 @@ class NeuroIntegrationWorkbench:
             **replacement_plan_checks,
             **connector_bundle_checks,
             **cross_modal_plan_checks,
+            **cross_modal_run_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -1193,6 +1387,11 @@ class NeuroIntegrationWorkbench:
             "analysis_pair_count": (
                 cross_modal_analysis_plan.get("analysis_pair_count", 0)
                 if cross_modal_analysis_plan is not None
+                else 0
+            ),
+            "analysis_result_count": (
+                cross_modal_analysis_run.get("result_count", 0)
+                if cross_modal_analysis_run is not None
                 else 0
             ),
             "claim_ceiling": NIW_CLAIM_CEILING,
@@ -1711,6 +1910,112 @@ class NeuroIntegrationWorkbench:
             )
         return catalog
 
+    def _build_cross_modal_pair_result(
+        self,
+        pair: Dict[str, Any],
+        sources_by_type: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        left_source_type, right_source_type = pair["source_types"]
+        left_source = sources_by_type[left_source_type]
+        right_source = sources_by_type[right_source_type]
+        left_axis_mean = self._axis_mean(left_source["analysis_axes"])
+        right_axis_mean = self._axis_mean(right_source["analysis_axes"])
+        compatibility = self._round_score(1.0 - abs(left_axis_mean - right_axis_mean))
+        coverage = self._round_score(
+            (
+                len(left_source["construct_coverage"])
+                + len(right_source["construct_coverage"])
+            )
+            / 8.0
+        )
+        uncertainty = self._round_score(1.0 - min(compatibility, coverage))
+        if pair["analysis_recipe_id"] == "survey-eeg-feature-alignment":
+            result_status = "seed-survey-eeg-result-bound"
+        elif pair["analysis_recipe_id"] == "organoid-context-comparison":
+            result_status = "in-vitro-context-result-bound"
+        else:
+            result_status = "cross-modal-context-result-bound"
+        result = {
+            "result_ref": (
+                f"analysis-result://neuro-integration/{new_id('niw-analysis-result')}"
+            ),
+            "pair_ref": pair["pair_ref"],
+            "pair_digest": pair["pair_digest"],
+            "source_types": list(pair["source_types"]),
+            "analysis_recipe_id": pair["analysis_recipe_id"],
+            "result_status": result_status,
+            "result_axis_summary": {
+                "left_axis_mean": left_axis_mean,
+                "right_axis_mean": right_axis_mean,
+                "bounded_compatibility_score": compatibility,
+                "construct_coverage_proxy": coverage,
+                "uncertainty_proxy": uncertainty,
+            },
+            "operator_summary": self._operator_result_summary(
+                pair["analysis_recipe_id"],
+                compatibility,
+                uncertainty,
+            ),
+            "agent_next_action": self._agent_result_next_action(
+                pair["analysis_recipe_id"]
+            ),
+            "evidence_refs": [
+                pair["pair_ref"],
+                *[
+                    connector_ref
+                    for support in pair["connector_support"]
+                    for connector_ref in support["connector_refs"]
+                ],
+            ],
+            "requires_ml_expertise": False,
+            "result_bound": pair["all_required_connectors_bound"],
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_result_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        result["result_digest"] = sha256_text(
+            canonical_json(self._analysis_result_digest_payload(result))
+        )
+        return result
+
+    def _axis_mean(self, axes: Dict[str, Any]) -> float:
+        values = [float(value) for value in axes.values() if isinstance(value, (int, float))]
+        if not values:
+            return 0.0
+        return self._round_score(sum(values) / len(values))
+
+    def _operator_result_summary(
+        self,
+        recipe_id: str,
+        compatibility: float,
+        uncertainty: float,
+    ) -> str:
+        if recipe_id == "survey-eeg-feature-alignment":
+            return (
+                "Questionnaire and EEG summaries have a bounded alignment score "
+                f"of {compatibility:.3f}; treat uncertainty {uncertainty:.3f} as review context."
+            )
+        if recipe_id == "organoid-context-comparison":
+            return (
+                "Organoid data is bound only as in-vitro neural tissue context; "
+                f"compatibility {compatibility:.3f} is not a personhood or identity signal."
+            )
+        return (
+            "This source pair has a bounded feature-summary compatibility score "
+            f"of {compatibility:.3f} with uncertainty {uncertainty:.3f}."
+        )
+
+    def _agent_result_next_action(self, recipe_id: str) -> str:
+        if recipe_id == "survey-eeg-feature-alignment":
+            return "review_seed_alignment_and_quality_flags"
+        if recipe_id == "neural-electrical-hemodynamic-context":
+            return "review_eeg_fmri_context_without_diagnosis"
+        if recipe_id == "organoid-context-comparison":
+            return "review_organoid_context_boundary"
+        return "review_generic_cross_modal_result_summary"
+
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(source_manifest, dict):
             raise ValueError("source_manifest must be a mapping")
@@ -2097,6 +2402,75 @@ class NeuroIntegrationWorkbench:
         if plan.get("pair_digest_set") != expected_pair_digest_set:
             raise ValueError("cross_modal_analysis_plan.pair_digest_set mismatch")
 
+    def _check_cross_modal_analysis_run(self, run: Dict[str, Any]) -> None:
+        if not isinstance(run, dict):
+            raise ValueError("cross_modal_analysis_run must be a mapping")
+        if run.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("cross_modal_analysis_run.schema_version mismatch")
+        if run.get("profile_id") != NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID:
+            raise ValueError("cross_modal_analysis_run.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._cross_modal_analysis_run_digest_payload(run))
+        )
+        if run.get("cross_modal_analysis_run_digest") != expected_digest:
+            raise ValueError(
+                "cross_modal_analysis_run.cross_modal_analysis_run_digest mismatch"
+            )
+        if run.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("cross_modal_analysis_run.claim_ceiling mismatch")
+        if run.get("storage_policy") != NIW_CROSS_MODAL_ANALYSIS_RUN_POLICY:
+            raise ValueError("cross_modal_analysis_run.storage_policy mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if run.get(field_name) is not False:
+                raise ValueError(f"cross_modal_analysis_run.{field_name} must be false")
+        results = run.get("pair_results")
+        if not isinstance(results, list) or not results:
+            raise ValueError(
+                "cross_modal_analysis_run.pair_results must be a non-empty list"
+            )
+        if any(not isinstance(result, dict) for result in results):
+            raise ValueError(
+                "cross_modal_analysis_run.pair_results must contain mappings"
+            )
+        if run.get("result_count") != len(results):
+            raise ValueError("cross_modal_analysis_run.result_count must match results")
+        result_digests = []
+        for result in results:
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+            ):
+                if result.get(field_name) is not False:
+                    raise ValueError(
+                        f"cross_modal_analysis_result.{field_name} must be false"
+                    )
+            expected_result_digest = sha256_text(
+                canonical_json(self._analysis_result_digest_payload(result))
+            )
+            if result.get("result_digest") != expected_result_digest:
+                raise ValueError("cross_modal_analysis_result.result_digest mismatch")
+            result_digests.append(expected_result_digest)
+        if run.get("result_digests") != result_digests:
+            raise ValueError("cross_modal_analysis_run.result_digests mismatch")
+        expected_result_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID,
+                    "result_digests": result_digests,
+                    "cross_modal_analysis_plan_digest": run.get(
+                        "cross_modal_analysis_plan_digest"
+                    ),
+                }
+            )
+        )
+        if run.get("result_digest_set") != expected_result_digest_set:
+            raise ValueError("cross_modal_analysis_run.result_digest_set mismatch")
+
     def _normalize_operator_profile(self, operator_profile: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(operator_profile, dict):
             raise ValueError("operator_profile must be a mapping")
@@ -2229,6 +2603,21 @@ class NeuroIntegrationWorkbench:
         )
         return plan_raw_flags and pair_raw_flags
 
+    def _cross_modal_analysis_run_payload_redacted(self, run: Dict[str, Any]) -> bool:
+        run_raw_flags = all(
+            run.get(field_name) is False
+            for field_name in run
+            if field_name.startswith("raw_")
+        )
+        result_raw_flags = all(
+            result.get(field_name) is False
+            for result in run.get("pair_results", [])
+            if isinstance(result, dict)
+            for field_name in result
+            if field_name.startswith("raw_")
+        )
+        return run_raw_flags and result_raw_flags
+
     def _upstream_receipt_digest_set(
         self,
         upstream_receipt_bindings: Sequence[Dict[str, Any]],
@@ -2309,6 +2698,21 @@ class NeuroIntegrationWorkbench:
             ),
             "requires_ml_expertise": pair.get("requires_ml_expertise"),
             "claim_ceiling": pair.get("claim_ceiling"),
+        }
+
+    def _analysis_result_digest_payload(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "pair_digest": result.get("pair_digest"),
+            "source_types": result.get("source_types"),
+            "analysis_recipe_id": result.get("analysis_recipe_id"),
+            "result_status": result.get("result_status"),
+            "result_axis_summary": result.get("result_axis_summary"),
+            "operator_summary": result.get("operator_summary"),
+            "agent_next_action": result.get("agent_next_action"),
+            "evidence_refs": result.get("evidence_refs"),
+            "requires_ml_expertise": result.get("requires_ml_expertise"),
+            "result_bound": result.get("result_bound"),
+            "claim_ceiling": result.get("claim_ceiling"),
         }
 
     def _source_bundle_digest_payload(self, source_bundle: Dict[str, Any]) -> Dict[str, Any]:
@@ -2452,4 +2856,32 @@ class NeuroIntegrationWorkbench:
             ),
             "planning_scope": plan.get("planning_scope"),
             "claim_ceiling": plan.get("claim_ceiling"),
+        }
+
+    def _cross_modal_analysis_run_digest_payload(
+        self,
+        run: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": run.get("profile_id"),
+            "identity_id": run.get("identity_id"),
+            "source_bundle_digest": run.get("source_bundle_digest"),
+            "connector_bundle_digest": run.get("connector_bundle_digest"),
+            "cross_modal_analysis_plan_digest": run.get(
+                "cross_modal_analysis_plan_digest"
+            ),
+            "analysis_pair_count": run.get("analysis_pair_count"),
+            "result_count": run.get("result_count"),
+            "result_digest_set": run.get("result_digest_set"),
+            "all_pair_results_bound": run.get("all_pair_results_bound"),
+            "seed_survey_eeg_result_bound": run.get(
+                "seed_survey_eeg_result_bound"
+            ),
+            "operator_review_ready": run.get("operator_review_ready"),
+            "coding_agent_review_ready": run.get("coding_agent_review_ready"),
+            "result_summary": run.get("result_summary"),
+            "cross_modal_analysis_run_bound": run.get(
+                "cross_modal_analysis_run_bound"
+            ),
+            "claim_ceiling": run.get("claim_ceiling"),
         }

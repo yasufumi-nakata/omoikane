@@ -438,6 +438,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["cross_modal_source_pair_coverage_bound"])
         self.assertTrue(result["validation"]["cross_modal_analysis_payload_redacted"])
         self.assertEqual(6, result["validation"]["analysis_pair_count"])
+        self.assertTrue(result["validation"]["cross_modal_analysis_run_bound"])
+        self.assertTrue(result["validation"]["cross_modal_analysis_run_digest_bound"])
+        self.assertTrue(result["validation"]["cross_modal_pair_results_bound"])
+        self.assertTrue(result["validation"]["cross_modal_result_payload_redacted"])
+        self.assertEqual(6, result["validation"]["analysis_result_count"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
@@ -452,6 +457,9 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["connector_bundle"]["connector_bundle_bound"])
         self.assertTrue(
             result["cross_modal_analysis_plan"]["cross_modal_analysis_plan_bound"]
+        )
+        self.assertTrue(
+            result["cross_modal_analysis_run"]["cross_modal_analysis_run_bound"]
         )
 
     def test_observation_integration_demo_emits_universal_observation_package(self) -> None:

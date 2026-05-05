@@ -11430,6 +11430,13 @@ json.dump(response, sys.stdout)
                 connector_bundle,
             )
         )
+        cross_modal_analysis_run = (
+            self.neuro_integration_workbench.execute_cross_modal_analysis_plan(
+                source_bundle,
+                connector_bundle,
+                cross_modal_analysis_plan,
+            )
+        )
         validation = self.neuro_integration_workbench.validate_integration_bundle(
             app_receipts,
             source_bundle,
@@ -11439,6 +11446,7 @@ json.dump(response, sys.stdout)
             replacement_plan,
             connector_bundle,
             cross_modal_analysis_plan,
+            cross_modal_analysis_run,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11680,6 +11688,49 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.cross_modal_analysis_run.bound",
+            payload={
+                "cross_modal_analysis_run_ref": cross_modal_analysis_run[
+                    "cross_modal_analysis_run_ref"
+                ],
+                "cross_modal_analysis_run_digest": cross_modal_analysis_run[
+                    "cross_modal_analysis_run_digest"
+                ],
+                "cross_modal_analysis_plan_digest": cross_modal_analysis_run[
+                    "cross_modal_analysis_plan_digest"
+                ],
+                "result_digest_set": cross_modal_analysis_run[
+                    "result_digest_set"
+                ],
+                "result_count": cross_modal_analysis_run["result_count"],
+                "all_pair_results_bound": cross_modal_analysis_run[
+                    "all_pair_results_bound"
+                ],
+                "seed_survey_eeg_result_bound": cross_modal_analysis_run[
+                    "seed_survey_eeg_result_bound"
+                ],
+                "operator_review_ready": cross_modal_analysis_run[
+                    "operator_review_ready"
+                ],
+                "coding_agent_review_ready": cross_modal_analysis_run[
+                    "coding_agent_review_ready"
+                ],
+                "cross_modal_analysis_run_bound": cross_modal_analysis_run[
+                    "cross_modal_analysis_run_bound"
+                ],
+                "claim_ceiling": cross_modal_analysis_run["claim_ceiling"],
+                "raw_result_payload_stored": cross_modal_analysis_run[
+                    "raw_result_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-cross-modal-run",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -11696,6 +11747,7 @@ json.dump(response, sys.stdout)
             "replacement_plan": replacement_plan,
             "connector_bundle": connector_bundle,
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
+            "cross_modal_analysis_run": cross_modal_analysis_run,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -11742,6 +11794,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "cross_modal_analysis_plan",
                     "schema_path": "specs/schemas/neuro_integration_cross_modal_analysis_plan.schema",
                     "contract_role": "neuro-integration-cross-modal-analysis-plan",
+                },
+                {
+                    "payload_path": "cross_modal_analysis_run",
+                    "schema_path": "specs/schemas/neuro_integration_cross_modal_analysis_run.schema",
+                    "contract_role": "neuro-integration-cross-modal-analysis-run",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

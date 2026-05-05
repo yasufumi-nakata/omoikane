@@ -53,6 +53,8 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
   credential refs / data contract refs / LLM tool refs を replacement plan に digest-only で束縛する。
 - 同日、NIW は cross-modal analysis plan を追加し、現在 source bundle に入っている source type
   全ペアへ bounded recipe と connector support を割り当てる。
+- 続いて NIW は cross-modal analysis run を追加し、全 pair の bounded result summary と
+  operator / coding-agent review readiness を digest-only receipt として束縛する。
 
 ## ブロッキング要因
 
@@ -105,6 +107,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - cross-modal analysis plan は全 source-type pair の分析計画 coverage だけを検証し、
   modality-specific causal inference、large-scale cohort validity、clinical utility、
   upload-readiness は別途研究課題として扱う
+- cross-modal analysis run は bounded compatibility / uncertainty summary だけを返し、
+  medical-grade result、semantic thought content、subjective equivalence、upload readiness には
+  昇格しない
 - Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
   BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない
