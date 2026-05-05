@@ -79,6 +79,7 @@ Researcher の evidence seed や調査補助メモは [agents/researchers/](agen
 - `PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
+- `PYTHONPATH=src python3 -m omoikane.cli human-body-analysis-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli observation-integration-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli collective-demo --json`
 - `PYTHONPATH=src python3 -m omoikane.cli connectome-demo --json`
@@ -114,7 +115,7 @@ Researcher の evidence seed や調査補助メモは [agents/researchers/](agen
 | `PYTHONPATH=src python3 -m unittest discover -s tests -t .` | reference runtime、CLI、schema、eval 連携の回帰テスト結果 | 実環境の起動、外部サービス接続、研究上の正しさの証明 |
 | `demo` | identity 作成、substrate allocation、ContinuityLedger、Council 承認、EthicsEnforcer veto の最小シナリオ | 意識・人格・同一性成立の主張 |
 | `substrate-demo` / `connectome-demo` | substrate allocation / attestation / migration と、L2 connectome snapshot の validation summary | 実ハードウェア移行、実神経データの取り込み |
-| `bdb-demo` / `biodata-transmitter-demo` / `neuro-integration-demo` / `observation-integration-demo` / `collective-demo` | L6 interface の proxy contract、biosignal roundtrip、アンケート+EEG の digest-only fusion receipt、アンケート+EEG seed から fMRI / 脳オルガノイド expansion lane までの multi-application workbench、人類の観測・計測 source と測定・解析 method catalog を raw payload なしで束縛する cross-domain analysis plan、collective identity の bounded merge / recovery receipt | 生体データの実測、身体状態の医学的診断、semantic thought content の復元、完全知識や真理統一の証明、意識再現、集合人格成立の証明 |
+| `bdb-demo` / `biodata-transmitter-demo` / `neuro-integration-demo` / `human-body-analysis-demo` / `observation-integration-demo` / `collective-demo` | L6 interface の proxy contract、biosignal roundtrip、アンケート+EEG の digest-only fusion receipt、アンケート+EEG seed から fMRI / 脳オルガノイド expansion lane までの multi-application workbench、human body analysis package、人類の観測・計測 source と測定・解析 method catalog を raw payload なしで束縛する cross-domain analysis plan、collective identity の bounded merge / recovery receipt | 生体データの実測、身体状態の医学的診断、semantic thought content の復元、完全知識や真理統一の証明、意識再現、集合人格成立の証明 |
 | `memory-edit-demo` / `memory-replication-demo` / `semantic-demo` / `procedural-demo` / `cognitive-demo` | MemoryCrystal、reversible memory edit、semantic / procedural projection、L3 reasoning failover の安全な代理シナリオ | 記憶の実改変、技能の実世界実行、汎用推論エンジン |
 | `cognitive-audit-governance-demo` / `council-demo` / `task-graph-demo` / `consensus-bus-demo` / `trust-demo` / `trust-transfer-demo` | Council、TaskGraph、ConsensusBus、TrustService、audit governance の policy / receipt / timeout / quorum 結果 | 人間監督の代替、法的承認、外部組織の実署名 |
 | `patch-generator-demo` / `diff-eval-demo` / `sandbox-demo` / `yaoyorozu-demo` / `builder-live-demo` / `rollback-demo` | Builder 系の patch plan、diff evaluation、sandbox freeze、worker dispatch、temp workspace 実行、rollback receipt | 現 checkout への無断永続変更、本番 worker 実行、秘密情報を含む長いログ保存 |

@@ -406,6 +406,7 @@ status: decided | superseded
 - [2026-05-06_neuro-integration-operator-runbook.md](2026-05-06_neuro-integration-operator-runbook.md)
 - [2026-05-06_neuro-integration-source-onboarding-catalog.md](2026-05-06_neuro-integration-source-onboarding-catalog.md)
 - [2026-05-06_human-body-analysis-package.md](2026-05-06_human-body-analysis-package.md)
+- [2026-05-06_human-body-analysis-command-inventory.md](2026-05-06_human-body-analysis-command-inventory.md)
 - [2026-05-05_biodata-survey-eeg-fusion.md](2026-05-05_biodata-survey-eeg-fusion.md)
 - [2026-05-05_l3-cognitive-public-schema-contract.md](2026-05-05_l3-cognitive-public-schema-contract.md)
 - [2026-05-06_neuro-integration-semantic-thought-ceiling.md](2026-05-06_neuro-integration-semantic-thought-ceiling.md)

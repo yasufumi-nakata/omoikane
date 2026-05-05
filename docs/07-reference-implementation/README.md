@@ -54,6 +54,7 @@ PYTHONPATH=src python3 -m omoikane.cli energy-budget-fabric-demo --json
 PYTHONPATH=src python3 -m omoikane.cli bdb-demo --json
 PYTHONPATH=src python3 -m omoikane.cli biodata-transmitter-demo --json
 PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json
+PYTHONPATH=src python3 -m omoikane.cli human-body-analysis-demo --json
 PYTHONPATH=src python3 -m omoikane.cli observation-integration-demo --json
 PYTHONPATH=src python3 -m omoikane.cli imc-demo --json
 PYTHONPATH=src python3 -m omoikane.cli collective-demo --json
