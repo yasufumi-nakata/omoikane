@@ -1,0 +1,312 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_collection_run.schema"
+title: NeuroIntegrationCollectionRun
+description: >
+  Digest-only bounded collection run receipt for executing a Neuro Integration
+  Workbench collection protocol without storing raw source, connector,
+  collection, or result payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - collection_run_ref
+  - created_at
+  - profile_id
+  - identity_id
+  - source_bundle_ref
+  - source_bundle_digest
+  - connector_bundle_ref
+  - connector_bundle_digest
+  - collection_protocol_ref
+  - collection_protocol_digest
+  - collection_step_count
+  - result_count
+  - collection_results
+  - result_digests
+  - result_digest_set
+  - all_collection_results_bound
+  - seed_survey_eeg_collection_result_bound
+  - expansion_collection_result_bound
+  - operator_review_ready
+  - coding_agent_review_ready
+  - collection_summary
+  - collection_run_bound
+  - storage_policy
+  - claim_ceiling
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_source_payload_stored
+  - raw_collection_payload_stored
+  - raw_connector_payload_stored
+  - raw_result_payload_stored
+  - clinical_diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - collection_run_digest
+properties:
+  schema_version:
+    const: "1.0"
+  collection_run_ref:
+    type: string
+    pattern: "^collection-run://neuro-integration/niw-collection-run-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: neuro-collection-run-v1
+  identity_id:
+    type: string
+    minLength: 1
+  source_bundle_ref:
+    type: string
+    minLength: 1
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+  connector_bundle_ref:
+    type: string
+    pattern: "^connector-bundle://neuro-integration/niw-connector-bundle-[a-f0-9]{12}$"
+  connector_bundle_digest:
+    $ref: "#/$defs/sha256"
+  collection_protocol_ref:
+    type: string
+    pattern: "^collection-protocol://neuro-integration/niw-collection-[a-f0-9]{12}$"
+  collection_protocol_digest:
+    $ref: "#/$defs/sha256"
+  collection_step_count:
+    type: integer
+    minimum: 2
+  result_count:
+    type: integer
+    minimum: 2
+  collection_results:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/collection_result"
+  result_digests:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/sha256"
+  result_digest_set:
+    $ref: "#/$defs/sha256"
+  all_collection_results_bound:
+    const: true
+  seed_survey_eeg_collection_result_bound:
+    const: true
+  expansion_collection_result_bound:
+    const: true
+  operator_review_ready:
+    const: true
+  coding_agent_review_ready:
+    const: true
+  collection_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - result_count
+      - bounded_result_count
+      - average_collection_quality_score
+      - max_collection_risk_proxy
+    properties:
+      result_count:
+        type: integer
+        minimum: 2
+      bounded_result_count:
+        type: integer
+        minimum: 2
+      average_collection_quality_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      max_collection_risk_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+  collection_run_bound:
+    const: true
+  storage_policy:
+    const: collection-step-digest+bounded-quality-summary+operator-review-only
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/neurodata-integration
+  raw_source_payload_stored:
+    const: false
+  raw_collection_payload_stored:
+    const: false
+  raw_connector_payload_stored:
+    const: false
+  raw_result_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  collection_run_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  collection_status:
+    enum:
+      - seed-questionnaire-collection-bound
+      - seed-eeg-collection-bound
+      - neuroimaging-collection-context-bound
+      - in-vitro-collection-context-bound
+      - generic-biodata-collection-bound
+  collection_quality_summary:
+    type: object
+    additionalProperties: false
+    required:
+      - feature_completeness_score
+      - construct_coverage_score
+      - connector_binding_score
+      - consent_binding_score
+      - bounded_quality_score
+      - collection_risk_proxy
+    properties:
+      feature_completeness_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      construct_coverage_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      connector_binding_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      consent_binding_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      bounded_quality_score:
+        type: number
+        minimum: 0
+        maximum: 1
+      collection_risk_proxy:
+        type: number
+        minimum: 0
+        maximum: 1
+  collection_result:
+    type: object
+    additionalProperties: false
+    required:
+      - collection_result_ref
+      - collection_step_ref
+      - collection_step_digest
+      - source_type
+      - source_family
+      - source_ref
+      - feature_summary_ref
+      - feature_digest
+      - collection_window_ref
+      - collection_method_id
+      - measurement_connector_refs
+      - measurement_connector_digests
+      - collection_status
+      - collection_quality_summary
+      - operator_summary
+      - agent_next_action
+      - evidence_refs
+      - requires_ml_expertise
+      - collection_result_bound
+      - claim_ceiling
+      - raw_source_payload_stored
+      - raw_collection_payload_stored
+      - raw_connector_payload_stored
+      - raw_result_payload_stored
+      - clinical_diagnosis_claimed
+      - consciousness_reproduction_claimed
+      - identity_replacement_claimed
+      - collection_result_digest
+    properties:
+      collection_result_ref:
+        type: string
+        pattern: "^collection-result://neuro-integration/niw-collection-result-[a-f0-9]{12}$"
+      collection_step_ref:
+        type: string
+        pattern: "^collection-step://neuro-integration/niw-collection-step-[a-f0-9]{12}$"
+      collection_step_digest:
+        $ref: "#/$defs/sha256"
+      source_type:
+        $ref: "#/$defs/source_type"
+      source_family:
+        type: string
+        minLength: 1
+      source_ref:
+        type: string
+        minLength: 1
+      feature_summary_ref:
+        type: string
+        minLength: 1
+      feature_digest:
+        $ref: "#/$defs/sha256"
+      collection_window_ref:
+        type: string
+        pattern: "^collection-window://neuro-integration/[a-z0-9_-]+/niw-window-[a-f0-9]{12}$"
+      collection_method_id:
+        type: string
+        minLength: 1
+      measurement_connector_refs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      measurement_connector_digests:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/sha256"
+      collection_status:
+        $ref: "#/$defs/collection_status"
+      collection_quality_summary:
+        $ref: "#/$defs/collection_quality_summary"
+      operator_summary:
+        type: string
+        minLength: 1
+      agent_next_action:
+        type: string
+        minLength: 1
+      evidence_refs:
+        type: array
+        minItems: 4
+        items:
+          type: string
+          minLength: 1
+      requires_ml_expertise:
+        const: false
+      collection_result_bound:
+        const: true
+      claim_ceiling:
+        const: feature-alignment-and-analysis-plan-only
+      raw_source_payload_stored:
+        const: false
+      raw_collection_payload_stored:
+        const: false
+      raw_connector_payload_stored:
+        const: false
+      raw_result_payload_stored:
+        const: false
+      clinical_diagnosis_claimed:
+        const: false
+      consciousness_reproduction_claimed:
+        const: false
+      identity_replacement_claimed:
+        const: false
+      collection_result_digest:
+        $ref: "#/$defs/sha256"

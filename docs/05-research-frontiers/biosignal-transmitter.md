@@ -54,6 +54,8 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - 同日、NIW は collection protocol receipt を追加し、questionnaire、EEG、fMRI BOLD、
   brain organoid の source summaries を consent refs、measurement connector refs、
   collection window refs に analysis planning 前の digest-only 収集境界として束縛する。
+- 続いて NIW は collection run receipt を追加し、collection protocol の各 step から
+  bounded quality / risk summary と operator / coding-agent review readiness を digest-only で束縛する。
 - 同日、NIW は cross-modal analysis plan を追加し、現在 source bundle に入っている source type
   全ペアへ bounded recipe と connector support を割り当てる。
 - 続いて NIW は cross-modal analysis run を追加し、全 pair の bounded result summary と
@@ -110,6 +112,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - collection protocol は measurement connector coverage、consent ref、collection window ref
   の digest-only 境界だけを検証し、実測デバイスの校正、信号品質、被験者負荷、IRB/法務監査、
   longitudinal sampling 妥当性は別途研究課題として扱う
+- collection run は feature summary completeness、construct coverage、connector binding、
+  consent binding から bounded quality / risk proxy を返すだけで、実測デバイスの
+  calibration、artifact rejection、clinical-grade QC、session burden safety を証明しない
 - cross-modal analysis plan は全 source-type pair の分析計画 coverage だけを検証し、
   modality-specific causal inference、large-scale cohort validity、clinical utility、
   upload-readiness は別途研究課題として扱う

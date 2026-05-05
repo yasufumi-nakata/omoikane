@@ -18,6 +18,7 @@ imports:
   neuro_integration_application_replacement_plan: ../schemas/neuro_integration_application_replacement_plan.schema
   neuro_integration_application_connector_bundle: ../schemas/neuro_integration_application_connector_bundle.schema
   neuro_integration_collection_protocol: ../schemas/neuro_integration_collection_protocol.schema
+  neuro_integration_collection_run: ../schemas/neuro_integration_collection_run.schema
   neuro_integration_cross_modal_analysis_plan: ../schemas/neuro_integration_cross_modal_analysis_plan.schema
   neuro_integration_cross_modal_analysis_run: ../schemas/neuro_integration_cross_modal_analysis_run.schema
 operations:
@@ -304,6 +305,31 @@ operations:
       - non-ML operator and coding-agent collection handoffs must require no ML expertise
       - raw source, collection, connector, and credential payload storage must remain false
       - diagnosis, consciousness reproduction, and identity replacement claims must remain false
+  execute_collection_protocol:
+    summary: Execute a collection protocol into bounded per-source collection result summaries for operator and coding-agent review.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - connector_bundle
+          - collection_protocol
+        properties:
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          connector_bundle:
+            schema_ref: neuro_integration_application_connector_bundle
+          collection_protocol:
+            schema_ref: neuro_integration_collection_protocol
+    output:
+      schema_ref: neuro_integration_collection_run
+    guarantees:
+      - every collection protocol step must produce one bounded collection result summary
+      - questionnaire and EEG collection results must be present before downstream analysis claims pass
+      - result summaries must bind collection step digests, feature digests, connector refs, and collection-window refs
+      - operator and coding-agent review readiness must be explicit and require no ML expertise
+      - raw source, collection, connector, and result payload storage must remain false
+      - diagnosis, consciousness reproduction, and identity replacement claims must remain false
   build_cross_modal_analysis_plan:
     summary: Emit a digest-only plan for every current source-type pair so questionnaire, EEG, fMRI, organoid, and future biological summaries can be analyzed through bounded recipes.
     input:
@@ -360,7 +386,7 @@ operations:
       - raw source, analysis, connector, and result payload storage must remain false
       - diagnosis, consciousness reproduction, and identity replacement claims must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional cross-modal analysis-plan, and optional cross-modal analysis-run digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, optional collection-protocol, optional collection-run, optional cross-modal analysis-plan, and optional cross-modal analysis-run digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -390,6 +416,8 @@ operations:
             schema_ref: neuro_integration_application_connector_bundle
           collection_protocol:
             schema_ref: neuro_integration_collection_protocol
+          collection_run:
+            schema_ref: neuro_integration_collection_run
           cross_modal_analysis_plan:
             schema_ref: neuro_integration_cross_modal_analysis_plan
           cross_modal_analysis_run:
@@ -413,6 +441,10 @@ operations:
           - source_collection_coverage_bound
           - seed_collection_bound
           - collection_payload_redacted
+          - collection_run_bound
+          - collection_run_digest_bound
+          - collection_results_bound
+          - collection_result_payload_redacted
           - survey_eeg_fusion_receipt_bound
           - upstream_receipt_payload_redacted
           - connector_bundle_digest_bound
@@ -459,6 +491,14 @@ operations:
             type: boolean
           collection_payload_redacted:
             type: boolean
+          collection_run_bound:
+            type: boolean
+          collection_run_digest_bound:
+            type: boolean
+          collection_results_bound:
+            type: boolean
+          collection_result_payload_redacted:
+            type: boolean
           survey_eeg_fusion_receipt_bound:
             type: boolean
           upstream_receipt_payload_redacted:
@@ -495,6 +535,9 @@ operations:
           collection_step_count:
             type: integer
             minimum: 0
+          collection_result_count:
+            type: integer
+            minimum: 0
           analysis_pair_count:
             type: integer
             minimum: 0
@@ -512,6 +555,8 @@ events:
     payload_schema: neuro_integration_application_connector_bundle
   - name: neuro_integration_workbench.collection_protocol.bound
     payload_schema: neuro_integration_collection_protocol
+  - name: neuro_integration_workbench.collection_run.bound
+    payload_schema: neuro_integration_collection_run
   - name: neuro_integration_workbench.cross_modal_analysis_plan.bound
     payload_schema: neuro_integration_cross_modal_analysis_plan
   - name: neuro_integration_workbench.cross_modal_analysis_run.bound

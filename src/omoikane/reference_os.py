@@ -11428,6 +11428,13 @@ json.dump(response, sys.stdout)
                 connector_bundle,
             )
         )
+        collection_run = (
+            self.neuro_integration_workbench.execute_collection_protocol(
+                source_bundle,
+                connector_bundle,
+                collection_protocol,
+            )
+        )
         cross_modal_analysis_plan = (
             self.neuro_integration_workbench.build_cross_modal_analysis_plan(
                 source_bundle,
@@ -11455,6 +11462,7 @@ json.dump(response, sys.stdout)
             cross_modal_analysis_plan,
             cross_modal_analysis_run,
             collection_protocol=collection_protocol,
+            collection_run=collection_run,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11706,6 +11714,48 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.collection_run.bound",
+            payload={
+                "collection_run_ref": collection_run["collection_run_ref"],
+                "collection_run_digest": collection_run[
+                    "collection_run_digest"
+                ],
+                "collection_protocol_digest": collection_run[
+                    "collection_protocol_digest"
+                ],
+                "result_digest_set": collection_run["result_digest_set"],
+                "result_count": collection_run["result_count"],
+                "all_collection_results_bound": collection_run[
+                    "all_collection_results_bound"
+                ],
+                "seed_survey_eeg_collection_result_bound": collection_run[
+                    "seed_survey_eeg_collection_result_bound"
+                ],
+                "expansion_collection_result_bound": collection_run[
+                    "expansion_collection_result_bound"
+                ],
+                "operator_review_ready": collection_run[
+                    "operator_review_ready"
+                ],
+                "coding_agent_review_ready": collection_run[
+                    "coding_agent_review_ready"
+                ],
+                "collection_run_bound": collection_run[
+                    "collection_run_bound"
+                ],
+                "claim_ceiling": collection_run["claim_ceiling"],
+                "raw_result_payload_stored": collection_run[
+                    "raw_result_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-collection-run",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="neuro_integration_workbench.cross_modal_analysis_plan.bound",
             payload={
                 "cross_modal_analysis_plan_ref": cross_modal_analysis_plan[
@@ -11803,6 +11853,7 @@ json.dump(response, sys.stdout)
             "replacement_plan": replacement_plan,
             "connector_bundle": connector_bundle,
             "collection_protocol": collection_protocol,
+            "collection_run": collection_run,
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
             "validation": validation,
@@ -11851,6 +11902,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "collection_protocol",
                     "schema_path": "specs/schemas/neuro_integration_collection_protocol.schema",
                     "contract_role": "neuro-integration-collection-protocol",
+                },
+                {
+                    "payload_path": "collection_run",
+                    "schema_path": "specs/schemas/neuro_integration_collection_run.schema",
+                    "contract_role": "neuro-integration-collection-run",
                 },
                 {
                     "payload_path": "cross_modal_analysis_plan",

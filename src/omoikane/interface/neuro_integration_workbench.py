@@ -17,6 +17,7 @@ NIW_REPLACEMENT_PLAN_PROFILE_ID = "neuro-application-replacement-plan-v1"
 NIW_CONNECTOR_PROFILE_ID = "neuro-application-connector-v1"
 NIW_CONNECTOR_BUNDLE_PROFILE_ID = "neuro-application-connector-bundle-v1"
 NIW_COLLECTION_PROTOCOL_PROFILE_ID = "neuro-collection-protocol-v1"
+NIW_COLLECTION_RUN_PROFILE_ID = "neuro-collection-run-v1"
 NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID = "neuro-cross-modal-analysis-plan-v1"
 NIW_CROSS_MODAL_ANALYSIS_RUN_PROFILE_ID = "neuro-cross-modal-analysis-run-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
@@ -31,6 +32,9 @@ NIW_REPLACEMENT_PLAN_POLICY = "app-digest+source-family-lane-coverage-only"
 NIW_CONNECTOR_BUNDLE_POLICY = "connector-ref+credential-ref+contract-digest-only"
 NIW_COLLECTION_PROTOCOL_POLICY = (
     "source-consent+measurement-connector+collection-window-digest-only"
+)
+NIW_COLLECTION_RUN_POLICY = (
+    "collection-step-digest+bounded-quality-summary+operator-review-only"
 )
 NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY = (
     "source-pair-feature-digest+connector-ref-analysis-plan-only"
@@ -148,6 +152,7 @@ class NeuroIntegrationWorkbench:
             "connector_profile_id": NIW_CONNECTOR_PROFILE_ID,
             "connector_bundle_profile_id": NIW_CONNECTOR_BUNDLE_PROFILE_ID,
             "collection_protocol_profile_id": NIW_COLLECTION_PROTOCOL_PROFILE_ID,
+            "collection_run_profile_id": NIW_COLLECTION_RUN_PROFILE_ID,
             "cross_modal_analysis_plan_profile_id": (
                 NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID
             ),
@@ -169,6 +174,7 @@ class NeuroIntegrationWorkbench:
             "replacement_plan_policy": NIW_REPLACEMENT_PLAN_POLICY,
             "connector_bundle_policy": NIW_CONNECTOR_BUNDLE_POLICY,
             "collection_protocol_policy": NIW_COLLECTION_PROTOCOL_POLICY,
+            "collection_run_policy": NIW_COLLECTION_RUN_POLICY,
             "cross_modal_analysis_plan_policy": (
                 NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY
             ),
@@ -1014,6 +1020,150 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(protocol)
 
+    def execute_collection_protocol(
+        self,
+        source_bundle: Dict[str, Any],
+        connector_bundle: Dict[str, Any],
+        collection_protocol: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self._check_source_bundle(source_bundle)
+        self._check_connector_bundle(connector_bundle)
+        self._check_collection_protocol(collection_protocol)
+        if collection_protocol["source_bundle_digest"] != source_bundle[
+            "source_bundle_digest"
+        ]:
+            raise ValueError("collection_protocol.source_bundle_digest must match source bundle")
+        if collection_protocol["connector_bundle_digest"] != connector_bundle[
+            "connector_bundle_digest"
+        ]:
+            raise ValueError(
+                "collection_protocol.connector_bundle_digest must match connector bundle"
+            )
+        collection_results = [
+            self._build_collection_result(step)
+            for step in collection_protocol["collection_steps"]
+        ]
+        result_digests = [
+            result["collection_result_digest"] for result in collection_results
+        ]
+        result_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_COLLECTION_RUN_PROFILE_ID,
+                    "collection_protocol_digest": collection_protocol[
+                        "collection_protocol_digest"
+                    ],
+                    "result_digests": result_digests,
+                }
+            )
+        )
+        all_collection_results_bound = (
+            len(collection_results) == collection_protocol["collection_step_count"]
+            and all(result["collection_result_bound"] for result in collection_results)
+        )
+        seed_collection_result_bound = all(
+            any(
+                result["source_type"] == source_type
+                and result["collection_result_bound"]
+                for result in collection_results
+            )
+            for source_type in NIW_SEED_SOURCE_TYPES
+        )
+        expansion_collection_result_bound = all(
+            any(
+                result["source_type"] == source_type
+                and result["collection_result_bound"]
+                for result in collection_results
+            )
+            for source_type in source_bundle["expansion_source_types_present"]
+        )
+        summary = {
+            "result_count": len(collection_results),
+            "bounded_result_count": sum(
+                1
+                for result in collection_results
+                if result["collection_result_bound"]
+            ),
+            "average_collection_quality_score": self._round_score(
+                sum(
+                    result["collection_quality_summary"][
+                        "bounded_quality_score"
+                    ]
+                    for result in collection_results
+                )
+                / max(len(collection_results), 1)
+            ),
+            "max_collection_risk_proxy": self._round_score(
+                max(
+                    (
+                        result["collection_quality_summary"][
+                            "collection_risk_proxy"
+                        ]
+                        for result in collection_results
+                    ),
+                    default=0.0,
+                )
+            ),
+        }
+        run = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "collection_run_ref": (
+                f"collection-run://neuro-integration/{new_id('niw-collection-run')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_COLLECTION_RUN_PROFILE_ID,
+            "identity_id": source_bundle["identity_id"],
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "connector_bundle_ref": connector_bundle["connector_bundle_ref"],
+            "connector_bundle_digest": connector_bundle["connector_bundle_digest"],
+            "collection_protocol_ref": collection_protocol[
+                "collection_protocol_ref"
+            ],
+            "collection_protocol_digest": collection_protocol[
+                "collection_protocol_digest"
+            ],
+            "collection_step_count": collection_protocol["collection_step_count"],
+            "result_count": len(collection_results),
+            "collection_results": collection_results,
+            "result_digests": result_digests,
+            "result_digest_set": result_digest_set,
+            "all_collection_results_bound": all_collection_results_bound,
+            "seed_survey_eeg_collection_result_bound": (
+                seed_collection_result_bound
+            ),
+            "expansion_collection_result_bound": (
+                expansion_collection_result_bound
+            ),
+            "operator_review_ready": collection_protocol["non_ml_operator_ready"]
+            and all_collection_results_bound,
+            "coding_agent_review_ready": collection_protocol["coding_agent_ready"]
+            and all_collection_results_bound,
+            "collection_summary": summary,
+            "collection_run_bound": (
+                collection_protocol["collection_protocol_bound"]
+                and connector_bundle["connector_bundle_bound"]
+                and all_collection_results_bound
+                and seed_collection_result_bound
+                and expansion_collection_result_bound
+            ),
+            "storage_policy": NIW_COLLECTION_RUN_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_source_payload_stored": False,
+            "raw_collection_payload_stored": False,
+            "raw_connector_payload_stored": False,
+            "raw_result_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        run["collection_run_digest"] = sha256_text(
+            canonical_json(self._collection_run_digest_payload(run))
+        )
+        return deepcopy(run)
+
     def execute_cross_modal_analysis_plan(
         self,
         source_bundle: Dict[str, Any],
@@ -1154,6 +1304,7 @@ class NeuroIntegrationWorkbench:
         cross_modal_analysis_plan: Dict[str, Any] | None = None,
         cross_modal_analysis_run: Dict[str, Any] | None = None,
         collection_protocol: Dict[str, Any] | None = None,
+        collection_run: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -1211,6 +1362,13 @@ class NeuroIntegrationWorkbench:
                 errors.append(str(exc))
             if connector_bundle is None:
                 errors.append("collection_protocol requires connector_bundle")
+        if collection_run is not None:
+            try:
+                self._check_collection_run(collection_run)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if collection_protocol is None:
+                errors.append("collection_run requires collection_protocol")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -1394,6 +1552,46 @@ class NeuroIntegrationWorkbench:
                     self._collection_protocol_payload_redacted(collection_protocol)
                 ),
             }
+        collection_run_checks: Dict[str, bool] = {}
+        if collection_run is not None:
+            collection_run_digest_bound = (
+                collection_run.get("collection_run_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._collection_run_digest_payload(collection_run)
+                    )
+                )
+            )
+            expected_collection_protocol_digest = (
+                collection_protocol.get("collection_protocol_digest")
+                if collection_protocol is not None
+                else ""
+            )
+            expected_connector_digest = (
+                connector_bundle.get("connector_bundle_digest")
+                if connector_bundle is not None
+                else ""
+            )
+            collection_run_checks = {
+                "collection_run_digest_bound": collection_run_digest_bound,
+                "collection_run_bound": (
+                    collection_run.get("collection_run_bound") is True
+                    and collection_run.get("source_bundle_digest")
+                    == source_bundle.get("source_bundle_digest")
+                    and collection_run.get("collection_protocol_digest")
+                    == expected_collection_protocol_digest
+                    and collection_run.get("connector_bundle_digest")
+                    == expected_connector_digest
+                ),
+                "collection_results_bound": (
+                    collection_run.get("all_collection_results_bound") is True
+                    and collection_run.get("result_count")
+                    == collection_run.get("collection_step_count")
+                ),
+                "collection_result_payload_redacted": (
+                    self._collection_run_payload_redacted(collection_run)
+                ),
+            }
         cross_modal_plan_checks: Dict[str, bool] = {}
         if cross_modal_analysis_plan is not None:
             cross_modal_analysis_plan_digest_bound = (
@@ -1523,6 +1721,7 @@ class NeuroIntegrationWorkbench:
             **replacement_plan_checks,
             **connector_bundle_checks,
             **collection_protocol_checks,
+            **collection_run_checks,
             **cross_modal_plan_checks,
             **cross_modal_run_checks,
         }
@@ -1554,6 +1753,11 @@ class NeuroIntegrationWorkbench:
             "collection_step_count": (
                 collection_protocol.get("collection_step_count", 0)
                 if collection_protocol is not None
+                else 0
+            ),
+            "collection_result_count": (
+                collection_run.get("result_count", 0)
+                if collection_run is not None
                 else 0
             ),
             "analysis_pair_count": (
@@ -2215,6 +2419,99 @@ class NeuroIntegrationWorkbench:
         )
         return step
 
+    def _build_collection_result(self, step: Dict[str, Any]) -> Dict[str, Any]:
+        quality_summary = self._collection_quality_summary(step)
+        result = {
+            "collection_result_ref": (
+                "collection-result://neuro-integration/"
+                f"{new_id('niw-collection-result')}"
+            ),
+            "collection_step_ref": step["collection_step_ref"],
+            "collection_step_digest": step["collection_step_digest"],
+            "source_type": step["source_type"],
+            "source_family": step["source_family"],
+            "source_ref": step["source_ref"],
+            "feature_summary_ref": step["feature_summary_ref"],
+            "feature_digest": step["feature_digest"],
+            "collection_window_ref": step["collection_window_ref"],
+            "collection_method_id": step["collection_method_id"],
+            "measurement_connector_refs": list(
+                step["measurement_connector_refs"]
+            ),
+            "measurement_connector_digests": list(
+                step["measurement_connector_digests"]
+            ),
+            "collection_status": self._collection_result_status(
+                step["source_type"]
+            ),
+            "collection_quality_summary": quality_summary,
+            "operator_summary": self._collection_result_operator_summary(
+                step["source_type"],
+                quality_summary["bounded_quality_score"],
+                quality_summary["collection_risk_proxy"],
+            ),
+            "agent_next_action": self._collection_result_next_action(
+                step["source_type"]
+            ),
+            "evidence_refs": [
+                step["collection_step_ref"],
+                step["source_ref"],
+                step["feature_summary_ref"],
+                *step["measurement_connector_refs"],
+            ],
+            "requires_ml_expertise": False,
+            "collection_result_bound": (
+                step["collection_step_bound"]
+                and quality_summary["bounded_quality_score"] >= 0.0
+            ),
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_source_payload_stored": False,
+            "raw_collection_payload_stored": False,
+            "raw_connector_payload_stored": False,
+            "raw_result_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        result["collection_result_digest"] = sha256_text(
+            canonical_json(self._collection_result_digest_payload(result))
+        )
+        return result
+
+    def _collection_quality_summary(self, step: Dict[str, Any]) -> Dict[str, float]:
+        axis_summary = step["collection_axis_summary"]
+        feature_count = (
+            axis_summary["numeric_feature_count"]
+            + axis_summary["string_feature_count"]
+        )
+        completeness_score = self._round_score(min(1.0, feature_count / 4.0))
+        construct_score = self._round_score(
+            min(1.0, axis_summary["construct_axis_count"] / 4.0)
+        )
+        connector_score = 1.0 if step["measurement_connector_bound"] else 0.0
+        consent_score = (
+            1.0
+            if step["consent_ref"] and axis_summary["raw_payload_stored"] is False
+            else 0.0
+        )
+        quality_score = self._round_score(
+            (
+                completeness_score
+                + construct_score
+                + connector_score
+                + consent_score
+            )
+            / 4.0
+        )
+        return {
+            "feature_completeness_score": completeness_score,
+            "construct_coverage_score": construct_score,
+            "connector_binding_score": connector_score,
+            "consent_binding_score": consent_score,
+            "bounded_quality_score": quality_score,
+            "collection_risk_proxy": self._round_score(1.0 - quality_score),
+        }
+
     def _collection_method_id(self, source_type: str) -> str:
         return {
             "questionnaire": "self-report-questionnaire-feature-window",
@@ -2244,6 +2541,43 @@ class NeuroIntegrationWorkbench:
             "fmri_bold": "verify_fmri_summary_motion_qc_and_digest",
             "brain_organoid": "verify_organoid_context_boundary_and_digest",
         }.get(source_type, "verify_generic_biodata_summary_digest")
+
+    def _collection_result_status(self, source_type: str) -> str:
+        return {
+            "questionnaire": "seed-questionnaire-collection-bound",
+            "eeg": "seed-eeg-collection-bound",
+            "fmri_bold": "neuroimaging-collection-context-bound",
+            "brain_organoid": "in-vitro-collection-context-bound",
+        }.get(source_type, "generic-biodata-collection-bound")
+
+    def _collection_result_operator_summary(
+        self,
+        source_type: str,
+        quality_score: float,
+        risk_proxy: float,
+    ) -> str:
+        if source_type == "questionnaire":
+            label = "Questionnaire collection"
+        elif source_type == "eeg":
+            label = "EEG feature-window collection"
+        elif source_type == "fmri_bold":
+            label = "fMRI BOLD summary collection"
+        elif source_type == "brain_organoid":
+            label = "Organoid context collection"
+        else:
+            label = "Biological feature-summary collection"
+        return (
+            f"{label} is bounded with quality {quality_score:.3f}; "
+            f"review risk proxy {risk_proxy:.3f} before analysis."
+        )
+
+    def _collection_result_next_action(self, source_type: str) -> str:
+        return {
+            "questionnaire": "review_questionnaire_collection_quality",
+            "eeg": "review_eeg_collection_artifact_context",
+            "fmri_bold": "review_fmri_collection_motion_context",
+            "brain_organoid": "review_organoid_collection_boundary",
+        }.get(source_type, "review_generic_biodata_collection_quality")
 
     def _axis_mean(self, axes: Dict[str, Any]) -> float:
         values = [float(value) for value in axes.values() if isinstance(value, (int, float))]
@@ -2664,6 +2998,75 @@ class NeuroIntegrationWorkbench:
             if protocol.get(field_name) is not False:
                 raise ValueError(f"collection_protocol.{field_name} must be false")
 
+    def _check_collection_run(self, run: Dict[str, Any]) -> None:
+        if not isinstance(run, dict):
+            raise ValueError("collection_run must be a mapping")
+        if run.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("collection_run.schema_version mismatch")
+        if run.get("profile_id") != NIW_COLLECTION_RUN_PROFILE_ID:
+            raise ValueError("collection_run.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._collection_run_digest_payload(run))
+        )
+        if run.get("collection_run_digest") != expected_digest:
+            raise ValueError("collection_run.collection_run_digest mismatch")
+        if run.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("collection_run.claim_ceiling mismatch")
+        if run.get("storage_policy") != NIW_COLLECTION_RUN_POLICY:
+            raise ValueError("collection_run.storage_policy mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if run.get(field_name) is not False:
+                raise ValueError(f"collection_run.{field_name} must be false")
+        results = run.get("collection_results")
+        if not isinstance(results, list) or not results:
+            raise ValueError(
+                "collection_run.collection_results must be a non-empty list"
+            )
+        if any(not isinstance(result, dict) for result in results):
+            raise ValueError(
+                "collection_run.collection_results must contain mappings"
+            )
+        if run.get("result_count") != len(results):
+            raise ValueError("collection_run.result_count must match results")
+        result_digests = []
+        for result in results:
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+            ):
+                if result.get(field_name) is not False:
+                    raise ValueError(
+                        f"collection_result.{field_name} must be false"
+                    )
+            expected_result_digest = sha256_text(
+                canonical_json(self._collection_result_digest_payload(result))
+            )
+            if result.get("collection_result_digest") != expected_result_digest:
+                raise ValueError(
+                    "collection_result.collection_result_digest mismatch"
+                )
+            result_digests.append(expected_result_digest)
+        if run.get("result_digests") != result_digests:
+            raise ValueError("collection_run.result_digests mismatch")
+        expected_result_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_COLLECTION_RUN_PROFILE_ID,
+                    "collection_protocol_digest": run.get(
+                        "collection_protocol_digest"
+                    ),
+                    "result_digests": result_digests,
+                }
+            )
+        )
+        if run.get("result_digest_set") != expected_result_digest_set:
+            raise ValueError("collection_run.result_digest_set mismatch")
+
     def _check_cross_modal_analysis_plan(self, plan: Dict[str, Any]) -> None:
         if not isinstance(plan, dict):
             raise ValueError("cross_modal_analysis_plan must be a mapping")
@@ -2934,6 +3337,21 @@ class NeuroIntegrationWorkbench:
         )
         return protocol_raw_flags and step_raw_flags
 
+    def _collection_run_payload_redacted(self, run: Dict[str, Any]) -> bool:
+        run_raw_flags = all(
+            run.get(field_name) is False
+            for field_name in run
+            if field_name.startswith("raw_")
+        )
+        result_raw_flags = all(
+            result.get(field_name) is False
+            for result in run.get("collection_results", [])
+            if isinstance(result, dict)
+            for field_name in result
+            if field_name.startswith("raw_")
+        )
+        return run_raw_flags and result_raw_flags
+
     def _cross_modal_analysis_payload_redacted(self, plan: Dict[str, Any]) -> bool:
         plan_raw_flags = all(
             plan.get(field_name) is False
@@ -3086,6 +3504,37 @@ class NeuroIntegrationWorkbench:
             "claim_ceiling": step.get("claim_ceiling"),
         }
 
+    def _collection_result_digest_payload(
+        self,
+        result: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "collection_step_digest": result.get("collection_step_digest"),
+            "source_type": result.get("source_type"),
+            "source_family": result.get("source_family"),
+            "source_ref": result.get("source_ref"),
+            "feature_summary_ref": result.get("feature_summary_ref"),
+            "feature_digest": result.get("feature_digest"),
+            "collection_window_ref": result.get("collection_window_ref"),
+            "collection_method_id": result.get("collection_method_id"),
+            "measurement_connector_refs": result.get(
+                "measurement_connector_refs"
+            ),
+            "measurement_connector_digests": result.get(
+                "measurement_connector_digests"
+            ),
+            "collection_status": result.get("collection_status"),
+            "collection_quality_summary": result.get(
+                "collection_quality_summary"
+            ),
+            "operator_summary": result.get("operator_summary"),
+            "agent_next_action": result.get("agent_next_action"),
+            "evidence_refs": result.get("evidence_refs"),
+            "requires_ml_expertise": result.get("requires_ml_expertise"),
+            "collection_result_bound": result.get("collection_result_bound"),
+            "claim_ceiling": result.get("claim_ceiling"),
+        }
+
     def _source_bundle_digest_payload(self, source_bundle: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "profile_id": source_bundle.get("profile_id"),
@@ -3225,6 +3674,37 @@ class NeuroIntegrationWorkbench:
             ),
             "storage_policy": protocol.get("storage_policy"),
             "claim_ceiling": protocol.get("claim_ceiling"),
+        }
+
+    def _collection_run_digest_payload(
+        self,
+        run: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": run.get("profile_id"),
+            "identity_id": run.get("identity_id"),
+            "source_bundle_digest": run.get("source_bundle_digest"),
+            "connector_bundle_digest": run.get("connector_bundle_digest"),
+            "collection_protocol_digest": run.get(
+                "collection_protocol_digest"
+            ),
+            "collection_step_count": run.get("collection_step_count"),
+            "result_count": run.get("result_count"),
+            "result_digest_set": run.get("result_digest_set"),
+            "all_collection_results_bound": run.get(
+                "all_collection_results_bound"
+            ),
+            "seed_survey_eeg_collection_result_bound": run.get(
+                "seed_survey_eeg_collection_result_bound"
+            ),
+            "expansion_collection_result_bound": run.get(
+                "expansion_collection_result_bound"
+            ),
+            "operator_review_ready": run.get("operator_review_ready"),
+            "coding_agent_review_ready": run.get("coding_agent_review_ready"),
+            "collection_summary": run.get("collection_summary"),
+            "collection_run_bound": run.get("collection_run_bound"),
+            "claim_ceiling": run.get("claim_ceiling"),
         }
 
     def _cross_modal_analysis_plan_digest_payload(

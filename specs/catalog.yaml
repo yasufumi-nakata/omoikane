@@ -2540,6 +2540,16 @@ entries:
     rationale: Required to bind each biological source summary to consent refs, measurement connector refs, and collection-window refs before analysis planning without storing raw collection payloads.
   - priority: P1
     kind: schema
+    file: specs/schemas/neuro_integration_collection_run.schema
+    consumers:
+      - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+      - docs/02-subsystems/interface/neuro-integration-workbench.md
+      - reference-runtime
+      - evals/interface/neuro_integration_workbench.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind bounded per-source collection result summaries to the collection protocol before analysis planning without storing raw source, collection, connector, or result payloads.
+  - priority: P1
+    kind: schema
     file: specs/schemas/neuro_integration_cross_modal_analysis_plan.schema
     consumers:
       - specs/interfaces/interface.neuro_integration_workbench.v0.idl

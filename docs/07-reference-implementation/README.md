@@ -176,14 +176,17 @@ application replacement plan も返す。さらに replacement plan に対して
 credential refs、data contract refs、LLM tool refs を束縛する connector bundle を返し、
 実アプリ置換の接続面を raw connector payload なしで検証する。collection protocol は
 各 source summary を consent refs、measurement connector refs、collection window refs に
-analysis planning 前の digest-only 収集 receipt として束縛する。cross-modal analysis plan は
+analysis planning 前の digest-only 収集 receipt として束縛する。collection run は各 collection
+step から bounded quality / risk summary と operator / coding-agent review readiness を
+digest-only で返す。cross-modal analysis plan は
 現在の source type 全ペアに bounded recipe と connector support を割り当て、
 questionnaire + EEG seed から fMRI / brain organoid context へ分析計画を広げる。analysis run は
 全 pair の bounded result summary、operator review readiness、coding-agent review readiness を
 digest-only で返す。
 非 ML 専門家向け plain-language cards と coding agent 向け task template を同じ operator guide に入れる。claim ceiling は
 `feature-alignment-and-analysis-plan-only` で、raw questionnaire / EEG /
-neuroimaging / organoid / analysis / connector / collection / plan / result payload、clinical diagnosis、
+neuroimaging / organoid / analysis / connector / collection / collection-result /
+plan / result payload、clinical diagnosis、
 consciousness reproduction、identity replacement は保持または主張しない。
 
 `observation-integration-demo` は L6 Observation Integration Workbench の reference contract
