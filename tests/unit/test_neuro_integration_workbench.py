@@ -238,6 +238,11 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
                 },
             ],
         )
+        collection_protocol = workbench.build_collection_protocol(
+            source_bundle,
+            replacement_plan,
+            connector_bundle,
+        )
         cross_modal_analysis_plan = workbench.build_cross_modal_analysis_plan(
             source_bundle,
             analysis,
@@ -259,6 +264,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "guide": guide,
             "replacement_plan": replacement_plan,
             "connector_bundle": connector_bundle,
+            "collection_protocol": collection_protocol,
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
         }
@@ -275,6 +281,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["connector_bundle"],
             artifacts["cross_modal_analysis_plan"],
             artifacts["cross_modal_analysis_run"],
+            collection_protocol=artifacts["collection_protocol"],
         )
 
         self.assertTrue(validation["ok"])
@@ -291,6 +298,11 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["connector_bundle_digest_bound"])
         self.assertTrue(validation["connector_source_type_coverage_bound"])
         self.assertTrue(validation["connector_payload_redacted"])
+        self.assertTrue(validation["collection_protocol_bound"])
+        self.assertTrue(validation["collection_protocol_digest_bound"])
+        self.assertTrue(validation["source_collection_coverage_bound"])
+        self.assertTrue(validation["seed_collection_bound"])
+        self.assertTrue(validation["collection_payload_redacted"])
         self.assertTrue(validation["cross_modal_analysis_plan_bound"])
         self.assertTrue(validation["cross_modal_analysis_plan_digest_bound"])
         self.assertTrue(validation["cross_modal_source_pair_coverage_bound"])
@@ -317,6 +329,9 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(artifacts["replacement_plan"]["replacement_plan_bound"])
         self.assertTrue(artifacts["connector_bundle"]["connector_bundle_bound"])
         self.assertEqual(5, artifacts["connector_bundle"]["connector_count"])
+        self.assertTrue(artifacts["collection_protocol"]["collection_protocol_bound"])
+        self.assertEqual(4, artifacts["collection_protocol"]["collection_step_count"])
+        self.assertEqual(4, validation["collection_step_count"])
         self.assertTrue(
             artifacts["cross_modal_analysis_plan"][
                 "cross_modal_analysis_plan_bound"
@@ -362,6 +377,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["connector_bundle"],
             artifacts["cross_modal_analysis_plan"],
             artifacts["cross_modal_analysis_run"],
+            collection_protocol=artifacts["collection_protocol"],
         )
 
         self.assertFalse(validation["ok"])
@@ -430,6 +446,28 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "cross_modal_analysis_run.result_digests mismatch",
+            validation["errors"],
+        )
+
+    def test_tampered_collection_step_digest_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_protocol = deepcopy(artifacts["collection_protocol"])
+        tampered_protocol["collection_step_digests"][0] = "0" * 64
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            collection_protocol=tampered_protocol,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "collection_protocol.collection_step_digests mismatch",
             validation["errors"],
         )
 

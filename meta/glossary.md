@@ -54,6 +54,7 @@
 | **BioData Fusion Binding** | Survey EEG Fusion receipt の digest / fused window digest を NIW source bundle と analysis receipt に再束縛する compact binding |
 | **Application Replacement Plan** | NIW の source type ごとの measurement / analysis / curation / operator / agent lane coverage を app digest で束縛する receipt |
 | **Application Connector Bundle** | NIW の replacement plan に external connector ref、credential ref、data contract ref、LLM tool ref を digest-only で束縛する receipt |
+| **Collection Protocol** | NIW の各 biological source summary を consent ref、measurement connector ref、collection window ref に digest-only で束縛する receipt |
 | **Observation Integration Workbench** | 人類が取得・計測してきた source を taxonomy / source bundle / graph / analysis plan / operator guide に raw payload なしで束縛する L6 workbench |
 | **Observation Method Catalog** | 過去に行われた測定方法と解析方法を method family / method id / digest に縮約し、完全網羅や raw algorithm 保存を避ける OIW catalog |
 | **Observation Analysis Run** | OIW の ingest / normalize / align / model / audit / publish-digest lane result summary と review readiness を束縛する digest-only receipt |

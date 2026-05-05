@@ -35,6 +35,12 @@ expected:
   connector_source_type_coverage_bound: true
   connector_payload_redacted: true
   connector_count: 5
+  collection_protocol_bound: true
+  collection_protocol_digest_bound: true
+  source_collection_coverage_bound: true
+  seed_collection_bound: true
+  collection_payload_redacted: true
+  collection_step_count: 4
   cross_modal_analysis_plan_bound: true
   cross_modal_analysis_plan_digest_bound: true
   cross_modal_source_pair_coverage_bound: true

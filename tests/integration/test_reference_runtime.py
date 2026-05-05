@@ -318,6 +318,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["connector_source_type_coverage_bound"])
         self.assertTrue(result["validation"]["connector_payload_redacted"])
         self.assertEqual(5, result["validation"]["connector_count"])
+        self.assertTrue(result["validation"]["collection_protocol_bound"])
+        self.assertTrue(result["validation"]["collection_protocol_digest_bound"])
+        self.assertTrue(result["validation"]["source_collection_coverage_bound"])
+        self.assertTrue(result["validation"]["seed_collection_bound"])
+        self.assertTrue(result["validation"]["collection_payload_redacted"])
+        self.assertEqual(4, result["validation"]["collection_step_count"])
         self.assertTrue(result["validation"]["cross_modal_analysis_plan_bound"])
         self.assertTrue(result["validation"]["cross_modal_analysis_plan_digest_bound"])
         self.assertTrue(result["validation"]["cross_modal_source_pair_coverage_bound"])
@@ -346,6 +352,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["analysis"]["upstream_fusion_binding"]["bound"])
         self.assertTrue(result["replacement_plan"]["replacement_plan_bound"])
         self.assertTrue(result["connector_bundle"]["connector_bundle_bound"])
+        self.assertTrue(result["collection_protocol"]["collection_protocol_bound"])
         self.assertTrue(
             result["cross_modal_analysis_plan"]["cross_modal_analysis_plan_bound"]
         )
@@ -372,6 +379,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-neuro-integration-workbench-guide"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-neuro-integration-workbench-collection-protocol"
             ],
         )
         self.assertEqual(

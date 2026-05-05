@@ -24,6 +24,8 @@
 - source type ごとに 5 置換 lane の app digest coverage を application replacement plan に束縛する
 - replacement plan に external connector refs / credential refs / data contract refs /
   LLM tool refs を束縛し、実アプリ置換の接続面を raw payload なしで検証する
+- 各 biological source summary を consent refs、measurement connector refs、collection window
+  refs に束縛する collection protocol を analysis plan より前に固定する
 - 現在の source type 全ペアに bounded analysis recipe と connector support を割り当てる
   cross-modal analysis plan を束縛する
 - cross-modal analysis plan の全 pair から bounded result summary を生成し、operator /
@@ -32,8 +34,9 @@
 - fMRI と脳オルガノイドは expansion context であり、意識再現や本人同一性の証明にはしない
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
   で BDT Survey EEG Fusion receipt binding、expansion modality binding、replacement lane coverage、
-  source-type lane coverage、connector bundle binding、cross-modal analysis pair coverage、
-  bounded result summary binding、raw payload redaction、claim ceiling をまとめて検証する
+  source-type lane coverage、connector bundle binding、collection protocol binding、
+  cross-modal analysis pair coverage、bounded result summary binding、raw payload redaction、
+  claim ceiling をまとめて検証する
 
 ### Observation Integration Workbench (OIW)
 - 人類が取得・計測してきた source を、human biodata、neuroscience、clinical health、

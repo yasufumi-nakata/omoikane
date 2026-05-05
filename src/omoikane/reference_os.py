@@ -11421,6 +11421,13 @@ json.dump(response, sys.stdout)
                 ],
             )
         )
+        collection_protocol = (
+            self.neuro_integration_workbench.build_collection_protocol(
+                source_bundle,
+                replacement_plan,
+                connector_bundle,
+            )
+        )
         cross_modal_analysis_plan = (
             self.neuro_integration_workbench.build_cross_modal_analysis_plan(
                 source_bundle,
@@ -11447,6 +11454,7 @@ json.dump(response, sys.stdout)
             connector_bundle,
             cross_modal_analysis_plan,
             cross_modal_analysis_run,
+            collection_protocol=collection_protocol,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11650,6 +11658,54 @@ json.dump(response, sys.stdout)
         )
         self.ledger.append(
             identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.collection_protocol.bound",
+            payload={
+                "collection_protocol_ref": collection_protocol[
+                    "collection_protocol_ref"
+                ],
+                "collection_protocol_digest": collection_protocol[
+                    "collection_protocol_digest"
+                ],
+                "source_bundle_digest": collection_protocol[
+                    "source_bundle_digest"
+                ],
+                "connector_bundle_digest": collection_protocol[
+                    "connector_bundle_digest"
+                ],
+                "collection_step_digest_set": collection_protocol[
+                    "collection_step_digest_set"
+                ],
+                "collection_step_count": collection_protocol[
+                    "collection_step_count"
+                ],
+                "all_sources_collection_bound": collection_protocol[
+                    "all_sources_collection_bound"
+                ],
+                "seed_survey_eeg_collection_bound": collection_protocol[
+                    "seed_survey_eeg_collection_bound"
+                ],
+                "expansion_collection_bound": collection_protocol[
+                    "expansion_collection_bound"
+                ],
+                "measurement_connector_coverage_bound": collection_protocol[
+                    "measurement_connector_coverage_bound"
+                ],
+                "collection_protocol_bound": collection_protocol[
+                    "collection_protocol_bound"
+                ],
+                "claim_ceiling": collection_protocol["claim_ceiling"],
+                "raw_collection_payload_stored": collection_protocol[
+                    "raw_collection_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-collection-protocol",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
+        self.ledger.append(
+            identity_id=identity.identity_id,
             event_type="neuro_integration_workbench.cross_modal_analysis_plan.bound",
             payload={
                 "cross_modal_analysis_plan_ref": cross_modal_analysis_plan[
@@ -11746,6 +11802,7 @@ json.dump(response, sys.stdout)
             "operator_guide": operator_guide,
             "replacement_plan": replacement_plan,
             "connector_bundle": connector_bundle,
+            "collection_protocol": collection_protocol,
             "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "cross_modal_analysis_run": cross_modal_analysis_run,
             "validation": validation,
@@ -11789,6 +11846,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "connector_bundle",
                     "schema_path": "specs/schemas/neuro_integration_application_connector_bundle.schema",
                     "contract_role": "neuro-integration-application-connector-bundle",
+                },
+                {
+                    "payload_path": "collection_protocol",
+                    "schema_path": "specs/schemas/neuro_integration_collection_protocol.schema",
+                    "contract_role": "neuro-integration-collection-protocol",
                 },
                 {
                     "payload_path": "cross_modal_analysis_plan",
