@@ -247,6 +247,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/neuro_integration_application_replacement_plan.schema",
             result["replacement_plan"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_application_connector_bundle.schema",
+            result["connector_bundle"],
+        )
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["app_registry_digest_bound"])
         self.assertTrue(result["validation"]["source_bundle_digest_bound"])
@@ -262,6 +266,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["application_replacement_plan_bound"])
         self.assertTrue(result["validation"]["source_type_lane_coverage_bound"])
         self.assertTrue(result["validation"]["replacement_plan_payload_redacted"])
+        self.assertTrue(result["validation"]["application_connector_bundle_bound"])
+        self.assertTrue(result["validation"]["connector_bundle_digest_bound"])
+        self.assertTrue(result["validation"]["connector_source_type_coverage_bound"])
+        self.assertTrue(result["validation"]["connector_payload_redacted"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])

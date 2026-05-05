@@ -30,6 +30,11 @@ expected:
   source_type_lane_coverage_bound: true
   covered_source_type_count: 4
   replacement_plan_payload_redacted: true
+  application_connector_bundle_bound: true
+  connector_bundle_digest_bound: true
+  connector_source_type_coverage_bound: true
+  connector_payload_redacted: true
+  connector_count: 5
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

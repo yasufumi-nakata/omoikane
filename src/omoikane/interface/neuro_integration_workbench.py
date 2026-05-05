@@ -14,6 +14,8 @@ NIW_WORKSPACE_PROFILE_ID = "llm-native-neuroscience-workspace-v1"
 NIW_ANALYSIS_PROFILE_ID = "survey-eeg-neurodata-fusion-analysis-v1"
 NIW_OPERATOR_GUIDE_PROFILE_ID = "llm-native-non-ml-operator-guide-v1"
 NIW_REPLACEMENT_PLAN_PROFILE_ID = "neuro-application-replacement-plan-v1"
+NIW_CONNECTOR_PROFILE_ID = "neuro-application-connector-v1"
+NIW_CONNECTOR_BUNDLE_PROFILE_ID = "neuro-application-connector-bundle-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -23,6 +25,7 @@ NIW_SOURCE_STORAGE_POLICY = "feature-digest+analysis-axis-summary-only"
 NIW_WORKSPACE_STORAGE_POLICY = "app-receipt-digest+source-bundle-digest-only"
 NIW_GUIDE_POLICY = "plain-language-cards+agent-task-templates-v1"
 NIW_REPLACEMENT_PLAN_POLICY = "app-digest+source-family-lane-coverage-only"
+NIW_CONNECTOR_BUNDLE_POLICY = "connector-ref+credential-ref+contract-digest-only"
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
 NIW_REQUIRED_REPLACEMENT_LANES = (
@@ -45,6 +48,22 @@ NIW_APP_KINDS = (
     "visualization",
     "operator-copilot",
     "agent-automation",
+)
+NIW_CONNECTOR_KINDS = (
+    "measurement-ingest",
+    "analysis-runner",
+    "curation-ledger",
+    "operator-console",
+    "agent-runner",
+    "visualization-viewer",
+)
+NIW_CONNECTOR_PROTOCOLS = (
+    "local-file",
+    "https-api",
+    "database-view",
+    "notebook-runner",
+    "llm-tool",
+    "message-queue",
 )
 NIW_SOURCE_TYPE_ALIASES = {
     "survey": "questionnaire",
@@ -108,6 +127,8 @@ class NeuroIntegrationWorkbench:
             "analysis_profile_id": NIW_ANALYSIS_PROFILE_ID,
             "operator_guide_profile_id": NIW_OPERATOR_GUIDE_PROFILE_ID,
             "replacement_plan_profile_id": NIW_REPLACEMENT_PLAN_PROFILE_ID,
+            "connector_profile_id": NIW_CONNECTOR_PROFILE_ID,
+            "connector_bundle_profile_id": NIW_CONNECTOR_BUNDLE_PROFILE_ID,
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
@@ -121,6 +142,7 @@ class NeuroIntegrationWorkbench:
             "workspace_storage_policy": NIW_WORKSPACE_STORAGE_POLICY,
             "operator_guide_policy": NIW_GUIDE_POLICY,
             "replacement_plan_policy": NIW_REPLACEMENT_PLAN_POLICY,
+            "connector_bundle_policy": NIW_CONNECTOR_BUNDLE_POLICY,
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -609,6 +631,109 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(plan)
 
+    def bind_application_connector_bundle(
+        self,
+        app_receipts: Sequence[Dict[str, Any]],
+        replacement_plan: Dict[str, Any],
+        connector_manifests: Sequence[Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        apps = [self._check_app_receipt(app_receipt) for app_receipt in app_receipts]
+        if not apps:
+            raise ValueError("app_receipts must not be empty")
+        self._check_replacement_plan(replacement_plan)
+        if not connector_manifests:
+            raise ValueError("connector_manifests must not be empty")
+
+        app_digests = [app["app_digest"] for app in apps]
+        if replacement_plan.get("app_digests") != app_digests:
+            raise ValueError("replacement_plan.app_digests must match app_receipts")
+        app_by_ref = {app["app_ref"]: app for app in apps}
+        connectors = [
+            self._normalize_connector_manifest(connector_manifest, app_by_ref)
+            for connector_manifest in connector_manifests
+        ]
+        connector_app_refs = {connector["app_ref"] for connector in connectors}
+        all_apps_connected = all(
+            app_ref in connector_app_refs for app_ref in replacement_plan["app_refs"]
+        )
+        source_types = list(replacement_plan["source_types"])
+        lane_coverage = self._build_connector_lane_coverage(
+            connectors,
+            source_types,
+        )
+        source_type_coverage = self._build_connector_source_type_coverage(
+            connectors,
+            source_types,
+        )
+        required_lanes_connected = all(item["bound"] for item in lane_coverage)
+        source_types_connector_bound = all(item["covered"] for item in source_type_coverage)
+        llm_tooling_bound = all(connector["llm_tool_bound"] for connector in connectors)
+        operator_safe_mode_bound = all(
+            connector["operator_safe_mode"] for connector in connectors
+        )
+        connector_digests = [connector["connector_digest"] for connector in connectors]
+        connector_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_CONNECTOR_BUNDLE_PROFILE_ID,
+                    "connector_digests": connector_digests,
+                    "replacement_plan_digest": replacement_plan[
+                        "replacement_plan_digest"
+                    ],
+                }
+            )
+        )
+        bundle = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "connector_bundle_ref": (
+                f"connector-bundle://neuro-integration/{new_id('niw-connector-bundle')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_CONNECTOR_BUNDLE_PROFILE_ID,
+            "replacement_plan_ref": replacement_plan["replacement_plan_ref"],
+            "replacement_plan_digest": replacement_plan["replacement_plan_digest"],
+            "workspace_digest": replacement_plan["workspace_digest"],
+            "source_bundle_digest": replacement_plan["source_bundle_digest"],
+            "operator_guide_digest": replacement_plan["operator_guide_digest"],
+            "app_refs": list(replacement_plan["app_refs"]),
+            "app_digests": app_digests,
+            "source_types": source_types,
+            "required_replacement_lanes": list(NIW_REQUIRED_REPLACEMENT_LANES),
+            "connector_count": len(connectors),
+            "connectors": connectors,
+            "connector_digests": connector_digests,
+            "connector_digest_set": connector_digest_set,
+            "lane_connector_coverage": lane_coverage,
+            "source_type_connector_coverage": source_type_coverage,
+            "all_apps_connected": all_apps_connected,
+            "required_lanes_connected": required_lanes_connected,
+            "source_types_connector_bound": source_types_connector_bound,
+            "llm_tooling_bound": llm_tooling_bound,
+            "operator_safe_mode_bound": operator_safe_mode_bound,
+            "connector_bundle_bound": (
+                all_apps_connected
+                and required_lanes_connected
+                and source_types_connector_bound
+                and llm_tooling_bound
+                and operator_safe_mode_bound
+                and replacement_plan["replacement_plan_bound"]
+            ),
+            "storage_policy": NIW_CONNECTOR_BUNDLE_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_connector_payload_stored": False,
+            "raw_credential_payload_stored": False,
+            "raw_endpoint_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        bundle["connector_bundle_digest"] = sha256_text(
+            canonical_json(self._connector_bundle_digest_payload(bundle))
+        )
+        return deepcopy(bundle)
+
     def validate_integration_bundle(
         self,
         app_receipts: Sequence[Dict[str, Any]],
@@ -617,6 +742,7 @@ class NeuroIntegrationWorkbench:
         analysis: Dict[str, Any],
         operator_guide: Dict[str, Any],
         replacement_plan: Dict[str, Any] | None = None,
+        connector_bundle: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -646,6 +772,13 @@ class NeuroIntegrationWorkbench:
                 self._check_replacement_plan(replacement_plan)
             except ValueError as exc:
                 errors.append(str(exc))
+        if connector_bundle is not None:
+            try:
+                self._check_connector_bundle(connector_bundle)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if replacement_plan is None:
+                errors.append("connector_bundle requires replacement_plan")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -750,6 +883,37 @@ class NeuroIntegrationWorkbench:
                     if field_name.startswith("raw_")
                 ),
             }
+        connector_bundle_checks: Dict[str, bool] = {}
+        if connector_bundle is not None:
+            connector_bundle_digest_bound = (
+                connector_bundle.get("connector_bundle_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._connector_bundle_digest_payload(connector_bundle)
+                    )
+                )
+            )
+            expected_replacement_digest = (
+                replacement_plan.get("replacement_plan_digest")
+                if replacement_plan is not None
+                else ""
+            )
+            connector_bundle_checks = {
+                "connector_bundle_digest_bound": connector_bundle_digest_bound,
+                "application_connector_bundle_bound": (
+                    connector_bundle.get("connector_bundle_bound") is True
+                    and connector_bundle.get("replacement_plan_digest")
+                    == expected_replacement_digest
+                    and connector_bundle.get("app_digests")
+                    == [app["app_digest"] for app in normalized_apps]
+                ),
+                "connector_source_type_coverage_bound": (
+                    connector_bundle.get("source_types_connector_bound") is True
+                ),
+                "connector_payload_redacted": self._connector_payload_redacted(
+                    connector_bundle
+                ),
+            }
 
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
@@ -769,6 +933,7 @@ class NeuroIntegrationWorkbench:
             "raw_payload_redacted": raw_payload_redacted,
             "no_diagnosis_or_identity_claim": no_diagnosis_or_identity_claim,
             **replacement_plan_checks,
+            **connector_bundle_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -788,6 +953,11 @@ class NeuroIntegrationWorkbench:
                     0,
                 )
                 if replacement_plan is not None
+                else 0
+            ),
+            "connector_count": (
+                connector_bundle.get("connector_count", 0)
+                if connector_bundle is not None
                 else 0
             ),
             "claim_ceiling": NIW_CLAIM_CEILING,
@@ -951,6 +1121,173 @@ class NeuroIntegrationWorkbench:
                     "source_family": self._source_family(source_type),
                     "lane_app_refs": lane_refs,
                     "lane_app_digests": lane_digests,
+                    "missing_lanes": missing_lanes,
+                    "covered": not missing_lanes,
+                }
+            )
+        return coverage
+
+    def _normalize_connector_manifest(
+        self,
+        connector_manifest: Dict[str, Any],
+        app_by_ref: Dict[str, Dict[str, Any]],
+    ) -> Dict[str, Any]:
+        if not isinstance(connector_manifest, dict):
+            raise ValueError("connector_manifest must be a mapping")
+        app_ref = str(connector_manifest.get("app_ref", "")).strip()
+        if app_ref not in app_by_ref:
+            raise ValueError("connector_manifest.app_ref must reference an app receipt")
+        app = app_by_ref[app_ref]
+        connector_kind = self._normalize_connector_kind(
+            connector_manifest.get("connector_kind")
+        )
+        protocol = self._normalize_connector_protocol(
+            connector_manifest.get("protocol")
+        )
+        supported_source_types = self._normalize_source_types(
+            connector_manifest.get("supported_source_types", []),
+            "connector_manifest.supported_source_types",
+        )
+        unsupported = [
+            source_type
+            for source_type in supported_source_types
+            if source_type not in app["supported_source_types"]
+        ]
+        if unsupported:
+            raise ValueError(
+                "connector_manifest.supported_source_types must be supported by app: "
+                f"{unsupported}"
+            )
+        for field_name in (
+            "endpoint_ref",
+            "credential_ref",
+            "permission_ref",
+            "data_contract_ref",
+            "llm_tool_ref",
+            "operator_label",
+        ):
+            self._require_non_empty_string(
+                connector_manifest.get(field_name),
+                f"connector_manifest.{field_name}",
+            )
+        dry_run_supported = bool(connector_manifest.get("dry_run_supported", True))
+        credential_scope_digest = sha256_text(
+            canonical_json(
+                {
+                    "credential_ref": connector_manifest["credential_ref"],
+                    "permission_ref": connector_manifest["permission_ref"],
+                    "data_contract_ref": connector_manifest["data_contract_ref"],
+                }
+            )
+        )
+        connector = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "connector_ref": (
+                f"connector://neuro-integration/{new_id('niw-connector')}"
+            ),
+            "connector_profile_id": NIW_CONNECTOR_PROFILE_ID,
+            "app_ref": app["app_ref"],
+            "app_digest": app["app_digest"],
+            "app_kind": app["app_kind"],
+            "replacement_lanes": list(app["replacement_lanes"]),
+            "connector_kind": connector_kind,
+            "protocol": protocol,
+            "endpoint_ref": str(connector_manifest["endpoint_ref"]),
+            "credential_ref": str(connector_manifest["credential_ref"]),
+            "permission_ref": str(connector_manifest["permission_ref"]),
+            "data_contract_ref": str(connector_manifest["data_contract_ref"]),
+            "llm_tool_ref": str(connector_manifest["llm_tool_ref"]),
+            "operator_label": str(connector_manifest["operator_label"]),
+            "supported_source_types": supported_source_types,
+            "supported_source_families": {
+                source_type: self._source_family(source_type)
+                for source_type in supported_source_types
+            },
+            "credential_scope_digest": credential_scope_digest,
+            "dry_run_supported": dry_run_supported,
+            "llm_tool_bound": True,
+            "operator_safe_mode": app["beginner_safe_mode"] or app["llm_native"],
+            "raw_connector_payload_stored": False,
+            "raw_credential_payload_stored": False,
+            "raw_endpoint_payload_stored": False,
+        }
+        connector["connector_digest"] = sha256_text(
+            canonical_json(self._connector_digest_payload(connector))
+        )
+        return connector
+
+    def _build_connector_lane_coverage(
+        self,
+        connectors: Sequence[Dict[str, Any]],
+        source_types: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        coverage: List[Dict[str, Any]] = []
+        for lane in NIW_REQUIRED_REPLACEMENT_LANES:
+            lane_connectors = [
+                connector
+                for connector in connectors
+                if lane in connector["replacement_lanes"]
+            ]
+            supported_source_types = sorted(
+                {
+                    source_type
+                    for connector in lane_connectors
+                    for source_type in connector["supported_source_types"]
+                    if source_type in source_types
+                }
+            )
+            missing_source_types = [
+                source_type
+                for source_type in source_types
+                if source_type not in supported_source_types
+            ]
+            coverage.append(
+                {
+                    "replacement_lane": lane,
+                    "connector_refs": [
+                        connector["connector_ref"] for connector in lane_connectors
+                    ],
+                    "connector_digests": [
+                        connector["connector_digest"] for connector in lane_connectors
+                    ],
+                    "source_types_covered": supported_source_types,
+                    "missing_source_types": missing_source_types,
+                    "bound": bool(lane_connectors) and not missing_source_types,
+                }
+            )
+        return coverage
+
+    def _build_connector_source_type_coverage(
+        self,
+        connectors: Sequence[Dict[str, Any]],
+        source_types: Sequence[str],
+    ) -> List[Dict[str, Any]]:
+        coverage: List[Dict[str, Any]] = []
+        for source_type in source_types:
+            lane_connector_refs: Dict[str, List[str]] = {}
+            lane_connector_digests: Dict[str, List[str]] = {}
+            missing_lanes: List[str] = []
+            for lane in NIW_REQUIRED_REPLACEMENT_LANES:
+                lane_connectors = [
+                    connector
+                    for connector in connectors
+                    if lane in connector["replacement_lanes"]
+                    and source_type in connector["supported_source_types"]
+                ]
+                lane_connector_refs[lane] = [
+                    connector["connector_ref"] for connector in lane_connectors
+                ]
+                lane_connector_digests[lane] = [
+                    connector["connector_digest"] for connector in lane_connectors
+                ]
+                if not lane_connectors:
+                    missing_lanes.append(lane)
+            coverage.append(
+                {
+                    "source_type": source_type,
+                    "source_family": self._source_family(source_type),
+                    "lane_connector_refs": lane_connector_refs,
+                    "lane_connector_digests": lane_connector_digests,
                     "missing_lanes": missing_lanes,
                     "covered": not missing_lanes,
                 }
@@ -1227,6 +1564,53 @@ class NeuroIntegrationWorkbench:
         if plan.get("storage_policy") != NIW_REPLACEMENT_PLAN_POLICY:
             raise ValueError("replacement_plan.storage_policy mismatch")
 
+    def _check_connector_bundle(self, bundle: Dict[str, Any]) -> None:
+        if not isinstance(bundle, dict):
+            raise ValueError("connector_bundle must be a mapping")
+        if bundle.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("connector_bundle.schema_version mismatch")
+        if bundle.get("profile_id") != NIW_CONNECTOR_BUNDLE_PROFILE_ID:
+            raise ValueError("connector_bundle.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._connector_bundle_digest_payload(bundle))
+        )
+        if bundle.get("connector_bundle_digest") != expected_digest:
+            raise ValueError("connector_bundle.connector_bundle_digest mismatch")
+        if bundle.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("connector_bundle.claim_ceiling mismatch")
+        if bundle.get("storage_policy") != NIW_CONNECTOR_BUNDLE_POLICY:
+            raise ValueError("connector_bundle.storage_policy mismatch")
+        connectors = bundle.get("connectors")
+        if not isinstance(connectors, list) or not connectors:
+            raise ValueError("connector_bundle.connectors must be a non-empty list")
+        if any(not isinstance(connector, dict) for connector in connectors):
+            raise ValueError("connector_bundle.connectors must contain mappings")
+        if bundle.get("connector_count") != len(connectors):
+            raise ValueError("connector_bundle.connector_count must match connectors")
+        connector_digests = []
+        for connector in connectors:
+            expected_connector_digest = sha256_text(
+                canonical_json(self._connector_digest_payload(connector))
+            )
+            if connector.get("connector_digest") != expected_connector_digest:
+                raise ValueError("connector.connector_digest mismatch")
+            connector_digests.append(expected_connector_digest)
+        if bundle.get("connector_digests") != connector_digests:
+            raise ValueError("connector_bundle.connector_digests mismatch")
+        expected_connector_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_CONNECTOR_BUNDLE_PROFILE_ID,
+                    "connector_digests": connector_digests,
+                    "replacement_plan_digest": bundle.get(
+                        "replacement_plan_digest"
+                    ),
+                }
+            )
+        )
+        if bundle.get("connector_digest_set") != expected_connector_digest_set:
+            raise ValueError("connector_bundle.connector_digest_set mismatch")
+
     def _normalize_operator_profile(self, operator_profile: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(operator_profile, dict):
             raise ValueError("operator_profile must be a mapping")
@@ -1247,6 +1631,22 @@ class NeuroIntegrationWorkbench:
         normalized = str(app_kind).strip().lower().replace("_", "-")
         if normalized not in NIW_APP_KINDS:
             raise ValueError("app_kind is not supported")
+        return normalized
+
+    def _normalize_connector_kind(self, connector_kind: Any) -> str:
+        self._require_non_empty_string(connector_kind, "connector_kind")
+        normalized = str(connector_kind).strip().lower().replace("_", "-")
+        normalized = normalized.replace(" ", "-")
+        if normalized not in NIW_CONNECTOR_KINDS:
+            raise ValueError("connector_kind is not supported")
+        return normalized
+
+    def _normalize_connector_protocol(self, protocol: Any) -> str:
+        self._require_non_empty_string(protocol, "protocol")
+        normalized = str(protocol).strip().lower().replace("_", "-")
+        normalized = normalized.replace(" ", "-")
+        if normalized not in NIW_CONNECTOR_PROTOCOLS:
+            raise ValueError("connector protocol is not supported")
         return normalized
 
     def _normalize_workflow_roles(self, workflow_roles: Sequence[str]) -> List[str]:
@@ -1313,6 +1713,21 @@ class NeuroIntegrationWorkbench:
             raise ValueError(f"{field_name} must be a sha256 hex digest")
         return digest
 
+    def _connector_payload_redacted(self, connector_bundle: Dict[str, Any]) -> bool:
+        bundle_raw_flags = all(
+            connector_bundle.get(field_name) is False
+            for field_name in connector_bundle
+            if field_name.startswith("raw_")
+        )
+        connector_raw_flags = all(
+            connector.get(field_name) is False
+            for connector in connector_bundle.get("connectors", [])
+            if isinstance(connector, dict)
+            for field_name in connector
+            if field_name.startswith("raw_")
+        )
+        return bundle_raw_flags and connector_raw_flags
+
     def _upstream_receipt_digest_set(
         self,
         upstream_receipt_bindings: Sequence[Dict[str, Any]],
@@ -1352,6 +1767,29 @@ class NeuroIntegrationWorkbench:
             "replacement_lanes": app_receipt.get("replacement_lanes"),
             "operator_skill_floor": app_receipt.get("operator_skill_floor"),
             "llm_native": app_receipt.get("llm_native"),
+        }
+
+    def _connector_digest_payload(self, connector: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "connector_profile_id": connector.get("connector_profile_id"),
+            "app_ref": connector.get("app_ref"),
+            "app_digest": connector.get("app_digest"),
+            "app_kind": connector.get("app_kind"),
+            "replacement_lanes": connector.get("replacement_lanes"),
+            "connector_kind": connector.get("connector_kind"),
+            "protocol": connector.get("protocol"),
+            "endpoint_ref": connector.get("endpoint_ref"),
+            "credential_ref": connector.get("credential_ref"),
+            "permission_ref": connector.get("permission_ref"),
+            "data_contract_ref": connector.get("data_contract_ref"),
+            "llm_tool_ref": connector.get("llm_tool_ref"),
+            "operator_label": connector.get("operator_label"),
+            "supported_source_types": connector.get("supported_source_types"),
+            "supported_source_families": connector.get("supported_source_families"),
+            "credential_scope_digest": connector.get("credential_scope_digest"),
+            "dry_run_supported": connector.get("dry_run_supported"),
+            "llm_tool_bound": connector.get("llm_tool_bound"),
+            "operator_safe_mode": connector.get("operator_safe_mode"),
         }
 
     def _source_bundle_digest_payload(self, source_bundle: Dict[str, Any]) -> Dict[str, Any]:
@@ -1430,4 +1868,30 @@ class NeuroIntegrationWorkbench:
             "coding_agent_ready": plan.get("coding_agent_ready"),
             "operator_handoffs": plan.get("operator_handoffs"),
             "claim_ceiling": plan.get("claim_ceiling"),
+        }
+
+    def _connector_bundle_digest_payload(self, bundle: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "profile_id": bundle.get("profile_id"),
+            "replacement_plan_digest": bundle.get("replacement_plan_digest"),
+            "workspace_digest": bundle.get("workspace_digest"),
+            "source_bundle_digest": bundle.get("source_bundle_digest"),
+            "operator_guide_digest": bundle.get("operator_guide_digest"),
+            "app_digests": bundle.get("app_digests"),
+            "source_types": bundle.get("source_types"),
+            "required_replacement_lanes": bundle.get("required_replacement_lanes"),
+            "connector_digest_set": bundle.get("connector_digest_set"),
+            "lane_connector_coverage": bundle.get("lane_connector_coverage"),
+            "source_type_connector_coverage": bundle.get(
+                "source_type_connector_coverage"
+            ),
+            "all_apps_connected": bundle.get("all_apps_connected"),
+            "required_lanes_connected": bundle.get("required_lanes_connected"),
+            "source_types_connector_bound": bundle.get(
+                "source_types_connector_bound"
+            ),
+            "llm_tooling_bound": bundle.get("llm_tooling_bound"),
+            "operator_safe_mode_bound": bundle.get("operator_safe_mode_bound"),
+            "connector_bundle_bound": bundle.get("connector_bundle_bound"),
+            "claim_ceiling": bundle.get("claim_ceiling"),
         }

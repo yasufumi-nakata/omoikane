@@ -428,6 +428,11 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["application_replacement_plan_bound"])
         self.assertTrue(result["validation"]["source_type_lane_coverage_bound"])
         self.assertTrue(result["validation"]["replacement_plan_payload_redacted"])
+        self.assertTrue(result["validation"]["application_connector_bundle_bound"])
+        self.assertTrue(result["validation"]["connector_bundle_digest_bound"])
+        self.assertTrue(result["validation"]["connector_source_type_coverage_bound"])
+        self.assertTrue(result["validation"]["connector_payload_redacted"])
+        self.assertEqual(5, result["validation"]["connector_count"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])
@@ -439,6 +444,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertIn("brain_organoid", result["source_bundle"]["source_types"])
         self.assertTrue(result["analysis"]["upstream_fusion_binding"]["bound"])
         self.assertTrue(result["replacement_plan"]["replacement_plan_bound"])
+        self.assertTrue(result["connector_bundle"]["connector_bundle_bound"])
 
     def test_energy_budget_demo_emits_ap1_floor_guard(self) -> None:
         stdout = io.StringIO()

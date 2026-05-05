@@ -53,6 +53,7 @@
 | **Survey EEG Fusion** | アンケート score summary digest と EEG feature-window digest を同じ analysis window に束縛する BDT receipt |
 | **BioData Fusion Binding** | Survey EEG Fusion receipt の digest / fused window digest を NIW source bundle と analysis receipt に再束縛する compact binding |
 | **Application Replacement Plan** | NIW の source type ごとの measurement / analysis / curation / operator / agent lane coverage を app digest で束縛する receipt |
+| **Application Connector Bundle** | NIW の replacement plan に external connector ref、credential ref、data contract ref、LLM tool ref を digest-only で束縛する receipt |
 | **BDB** | Biological-Digital Bridge |
 | **IMC** | Inter-Mind Channel |
 | **WMS** | World Model Sync |

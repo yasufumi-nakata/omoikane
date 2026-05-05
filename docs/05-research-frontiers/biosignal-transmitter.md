@@ -48,6 +48,9 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - Neuro Integration Workbench はこの Survey EEG Fusion receipt を upstream digest として
   source bundle / analysis receipt に束縛し、BioData 側の bounded receipt を multi-application
   workspace の seed にできる。
+- 2026-05-05 時点で NIW は application connector bundle を追加し、measurement ingest、
+  analysis runner、curation ledger、operator console、agent runner の connector refs /
+  credential refs / data contract refs / LLM tool refs を replacement plan に digest-only で束縛する。
 
 ## ブロッキング要因
 
@@ -94,6 +97,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
   `feature-alignment-and-analysis-plan-only` のままにする
 - replacement plan receipt は、現在 source bundle に入っている各 source type が 5 lane
   すべてで app digest に覆われることだけを検証し、未知 source の科学的妥当性は別途研究課題として扱う
+- application connector bundle は endpoint / credential / permission / data contract /
+  LLM tool の参照と digest coverage だけを検証し、live connector の権限監査、課金、
+  latency、実データ品質、外部 API 安全性は別途研究課題として扱う
 - Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
   BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない

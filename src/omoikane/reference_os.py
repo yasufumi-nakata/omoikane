@@ -11345,6 +11345,80 @@ json.dump(response, sys.stdout)
                 operator_guide,
             )
         )
+        connector_source_types = source_bundle["source_types"]
+        connector_bundle = (
+            self.neuro_integration_workbench.bind_application_connector_bundle(
+                app_receipts,
+                replacement_plan,
+                connector_manifests=[
+                    {
+                        "app_ref": measurement_app["app_ref"],
+                        "connector_kind": "measurement-ingest",
+                        "protocol": "local-file",
+                        "endpoint_ref": "connector-endpoint://neuro-workbench/measure/import",
+                        "credential_ref": "credential://neuro-workbench/measure/redacted",
+                        "permission_ref": "permission://neuro-workbench/measure/feature-summary-only",
+                        "data_contract_ref": "data-contract://neuro-workbench/measure/source-summary-v1",
+                        "llm_tool_ref": "llm-tool://neuro-workbench/measure/import-source-summary",
+                        "operator_label": "Import source feature summaries",
+                        "supported_source_types": connector_source_types,
+                        "dry_run_supported": True,
+                    },
+                    {
+                        "app_ref": analysis_app["app_ref"],
+                        "connector_kind": "analysis-runner",
+                        "protocol": "notebook-runner",
+                        "endpoint_ref": "connector-endpoint://neuro-workbench/analysis/run",
+                        "credential_ref": "credential://neuro-workbench/analysis/redacted",
+                        "permission_ref": "permission://neuro-workbench/analysis/digest-only",
+                        "data_contract_ref": "data-contract://neuro-workbench/analysis/receipt-v1",
+                        "llm_tool_ref": "llm-tool://neuro-workbench/analysis/run-bounded-plan",
+                        "operator_label": "Run bounded analysis plan",
+                        "supported_source_types": connector_source_types,
+                        "dry_run_supported": True,
+                    },
+                    {
+                        "app_ref": curation_app["app_ref"],
+                        "connector_kind": "curation-ledger",
+                        "protocol": "database-view",
+                        "endpoint_ref": "connector-endpoint://neuro-workbench/curation/ledger",
+                        "credential_ref": "credential://neuro-workbench/curation/redacted",
+                        "permission_ref": "permission://neuro-workbench/curation/append-only-digest",
+                        "data_contract_ref": "data-contract://neuro-workbench/curation/provenance-v1",
+                        "llm_tool_ref": "llm-tool://neuro-workbench/curation/check-provenance",
+                        "operator_label": "Check consent and provenance digests",
+                        "supported_source_types": connector_source_types,
+                        "dry_run_supported": True,
+                    },
+                    {
+                        "app_ref": copilot_app["app_ref"],
+                        "connector_kind": "operator-console",
+                        "protocol": "llm-tool",
+                        "endpoint_ref": "connector-endpoint://neuro-workbench/copilot/plain-status",
+                        "credential_ref": "credential://neuro-workbench/copilot/redacted",
+                        "permission_ref": "permission://neuro-workbench/copilot/plain-language-only",
+                        "data_contract_ref": "data-contract://neuro-workbench/copilot/operator-guide-v1",
+                        "llm_tool_ref": "llm-tool://neuro-workbench/copilot/explain-next-action",
+                        "operator_label": "Explain safe next action",
+                        "supported_source_types": connector_source_types,
+                        "dry_run_supported": True,
+                    },
+                    {
+                        "app_ref": agent_app["app_ref"],
+                        "connector_kind": "agent-runner",
+                        "protocol": "message-queue",
+                        "endpoint_ref": "connector-endpoint://neuro-workbench/agent/task-runner",
+                        "credential_ref": "credential://neuro-workbench/agent/redacted",
+                        "permission_ref": "permission://neuro-workbench/agent/schema-bound-only",
+                        "data_contract_ref": "data-contract://neuro-workbench/agent/task-template-v1",
+                        "llm_tool_ref": "llm-tool://neuro-workbench/agent/execute-schema-task",
+                        "operator_label": "Run coding-agent schema task",
+                        "supported_source_types": connector_source_types,
+                        "dry_run_supported": True,
+                    },
+                ],
+            )
+        )
         validation = self.neuro_integration_workbench.validate_integration_bundle(
             app_receipts,
             source_bundle,
@@ -11352,6 +11426,7 @@ json.dump(response, sys.stdout)
             analysis,
             operator_guide,
             replacement_plan,
+            connector_bundle,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11516,6 +11591,43 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.application_connector_bundle.bound",
+            payload={
+                "connector_bundle_ref": connector_bundle["connector_bundle_ref"],
+                "connector_bundle_digest": connector_bundle[
+                    "connector_bundle_digest"
+                ],
+                "replacement_plan_digest": connector_bundle[
+                    "replacement_plan_digest"
+                ],
+                "connector_digest_set": connector_bundle["connector_digest_set"],
+                "connector_count": connector_bundle["connector_count"],
+                "connector_bundle_bound": connector_bundle[
+                    "connector_bundle_bound"
+                ],
+                "source_types_connector_bound": connector_bundle[
+                    "source_types_connector_bound"
+                ],
+                "llm_tooling_bound": connector_bundle["llm_tooling_bound"],
+                "operator_safe_mode_bound": connector_bundle[
+                    "operator_safe_mode_bound"
+                ],
+                "claim_ceiling": connector_bundle["claim_ceiling"],
+                "raw_connector_payload_stored": connector_bundle[
+                    "raw_connector_payload_stored"
+                ],
+                "raw_credential_payload_stored": connector_bundle[
+                    "raw_credential_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-connectors",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -11530,6 +11642,7 @@ json.dump(response, sys.stdout)
             "analysis": analysis,
             "operator_guide": operator_guide,
             "replacement_plan": replacement_plan,
+            "connector_bundle": connector_bundle,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -11566,6 +11679,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "replacement_plan",
                     "schema_path": "specs/schemas/neuro_integration_application_replacement_plan.schema",
                     "contract_role": "neuro-integration-application-replacement-plan",
+                },
+                {
+                    "payload_path": "connector_bundle",
+                    "schema_path": "specs/schemas/neuro_integration_application_connector_bundle.schema",
+                    "contract_role": "neuro-integration-application-connector-bundle",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

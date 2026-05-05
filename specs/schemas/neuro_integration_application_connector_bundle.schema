@@ -1,0 +1,365 @@
+$schema: "https://json-schema.org/draft/2020-12/schema"
+$id: "https://omoikane.dev/specs/schemas/neuro_integration_application_connector_bundle.schema"
+title: NeuroIntegrationApplicationConnectorBundle
+description: >
+  Digest-only connector bundle that binds external measurement, analysis,
+  curation, operator-copilot, and agent-automation application connectors to a
+  Neuro Integration Workbench replacement plan without storing raw credentials,
+  endpoints, or connector payloads.
+type: object
+additionalProperties: false
+required:
+  - schema_version
+  - connector_bundle_ref
+  - created_at
+  - profile_id
+  - replacement_plan_ref
+  - replacement_plan_digest
+  - workspace_digest
+  - source_bundle_digest
+  - operator_guide_digest
+  - app_refs
+  - app_digests
+  - source_types
+  - required_replacement_lanes
+  - connector_count
+  - connectors
+  - connector_digests
+  - connector_digest_set
+  - lane_connector_coverage
+  - source_type_connector_coverage
+  - all_apps_connected
+  - required_lanes_connected
+  - source_types_connector_bound
+  - llm_tooling_bound
+  - operator_safe_mode_bound
+  - connector_bundle_bound
+  - storage_policy
+  - claim_ceiling
+  - conflict_refs
+  - mind_upload_conflict_sink_url
+  - raw_connector_payload_stored
+  - raw_credential_payload_stored
+  - raw_endpoint_payload_stored
+  - clinical_diagnosis_claimed
+  - consciousness_reproduction_claimed
+  - identity_replacement_claimed
+  - connector_bundle_digest
+properties:
+  schema_version:
+    const: "1.0"
+  connector_bundle_ref:
+    type: string
+    pattern: "^connector-bundle://neuro-integration/niw-connector-bundle-[a-f0-9]{12}$"
+  created_at:
+    type: string
+    format: date-time
+  profile_id:
+    const: neuro-application-connector-bundle-v1
+  replacement_plan_ref:
+    type: string
+    pattern: "^replacement-plan://neuro-integration/niw-replacement-plan-[a-f0-9]{12}$"
+  replacement_plan_digest:
+    $ref: "#/$defs/sha256"
+  workspace_digest:
+    $ref: "#/$defs/sha256"
+  source_bundle_digest:
+    $ref: "#/$defs/sha256"
+  operator_guide_digest:
+    $ref: "#/$defs/sha256"
+  app_refs:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      type: string
+      minLength: 1
+  app_digests:
+    type: array
+    minItems: 1
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/sha256"
+  source_types:
+    type: array
+    minItems: 2
+    uniqueItems: true
+    items:
+      $ref: "#/$defs/source_type"
+  required_replacement_lanes:
+    const:
+      - measurement
+      - analysis
+      - data-curation
+      - operator-copilot
+      - agent-automation
+  connector_count:
+    type: integer
+    minimum: 5
+  connectors:
+    type: array
+    minItems: 5
+    items:
+      $ref: "#/$defs/connector"
+  connector_digests:
+    type: array
+    minItems: 5
+    items:
+      $ref: "#/$defs/sha256"
+  connector_digest_set:
+    $ref: "#/$defs/sha256"
+  lane_connector_coverage:
+    type: array
+    minItems: 5
+    items:
+      $ref: "#/$defs/lane_connector_coverage"
+  source_type_connector_coverage:
+    type: array
+    minItems: 2
+    items:
+      $ref: "#/$defs/source_type_connector_coverage"
+  all_apps_connected:
+    const: true
+  required_lanes_connected:
+    const: true
+  source_types_connector_bound:
+    const: true
+  llm_tooling_bound:
+    const: true
+  operator_safe_mode_bound:
+    const: true
+  connector_bundle_bound:
+    const: true
+  storage_policy:
+    const: connector-ref+credential-ref+contract-digest-only
+  claim_ceiling:
+    const: feature-alignment-and-analysis-plan-only
+  conflict_refs:
+    type: array
+    minItems: 1
+    items:
+      type: object
+  mind_upload_conflict_sink_url:
+    const: https://mind-upload.com/frontiers/neurodata-integration
+  raw_connector_payload_stored:
+    const: false
+  raw_credential_payload_stored:
+    const: false
+  raw_endpoint_payload_stored:
+    const: false
+  clinical_diagnosis_claimed:
+    const: false
+  consciousness_reproduction_claimed:
+    const: false
+  identity_replacement_claimed:
+    const: false
+  connector_bundle_digest:
+    $ref: "#/$defs/sha256"
+$defs:
+  sha256:
+    type: string
+    pattern: "^[a-f0-9]{64}$"
+  source_type:
+    type: string
+    pattern: "^[a-z0-9][a-z0-9_-]{0,63}$"
+  replacement_lane:
+    enum:
+      - measurement
+      - analysis
+      - data-curation
+      - operator-copilot
+      - agent-automation
+  connector_kind:
+    enum:
+      - measurement-ingest
+      - analysis-runner
+      - curation-ledger
+      - operator-console
+      - agent-runner
+      - visualization-viewer
+  connector_protocol:
+    enum:
+      - local-file
+      - https-api
+      - database-view
+      - notebook-runner
+      - llm-tool
+      - message-queue
+  app_kind:
+    enum:
+      - measurement
+      - analysis
+      - data-curation
+      - visualization
+      - operator-copilot
+      - agent-automation
+  connector:
+    type: object
+    additionalProperties: false
+    required:
+      - schema_version
+      - connector_ref
+      - connector_profile_id
+      - app_ref
+      - app_digest
+      - app_kind
+      - replacement_lanes
+      - connector_kind
+      - protocol
+      - endpoint_ref
+      - credential_ref
+      - permission_ref
+      - data_contract_ref
+      - llm_tool_ref
+      - operator_label
+      - supported_source_types
+      - supported_source_families
+      - credential_scope_digest
+      - dry_run_supported
+      - llm_tool_bound
+      - operator_safe_mode
+      - raw_connector_payload_stored
+      - raw_credential_payload_stored
+      - raw_endpoint_payload_stored
+      - connector_digest
+    properties:
+      schema_version:
+        const: "1.0"
+      connector_ref:
+        type: string
+        pattern: "^connector://neuro-integration/niw-connector-[a-f0-9]{12}$"
+      connector_profile_id:
+        const: neuro-application-connector-v1
+      app_ref:
+        type: string
+        minLength: 1
+      app_digest:
+        $ref: "#/$defs/sha256"
+      app_kind:
+        $ref: "#/$defs/app_kind"
+      replacement_lanes:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/replacement_lane"
+      connector_kind:
+        $ref: "#/$defs/connector_kind"
+      protocol:
+        $ref: "#/$defs/connector_protocol"
+      endpoint_ref:
+        type: string
+        minLength: 1
+      credential_ref:
+        type: string
+        minLength: 1
+      permission_ref:
+        type: string
+        minLength: 1
+      data_contract_ref:
+        type: string
+        minLength: 1
+      llm_tool_ref:
+        type: string
+        minLength: 1
+      operator_label:
+        type: string
+        minLength: 1
+      supported_source_types:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/source_type"
+      supported_source_families:
+        type: object
+        minProperties: 1
+        additionalProperties:
+          type: string
+          minLength: 1
+      credential_scope_digest:
+        $ref: "#/$defs/sha256"
+      dry_run_supported:
+        const: true
+      llm_tool_bound:
+        const: true
+      operator_safe_mode:
+        const: true
+      raw_connector_payload_stored:
+        const: false
+      raw_credential_payload_stored:
+        const: false
+      raw_endpoint_payload_stored:
+        const: false
+      connector_digest:
+        $ref: "#/$defs/sha256"
+  lane_connector_coverage:
+    type: object
+    additionalProperties: false
+    required:
+      - replacement_lane
+      - connector_refs
+      - connector_digests
+      - source_types_covered
+      - missing_source_types
+      - bound
+    properties:
+      replacement_lane:
+        $ref: "#/$defs/replacement_lane"
+      connector_refs:
+        type: array
+        minItems: 1
+        items:
+          type: string
+          minLength: 1
+      connector_digests:
+        type: array
+        minItems: 1
+        items:
+          $ref: "#/$defs/sha256"
+      source_types_covered:
+        type: array
+        minItems: 2
+        items:
+          $ref: "#/$defs/source_type"
+      missing_source_types:
+        const: []
+      bound:
+        const: true
+  source_type_connector_coverage:
+    type: object
+    additionalProperties: false
+    required:
+      - source_type
+      - source_family
+      - lane_connector_refs
+      - lane_connector_digests
+      - missing_lanes
+      - covered
+    properties:
+      source_type:
+        $ref: "#/$defs/source_type"
+      source_family:
+        type: string
+        minLength: 1
+      lane_connector_refs:
+        type: object
+        propertyNames:
+          $ref: "#/$defs/replacement_lane"
+        additionalProperties:
+          type: array
+          minItems: 1
+          items:
+            type: string
+            minLength: 1
+      lane_connector_digests:
+        type: object
+        propertyNames:
+          $ref: "#/$defs/replacement_lane"
+        additionalProperties:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/$defs/sha256"
+      missing_lanes:
+        const: []
+      covered:
+        const: true

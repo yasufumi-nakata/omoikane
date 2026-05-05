@@ -171,10 +171,12 @@ seed pair として束縛したうえで、BioData Transmitter の Survey EEG Fu
 expansion lane として同じ source bundle に追加する。measurement / analysis /
 data-curation / operator-copilot / agent-automation の 5 replacement lane を
 workspace digest に束縛し、各 source type が 5 lane すべてで app digest に覆われる
-application replacement plan も返す。非 ML 専門家向け plain-language cards と coding agent 向け
-task template を同じ operator guide に入れる。claim ceiling は
+application replacement plan も返す。さらに replacement plan に対して connector refs、
+credential refs、data contract refs、LLM tool refs を束縛する connector bundle を返し、
+実アプリ置換の接続面を raw connector payload なしで検証する。非 ML 専門家向け
+plain-language cards と coding agent 向け task template を同じ operator guide に入れる。claim ceiling は
 `feature-alignment-and-analysis-plan-only` で、raw questionnaire / EEG /
-neuroimaging / organoid / analysis payload、clinical diagnosis、
+neuroimaging / organoid / analysis / connector payload、clinical diagnosis、
 consciousness reproduction、identity replacement は保持または主張しない。
 
 

@@ -55,6 +55,8 @@
   - plain-language cards と coding-agent task templates を同じ guide digest に束縛し、非 ML 専門家でも安全な workflow を使えるようにする
 - `neuro_integration_application_replacement_plan.schema`
   - source bundle 内の各 source type が measurement / analysis / data-curation / operator-copilot / agent-automation の全 lane で app digest に覆われていることを検証する
+- `neuro_integration_application_connector_bundle.schema`
+  - replacement plan の各 lane に external connector ref、credential ref、data contract ref、LLM tool ref を digest-only で束縛し、raw connector / credential / endpoint payload を保存しないことを検証する
 - `build_artifact.yaml`
 - `build_request.yaml`
 - `builder_live_enactment_session.schema`

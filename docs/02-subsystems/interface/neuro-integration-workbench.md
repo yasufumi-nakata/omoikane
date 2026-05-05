@@ -18,8 +18,10 @@ reference runtime surface」を作ることである。これは mind uploading 
 - measurement / analysis / data-curation / operator-copilot / agent-automation の置換 lane を 1 workspace に束ねる
 - 各 source type が 5 つの置換 lane すべてで app digest に覆われていることを
   application replacement plan receipt に束縛する
+- replacement plan の各 lane に external connector ref、credential ref、data contract ref、
+  LLM tool ref を digest-only で束縛し、実アプリ置換時の接続面を明示する
 - 非 ML 専門家向けの plain-language cards と coding agent 向け task template を同じ guide receipt に入れる
-- raw questionnaire / EEG / neuroimaging / organoid / analysis payload は保存しない
+- raw questionnaire / EEG / neuroimaging / organoid / analysis / connector / credential / endpoint payload は保存しない
 - claim ceiling は `feature-alignment-and-analysis-plan-only` に固定する
 
 ## Reference Runtime v0
@@ -37,7 +39,10 @@ reference runtime surface」を作ることである。これは mind uploading 
 8. plain-language cards と coding-agent task templates を operator guide receipt に束縛する
 9. source type ごとに measurement / analysis / data-curation / operator-copilot /
    agent-automation の coverage を replacement plan receipt に束縛する
-10. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、replacement plan を記録する
+10. replacement plan に対して measurement ingest、analysis runner、curation ledger、
+    operator console、agent runner connector refs を connector bundle に束縛する
+11. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
+    replacement plan、connector bundle を記録する
 
 ## 不変条件
 
@@ -47,8 +52,9 @@ reference runtime surface」を作ることである。これは mind uploading 
 4. **LLM-native** ── coding agent と非 ML 専門家の両方が同じ schema-bound workflow を使える
 5. **replaceable lanes** ── 計測、解析、整備、operator copilot、agent automation の lane coverage を workspace digest に束縛する
 6. **source-type lane coverage** ── 現在束縛された各 source type は 5 つの置換 lane すべてで app digest に覆われる
-7. **digest-only** ── raw source / raw app / raw analysis payload を保存しない
-8. **claim ceiling** ── clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
+7. **connector coverage** ── 実アプリ置換用 connector は endpoint / credential / permission / data contract / LLM tool ref だけを保持し、各 source type を 5 lane すべてで覆う
+8. **digest-only** ── raw source / raw app / raw analysis / raw connector payload を保存しない
+9. **claim ceiling** ── clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
 
 ## 関連
 

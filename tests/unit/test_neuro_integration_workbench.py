@@ -166,6 +166,78 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             workspace,
             guide,
         )
+        connector_source_types = source_bundle["source_types"]
+        connector_bundle = workbench.bind_application_connector_bundle(
+            apps,
+            replacement_plan,
+            [
+                {
+                    "app_ref": apps[0]["app_ref"],
+                    "connector_kind": "measurement-ingest",
+                    "protocol": "local-file",
+                    "endpoint_ref": "connector-endpoint://unit/measure/import",
+                    "credential_ref": "credential://unit/measure/redacted",
+                    "permission_ref": "permission://unit/measure/feature-summary-only",
+                    "data_contract_ref": "data-contract://unit/measure/source-summary-v1",
+                    "llm_tool_ref": "llm-tool://unit/measure/import-source-summary",
+                    "operator_label": "Import source feature summaries",
+                    "supported_source_types": connector_source_types,
+                    "dry_run_supported": True,
+                },
+                {
+                    "app_ref": apps[1]["app_ref"],
+                    "connector_kind": "analysis-runner",
+                    "protocol": "notebook-runner",
+                    "endpoint_ref": "connector-endpoint://unit/analysis/run",
+                    "credential_ref": "credential://unit/analysis/redacted",
+                    "permission_ref": "permission://unit/analysis/digest-only",
+                    "data_contract_ref": "data-contract://unit/analysis/receipt-v1",
+                    "llm_tool_ref": "llm-tool://unit/analysis/run-bounded-plan",
+                    "operator_label": "Run bounded analysis plan",
+                    "supported_source_types": connector_source_types,
+                    "dry_run_supported": True,
+                },
+                {
+                    "app_ref": apps[2]["app_ref"],
+                    "connector_kind": "curation-ledger",
+                    "protocol": "database-view",
+                    "endpoint_ref": "connector-endpoint://unit/curation/ledger",
+                    "credential_ref": "credential://unit/curation/redacted",
+                    "permission_ref": "permission://unit/curation/append-only-digest",
+                    "data_contract_ref": "data-contract://unit/curation/provenance-v1",
+                    "llm_tool_ref": "llm-tool://unit/curation/check-provenance",
+                    "operator_label": "Check provenance digests",
+                    "supported_source_types": connector_source_types,
+                    "dry_run_supported": True,
+                },
+                {
+                    "app_ref": apps[3]["app_ref"],
+                    "connector_kind": "operator-console",
+                    "protocol": "llm-tool",
+                    "endpoint_ref": "connector-endpoint://unit/copilot/plain-status",
+                    "credential_ref": "credential://unit/copilot/redacted",
+                    "permission_ref": "permission://unit/copilot/plain-language-only",
+                    "data_contract_ref": "data-contract://unit/copilot/operator-guide-v1",
+                    "llm_tool_ref": "llm-tool://unit/copilot/explain-next-action",
+                    "operator_label": "Explain safe next action",
+                    "supported_source_types": connector_source_types,
+                    "dry_run_supported": True,
+                },
+                {
+                    "app_ref": apps[4]["app_ref"],
+                    "connector_kind": "agent-runner",
+                    "protocol": "message-queue",
+                    "endpoint_ref": "connector-endpoint://unit/agent/task-runner",
+                    "credential_ref": "credential://unit/agent/redacted",
+                    "permission_ref": "permission://unit/agent/schema-bound-only",
+                    "data_contract_ref": "data-contract://unit/agent/task-template-v1",
+                    "llm_tool_ref": "llm-tool://unit/agent/execute-schema-task",
+                    "operator_label": "Run coding-agent schema task",
+                    "supported_source_types": connector_source_types,
+                    "dry_run_supported": True,
+                },
+            ],
+        )
         return {
             "workbench": workbench,
             "apps": apps,
@@ -174,6 +246,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "analysis": analysis,
             "guide": guide,
             "replacement_plan": replacement_plan,
+            "connector_bundle": connector_bundle,
         }
 
     def test_binds_survey_eeg_seed_and_expansion_modalities(self) -> None:
@@ -185,6 +258,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["analysis"],
             artifacts["guide"],
             artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
         )
 
         self.assertTrue(validation["ok"])
@@ -197,6 +271,10 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["application_replacement_plan_bound"])
         self.assertTrue(validation["source_type_lane_coverage_bound"])
         self.assertTrue(validation["replacement_plan_payload_redacted"])
+        self.assertTrue(validation["application_connector_bundle_bound"])
+        self.assertTrue(validation["connector_bundle_digest_bound"])
+        self.assertTrue(validation["connector_source_type_coverage_bound"])
+        self.assertTrue(validation["connector_payload_redacted"])
         self.assertTrue(validation["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(validation["upstream_receipt_payload_redacted"])
         self.assertTrue(validation["claim_ceiling_bound"])
@@ -213,6 +291,8 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertEqual(1, artifacts["source_bundle"]["upstream_receipt_count"])
         self.assertTrue(artifacts["analysis"]["upstream_fusion_binding"]["bound"])
         self.assertTrue(artifacts["replacement_plan"]["replacement_plan_bound"])
+        self.assertTrue(artifacts["connector_bundle"]["connector_bundle_bound"])
+        self.assertEqual(5, artifacts["connector_bundle"]["connector_count"])
         self.assertEqual(
             4,
             artifacts["replacement_plan"]["coverage_summary"]["covered_source_type_count"],
@@ -237,10 +317,32 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["analysis"],
             artifacts["guide"],
             artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
         )
 
         self.assertFalse(validation["ok"])
         self.assertFalse(validation["workspace_digest_bound"])
+
+    def test_tampered_connector_digest_set_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_connector_bundle = deepcopy(artifacts["connector_bundle"])
+        tampered_connector_bundle["connector_digests"][0] = "0" * 64
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            tampered_connector_bundle,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "connector_bundle.connector_digests mismatch",
+            validation["errors"],
+        )
 
     def test_seed_bundle_requires_questionnaire_and_eeg(self) -> None:
         workbench = NeuroIntegrationWorkbench()

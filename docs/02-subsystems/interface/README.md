@@ -22,11 +22,13 @@
 - 計測アプリ、解析アプリ、データ整備アプリ、operator copilot、coding-agent automation を
   LLM-native workspace の置換 lane として束縛する
 - source type ごとに 5 置換 lane の app digest coverage を application replacement plan に束縛する
+- replacement plan に external connector refs / credential refs / data contract refs /
+  LLM tool refs を束縛し、実アプリ置換の接続面を raw payload なしで検証する
 - 非 ML 専門家向け plain-language guide と coding agent 向け task template を同じ receipt に入れる
 - fMRI と脳オルガノイドは expansion context であり、意識再現や本人同一性の証明にはしない
 - reference runtime v0 では `PYTHONPATH=src python3 -m omoikane.cli neuro-integration-demo --json`
   で BDT Survey EEG Fusion receipt binding、expansion modality binding、replacement lane coverage、
-  source-type lane coverage、raw payload redaction、claim ceiling をまとめて検証する
+  source-type lane coverage、connector bundle binding、raw payload redaction、claim ceiling をまとめて検証する
 
 ### Biological-Digital Bridge (BDB)
 - BCI（脳-コンピュータ・インタフェース）
