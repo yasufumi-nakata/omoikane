@@ -391,3 +391,4 @@ status: decided | superseded
 - [2026-05-05_neuro-integration-biodata-fusion-binding.md](2026-05-05_neuro-integration-biodata-fusion-binding.md)
 - [2026-05-05_neuro-integration-application-replacement-plan.md](2026-05-05_neuro-integration-application-replacement-plan.md)
 - [2026-05-05_biodata-survey-eeg-fusion.md](2026-05-05_biodata-survey-eeg-fusion.md)
+- [2026-05-05_l3-cognitive-public-schema-contract.md](2026-05-05_l3-cognitive-public-schema-contract.md)

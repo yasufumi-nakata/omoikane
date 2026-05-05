@@ -272,6 +272,92 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertFalse(result["validation"]["consciousness_reproduction_claimed"])
         self.assertFalse(result["validation"]["identity_replacement_claimed"])
 
+    def test_l3_cognitive_demos_match_public_schemas(self) -> None:
+        demos = [
+            {
+                "result": self.runtime.run_perception_demo(),
+                "payloads": [
+                    ("specs/schemas/perception_frame.schema", "baseline.perception.frame"),
+                    ("specs/schemas/perception_shift.schema", "baseline.perception.shift"),
+                    ("specs/schemas/perception_frame.schema", "perception.frame"),
+                    ("specs/schemas/perception_shift.schema", "perception.shift"),
+                ],
+            },
+            {
+                "result": self.runtime.run_reasoning_demo(),
+                "payloads": [
+                    ("specs/schemas/reasoning_trace.schema", "baseline.trace"),
+                    ("specs/schemas/reasoning_shift.schema", "baseline.shift"),
+                    ("specs/schemas/reasoning_trace.schema", "reasoning.trace"),
+                    ("specs/schemas/reasoning_shift.schema", "reasoning.shift"),
+                ],
+            },
+            {
+                "result": self.runtime.run_affect_demo(),
+                "payloads": [
+                    ("specs/schemas/affect_state.schema", "baseline.state"),
+                    ("specs/schemas/affect_transition.schema", "baseline.transition"),
+                    ("specs/schemas/affect_state.schema", "affect.state"),
+                    ("specs/schemas/affect_transition.schema", "affect.transition"),
+                ],
+            },
+            {
+                "result": self.runtime.run_attention_demo(),
+                "payloads": [
+                    ("specs/schemas/attention_focus.schema", "baseline.focus.focus"),
+                    ("specs/schemas/attention_shift.schema", "baseline.focus.shift"),
+                    ("specs/schemas/attention_focus.schema", "attention.focus"),
+                    ("specs/schemas/attention_shift.schema", "attention.shift"),
+                ],
+            },
+            {
+                "result": self.runtime.run_volition_demo(),
+                "payloads": [
+                    ("specs/schemas/volition_intent.schema", "baseline.volition.intent"),
+                    ("specs/schemas/volition_shift.schema", "baseline.volition.shift"),
+                    ("specs/schemas/volition_intent.schema", "volition.intent"),
+                    ("specs/schemas/volition_shift.schema", "volition.shift"),
+                ],
+            },
+            {
+                "result": self.runtime.run_imagination_demo(),
+                "payloads": [
+                    ("specs/schemas/imagination_scene.schema", "baseline.imagination.scene"),
+                    ("specs/schemas/imagination_shift.schema", "baseline.imagination.shift"),
+                    ("specs/schemas/imagination_scene.schema", "imagination.scene"),
+                    ("specs/schemas/imagination_shift.schema", "imagination.shift"),
+                ],
+            },
+            {
+                "result": self.runtime.run_language_demo(),
+                "payloads": [
+                    ("specs/schemas/language_render.schema", "baseline.language.render"),
+                    ("specs/schemas/language_shift.schema", "baseline.language.shift"),
+                    ("specs/schemas/language_render.schema", "language.render"),
+                    ("specs/schemas/language_shift.schema", "language.shift"),
+                ],
+            },
+            {
+                "result": self.runtime.run_metacognition_demo(),
+                "payloads": [
+                    ("specs/schemas/metacognition_report.schema", "baseline.report"),
+                    ("specs/schemas/metacognition_shift.schema", "baseline.shift"),
+                    ("specs/schemas/metacognition_report.schema", "metacognition.report"),
+                    ("specs/schemas/metacognition_shift.schema", "metacognition.shift"),
+                ],
+            },
+        ]
+
+        for demo in demos:
+            result = demo["result"]
+            self.assertTrue(result["validation"]["ok"])
+            for schema_path, dotted_path in demo["payloads"]:
+                with self.subTest(schema=schema_path, payload=dotted_path):
+                    self._assert_schema_valid(
+                        schema_path,
+                        self._payload_at(result, dotted_path),
+                    )
+
     def test_wms_demo_states_and_reconcile_match_public_schemas(self) -> None:
         result = self.runtime.run_wms_demo()
 
