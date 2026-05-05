@@ -11421,6 +11421,15 @@ json.dump(response, sys.stdout)
                 ],
             )
         )
+        cross_modal_analysis_plan = (
+            self.neuro_integration_workbench.build_cross_modal_analysis_plan(
+                source_bundle,
+                analysis,
+                operator_guide,
+                replacement_plan,
+                connector_bundle,
+            )
+        )
         validation = self.neuro_integration_workbench.validate_integration_bundle(
             app_receipts,
             source_bundle,
@@ -11429,6 +11438,7 @@ json.dump(response, sys.stdout)
             operator_guide,
             replacement_plan,
             connector_bundle,
+            cross_modal_analysis_plan,
         )
         validation["biodata_survey_eeg_fusion_ok"] = (
             biodata_survey_eeg_validation["ok"]
@@ -11630,6 +11640,46 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="neuro_integration_workbench.cross_modal_analysis_plan.bound",
+            payload={
+                "cross_modal_analysis_plan_ref": cross_modal_analysis_plan[
+                    "cross_modal_analysis_plan_ref"
+                ],
+                "cross_modal_analysis_plan_digest": cross_modal_analysis_plan[
+                    "cross_modal_analysis_plan_digest"
+                ],
+                "source_bundle_digest": cross_modal_analysis_plan[
+                    "source_bundle_digest"
+                ],
+                "analysis_digest": cross_modal_analysis_plan["analysis_digest"],
+                "connector_bundle_digest": cross_modal_analysis_plan[
+                    "connector_bundle_digest"
+                ],
+                "analysis_pair_count": cross_modal_analysis_plan[
+                    "analysis_pair_count"
+                ],
+                "expected_analysis_pair_count": cross_modal_analysis_plan[
+                    "expected_analysis_pair_count"
+                ],
+                "source_pair_coverage_bound": cross_modal_analysis_plan[
+                    "source_pair_coverage_bound"
+                ],
+                "cross_modal_analysis_plan_bound": cross_modal_analysis_plan[
+                    "cross_modal_analysis_plan_bound"
+                ],
+                "claim_ceiling": cross_modal_analysis_plan["claim_ceiling"],
+                "raw_plan_payload_stored": cross_modal_analysis_plan[
+                    "raw_plan_payload_stored"
+                ],
+            },
+            actor="NeuroIntegrationWorkbench",
+            category="interface-neuro-integration-workbench-cross-modal-plan",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -11645,6 +11695,7 @@ json.dump(response, sys.stdout)
             "operator_guide": operator_guide,
             "replacement_plan": replacement_plan,
             "connector_bundle": connector_bundle,
+            "cross_modal_analysis_plan": cross_modal_analysis_plan,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -11686,6 +11737,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "connector_bundle",
                     "schema_path": "specs/schemas/neuro_integration_application_connector_bundle.schema",
                     "contract_role": "neuro-integration-application-connector-bundle",
+                },
+                {
+                    "payload_path": "cross_modal_analysis_plan",
+                    "schema_path": "specs/schemas/neuro_integration_cross_modal_analysis_plan.schema",
+                    "contract_role": "neuro-integration-cross-modal-analysis-plan",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

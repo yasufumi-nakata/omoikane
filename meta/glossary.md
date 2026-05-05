@@ -55,6 +55,7 @@
 | **Application Replacement Plan** | NIW の source type ごとの measurement / analysis / curation / operator / agent lane coverage を app digest で束縛する receipt |
 | **Application Connector Bundle** | NIW の replacement plan に external connector ref、credential ref、data contract ref、LLM tool ref を digest-only で束縛する receipt |
 | **Observation Integration Workbench** | 人類が取得・計測してきた source を taxonomy / source bundle / graph / analysis plan / operator guide に raw payload なしで束縛する L6 workbench |
+| **Cross-Modal Analysis Plan** | NIW の source type 全ペアに bounded analysis recipe と connector support を割り当てる digest-only receipt |
 | **BDB** | Biological-Digital Bridge |
 | **IMC** | Inter-Mind Channel |
 | **WMS** | World Model Sync |

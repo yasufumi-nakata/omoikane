@@ -251,6 +251,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/neuro_integration_application_connector_bundle.schema",
             result["connector_bundle"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/neuro_integration_cross_modal_analysis_plan.schema",
+            result["cross_modal_analysis_plan"],
+        )
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["app_registry_digest_bound"])
         self.assertTrue(result["validation"]["source_bundle_digest_bound"])
@@ -270,6 +274,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["connector_bundle_digest_bound"])
         self.assertTrue(result["validation"]["connector_source_type_coverage_bound"])
         self.assertTrue(result["validation"]["connector_payload_redacted"])
+        self.assertTrue(result["validation"]["cross_modal_analysis_plan_bound"])
+        self.assertTrue(result["validation"]["cross_modal_analysis_plan_digest_bound"])
+        self.assertTrue(result["validation"]["cross_modal_source_pair_coverage_bound"])
+        self.assertTrue(result["validation"]["cross_modal_analysis_payload_redacted"])
         self.assertTrue(result["validation"]["biodata_survey_eeg_fusion_ok"])
         self.assertTrue(result["validation"]["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(result["validation"]["upstream_receipt_payload_redacted"])

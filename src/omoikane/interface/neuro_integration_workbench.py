@@ -16,6 +16,7 @@ NIW_OPERATOR_GUIDE_PROFILE_ID = "llm-native-non-ml-operator-guide-v1"
 NIW_REPLACEMENT_PLAN_PROFILE_ID = "neuro-application-replacement-plan-v1"
 NIW_CONNECTOR_PROFILE_ID = "neuro-application-connector-v1"
 NIW_CONNECTOR_BUNDLE_PROFILE_ID = "neuro-application-connector-bundle-v1"
+NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID = "neuro-cross-modal-analysis-plan-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID = "biodata-survey-eeg-window-fusion-v1"
 NIW_BIODATA_SURVEY_EEG_FUSION_CLAIM_CEILING = "survey-eeg-correlation-input-only"
 NIW_BIODATA_FUSION_BINDING_ROLE = "biodata-survey-eeg-fusion"
@@ -26,6 +27,9 @@ NIW_WORKSPACE_STORAGE_POLICY = "app-receipt-digest+source-bundle-digest-only"
 NIW_GUIDE_POLICY = "plain-language-cards+agent-task-templates-v1"
 NIW_REPLACEMENT_PLAN_POLICY = "app-digest+source-family-lane-coverage-only"
 NIW_CONNECTOR_BUNDLE_POLICY = "connector-ref+credential-ref+contract-digest-only"
+NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY = (
+    "source-pair-feature-digest+connector-ref-analysis-plan-only"
+)
 NIW_SEED_SOURCE_TYPES = ("questionnaire", "eeg")
 NIW_EXPANSION_SOURCE_TYPES = ("fmri_bold", "brain_organoid")
 NIW_REQUIRED_REPLACEMENT_LANES = (
@@ -64,6 +68,12 @@ NIW_CONNECTOR_PROTOCOLS = (
     "notebook-runner",
     "llm-tool",
     "message-queue",
+)
+NIW_ANALYSIS_RECIPE_IDS = (
+    "survey-eeg-feature-alignment",
+    "neural-electrical-hemodynamic-context",
+    "organoid-context-comparison",
+    "feature-summary-cross-modal-screen",
 )
 NIW_SOURCE_TYPE_ALIASES = {
     "survey": "questionnaire",
@@ -129,6 +139,9 @@ class NeuroIntegrationWorkbench:
             "replacement_plan_profile_id": NIW_REPLACEMENT_PLAN_PROFILE_ID,
             "connector_profile_id": NIW_CONNECTOR_PROFILE_ID,
             "connector_bundle_profile_id": NIW_CONNECTOR_BUNDLE_PROFILE_ID,
+            "cross_modal_analysis_plan_profile_id": (
+                NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID
+            ),
             "biodata_survey_eeg_fusion_profile_id": (
                 NIW_BIODATA_SURVEY_EEG_FUSION_PROFILE_ID
             ),
@@ -143,6 +156,9 @@ class NeuroIntegrationWorkbench:
             "operator_guide_policy": NIW_GUIDE_POLICY,
             "replacement_plan_policy": NIW_REPLACEMENT_PLAN_POLICY,
             "connector_bundle_policy": NIW_CONNECTOR_BUNDLE_POLICY,
+            "cross_modal_analysis_plan_policy": (
+                NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY
+            ),
             "conflict_sink_url": NIW_CONFLICT_SINK_URL,
             "raw_questionnaire_payload_stored": False,
             "raw_eeg_payload_stored": False,
@@ -734,6 +750,152 @@ class NeuroIntegrationWorkbench:
         )
         return deepcopy(bundle)
 
+    def build_cross_modal_analysis_plan(
+        self,
+        source_bundle: Dict[str, Any],
+        analysis: Dict[str, Any],
+        operator_guide: Dict[str, Any],
+        replacement_plan: Dict[str, Any],
+        connector_bundle: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self._check_source_bundle(source_bundle)
+        self._check_analysis(analysis)
+        self._check_operator_guide(operator_guide)
+        self._check_replacement_plan(replacement_plan)
+        self._check_connector_bundle(connector_bundle)
+        if analysis["source_bundle_digest"] != source_bundle["source_bundle_digest"]:
+            raise ValueError("analysis.source_bundle_digest must match source bundle")
+        if operator_guide["analysis_digest"] != analysis["analysis_digest"]:
+            raise ValueError("operator_guide.analysis_digest must match analysis")
+        if replacement_plan["source_bundle_digest"] != source_bundle["source_bundle_digest"]:
+            raise ValueError("replacement_plan.source_bundle_digest must match source bundle")
+        if replacement_plan["operator_guide_digest"] != operator_guide["guide_digest"]:
+            raise ValueError("replacement_plan.operator_guide_digest must match guide")
+        if connector_bundle["replacement_plan_digest"] != replacement_plan[
+            "replacement_plan_digest"
+        ]:
+            raise ValueError("connector_bundle.replacement_plan_digest must match plan")
+
+        source_types = list(source_bundle["source_types"])
+        if len(source_types) < 2:
+            raise ValueError("source_bundle must contain at least two source types")
+        sources_by_type = {
+            source["source_type"]: source for source in source_bundle["sources"]
+        }
+        connector_coverage_by_source = {
+            item["source_type"]: item
+            for item in connector_bundle["source_type_connector_coverage"]
+        }
+        analysis_pairs: List[Dict[str, Any]] = []
+        for index, left_source_type in enumerate(source_types):
+            for right_source_type in source_types[index + 1 :]:
+                analysis_pairs.append(
+                    self._build_cross_modal_analysis_pair(
+                        left_source_type,
+                        right_source_type,
+                        sources_by_type,
+                        connector_coverage_by_source,
+                        analysis,
+                    )
+                )
+        pair_digests = [pair["pair_digest"] for pair in analysis_pairs]
+        pair_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID,
+                    "pair_digests": pair_digests,
+                    "connector_bundle_digest": connector_bundle[
+                        "connector_bundle_digest"
+                    ],
+                }
+            )
+        )
+        recipe_catalog = self._build_analysis_recipe_catalog(analysis_pairs)
+        represented_source_types = sorted(
+            {
+                source_type
+                for pair in analysis_pairs
+                for source_type in pair["source_types"]
+            }
+        )
+        expected_pair_count = len(source_types) * (len(source_types) - 1) // 2
+        all_source_types_represented = represented_source_types == sorted(source_types)
+        source_pair_coverage_bound = (
+            len(analysis_pairs) == expected_pair_count
+            and all(pair["all_required_connectors_bound"] for pair in analysis_pairs)
+        )
+        survey_eeg_seed_analysis_bound = any(
+            pair["source_types"] == list(NIW_SEED_SOURCE_TYPES)
+            and pair["analysis_recipe_id"] == "survey-eeg-feature-alignment"
+            for pair in analysis_pairs
+        ) and analysis["seed_survey_eeg_bound"]
+        non_ml_operator_ready = (
+            operator_guide["beginner_operator_supported"]
+            and all(
+                pair["requires_ml_expertise"] is False for pair in analysis_pairs
+            )
+        )
+        plan = {
+            "schema_version": NIW_SCHEMA_VERSION,
+            "cross_modal_analysis_plan_ref": (
+                "cross-modal-analysis-plan://neuro-integration/"
+                f"{new_id('niw-cross-modal-plan')}"
+            ),
+            "created_at": utc_now_iso(),
+            "profile_id": NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID,
+            "identity_id": source_bundle["identity_id"],
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "analysis_ref": analysis["analysis_ref"],
+            "analysis_digest": analysis["analysis_digest"],
+            "operator_guide_ref": operator_guide["guide_ref"],
+            "operator_guide_digest": operator_guide["guide_digest"],
+            "replacement_plan_ref": replacement_plan["replacement_plan_ref"],
+            "replacement_plan_digest": replacement_plan["replacement_plan_digest"],
+            "connector_bundle_ref": connector_bundle["connector_bundle_ref"],
+            "connector_bundle_digest": connector_bundle["connector_bundle_digest"],
+            "source_types": source_types,
+            "source_families": dict(source_bundle["source_families"]),
+            "source_type_count": len(source_types),
+            "analysis_pair_count": len(analysis_pairs),
+            "expected_analysis_pair_count": expected_pair_count,
+            "analysis_pairs": analysis_pairs,
+            "pair_digests": pair_digests,
+            "pair_digest_set": pair_digest_set,
+            "recipe_catalog": recipe_catalog,
+            "all_source_types_represented": all_source_types_represented,
+            "source_pair_coverage_bound": source_pair_coverage_bound,
+            "survey_eeg_seed_analysis_bound": survey_eeg_seed_analysis_bound,
+            "connector_bundle_bound": connector_bundle["connector_bundle_bound"],
+            "non_ml_operator_ready": non_ml_operator_ready,
+            "coding_agent_ready": operator_guide["coding_agent_ready"],
+            "cross_modal_analysis_plan_bound": (
+                all_source_types_represented
+                and source_pair_coverage_bound
+                and survey_eeg_seed_analysis_bound
+                and connector_bundle["connector_bundle_bound"]
+                and replacement_plan["replacement_plan_bound"]
+                and non_ml_operator_ready
+                and operator_guide["coding_agent_ready"]
+            ),
+            "planning_scope": "all-current-source-type-pairs",
+            "storage_policy": NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "conflict_refs": deepcopy(list(NIW_CONFLICT_REFS)),
+            "mind_upload_conflict_sink_url": NIW_CONFLICT_SINK_URL,
+            "raw_source_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "raw_connector_payload_stored": False,
+            "raw_plan_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        plan["cross_modal_analysis_plan_digest"] = sha256_text(
+            canonical_json(self._cross_modal_analysis_plan_digest_payload(plan))
+        )
+        return deepcopy(plan)
+
     def validate_integration_bundle(
         self,
         app_receipts: Sequence[Dict[str, Any]],
@@ -743,6 +905,7 @@ class NeuroIntegrationWorkbench:
         operator_guide: Dict[str, Any],
         replacement_plan: Dict[str, Any] | None = None,
         connector_bundle: Dict[str, Any] | None = None,
+        cross_modal_analysis_plan: Dict[str, Any] | None = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
         normalized_apps: List[Dict[str, Any]] = []
@@ -779,6 +942,13 @@ class NeuroIntegrationWorkbench:
                 errors.append(str(exc))
             if replacement_plan is None:
                 errors.append("connector_bundle requires replacement_plan")
+        if cross_modal_analysis_plan is not None:
+            try:
+                self._check_cross_modal_analysis_plan(cross_modal_analysis_plan)
+            except ValueError as exc:
+                errors.append(str(exc))
+            if connector_bundle is None:
+                errors.append("cross_modal_analysis_plan requires connector_bundle")
 
         app_registry_digest_bound = all(
             app.get("app_digest") == sha256_text(canonical_json(self._app_digest_payload(app)))
@@ -914,6 +1084,65 @@ class NeuroIntegrationWorkbench:
                     connector_bundle
                 ),
             }
+        cross_modal_plan_checks: Dict[str, bool] = {}
+        if cross_modal_analysis_plan is not None:
+            cross_modal_analysis_plan_digest_bound = (
+                cross_modal_analysis_plan.get("cross_modal_analysis_plan_digest")
+                == sha256_text(
+                    canonical_json(
+                        self._cross_modal_analysis_plan_digest_payload(
+                            cross_modal_analysis_plan
+                        )
+                    )
+                )
+            )
+            expected_replacement_digest = (
+                replacement_plan.get("replacement_plan_digest")
+                if replacement_plan is not None
+                else ""
+            )
+            expected_connector_digest = (
+                connector_bundle.get("connector_bundle_digest")
+                if connector_bundle is not None
+                else ""
+            )
+            expected_pair_count = (
+                len(source_bundle.get("source_types", []))
+                * (len(source_bundle.get("source_types", [])) - 1)
+                // 2
+            )
+            cross_modal_plan_checks = {
+                "cross_modal_analysis_plan_digest_bound": (
+                    cross_modal_analysis_plan_digest_bound
+                ),
+                "cross_modal_analysis_plan_bound": (
+                    cross_modal_analysis_plan.get(
+                        "cross_modal_analysis_plan_bound"
+                    )
+                    is True
+                    and cross_modal_analysis_plan.get("source_bundle_digest")
+                    == source_bundle.get("source_bundle_digest")
+                    and cross_modal_analysis_plan.get("analysis_digest")
+                    == analysis.get("analysis_digest")
+                    and cross_modal_analysis_plan.get("operator_guide_digest")
+                    == operator_guide.get("guide_digest")
+                    and cross_modal_analysis_plan.get("replacement_plan_digest")
+                    == expected_replacement_digest
+                    and cross_modal_analysis_plan.get("connector_bundle_digest")
+                    == expected_connector_digest
+                ),
+                "cross_modal_source_pair_coverage_bound": (
+                    cross_modal_analysis_plan.get("source_pair_coverage_bound")
+                    is True
+                    and cross_modal_analysis_plan.get("analysis_pair_count")
+                    == expected_pair_count
+                ),
+                "cross_modal_analysis_payload_redacted": (
+                    self._cross_modal_analysis_payload_redacted(
+                        cross_modal_analysis_plan
+                    )
+                ),
+            }
 
         checks = {
             "app_registry_digest_bound": app_registry_digest_bound,
@@ -934,6 +1163,7 @@ class NeuroIntegrationWorkbench:
             "no_diagnosis_or_identity_claim": no_diagnosis_or_identity_claim,
             **replacement_plan_checks,
             **connector_bundle_checks,
+            **cross_modal_plan_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -958,6 +1188,11 @@ class NeuroIntegrationWorkbench:
             "connector_count": (
                 connector_bundle.get("connector_count", 0)
                 if connector_bundle is not None
+                else 0
+            ),
+            "analysis_pair_count": (
+                cross_modal_analysis_plan.get("analysis_pair_count", 0)
+                if cross_modal_analysis_plan is not None
                 else 0
             ),
             "claim_ceiling": NIW_CLAIM_CEILING,
@@ -1294,6 +1529,188 @@ class NeuroIntegrationWorkbench:
             )
         return coverage
 
+    def _build_cross_modal_analysis_pair(
+        self,
+        left_source_type: str,
+        right_source_type: str,
+        sources_by_type: Dict[str, Dict[str, Any]],
+        connector_coverage_by_source: Dict[str, Dict[str, Any]],
+        analysis: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        left_source = sources_by_type[left_source_type]
+        right_source = sources_by_type[right_source_type]
+        recipe_id = self._analysis_recipe_for_pair(left_source_type, right_source_type)
+        connector_support = self._connector_support_for_pair(
+            left_source_type,
+            right_source_type,
+            connector_coverage_by_source,
+        )
+        target_constructs = self._analysis_target_constructs(
+            recipe_id,
+            left_source_type,
+            right_source_type,
+        )
+        source_types = [left_source_type, right_source_type]
+        pair = {
+            "pair_ref": (
+                f"analysis-pair://neuro-integration/{new_id('niw-analysis-pair')}"
+            ),
+            "source_types": source_types,
+            "source_families": {
+                left_source_type: left_source["source_family"],
+                right_source_type: right_source["source_family"],
+            },
+            "source_feature_digests": {
+                left_source_type: left_source["feature_digest"],
+                right_source_type: right_source["feature_digest"],
+            },
+            "analysis_recipe_id": recipe_id,
+            "target_constructs": target_constructs,
+            "plain_language_question": self._analysis_plain_language_question(
+                recipe_id,
+                left_source_type,
+                right_source_type,
+            ),
+            "agent_action": self._analysis_agent_action(recipe_id),
+            "seed_analysis_digest": (
+                analysis["analysis_digest"]
+                if source_types == list(NIW_SEED_SOURCE_TYPES)
+                else ""
+            ),
+            "connector_support": connector_support,
+            "all_required_connectors_bound": all(
+                item["bound"] for item in connector_support
+            ),
+            "requires_ml_expertise": False,
+            "claim_ceiling": NIW_CLAIM_CEILING,
+            "raw_pair_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        pair["pair_digest"] = sha256_text(
+            canonical_json(self._analysis_pair_digest_payload(pair))
+        )
+        return pair
+
+    def _connector_support_for_pair(
+        self,
+        left_source_type: str,
+        right_source_type: str,
+        connector_coverage_by_source: Dict[str, Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        left_coverage = connector_coverage_by_source.get(left_source_type, {})
+        right_coverage = connector_coverage_by_source.get(right_source_type, {})
+        support: List[Dict[str, Any]] = []
+        for lane in NIW_REQUIRED_REPLACEMENT_LANES:
+            refs = sorted(
+                set(left_coverage.get("lane_connector_refs", {}).get(lane, []))
+                | set(right_coverage.get("lane_connector_refs", {}).get(lane, []))
+            )
+            digests = sorted(
+                set(left_coverage.get("lane_connector_digests", {}).get(lane, []))
+                | set(right_coverage.get("lane_connector_digests", {}).get(lane, []))
+            )
+            support.append(
+                {
+                    "replacement_lane": lane,
+                    "connector_refs": refs,
+                    "connector_digests": digests,
+                    "bound": bool(refs) and bool(digests),
+                }
+            )
+        return support
+
+    def _analysis_recipe_for_pair(
+        self,
+        left_source_type: str,
+        right_source_type: str,
+    ) -> str:
+        pair = {left_source_type, right_source_type}
+        if pair == set(NIW_SEED_SOURCE_TYPES):
+            return "survey-eeg-feature-alignment"
+        if pair == {"eeg", "fmri_bold"}:
+            return "neural-electrical-hemodynamic-context"
+        if "brain_organoid" in pair:
+            return "organoid-context-comparison"
+        return "feature-summary-cross-modal-screen"
+
+    def _analysis_target_constructs(
+        self,
+        recipe_id: str,
+        left_source_type: str,
+        right_source_type: str,
+    ) -> List[str]:
+        if recipe_id == "survey-eeg-feature-alignment":
+            return [
+                "distress-load-alignment",
+                "attention-load-alignment",
+                "upstream-fusion-reconciliation",
+            ]
+        if recipe_id == "neural-electrical-hemodynamic-context":
+            return [
+                "cortical-load-context",
+                "neurovascular-activation-context",
+                "network-coupling-context",
+            ]
+        if recipe_id == "organoid-context-comparison":
+            return [
+                "in-vitro-neural-activity-context",
+                "viability-boundary-context",
+                "no-personhood-or-identity-inference",
+            ]
+        return [
+            f"{left_source_type}-feature-summary-context",
+            f"{right_source_type}-feature-summary-context",
+        ]
+
+    def _analysis_plain_language_question(
+        self,
+        recipe_id: str,
+        left_source_type: str,
+        right_source_type: str,
+    ) -> str:
+        if recipe_id == "survey-eeg-feature-alignment":
+            return "Do questionnaire scores and EEG load proxies move together in this approved window?"
+        if recipe_id == "neural-electrical-hemodynamic-context":
+            return "Do EEG load proxies and fMRI BOLD context point to compatible neural activity summaries?"
+        if recipe_id == "organoid-context-comparison":
+            return "How should the organoid summary be kept as in-vitro context without treating it as the person?"
+        return (
+            f"What bounded relationship can be screened between {left_source_type} "
+            f"and {right_source_type} feature summaries?"
+        )
+
+    def _analysis_agent_action(self, recipe_id: str) -> str:
+        if recipe_id == "survey-eeg-feature-alignment":
+            return "reuse_seed_survey_eeg_alignment_receipt"
+        if recipe_id == "neural-electrical-hemodynamic-context":
+            return "plan_eeg_fmri_feature_context_screen"
+        if recipe_id == "organoid-context-comparison":
+            return "plan_organoid_context_boundary_screen"
+        return "plan_generic_feature_summary_screen"
+
+    def _build_analysis_recipe_catalog(
+        self,
+        analysis_pairs: Sequence[Dict[str, Any]],
+    ) -> List[Dict[str, Any]]:
+        catalog: List[Dict[str, Any]] = []
+        for recipe_id in NIW_ANALYSIS_RECIPE_IDS:
+            recipe_pairs = [
+                pair for pair in analysis_pairs if pair["analysis_recipe_id"] == recipe_id
+            ]
+            if not recipe_pairs:
+                continue
+            catalog.append(
+                {
+                    "analysis_recipe_id": recipe_id,
+                    "pair_count": len(recipe_pairs),
+                    "requires_ml_expertise": False,
+                    "claim_ceiling": NIW_CLAIM_CEILING,
+                }
+            )
+        return catalog
+
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(source_manifest, dict):
             raise ValueError("source_manifest must be a mapping")
@@ -1611,6 +2028,75 @@ class NeuroIntegrationWorkbench:
         if bundle.get("connector_digest_set") != expected_connector_digest_set:
             raise ValueError("connector_bundle.connector_digest_set mismatch")
 
+    def _check_cross_modal_analysis_plan(self, plan: Dict[str, Any]) -> None:
+        if not isinstance(plan, dict):
+            raise ValueError("cross_modal_analysis_plan must be a mapping")
+        if plan.get("schema_version") != NIW_SCHEMA_VERSION:
+            raise ValueError("cross_modal_analysis_plan.schema_version mismatch")
+        if plan.get("profile_id") != NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID:
+            raise ValueError("cross_modal_analysis_plan.profile_id mismatch")
+        expected_digest = sha256_text(
+            canonical_json(self._cross_modal_analysis_plan_digest_payload(plan))
+        )
+        if plan.get("cross_modal_analysis_plan_digest") != expected_digest:
+            raise ValueError(
+                "cross_modal_analysis_plan.cross_modal_analysis_plan_digest mismatch"
+            )
+        if plan.get("claim_ceiling") != NIW_CLAIM_CEILING:
+            raise ValueError("cross_modal_analysis_plan.claim_ceiling mismatch")
+        if plan.get("storage_policy") != NIW_CROSS_MODAL_ANALYSIS_PLAN_POLICY:
+            raise ValueError("cross_modal_analysis_plan.storage_policy mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if plan.get(field_name) is not False:
+                raise ValueError(f"cross_modal_analysis_plan.{field_name} must be false")
+        pairs = plan.get("analysis_pairs")
+        if not isinstance(pairs, list) or not pairs:
+            raise ValueError(
+                "cross_modal_analysis_plan.analysis_pairs must be a non-empty list"
+            )
+        if any(not isinstance(pair, dict) for pair in pairs):
+            raise ValueError(
+                "cross_modal_analysis_plan.analysis_pairs must contain mappings"
+            )
+        if plan.get("analysis_pair_count") != len(pairs):
+            raise ValueError(
+                "cross_modal_analysis_plan.analysis_pair_count must match pairs"
+            )
+        pair_digests = []
+        for pair in pairs:
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+            ):
+                if pair.get(field_name) is not False:
+                    raise ValueError(
+                        f"cross_modal_analysis_pair.{field_name} must be false"
+                    )
+            expected_pair_digest = sha256_text(
+                canonical_json(self._analysis_pair_digest_payload(pair))
+            )
+            if pair.get("pair_digest") != expected_pair_digest:
+                raise ValueError("cross_modal_analysis_pair.pair_digest mismatch")
+            pair_digests.append(expected_pair_digest)
+        if plan.get("pair_digests") != pair_digests:
+            raise ValueError("cross_modal_analysis_plan.pair_digests mismatch")
+        expected_pair_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": NIW_CROSS_MODAL_ANALYSIS_PLAN_PROFILE_ID,
+                    "pair_digests": pair_digests,
+                    "connector_bundle_digest": plan.get("connector_bundle_digest"),
+                }
+            )
+        )
+        if plan.get("pair_digest_set") != expected_pair_digest_set:
+            raise ValueError("cross_modal_analysis_plan.pair_digest_set mismatch")
+
     def _normalize_operator_profile(self, operator_profile: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(operator_profile, dict):
             raise ValueError("operator_profile must be a mapping")
@@ -1728,6 +2214,21 @@ class NeuroIntegrationWorkbench:
         )
         return bundle_raw_flags and connector_raw_flags
 
+    def _cross_modal_analysis_payload_redacted(self, plan: Dict[str, Any]) -> bool:
+        plan_raw_flags = all(
+            plan.get(field_name) is False
+            for field_name in plan
+            if field_name.startswith("raw_")
+        )
+        pair_raw_flags = all(
+            pair.get(field_name) is False
+            for pair in plan.get("analysis_pairs", [])
+            if isinstance(pair, dict)
+            for field_name in pair
+            if field_name.startswith("raw_")
+        )
+        return plan_raw_flags and pair_raw_flags
+
     def _upstream_receipt_digest_set(
         self,
         upstream_receipt_bindings: Sequence[Dict[str, Any]],
@@ -1790,6 +2291,24 @@ class NeuroIntegrationWorkbench:
             "dry_run_supported": connector.get("dry_run_supported"),
             "llm_tool_bound": connector.get("llm_tool_bound"),
             "operator_safe_mode": connector.get("operator_safe_mode"),
+        }
+
+    def _analysis_pair_digest_payload(self, pair: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "source_types": pair.get("source_types"),
+            "source_families": pair.get("source_families"),
+            "source_feature_digests": pair.get("source_feature_digests"),
+            "analysis_recipe_id": pair.get("analysis_recipe_id"),
+            "target_constructs": pair.get("target_constructs"),
+            "plain_language_question": pair.get("plain_language_question"),
+            "agent_action": pair.get("agent_action"),
+            "seed_analysis_digest": pair.get("seed_analysis_digest"),
+            "connector_support": pair.get("connector_support"),
+            "all_required_connectors_bound": pair.get(
+                "all_required_connectors_bound"
+            ),
+            "requires_ml_expertise": pair.get("requires_ml_expertise"),
+            "claim_ceiling": pair.get("claim_ceiling"),
         }
 
     def _source_bundle_digest_payload(self, source_bundle: Dict[str, Any]) -> Dict[str, Any]:
@@ -1894,4 +2413,43 @@ class NeuroIntegrationWorkbench:
             "operator_safe_mode_bound": bundle.get("operator_safe_mode_bound"),
             "connector_bundle_bound": bundle.get("connector_bundle_bound"),
             "claim_ceiling": bundle.get("claim_ceiling"),
+        }
+
+    def _cross_modal_analysis_plan_digest_payload(
+        self,
+        plan: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        return {
+            "profile_id": plan.get("profile_id"),
+            "identity_id": plan.get("identity_id"),
+            "source_bundle_digest": plan.get("source_bundle_digest"),
+            "analysis_digest": plan.get("analysis_digest"),
+            "operator_guide_digest": plan.get("operator_guide_digest"),
+            "replacement_plan_digest": plan.get("replacement_plan_digest"),
+            "connector_bundle_digest": plan.get("connector_bundle_digest"),
+            "source_types": plan.get("source_types"),
+            "source_families": plan.get("source_families"),
+            "analysis_pair_count": plan.get("analysis_pair_count"),
+            "expected_analysis_pair_count": plan.get(
+                "expected_analysis_pair_count"
+            ),
+            "pair_digest_set": plan.get("pair_digest_set"),
+            "recipe_catalog": plan.get("recipe_catalog"),
+            "all_source_types_represented": plan.get(
+                "all_source_types_represented"
+            ),
+            "source_pair_coverage_bound": plan.get(
+                "source_pair_coverage_bound"
+            ),
+            "survey_eeg_seed_analysis_bound": plan.get(
+                "survey_eeg_seed_analysis_bound"
+            ),
+            "connector_bundle_bound": plan.get("connector_bundle_bound"),
+            "non_ml_operator_ready": plan.get("non_ml_operator_ready"),
+            "coding_agent_ready": plan.get("coding_agent_ready"),
+            "cross_modal_analysis_plan_bound": plan.get(
+                "cross_modal_analysis_plan_bound"
+            ),
+            "planning_scope": plan.get("planning_scope"),
+            "claim_ceiling": plan.get("claim_ceiling"),
         }

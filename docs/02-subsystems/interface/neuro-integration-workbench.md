@@ -20,6 +20,8 @@ reference runtime surface」を作ることである。これは mind uploading 
   application replacement plan receipt に束縛する
 - replacement plan の各 lane に external connector ref、credential ref、data contract ref、
   LLM tool ref を digest-only で束縛し、実アプリ置換時の接続面を明示する
+- source bundle 内の全 source-type pair に bounded analysis recipe を割り当て、
+  questionnaire + EEG seed から fMRI / 脳オルガノイド等へ cross-modal analysis を広げる
 - 非 ML 専門家向けの plain-language cards と coding agent 向け task template を同じ guide receipt に入れる
 - raw questionnaire / EEG / neuroimaging / organoid / analysis / connector / credential / endpoint payload は保存しない
 - claim ceiling は `feature-alignment-and-analysis-plan-only` に固定する
@@ -41,8 +43,10 @@ reference runtime surface」を作ることである。これは mind uploading 
    agent-automation の coverage を replacement plan receipt に束縛する
 10. replacement plan に対して measurement ingest、analysis runner、curation ledger、
     operator console、agent runner connector refs を connector bundle に束縛する
-11. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
-    replacement plan、connector bundle を記録する
+11. 現在の source type 全ペアに survey+EEG alignment、EEG+fMRI context、
+    organoid context、generic feature-summary screen の bounded recipe を割り当てる
+12. ContinuityLedger に upstream receipt、source bundle、workspace、analysis、guide、
+    replacement plan、connector bundle、cross-modal analysis plan を記録する
 
 ## 不変条件
 
@@ -53,8 +57,9 @@ reference runtime surface」を作ることである。これは mind uploading 
 5. **replaceable lanes** ── 計測、解析、整備、operator copilot、agent automation の lane coverage を workspace digest に束縛する
 6. **source-type lane coverage** ── 現在束縛された各 source type は 5 つの置換 lane すべてで app digest に覆われる
 7. **connector coverage** ── 実アプリ置換用 connector は endpoint / credential / permission / data contract / LLM tool ref だけを保持し、各 source type を 5 lane すべてで覆う
-8. **digest-only** ── raw source / raw app / raw analysis / raw connector payload を保存しない
-9. **claim ceiling** ── clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
+8. **cross-modal pair coverage** ── 現在の source type 全ペアは bounded recipe と 5 lane connector support を持つ
+9. **digest-only** ── raw source / raw app / raw analysis / raw connector / raw plan payload を保存しない
+10. **claim ceiling** ── clinical diagnosis、consciousness reproduction、identity replacement はすべて false のまま維持する
 
 ## 関連
 

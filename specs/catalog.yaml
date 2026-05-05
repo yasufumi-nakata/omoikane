@@ -2529,6 +2529,16 @@ entries:
       - agents/guardians/integrity-guardian.yaml
     rationale: Required to bind external measurement, analysis, curation, operator-copilot, and agent-automation connector refs, credential refs, data-contract refs, and LLM tool refs to the application replacement plan without storing raw connector payloads.
   - priority: P1
+    kind: schema
+    file: specs/schemas/neuro_integration_cross_modal_analysis_plan.schema
+    consumers:
+      - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+      - docs/02-subsystems/interface/neuro-integration-workbench.md
+      - reference-runtime
+      - evals/interface/neuro_integration_workbench.yaml
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to prove every current neuro integration source-type pair has a bounded analysis recipe and connector support before claiming cross-modal analysis readiness.
+  - priority: P1
     kind: idl
     file: specs/interfaces/interface.neuro_integration_workbench.v0.idl
     consumers:

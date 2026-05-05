@@ -51,6 +51,8 @@ valence/arousal proxy、thought-pressure proxy のように、人間の体内情
 - 2026-05-05 時点で NIW は application connector bundle を追加し、measurement ingest、
   analysis runner、curation ledger、operator console、agent runner の connector refs /
   credential refs / data contract refs / LLM tool refs を replacement plan に digest-only で束縛する。
+- 同日、NIW は cross-modal analysis plan を追加し、現在 source bundle に入っている source type
+  全ペアへ bounded recipe と connector support を割り当てる。
 
 ## ブロッキング要因
 
@@ -100,6 +102,9 @@ OmoikaneOS は `interface.biodata_transmitter.v0` を採用し、reference runti
 - application connector bundle は endpoint / credential / permission / data contract /
   LLM tool の参照と digest coverage だけを検証し、live connector の権限監査、課金、
   latency、実データ品質、外部 API 安全性は別途研究課題として扱う
+- cross-modal analysis plan は全 source-type pair の分析計画 coverage だけを検証し、
+  modality-specific causal inference、large-scale cohort validity、clinical utility、
+  upload-readiness は別途研究課題として扱う
 - Workbench は BioData の Survey EEG Fusion receipt digest / fused window digest を受け取るが、
   BioData 側の `survey-eeg-correlation-input-only` ceiling を診断や mind-state proof へ昇格しない
 - thought は semantic content を生成しない

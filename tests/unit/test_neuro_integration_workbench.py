@@ -238,6 +238,13 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
                 },
             ],
         )
+        cross_modal_analysis_plan = workbench.build_cross_modal_analysis_plan(
+            source_bundle,
+            analysis,
+            guide,
+            replacement_plan,
+            connector_bundle,
+        )
         return {
             "workbench": workbench,
             "apps": apps,
@@ -247,6 +254,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             "guide": guide,
             "replacement_plan": replacement_plan,
             "connector_bundle": connector_bundle,
+            "cross_modal_analysis_plan": cross_modal_analysis_plan,
         }
 
     def test_binds_survey_eeg_seed_and_expansion_modalities(self) -> None:
@@ -259,6 +267,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["guide"],
             artifacts["replacement_plan"],
             artifacts["connector_bundle"],
+            artifacts["cross_modal_analysis_plan"],
         )
 
         self.assertTrue(validation["ok"])
@@ -275,6 +284,10 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["connector_bundle_digest_bound"])
         self.assertTrue(validation["connector_source_type_coverage_bound"])
         self.assertTrue(validation["connector_payload_redacted"])
+        self.assertTrue(validation["cross_modal_analysis_plan_bound"])
+        self.assertTrue(validation["cross_modal_analysis_plan_digest_bound"])
+        self.assertTrue(validation["cross_modal_source_pair_coverage_bound"])
+        self.assertTrue(validation["cross_modal_analysis_payload_redacted"])
         self.assertTrue(validation["survey_eeg_fusion_receipt_bound"])
         self.assertTrue(validation["upstream_receipt_payload_redacted"])
         self.assertTrue(validation["claim_ceiling_bound"])
@@ -293,6 +306,15 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(artifacts["replacement_plan"]["replacement_plan_bound"])
         self.assertTrue(artifacts["connector_bundle"]["connector_bundle_bound"])
         self.assertEqual(5, artifacts["connector_bundle"]["connector_count"])
+        self.assertTrue(
+            artifacts["cross_modal_analysis_plan"][
+                "cross_modal_analysis_plan_bound"
+            ]
+        )
+        self.assertEqual(
+            6,
+            artifacts["cross_modal_analysis_plan"]["analysis_pair_count"],
+        )
         self.assertEqual(
             4,
             artifacts["replacement_plan"]["coverage_summary"]["covered_source_type_count"],
@@ -318,6 +340,7 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
             artifacts["guide"],
             artifacts["replacement_plan"],
             artifacts["connector_bundle"],
+            artifacts["cross_modal_analysis_plan"],
         )
 
         self.assertFalse(validation["ok"])
@@ -341,6 +364,28 @@ class NeuroIntegrationWorkbenchTests(unittest.TestCase):
         self.assertFalse(validation["ok"])
         self.assertIn(
             "connector_bundle.connector_digests mismatch",
+            validation["errors"],
+        )
+
+    def test_tampered_cross_modal_pair_digest_fails_validation(self) -> None:
+        artifacts = self._build_demo_artifacts()
+        tampered_plan = deepcopy(artifacts["cross_modal_analysis_plan"])
+        tampered_plan["pair_digests"][0] = "0" * 64
+
+        validation = artifacts["workbench"].validate_integration_bundle(
+            artifacts["apps"],
+            artifacts["source_bundle"],
+            artifacts["workspace"],
+            artifacts["analysis"],
+            artifacts["guide"],
+            artifacts["replacement_plan"],
+            artifacts["connector_bundle"],
+            tampered_plan,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn(
+            "cross_modal_analysis_plan.pair_digests mismatch",
             validation["errors"],
         )
 

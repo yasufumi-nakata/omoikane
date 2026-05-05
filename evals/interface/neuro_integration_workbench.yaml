@@ -35,6 +35,11 @@ expected:
   connector_source_type_coverage_bound: true
   connector_payload_redacted: true
   connector_count: 5
+  cross_modal_analysis_plan_bound: true
+  cross_modal_analysis_plan_digest_bound: true
+  cross_modal_source_pair_coverage_bound: true
+  cross_modal_analysis_payload_redacted: true
+  analysis_pair_count: 6
   llm_native_workflow_bound: true
   beginner_operator_supported: true
   coding_agent_ready: true

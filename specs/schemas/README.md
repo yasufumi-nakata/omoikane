@@ -57,6 +57,8 @@
   - source bundle 内の各 source type が measurement / analysis / data-curation / operator-copilot / agent-automation の全 lane で app digest に覆われていることを検証する
 - `neuro_integration_application_connector_bundle.schema`
   - replacement plan の各 lane に external connector ref、credential ref、data contract ref、LLM tool ref を digest-only で束縛し、raw connector / credential / endpoint payload を保存しないことを検証する
+- `neuro_integration_cross_modal_analysis_plan.schema`
+  - source bundle 内の全 source-type pair に bounded analysis recipe と connector support を割り当て、questionnaire + EEG seed から fMRI / 脳オルガノイド等へ広げる cross-modal analysis plan を検証する
 - `observation_source_catalog.schema`
   - 人類が取得・計測してきた観測 family / source type taxonomy、alignment axes、analysis lanes を digest-only catalog として束縛し、完全知識や真理統一を主張しない
 - `observation_source_bundle.schema`

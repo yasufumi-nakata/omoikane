@@ -17,6 +17,7 @@ imports:
   neuro_integration_operator_guide: ../schemas/neuro_integration_operator_guide.schema
   neuro_integration_application_replacement_plan: ../schemas/neuro_integration_application_replacement_plan.schema
   neuro_integration_application_connector_bundle: ../schemas/neuro_integration_application_connector_bundle.schema
+  neuro_integration_cross_modal_analysis_plan: ../schemas/neuro_integration_cross_modal_analysis_plan.schema
 operations:
   register_application:
     summary: Register one measurement, analysis, curation, operator-copilot, or agent-automation app as a replaceable workbench lane.
@@ -276,8 +277,39 @@ operations:
       - connector receipts must bind endpoint refs, credential refs, permission refs, data contract refs, and LLM tool refs by digest only
       - operator-safe dry-run paths must be explicit for non-ML operators and coding agents
       - raw connector, credential, and endpoint payload storage must remain false
+  build_cross_modal_analysis_plan:
+    summary: Emit a digest-only plan for every current source-type pair so questionnaire, EEG, fMRI, organoid, and future biological summaries can be analyzed through bounded recipes.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - analysis
+          - operator_guide
+          - replacement_plan
+          - connector_bundle
+        properties:
+          source_bundle:
+            schema_ref: neuro_integration_source_bundle
+          analysis:
+            schema_ref: neuro_integration_analysis_receipt
+          operator_guide:
+            schema_ref: neuro_integration_operator_guide
+          replacement_plan:
+            schema_ref: neuro_integration_application_replacement_plan
+          connector_bundle:
+            schema_ref: neuro_integration_application_connector_bundle
+    output:
+      schema_ref: neuro_integration_cross_modal_analysis_plan
+    guarantees:
+      - every current source-type pair must have a bounded analysis recipe
+      - the questionnaire plus EEG pair must reuse the seed Survey EEG Fusion analysis receipt
+      - each analysis pair must bind measurement, analysis, curation, operator-copilot, and agent-automation connector refs
+      - non-ML operator and coding-agent execution must require no ML expertise
+      - raw source, analysis, connector, and plan payload storage must remain false
+      - diagnosis, consciousness reproduction, and identity replacement claims must remain false
   validate_integration_bundle:
-    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, and optional connector-bundle digest binding and claim ceilings.
+    summary: Verify app, source, workspace, analysis, operator-guide, optional replacement-plan, optional connector-bundle, and optional cross-modal analysis-plan digest binding and claim ceilings.
     input:
       inline_schema:
         type: object
@@ -305,6 +337,8 @@ operations:
             schema_ref: neuro_integration_application_replacement_plan
           connector_bundle:
             schema_ref: neuro_integration_application_connector_bundle
+          cross_modal_analysis_plan:
+            schema_ref: neuro_integration_cross_modal_analysis_plan
     output:
       inline_schema:
         type: object
@@ -323,6 +357,10 @@ operations:
           - upstream_receipt_payload_redacted
           - connector_bundle_digest_bound
           - connector_payload_redacted
+          - cross_modal_analysis_plan_bound
+          - cross_modal_analysis_plan_digest_bound
+          - cross_modal_source_pair_coverage_bound
+          - cross_modal_analysis_payload_redacted
           - claim_ceiling_bound
           - raw_payload_redacted
           - no_diagnosis_or_identity_claim
@@ -355,6 +393,14 @@ operations:
             type: boolean
           connector_payload_redacted:
             type: boolean
+          cross_modal_analysis_plan_bound:
+            type: boolean
+          cross_modal_analysis_plan_digest_bound:
+            type: boolean
+          cross_modal_source_pair_coverage_bound:
+            type: boolean
+          cross_modal_analysis_payload_redacted:
+            type: boolean
           claim_ceiling_bound:
             type: boolean
           raw_payload_redacted:
@@ -362,6 +408,9 @@ operations:
           no_diagnosis_or_identity_claim:
             type: boolean
           connector_count:
+            type: integer
+            minimum: 0
+          analysis_pair_count:
             type: integer
             minimum: 0
 events:
@@ -373,3 +422,5 @@ events:
     payload_schema: neuro_integration_application_replacement_plan
   - name: neuro_integration_workbench.application_connector_bundle.bound
     payload_schema: neuro_integration_application_connector_bundle
+  - name: neuro_integration_workbench.cross_modal_analysis_plan.bound
+    payload_schema: neuro_integration_cross_modal_analysis_plan
