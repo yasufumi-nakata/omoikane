@@ -13,9 +13,11 @@ UOI_METHOD_CATALOG_PROFILE_ID = "universal-observation-method-catalog-v1"
 UOI_BUNDLE_PROFILE_ID = "universal-observation-source-bundle-v1"
 UOI_GRAPH_PROFILE_ID = "universal-observation-integration-graph-v1"
 UOI_PLAN_PROFILE_ID = "universal-observation-analysis-plan-v1"
+UOI_ANALYSIS_RUN_PROFILE_ID = "universal-observation-analysis-run-v1"
 UOI_OPERATOR_GUIDE_PROFILE_ID = "universal-observation-operator-guide-v1"
 UOI_CLAIM_CEILING = "cross-domain-feature-integration-plan-only"
 UOI_STORAGE_POLICY = "feature-digest+provenance+axis-summary-only"
+UOI_ANALYSIS_RUN_POLICY = "lane-digest+bounded-result-summary+operator-review-only"
 UOI_CONFLICT_SINK_URL = "https://mind-upload.com/frontiers/universal-observation-integration"
 UOI_REQUIRED_ALIGNMENT_AXES = (
     "provenance",
@@ -313,6 +315,7 @@ class ObservationIntegrationWorkbench:
             "source_bundle_profile_id": UOI_BUNDLE_PROFILE_ID,
             "integration_graph_profile_id": UOI_GRAPH_PROFILE_ID,
             "analysis_plan_profile_id": UOI_PLAN_PROFILE_ID,
+            "analysis_run_profile_id": UOI_ANALYSIS_RUN_PROFILE_ID,
             "operator_guide_profile_id": UOI_OPERATOR_GUIDE_PROFILE_ID,
             "measurement_families": {
                 family: list(source_types)
@@ -330,6 +333,7 @@ class ObservationIntegrationWorkbench:
             "required_analysis_lanes": list(UOI_REQUIRED_ANALYSIS_LANES),
             "claim_ceiling": UOI_CLAIM_CEILING,
             "storage_policy": UOI_STORAGE_POLICY,
+            "analysis_run_policy": UOI_ANALYSIS_RUN_POLICY,
             "conflict_sink_url": UOI_CONFLICT_SINK_URL,
             "raw_observation_payload_stored": False,
             "raw_personal_payload_stored": False,
@@ -755,6 +759,129 @@ class ObservationIntegrationWorkbench:
         )
         return deepcopy(guide)
 
+    def execute_analysis_plan(
+        self,
+        source_bundle: Dict[str, Any],
+        integration_graph: Dict[str, Any],
+        analysis_plan: Dict[str, Any],
+        operator_guide: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        self._check_source_bundle(source_bundle)
+        self._check_integration_graph(integration_graph)
+        self._check_analysis_plan(analysis_plan)
+        self._check_operator_guide(operator_guide)
+        if integration_graph["source_bundle_digest"] != source_bundle["source_bundle_digest"]:
+            raise ValueError("integration_graph.source_bundle_digest must match source bundle")
+        if analysis_plan["source_bundle_digest"] != source_bundle["source_bundle_digest"]:
+            raise ValueError("analysis_plan.source_bundle_digest must match source bundle")
+        if analysis_plan["integration_graph_digest"] != integration_graph["integration_graph_digest"]:
+            raise ValueError("analysis_plan.integration_graph_digest must match graph")
+        if operator_guide["analysis_plan_digest"] != analysis_plan["analysis_plan_digest"]:
+            raise ValueError("operator_guide.analysis_plan_digest must match analysis plan")
+        planned_by_lane = {
+            item["lane_id"]: item
+            for item in analysis_plan.get("planned_analyses", [])
+            if isinstance(item, dict)
+        }
+        lane_results = [
+            self._build_lane_result(
+                lane,
+                planned_by_lane.get(lane["lane_id"], {}),
+                source_bundle,
+                integration_graph,
+                analysis_plan,
+                operator_guide,
+            )
+            for lane in analysis_plan["analysis_lanes"]
+        ]
+        result_digests = [result["result_digest"] for result in lane_results]
+        result_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": UOI_ANALYSIS_RUN_PROFILE_ID,
+                    "analysis_plan_digest": analysis_plan["analysis_plan_digest"],
+                    "result_digests": result_digests,
+                }
+            )
+        )
+        readiness_values = [
+            source["quality_summary"]["integration_readiness"]
+            for source in source_bundle["sources"]
+        ]
+        uncertainty_values = [
+            source["quality_summary"]["uncertainty_proxy"]
+            for source in source_bundle["sources"]
+        ]
+        all_lane_results_bound = (
+            len(lane_results) == len(analysis_plan["analysis_lanes"])
+            and all(result["result_bound"] for result in lane_results)
+        )
+        run = {
+            "schema_version": UOI_SCHEMA_VERSION,
+            "analysis_run_ref": f"analysis-run://universal-observation/{new_id('uoi-run')}",
+            "created_at": utc_now_iso(),
+            "profile_id": UOI_ANALYSIS_RUN_PROFILE_ID,
+            "source_bundle_ref": source_bundle["source_bundle_ref"],
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "integration_graph_ref": integration_graph["integration_graph_ref"],
+            "integration_graph_digest": integration_graph["integration_graph_digest"],
+            "analysis_plan_ref": analysis_plan["analysis_plan_ref"],
+            "analysis_plan_digest": analysis_plan["analysis_plan_digest"],
+            "operator_guide_ref": operator_guide["operator_guide_ref"],
+            "operator_guide_digest": operator_guide["operator_guide_digest"],
+            "required_analysis_lanes": list(UOI_REQUIRED_ANALYSIS_LANES),
+            "analysis_lane_count": len(analysis_plan["analysis_lanes"]),
+            "result_count": len(lane_results),
+            "lane_results": lane_results,
+            "result_digests": result_digests,
+            "result_digest_set": result_digest_set,
+            "all_lane_results_bound": all_lane_results_bound,
+            "operator_review_ready": (
+                operator_guide["beginner_operator_supported"] and all_lane_results_bound
+            ),
+            "coding_agent_review_ready": (
+                operator_guide["coding_agent_ready"] and all_lane_results_bound
+            ),
+            "analysis_run_summary": {
+                "result_count": len(lane_results),
+                "bounded_result_count": sum(
+                    1 for result in lane_results if result["result_bound"]
+                ),
+                "source_count": source_bundle["source_count"],
+                "family_coverage_count": source_bundle["family_coverage_count"],
+                "average_integration_readiness": self._round_score(
+                    sum(readiness_values) / len(readiness_values)
+                ),
+                "maximum_uncertainty_proxy": self._round_score(max(uncertainty_values)),
+            },
+            "observation_analysis_run_bound": (
+                analysis_plan["all_analysis_lanes_bound"]
+                and integration_graph["cross_domain_edge_bound"]
+                and operator_guide["coding_agent_ready"]
+                and operator_guide["beginner_operator_supported"]
+                and all_lane_results_bound
+            ),
+            "storage_policy": UOI_ANALYSIS_RUN_POLICY,
+            "claim_ceiling": UOI_CLAIM_CEILING,
+            "conflict_refs": self._conflict_refs(),
+            "mind_upload_conflict_sink_url": UOI_CONFLICT_SINK_URL,
+            "raw_source_payload_stored": False,
+            "raw_analysis_payload_stored": False,
+            "raw_model_payload_stored": False,
+            "raw_instruction_payload_stored": False,
+            "raw_result_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "causal_truth_claimed": False,
+            "truth_unification_claimed": False,
+            "complete_human_knowledge_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        run["analysis_run_digest"] = sha256_text(
+            canonical_json(self._analysis_run_digest_payload(run))
+        )
+        return deepcopy(run)
+
     def validate_observation_package(
         self,
         taxonomy: Dict[str, Any],
@@ -763,8 +890,39 @@ class ObservationIntegrationWorkbench:
         analysis_plan: Dict[str, Any],
         operator_guide: Dict[str, Any],
         method_catalog: Optional[Dict[str, Any]] = None,
+        analysis_run: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         errors: List[str] = []
+        if analysis_run is not None:
+            try:
+                self._check_analysis_run(analysis_run)
+            except ValueError as exc:
+                errors.append(str(exc))
+        analysis_run_checks: Dict[str, bool] = {}
+        if analysis_run is not None:
+            analysis_run_checks = {
+                "analysis_run_digest_bound": analysis_run.get("analysis_run_digest")
+                == sha256_text(
+                    canonical_json(self._analysis_run_digest_payload(analysis_run))
+                ),
+                "observation_analysis_run_bound": (
+                    analysis_run.get("observation_analysis_run_bound") is True
+                    and analysis_run.get("source_bundle_digest")
+                    == source_bundle.get("source_bundle_digest")
+                    and analysis_run.get("integration_graph_digest")
+                    == integration_graph.get("integration_graph_digest")
+                    and analysis_run.get("analysis_plan_digest")
+                    == analysis_plan.get("analysis_plan_digest")
+                    and analysis_run.get("operator_guide_digest")
+                    == operator_guide.get("operator_guide_digest")
+                ),
+                "all_lane_results_bound": (
+                    analysis_run.get("all_lane_results_bound") is True
+                ),
+                "analysis_result_payload_redacted": (
+                    self._analysis_run_payload_redacted(analysis_run)
+                ),
+            }
         artifacts = [
             taxonomy,
             source_bundle,
@@ -774,6 +932,8 @@ class ObservationIntegrationWorkbench:
         ]
         if method_catalog is not None:
             artifacts.append(method_catalog)
+        if analysis_run is not None:
+            artifacts.append(analysis_run)
         method_catalog_digest_bound = bool(
             analysis_plan.get("method_catalog_digest")
             and analysis_plan.get("method_catalog_profile_id")
@@ -843,6 +1003,7 @@ class ObservationIntegrationWorkbench:
                 and artifact.get("identity_replacement_claimed", False) is False
                 for artifact in artifacts
             ),
+            **analysis_run_checks,
         }
         for name, ok in checks.items():
             if not ok:
@@ -866,6 +1027,10 @@ class ObservationIntegrationWorkbench:
             "raw_source_payload_stored": False,
             "raw_analysis_payload_stored": False,
             "raw_method_payload_stored": False,
+            "analysis_result_count": (
+                analysis_run.get("result_count", 0) if analysis_run is not None else 0
+            ),
+            "raw_result_payload_stored": False,
             "complete_human_knowledge_claimed": False,
             "truth_unification_claimed": False,
             "consciousness_reproduction_claimed": False,
@@ -884,6 +1049,113 @@ class ObservationIntegrationWorkbench:
             }
             for family_id, method_ids in method_families.items()
         ]
+
+    def _build_lane_result(
+        self,
+        lane: Dict[str, Any],
+        planned_analysis: Dict[str, Any],
+        source_bundle: Dict[str, Any],
+        integration_graph: Dict[str, Any],
+        analysis_plan: Dict[str, Any],
+        operator_guide: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        lane_id = lane["lane_id"]
+        readiness_values = [
+            source["quality_summary"]["integration_readiness"]
+            for source in source_bundle["sources"]
+        ]
+        uncertainty_values = [
+            source["quality_summary"]["uncertainty_proxy"]
+            for source in source_bundle["sources"]
+        ]
+        edge_confidence_values = [
+            edge["confidence_proxy"] for edge in integration_graph["edges"]
+        ]
+        result = {
+            "result_ref": (
+                f"analysis-result://universal-observation/{new_id('uoi-result')}"
+            ),
+            "lane_id": lane_id,
+            "lane_digest": sha256_text(canonical_json(lane)),
+            "planned_analysis_id": planned_analysis.get(
+                "analysis_id",
+                f"{lane_id}-bounded-result",
+            ),
+            "result_status": self._lane_result_status(lane_id),
+            "source_bundle_digest": source_bundle["source_bundle_digest"],
+            "integration_graph_digest": integration_graph["integration_graph_digest"],
+            "analysis_plan_digest": analysis_plan["analysis_plan_digest"],
+            "result_axis_summary": {
+                "source_count": source_bundle["source_count"],
+                "family_coverage_count": source_bundle["family_coverage_count"],
+                "edge_count": integration_graph["edge_count"],
+                "alignment_axis_count": len(UOI_REQUIRED_ALIGNMENT_AXES),
+                "average_integration_readiness": self._round_score(
+                    sum(readiness_values) / len(readiness_values)
+                ),
+                "maximum_uncertainty_proxy": self._round_score(max(uncertainty_values)),
+                "average_edge_confidence_proxy": self._round_score(
+                    sum(edge_confidence_values) / len(edge_confidence_values)
+                ),
+                "rights_boundary_bound": integration_graph["rights_boundary_bound"],
+            },
+            "operator_summary": self._operator_lane_summary(
+                lane_id,
+                planned_analysis.get("goal", ""),
+            ),
+            "agent_next_action": self._agent_lane_next_action(lane_id),
+            "evidence_refs": [
+                source_bundle["source_bundle_ref"],
+                integration_graph["integration_graph_ref"],
+                analysis_plan["analysis_plan_ref"],
+                operator_guide["operator_guide_ref"],
+            ],
+            "requires_ml_expertise": False,
+            "result_bound": lane["status"] == "bound",
+            "claim_ceiling": UOI_CLAIM_CEILING,
+            "raw_lane_payload_stored": False,
+            "raw_result_payload_stored": False,
+            "clinical_diagnosis_claimed": False,
+            "causal_truth_claimed": False,
+            "truth_unification_claimed": False,
+            "complete_human_knowledge_claimed": False,
+            "consciousness_reproduction_claimed": False,
+            "identity_replacement_claimed": False,
+        }
+        result["result_digest"] = sha256_text(
+            canonical_json(self._lane_result_digest_payload(result))
+        )
+        return result
+
+    def _lane_result_status(self, lane_id: str) -> str:
+        return f"{lane_id}-result-bound"
+
+    def _operator_lane_summary(self, lane_id: str, goal: str) -> str:
+        if lane_id == "model":
+            return (
+                "Model lane produced only uncertainty-aware feature integration context; "
+                "it is not a causal truth, diagnosis, or identity claim."
+            )
+        if lane_id == "audit":
+            return (
+                "Audit lane preserved the claim ceiling and routes unresolved rights, "
+                "causality, and identity questions to explicit conflict refs."
+            )
+        if lane_id == "publish-digest":
+            return "Publish lane is limited to receipt digests, coverage summaries, and claim ceilings."
+        if goal:
+            return f"{lane_id} lane completed bounded review: {goal}"
+        return f"{lane_id} lane completed bounded digest-only review."
+
+    def _agent_lane_next_action(self, lane_id: str) -> str:
+        return {
+            "ingest": "verify_source_rights_and_feature_digest_refs",
+            "normalize": "verify_units_time_space_and_entity_axis_refs",
+            "align": "review_cross_domain_edge_axis_coverage",
+            "model": "review_uncertainty_without_causal_or_diagnostic_claim",
+            "audit": "route_unresolved_claims_to_guardian_conflict_refs",
+            "publish-digest": "publish_receipt_digests_only",
+        }.get(lane_id, "review_bounded_lane_summary")
 
     def _normalize_source_manifest(self, source_manifest: Dict[str, Any]) -> Dict[str, Any]:
         if not isinstance(source_manifest, dict):
@@ -1046,6 +1318,72 @@ class ObservationIntegrationWorkbench:
         ):
             raise ValueError("method_catalog_digest mismatch")
 
+    def _check_operator_guide(self, operator_guide: Dict[str, Any]) -> None:
+        if operator_guide.get("profile_id") != UOI_OPERATOR_GUIDE_PROFILE_ID:
+            raise ValueError("operator_guide.profile_id mismatch")
+        if operator_guide.get("operator_guide_digest") != sha256_text(
+            canonical_json(self._guide_digest_payload(operator_guide))
+        ):
+            raise ValueError("operator_guide_digest mismatch")
+
+    def _check_analysis_run(self, analysis_run: Dict[str, Any]) -> None:
+        if analysis_run.get("profile_id") != UOI_ANALYSIS_RUN_PROFILE_ID:
+            raise ValueError("analysis_run.profile_id mismatch")
+        if analysis_run.get("analysis_run_digest") != sha256_text(
+            canonical_json(self._analysis_run_digest_payload(analysis_run))
+        ):
+            raise ValueError("analysis_run_digest mismatch")
+        if analysis_run.get("claim_ceiling") != UOI_CLAIM_CEILING:
+            raise ValueError("analysis_run.claim_ceiling mismatch")
+        if analysis_run.get("storage_policy") != UOI_ANALYSIS_RUN_POLICY:
+            raise ValueError("analysis_run.storage_policy mismatch")
+        for field_name in (
+            "clinical_diagnosis_claimed",
+            "causal_truth_claimed",
+            "truth_unification_claimed",
+            "complete_human_knowledge_claimed",
+            "consciousness_reproduction_claimed",
+            "identity_replacement_claimed",
+        ):
+            if analysis_run.get(field_name) is not False:
+                raise ValueError(f"analysis_run.{field_name} must be false")
+        results = analysis_run.get("lane_results")
+        if not isinstance(results, list) or not results:
+            raise ValueError("analysis_run.lane_results must be a non-empty list")
+        if analysis_run.get("result_count") != len(results):
+            raise ValueError("analysis_run.result_count must match lane_results")
+        result_digests = []
+        for result in results:
+            for field_name in (
+                "clinical_diagnosis_claimed",
+                "causal_truth_claimed",
+                "truth_unification_claimed",
+                "complete_human_knowledge_claimed",
+                "consciousness_reproduction_claimed",
+                "identity_replacement_claimed",
+            ):
+                if result.get(field_name) is not False:
+                    raise ValueError(f"analysis_run_result.{field_name} must be false")
+            expected_result_digest = sha256_text(
+                canonical_json(self._lane_result_digest_payload(result))
+            )
+            if result.get("result_digest") != expected_result_digest:
+                raise ValueError("analysis_run_result.result_digest mismatch")
+            result_digests.append(expected_result_digest)
+        if analysis_run.get("result_digests") != result_digests:
+            raise ValueError("analysis_run.result_digests mismatch")
+        expected_result_digest_set = sha256_text(
+            canonical_json(
+                {
+                    "profile_id": UOI_ANALYSIS_RUN_PROFILE_ID,
+                    "analysis_plan_digest": analysis_run.get("analysis_plan_digest"),
+                    "result_digests": result_digests,
+                }
+            )
+        )
+        if analysis_run.get("result_digest_set") != expected_result_digest_set:
+            raise ValueError("analysis_run.result_digest_set mismatch")
+
     def _taxonomy_digest_payload(self, taxonomy: Dict[str, Any]) -> Dict[str, Any]:
         return {
             key: taxonomy[key]
@@ -1198,6 +1536,61 @@ class ObservationIntegrationWorkbench:
                 "truth_unification_claimed",
                 "complete_human_knowledge_claimed",
             )
+        }
+
+    def _analysis_run_payload_redacted(self, analysis_run: Dict[str, Any]) -> bool:
+        run_raw_flags = all(
+            analysis_run.get(field_name) is False
+            for field_name in analysis_run
+            if field_name.startswith("raw_")
+        )
+        result_raw_flags = all(
+            result.get(field_name) is False
+            for result in analysis_run.get("lane_results", [])
+            if isinstance(result, dict)
+            for field_name in result
+            if field_name.startswith("raw_")
+        )
+        return run_raw_flags and result_raw_flags
+
+    def _lane_result_digest_payload(self, result: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "lane_id": result.get("lane_id"),
+            "lane_digest": result.get("lane_digest"),
+            "planned_analysis_id": result.get("planned_analysis_id"),
+            "result_status": result.get("result_status"),
+            "source_bundle_digest": result.get("source_bundle_digest"),
+            "integration_graph_digest": result.get("integration_graph_digest"),
+            "analysis_plan_digest": result.get("analysis_plan_digest"),
+            "result_axis_summary": result.get("result_axis_summary"),
+            "operator_summary": result.get("operator_summary"),
+            "agent_next_action": result.get("agent_next_action"),
+            "evidence_refs": result.get("evidence_refs"),
+            "requires_ml_expertise": result.get("requires_ml_expertise"),
+            "result_bound": result.get("result_bound"),
+            "claim_ceiling": result.get("claim_ceiling"),
+        }
+
+    def _analysis_run_digest_payload(self, run: Dict[str, Any]) -> Dict[str, Any]:
+        return {
+            "schema_version": run.get("schema_version"),
+            "profile_id": run.get("profile_id"),
+            "source_bundle_digest": run.get("source_bundle_digest"),
+            "integration_graph_digest": run.get("integration_graph_digest"),
+            "analysis_plan_digest": run.get("analysis_plan_digest"),
+            "operator_guide_digest": run.get("operator_guide_digest"),
+            "required_analysis_lanes": run.get("required_analysis_lanes"),
+            "analysis_lane_count": run.get("analysis_lane_count"),
+            "result_count": run.get("result_count"),
+            "result_digest_set": run.get("result_digest_set"),
+            "all_lane_results_bound": run.get("all_lane_results_bound"),
+            "operator_review_ready": run.get("operator_review_ready"),
+            "coding_agent_review_ready": run.get("coding_agent_review_ready"),
+            "analysis_run_summary": run.get("analysis_run_summary"),
+            "observation_analysis_run_bound": run.get(
+                "observation_analysis_run_bound"
+            ),
+            "claim_ceiling": run.get("claim_ceiling"),
         }
 
     def _conflict_refs(self) -> List[Dict[str, str]]:

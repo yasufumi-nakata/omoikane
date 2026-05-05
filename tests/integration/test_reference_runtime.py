@@ -396,12 +396,17 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual(6, result["validation"]["source_count"])
         self.assertGreaterEqual(result["validation"]["family_coverage_count"], 6)
         self.assertEqual(6, result["validation"]["analysis_lane_count"])
+        self.assertEqual(6, result["validation"]["analysis_result_count"])
         self.assertTrue(result["validation"]["taxonomy_digest_bound"])
         self.assertTrue(result["validation"]["method_catalog_digest_bound"])
         self.assertTrue(result["validation"]["source_bundle_digest_bound"])
         self.assertTrue(result["validation"]["integration_graph_digest_bound"])
         self.assertTrue(result["validation"]["analysis_plan_digest_bound"])
         self.assertTrue(result["validation"]["operator_guide_digest_bound"])
+        self.assertTrue(result["validation"]["analysis_run_digest_bound"])
+        self.assertTrue(result["validation"]["observation_analysis_run_bound"])
+        self.assertTrue(result["validation"]["all_lane_results_bound"])
+        self.assertTrue(result["validation"]["analysis_result_payload_redacted"])
         self.assertTrue(result["validation"]["alignment_axes_bound"])
         self.assertTrue(result["validation"]["rights_and_consent_bound"])
         self.assertTrue(result["validation"]["cross_domain_graph_bound"])
@@ -426,6 +431,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertFalse(result["analysis_plan"]["complete_human_knowledge_claimed"])
         self.assertFalse(result["analysis_plan"]["consciousness_reproduction_claimed"])
         self.assertFalse(result["analysis_plan"]["identity_replacement_claimed"])
+        self.assertTrue(result["analysis_run"]["observation_analysis_run_bound"])
+        self.assertEqual(6, result["analysis_run"]["result_count"])
         self.assertEqual(
             1,
             result["ledger_verification"]["category_counts"][
@@ -460,6 +467,12 @@ class ReferenceRuntimeTests(unittest.TestCase):
             1,
             result["ledger_verification"]["category_counts"][
                 "interface-observation-integration-guide"
+            ],
+        )
+        self.assertEqual(
+            1,
+            result["ledger_verification"]["category_counts"][
+                "interface-observation-integration-run"
             ],
         )
 

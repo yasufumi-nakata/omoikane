@@ -73,6 +73,8 @@
   - ingest / normalize / align / model / audit / publish-digest lanes を同じ graph digest に束縛し、analysis output を feature integration plan に制限する
 - `observation_operator_guide.schema`
   - beginner operator card と coding-agent task template を analysis plan digest に束縛し、raw instruction / source / analysis payload を保存しない
+- `observation_analysis_run.schema`
+  - ingest / normalize / align / model / audit / publish-digest の各 lane result summary と operator / coding-agent review readiness を digest-only で検証する
 - `build_artifact.yaml`
 - `build_request.yaml`
 - `builder_live_enactment_session.schema`

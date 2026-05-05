@@ -4056,6 +4056,7 @@ entries:
       - specs/schemas/observation_integration_graph.schema
       - specs/schemas/observation_analysis_plan.schema
       - specs/schemas/observation_operator_guide.schema
+      - specs/schemas/observation_analysis_run.schema
       - evals/interface/observation_integration_workbench.yaml
       - docs/02-subsystems/interface/observation-integration-workbench.md
       - agents/guardians/integrity-guardian.yaml
@@ -4122,10 +4123,22 @@ entries:
     consumers:
       - specs/interfaces/interface.observation_integration_workbench.v0.idl
       - reference-runtime
+      - specs/schemas/observation_analysis_run.schema
       - tests/integration/test_interface_schema_contracts.py
       - evals/interface/observation_integration_workbench.yaml
       - docs/02-subsystems/interface/observation-integration-workbench.md
     rationale: Required to serialize beginner operator cards and coding-agent task templates bound to the analysis plan digest without storing raw instruction, analysis, or source payloads.
+  - priority: P1
+    kind: schema
+    file: specs/schemas/observation_analysis_run.schema
+    consumers:
+      - specs/interfaces/interface.observation_integration_workbench.v0.idl
+      - reference-runtime
+      - tests/integration/test_interface_schema_contracts.py
+      - evals/interface/observation_integration_workbench.yaml
+      - docs/02-subsystems/interface/observation-integration-workbench.md
+      - agents/guardians/integrity-guardian.yaml
+    rationale: Required to bind bounded lane-level result summaries for ingest, normalize, align, model, audit, and publish-digest analysis without storing raw source, model, instruction, or result payloads.
   - priority: P1
     kind: eval
     file: evals/interface/observation_integration_workbench.yaml
@@ -4136,6 +4149,6 @@ entries:
       - tests/integration/test_cli.py
       - tests/integration/test_reference_runtime.py
       - docs/02-subsystems/interface/observation-integration-workbench.md
-    rationale: Guards that the universal observation workbench keeps taxonomy, source bundle, graph, analysis plan, and operator guide digest-bound while raw payloads, complete knowledge, truth unification, consciousness reproduction, and identity replacement remain false.
+    rationale: Guards that the universal observation workbench keeps taxonomy, source bundle, graph, analysis plan, operator guide, and analysis run digest-bound while raw payloads, complete knowledge, truth unification, consciousness reproduction, and identity replacement remain false.
 next_priority:
   # Future automation can append the next missing contract here.

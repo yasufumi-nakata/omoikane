@@ -11993,6 +11993,12 @@ json.dump(response, sys.stdout)
             source_bundle,
             analysis_plan,
         )
+        analysis_run = self.observation_integration_workbench.execute_analysis_plan(
+            source_bundle,
+            integration_graph,
+            analysis_plan,
+            operator_guide,
+        )
         validation = self.observation_integration_workbench.validate_observation_package(
             taxonomy,
             source_bundle,
@@ -12000,6 +12006,7 @@ json.dump(response, sys.stdout)
             analysis_plan,
             operator_guide,
             method_catalog=method_catalog,
+            analysis_run=analysis_run,
         )
         self.ledger.append(
             identity_id=identity.identity_id,
@@ -12144,6 +12151,32 @@ json.dump(response, sys.stdout)
             signature_roles=["self", "guardian"],
             substrate="hybrid-bio-digital",
         )
+        self.ledger.append(
+            identity_id=identity.identity_id,
+            event_type="observation_integration.analysis_run.bound",
+            payload={
+                "analysis_run_ref": analysis_run["analysis_run_ref"],
+                "analysis_run_digest": analysis_run["analysis_run_digest"],
+                "analysis_plan_digest": analysis_run["analysis_plan_digest"],
+                "result_digest_set": analysis_run["result_digest_set"],
+                "result_count": analysis_run["result_count"],
+                "all_lane_results_bound": analysis_run["all_lane_results_bound"],
+                "operator_review_ready": analysis_run["operator_review_ready"],
+                "coding_agent_review_ready": analysis_run["coding_agent_review_ready"],
+                "observation_analysis_run_bound": analysis_run[
+                    "observation_analysis_run_bound"
+                ],
+                "claim_ceiling": analysis_run["claim_ceiling"],
+                "raw_result_payload_stored": analysis_run[
+                    "raw_result_payload_stored"
+                ],
+            },
+            actor="ObservationIntegrationWorkbench",
+            category="interface-observation-integration-run",
+            layer="L6",
+            signature_roles=["self", "guardian"],
+            substrate="hybrid-bio-digital",
+        )
         return {
             "identity": {
                 "identity_id": identity.identity_id,
@@ -12156,6 +12189,7 @@ json.dump(response, sys.stdout)
             "integration_graph": integration_graph,
             "analysis_plan": analysis_plan,
             "operator_guide": operator_guide,
+            "analysis_run": analysis_run,
             "validation": validation,
             "schema_contracts": [
                 {
@@ -12187,6 +12221,11 @@ json.dump(response, sys.stdout)
                     "payload_path": "operator_guide",
                     "schema_path": "specs/schemas/observation_operator_guide.schema",
                     "contract_role": "observation-operator-guide",
+                },
+                {
+                    "payload_path": "analysis_run",
+                    "schema_path": "specs/schemas/observation_analysis_run.schema",
+                    "contract_role": "observation-analysis-run",
                 },
             ],
             "ledger_profile": self.ledger.profile(),

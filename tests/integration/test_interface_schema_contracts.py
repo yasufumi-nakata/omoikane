@@ -323,6 +323,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
             "specs/schemas/observation_operator_guide.schema",
             result["operator_guide"],
         )
+        self._assert_schema_valid(
+            "specs/schemas/observation_analysis_run.schema",
+            result["analysis_run"],
+        )
         self.assertTrue(result["validation"]["ok"])
         self.assertTrue(result["validation"]["taxonomy_digest_bound"])
         self.assertTrue(result["validation"]["method_catalog_digest_bound"])
@@ -330,6 +334,10 @@ class InterfaceSchemaContractTests(unittest.TestCase):
         self.assertTrue(result["validation"]["integration_graph_digest_bound"])
         self.assertTrue(result["validation"]["analysis_plan_digest_bound"])
         self.assertTrue(result["validation"]["operator_guide_digest_bound"])
+        self.assertTrue(result["validation"]["analysis_run_digest_bound"])
+        self.assertTrue(result["validation"]["observation_analysis_run_bound"])
+        self.assertTrue(result["validation"]["all_lane_results_bound"])
+        self.assertTrue(result["validation"]["analysis_result_payload_redacted"])
         self.assertTrue(result["validation"]["alignment_axes_bound"])
         self.assertTrue(result["validation"]["rights_and_consent_bound"])
         self.assertTrue(result["validation"]["cross_domain_graph_bound"])

@@ -393,6 +393,7 @@ status: decided | superseded
 - [2026-05-05_neuro-integration-application-connector-bundle.md](2026-05-05_neuro-integration-application-connector-bundle.md)
 - [2026-05-05_observation-integration-workbench.md](2026-05-05_observation-integration-workbench.md)
 - [2026-05-05_observation-measurement-analysis-catalog.md](2026-05-05_observation-measurement-analysis-catalog.md)
+- [2026-05-05_observation-integration-analysis-run.md](2026-05-05_observation-integration-analysis-run.md)
 - [2026-05-05_neuro-integration-cross-modal-analysis-plan.md](2026-05-05_neuro-integration-cross-modal-analysis-plan.md)
 - [2026-05-05_neuro-integration-cross-modal-analysis-run.md](2026-05-05_neuro-integration-cross-modal-analysis-run.md)
 - [2026-05-05_biodata-survey-eeg-fusion.md](2026-05-05_biodata-survey-eeg-fusion.md)

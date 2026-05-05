@@ -17,6 +17,10 @@ expected:
   integration_graph_digest_bound: true
   analysis_plan_digest_bound: true
   operator_guide_digest_bound: true
+  analysis_run_digest_bound: true
+  observation_analysis_run_bound: true
+  all_lane_results_bound: true
+  analysis_result_payload_redacted: true
   alignment_axes_bound: true
   rights_and_consent_bound: true
   cross_domain_graph_bound: true
@@ -32,6 +36,7 @@ expected:
   measurement_method_count_min: 40
   analysis_method_family_count_min: 10
   analysis_method_count_min: 40
+  analysis_result_count: 6
   claim_ceiling: cross-domain-feature-integration-plan-only
   claim_ceiling_bound: true
   raw_payload_redacted: true

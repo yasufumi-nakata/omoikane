@@ -16,6 +16,7 @@ imports:
   observation_integration_graph: ../schemas/observation_integration_graph.schema
   observation_analysis_plan: ../schemas/observation_analysis_plan.schema
   observation_operator_guide: ../schemas/observation_operator_guide.schema
+  observation_analysis_run: ../schemas/observation_analysis_run.schema
 operations:
   emit_taxonomy:
     summary: Emit the open-world observation source taxonomy and required alignment axes.
@@ -142,8 +143,35 @@ operations:
       - beginner operator and coding-agent handoffs must be explicit
       - operator instructions must remain schema-bound and digest-only
       - raw instruction, analysis, and source payload storage must remain false
+  execute_analysis_plan:
+    summary: Emit bounded digest-only lane results for every universal observation analysis lane.
+    input:
+      inline_schema:
+        type: object
+        required:
+          - source_bundle
+          - integration_graph
+          - analysis_plan
+          - operator_guide
+        properties:
+          source_bundle:
+            schema_ref: observation_source_bundle
+          integration_graph:
+            schema_ref: observation_integration_graph
+          analysis_plan:
+            schema_ref: observation_analysis_plan
+          operator_guide:
+            schema_ref: observation_operator_guide
+    output:
+      schema_ref: observation_analysis_run
+    guarantees:
+      - ingest, normalize, align, model, audit, and publish-digest lanes must each produce one bounded result summary
+      - result summaries must bind source bundle, graph, plan, and operator-guide digests
+      - operator and coding-agent review readiness must be explicit
+      - raw source, model, instruction, and result payload storage must remain false
+      - clinical diagnosis, causal truth, totality, consciousness, and identity claims must remain false
   validate_observation_package:
-    summary: Verify taxonomy, source bundle, graph, analysis plan, and guide digest binding plus safety ceilings.
+    summary: Verify taxonomy, source bundle, graph, analysis plan, guide, and optional analysis run digest binding plus safety ceilings.
     input:
       inline_schema:
         type: object
@@ -166,6 +194,8 @@ operations:
             schema_ref: observation_analysis_plan
           operator_guide:
             schema_ref: observation_operator_guide
+          analysis_run:
+            schema_ref: observation_analysis_run
     output:
       inline_schema:
         type: object
@@ -176,6 +206,10 @@ operations:
           - integration_graph_digest_bound
           - analysis_plan_digest_bound
           - operator_guide_digest_bound
+          - analysis_run_digest_bound
+          - observation_analysis_run_bound
+          - all_lane_results_bound
+          - analysis_result_payload_redacted
           - raw_payload_redacted
           - no_totality_or_truth_claim
           - no_identity_or_consciousness_claim
@@ -193,6 +227,14 @@ operations:
           analysis_plan_digest_bound:
             type: boolean
           operator_guide_digest_bound:
+            type: boolean
+          analysis_run_digest_bound:
+            type: boolean
+          observation_analysis_run_bound:
+            type: boolean
+          all_lane_results_bound:
+            type: boolean
+          analysis_result_payload_redacted:
             type: boolean
           raw_payload_redacted:
             type: boolean
@@ -213,3 +255,5 @@ events:
     payload_schema: observation_analysis_plan
   - name: observation_integration.operator_guide.bound
     payload_schema: observation_operator_guide
+  - name: observation_integration.analysis_run.bound
+    payload_schema: observation_analysis_run

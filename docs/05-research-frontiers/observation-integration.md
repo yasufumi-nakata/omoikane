@@ -19,7 +19,8 @@ provenance、rights、time、space、unit、uncertainty、entity scope を同じ
 各領域には domain-specific repository、metadata schema、identifier、ontology、
 quality-control practice がある。OmoikaneOS reference runtime v0 は、
 raw data ではなく feature digest と alignment axes だけを受け取る
-Observation Integration Workbench として、解析計画 surface までを固定した。
+Observation Integration Workbench として、解析計画 surface と bounded lane result
+summary surface までを固定した。
 2026-05-05 の拡張では、測定方法と解析方法も open-world method catalog として
 digest-bound にし、method id / family / count / analysis lane refs だけを保持する。
 
@@ -40,6 +41,9 @@ consciousness reproduction、identity replacement をすべて false に固定�
 外部 source は raw payload として保存せず、source manifest、feature digest、
 alignment axis summary、rights ref、uncertainty model ref、measurement method ref、
 analysis method ref だけを取り込む。
+analysis run は ingest / normalize / align / model / audit / publish-digest の
+bounded lane summary だけを返し、medical result、causal truth、truth unification、
+upload readiness には昇格しない。
 矛盾や不完全性は `https://mind-upload.com/frontiers/universal-observation-integration`
 の conflict sink に分離する。
 

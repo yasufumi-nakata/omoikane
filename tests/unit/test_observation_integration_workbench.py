@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from copy import deepcopy
 
 from omoikane.interface.observation_integration_workbench import (
     ObservationIntegrationWorkbench,
@@ -56,6 +57,7 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
             method_catalog=method_catalog,
         )
         guide = workbench.build_operator_guide(source_bundle, plan)
+        run = workbench.execute_analysis_plan(source_bundle, graph, plan, guide)
         return {
             "workbench": workbench,
             "taxonomy": taxonomy,
@@ -64,6 +66,7 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
             "graph": graph,
             "plan": plan,
             "guide": guide,
+            "run": run,
         }
 
     def test_binds_open_world_observation_package(self) -> None:
@@ -75,6 +78,7 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
             package["plan"],
             package["guide"],
             method_catalog=package["method_catalog"],
+            analysis_run=package["run"],
         )
 
         self.assertTrue(validation["ok"])
@@ -84,6 +88,10 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
         self.assertTrue(validation["integration_graph_digest_bound"])
         self.assertTrue(validation["analysis_plan_digest_bound"])
         self.assertTrue(validation["operator_guide_digest_bound"])
+        self.assertTrue(validation["analysis_run_digest_bound"])
+        self.assertTrue(validation["observation_analysis_run_bound"])
+        self.assertTrue(validation["all_lane_results_bound"])
+        self.assertTrue(validation["analysis_result_payload_redacted"])
         self.assertTrue(validation["alignment_axes_bound"])
         self.assertTrue(validation["rights_and_consent_bound"])
         self.assertTrue(validation["cross_domain_graph_bound"])
@@ -98,6 +106,9 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
         self.assertGreaterEqual(validation["family_coverage_count"], 4)
         self.assertGreaterEqual(validation["measurement_method_family_count"], 8)
         self.assertGreaterEqual(validation["analysis_method_family_count"], 10)
+        self.assertEqual(6, validation["analysis_result_count"])
+        self.assertTrue(package["run"]["observation_analysis_run_bound"])
+        self.assertEqual(6, package["run"]["result_count"])
         self.assertEqual(
             "cross-domain-feature-integration-plan-only",
             validation["claim_ceiling"],
@@ -124,6 +135,24 @@ class ObservationIntegrationWorkbenchTests(unittest.TestCase):
                 "Tampered method catalog should be rejected.",
                 method_catalog=tampered,
             )
+
+    def test_tampered_analysis_run_result_digest_fails_validation(self) -> None:
+        package = self._build_package()
+        tampered_run = deepcopy(package["run"])
+        tampered_run["result_digests"][0] = "0" * 64
+
+        validation = package["workbench"].validate_observation_package(
+            package["taxonomy"],
+            package["source_bundle"],
+            package["graph"],
+            package["plan"],
+            package["guide"],
+            method_catalog=package["method_catalog"],
+            analysis_run=tampered_run,
+        )
+
+        self.assertFalse(validation["ok"])
+        self.assertIn("analysis_run.result_digests mismatch", validation["errors"])
 
     def test_requires_four_observation_domains(self) -> None:
         workbench = ObservationIntegrationWorkbench()

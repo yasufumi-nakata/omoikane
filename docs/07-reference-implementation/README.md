@@ -187,16 +187,18 @@ consciousness reproduction、identity replacement は保持または主張しな
 `observation-integration-demo` は L6 Observation Integration Workbench の reference contract
 (`interface.observation_integration_workbench.v0`) を JSON で可視化し、人類が取得・
 計測してきた source を broad taxonomy、source bundle、cross-domain integration graph、
-analysis plan、operator guide に束縛する。さらに measurement / analysis method catalog を
+analysis plan、operator guide、analysis run に束縛する。analysis run は各 lane の
+bounded result summary と operator / coding-agent review readiness を digest-only で返す。
+さらに measurement / analysis method catalog を
 返し、questionnaire、biosignal recording、imaging、sequencing、sensor、registry、
 experiment、simulation などの測定方法と、statistics、signal processing、
 spatial-temporal analysis、statistical inference、machine learning、graph analysis、
 omics、image analysis、simulation、qualitative analysis、rights audit などの解析方法を
 open-world な method ref として analysis plan に束縛する。source manifest は feature digest、
 provenance、rights、time、space、unit、uncertainty、entity scope だけを持ち、
-raw observation / personal / external dataset / method / algorithm / analysis payload は保持しない。claim ceiling は
+raw observation / personal / external dataset / method / algorithm / analysis / result payload は保持しない。claim ceiling は
 `cross-domain-feature-integration-plan-only` で、complete human knowledge、
-truth unification、consciousness reproduction、identity replacement は主張しない。
+truth unification、causal truth、consciousness reproduction、identity replacement は主張しない。
 
 
 `identity-demo` は L1 IdentityRegistry の reference contract

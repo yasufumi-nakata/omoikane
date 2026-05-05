@@ -30,8 +30,10 @@ graph、analysis plan、operator guide に乗せ、後続の Builder / Researche
   boundary を保持する
 - ingest、normalize、align、model、audit、publish-digest の analysis lane を同じ
   graph digest と method catalog digest に束縛する
+- 各 analysis lane の bounded result summary を analysis run receipt として束縛し、
+  operator / coding-agent review readiness を明示する
 - 非専門 operator 向け card と coding agent 向け task template を同じ guide receipt に入れる
-- raw observation / personal / external dataset / analysis / instruction payload は保存しない
+- raw observation / personal / external dataset / analysis / instruction / result payload は保存しない
 - claim ceiling は `cross-domain-feature-integration-plan-only` に固定する
 
 ## Reference Runtime v0
@@ -48,7 +50,8 @@ graph、analysis plan、operator guide に乗せ、後続の Builder / Researche
 5. analysis question を ingest / normalize / align / model / audit / publish-digest lane に分解し、
    各 lane を measurement method ref と analysis method ref に束縛する
 6. beginner operator card と coding-agent task template を operator guide に束縛する
-7. taxonomy、method catalog、source bundle、graph、analysis plan、guide を ContinuityLedger に記録する
+7. 各 lane の bounded result summary を digest-only analysis run として生成する
+8. taxonomy、method catalog、source bundle、graph、analysis plan、guide、analysis run を ContinuityLedger に記録する
 
 ## 不変条件
 
@@ -57,7 +60,8 @@ graph、analysis plan、operator guide に乗せ、後続の Builder / Researche
 3. **method catalog, not method capture** ── 測定法と解析法は method id / ref / digest に縮約し、raw algorithm や code payload を保存しない
 4. **rights-first graph** ── cross-domain edge は rights boundary と uncertainty propagation を持つ
 5. **plan, not truth** ── 統合結果は解析計画であり、完全知識や真理統一の主張ではない
-6. **claim ceiling** ── consciousness reproduction と identity replacement は false のまま維持する
+6. **bounded lane results** ── analysis run は lane ごとの bounded summary に限り、診断、因果真理、完全知識へ昇格しない
+7. **claim ceiling** ── consciousness reproduction と identity replacement は false のまま維持する
 
 ## 研究課題
 
