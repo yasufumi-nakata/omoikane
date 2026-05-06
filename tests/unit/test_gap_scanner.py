@@ -673,6 +673,42 @@ class GapScannerTests(unittest.TestCase):
             )
             self.assertIn("build_request.yaml", report["inventory_drift_hits"][0]["line"])
 
+    def test_scan_reports_duplicate_schema_inventory_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            schemas_root = repo_root / "specs" / "schemas"
+            (schemas_root / "README.md").write_text(
+                "# Schemas\n\n"
+                "- `identity_record.schema`\n"
+                "  - `identity_record.schema` is an explanatory nested reference\n"
+                "- `identity_record.schema`\n",
+                encoding="utf-8",
+            )
+            (schemas_root / "identity_record.schema").write_text(
+                "{\n  \"type\": \"object\"\n}\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            self.assertEqual(
+                "specs/schemas/README.md",
+                report["inventory_drift_hits"][0]["path"],
+            )
+            self.assertIn(
+                "listed more than once",
+                report["inventory_drift_hits"][0]["line"],
+            )
+            self.assertIn(
+                "identity_record.schema",
+                report["inventory_drift_hits"][0]["line"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
+            )
+
     def test_scan_reports_eval_inventory_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

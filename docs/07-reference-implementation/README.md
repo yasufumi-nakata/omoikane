@@ -111,6 +111,7 @@ automation が前提にする repo-local `references/*.md` の欠落
 各 runbook の必須 section-level policy
 (`Preflight` / `Gate Order` / `Worker Boundaries` / `Verification` など) の欠落、
 `specs/interfaces/README.md` / `specs/schemas/README.md` / `evals/*/README.md` の inventory drift、
+同じ inventory item の重複掲載、
 実装済みの `specs/interfaces/*.idl` / `specs/schemas/*` が
 `specs/catalog.yaml` entries に未登録の catalog coverage gap、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /

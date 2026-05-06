@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import subprocess
+from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List
 
@@ -1077,9 +1078,9 @@ class GapScanner:
     ) -> List[str]:
         entries: List[str] = []
         for line in readme_path.read_text(encoding="utf-8").splitlines():
-            stripped = line.strip()
-            if not stripped.startswith("- "):
+            if not line.startswith("- "):
                 continue
+            stripped = line.strip()
             if "`" not in stripped:
                 continue
             parts = stripped.split("`")
@@ -1091,6 +1092,11 @@ class GapScanner:
                     continue
                 entries.append(candidate)
         return entries
+
+    @staticmethod
+    def _duplicate_inventory_entries(entries: List[str]) -> List[str]:
+        counts = Counter(entries)
+        return sorted(entry for entry, count in counts.items() if count > 1)
 
     @staticmethod
     def _empty_eval_surfaces(evals_root: Path) -> List[str]:
@@ -1133,12 +1139,20 @@ class GapScanner:
         top_level_eval_readme = repo_root / TOP_LEVEL_EVAL_INVENTORY_SPEC[0]
         top_level_eval_root = repo_root / TOP_LEVEL_EVAL_INVENTORY_SPEC[1]
         if top_level_eval_readme.exists() and top_level_eval_root.exists():
-            listed_eval_entries = set(
-                self._extract_inventory_entries(
-                    top_level_eval_readme,
-                    allow_paths=True,
-                )
+            listed_eval_entry_list = self._extract_inventory_entries(
+                top_level_eval_readme,
+                allow_paths=True,
             )
+            listed_eval_entries = set(listed_eval_entry_list)
+            for duplicate_entry in self._duplicate_inventory_entries(
+                listed_eval_entry_list
+            ):
+                hits.append(
+                    {
+                        "path": TOP_LEVEL_EVAL_INVENTORY_SPEC[0],
+                        "line": f"`{duplicate_entry}` is listed more than once in the top-level eval inventory",
+                    }
+                )
             actual_eval_entries = {
                 str(path.relative_to(top_level_eval_root))
                 for suffix in TOP_LEVEL_EVAL_INVENTORY_SPEC[2]
@@ -1168,7 +1182,15 @@ class GapScanner:
             directory_path = repo_root / directory_name
             if not readme_path.exists() or not directory_path.exists():
                 continue
-            listed_entries = set(self._extract_inventory_entries(readme_path))
+            listed_entry_list = self._extract_inventory_entries(readme_path)
+            listed_entries = set(listed_entry_list)
+            for duplicate_entry in self._duplicate_inventory_entries(listed_entry_list):
+                hits.append(
+                    {
+                        "path": readme_name,
+                        "line": f"`{duplicate_entry}` is listed more than once in the README inventory",
+                    }
+                )
             actual_entries = {
                 path.name
                 for suffix in suffixes
