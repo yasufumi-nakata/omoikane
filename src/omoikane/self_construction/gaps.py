@@ -822,7 +822,9 @@ class GapScanner:
             normalized = normalized[2:]
         if not normalized:
             return False
-        if normalized in GENERATED_ARTIFACT_FILENAMES:
+        path_parts = normalized.split("/")
+        basename = path_parts[-1]
+        if basename in GENERATED_ARTIFACT_FILENAMES:
             return True
         if normalized.startswith(GENERATED_ARTIFACT_PREFIXES):
             return True
@@ -830,7 +832,7 @@ class GapScanner:
             return True
         return any(
             part.endswith(GENERATED_ARTIFACT_PART_SUFFIXES)
-            for part in normalized.split("/")
+            for part in path_parts
         )
 
     @staticmethod
@@ -908,9 +910,11 @@ class GapScanner:
         normalized = path.strip()
         if normalized.startswith("./"):
             normalized = normalized[2:]
-        if normalized in GENERATED_ARTIFACT_PLATFORM_FILENAMES:
+        path_parts = normalized.split("/") if normalized else [""]
+        basename = path_parts[-1]
+        if basename in GENERATED_ARTIFACT_PLATFORM_FILENAMES:
             return "platform-metadata-output"
-        if normalized in GENERATED_ARTIFACT_COVERAGE_FILENAMES:
+        if basename in GENERATED_ARTIFACT_COVERAGE_FILENAMES:
             return "coverage-output"
         if normalized.startswith(GENERATED_ARTIFACT_CACHE_PREFIXES):
             return "test-or-analysis-cache"
@@ -919,7 +923,7 @@ class GapScanner:
         ) or normalized.endswith(".patch"):
             return "patch-or-artifact-output"
         if normalized.startswith(GENERATED_ARTIFACT_PACKAGING_PREFIXES) or any(
-            part.endswith(".egg-info") for part in normalized.split("/")
+            part.endswith(".egg-info") for part in path_parts
         ):
             return "packaging-output"
         if normalized.startswith(GENERATED_ARTIFACT_COVERAGE_PREFIXES):

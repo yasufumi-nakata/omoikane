@@ -386,25 +386,84 @@ class GapScannerTests(unittest.TestCase):
                 "-m",
                 "bootstrap",
             )
-            (repo_root / ".DS_Store").write_bytes(b"Finder metadata")
+            ds_store_path = repo_root / "tests" / "integration" / ".DS_Store"
+            thumbs_path = repo_root / "docs" / "Thumbs.db"
+            ds_store_path.parent.mkdir(parents=True, exist_ok=True)
+            thumbs_path.parent.mkdir(parents=True, exist_ok=True)
+            ds_store_path.write_bytes(b"Finder metadata")
+            thumbs_path.write_bytes(b"Windows Explorer metadata")
 
             report = GapScanner().scan(repo_root)
-            hit = report["untracked_generated_artifact_hits"][0]
+            hits = {
+                hit["path"]: hit for hit in report["untracked_generated_artifact_hits"]
+            }
 
-            self.assertEqual(1, report["untracked_generated_artifact_count"])
-            self.assertEqual(".DS_Store", hit["path"])
-            self.assertEqual("platform-metadata-output", hit["artifact_class"])
+            self.assertEqual(2, report["untracked_generated_artifact_count"])
             self.assertEqual(
-                "untracked-generated-artifact",
-                hit["untracked_artifact_status"],
+                {
+                    "docs/Thumbs.db",
+                    "tests/integration/.DS_Store",
+                },
+                set(hits),
             )
-            self.assertFalse(hit["raw_artifact_payload_stored"])
+            for hit in hits.values():
+                self.assertEqual("platform-metadata-output", hit["artifact_class"])
+                self.assertEqual(
+                    "untracked-generated-artifact",
+                    hit["untracked_artifact_status"],
+                )
+                self.assertFalse(hit["raw_artifact_payload_stored"])
             surface_digest = next(
                 entry
                 for entry in report["scan_receipt"]["scan_surface_digests"]
                 if entry["path"] == "git:untracked-generated-artifacts"
             )
-            self.assertEqual(sha256_text(".DS_Store\n"), surface_digest["sha256"])
+            self.assertEqual(
+                sha256_text("docs/Thumbs.db\ntests/integration/.DS_Store\n"),
+                surface_digest["sha256"],
+            )
+
+    def test_scan_reports_tracked_nested_platform_metadata_artifact(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            ds_store_path = repo_root / "tests" / "integration" / ".DS_Store"
+            ds_store_path.parent.mkdir(parents=True, exist_ok=True)
+            ds_store_path.write_bytes(b"Finder metadata")
+            self._run_git(repo_root, "add", ".")
+            self._run_git(repo_root, "add", "-f", "tests/integration/.DS_Store")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap with platform metadata",
+            )
+
+            report = GapScanner().scan(repo_root)
+            hit = report["tracked_generated_artifact_hits"][0]
+
+            self.assertEqual(1, report["tracked_generated_artifact_count"])
+            self.assertEqual("tests/integration/.DS_Store", hit["path"])
+            self.assertEqual("platform-metadata-output", hit["artifact_class"])
+            self.assertEqual(
+                "tracked-generated-artifact",
+                hit["tracked_artifact_status"],
+            )
+            self.assertFalse(hit["raw_artifact_payload_stored"])
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:tracked-generated-artifacts"
+            )
+            self.assertEqual(
+                sha256_text("tests/integration/.DS_Store\n"),
+                surface_digest["sha256"],
+            )
 
     def test_scan_reports_tracked_test_cache_artifacts(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
