@@ -1,3 +1,18 @@
+---
+date: 2026-05-06
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/neuro_integration_workbench.py
+  - src/omoikane/reference_os.py
+  - specs/schemas/neuro_integration_operator_runbook.schema
+  - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+  - tests/unit/test_neuro_integration_workbench.py
+  - tests/integration/test_interface_schema_contracts.py
+  - tests/integration/test_reference_runtime.py
+  - tests/integration/test_cli.py
+status: decided
+---
+
 # 2026-05-06 Neuro Integration Operator Runbook
 
 ## 決定

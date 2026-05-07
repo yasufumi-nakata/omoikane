@@ -1,3 +1,12 @@
+---
+date: 2026-04-19
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - specs/schemas/distributed_council_resolution.schema
+  - evals/agentic/distributed_council_resolution.yaml
+status: decided
+---
+
 # 2026-04-19 Distributed Council Resolution
 
 ## Context

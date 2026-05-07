@@ -21,6 +21,16 @@ touchpoints:
   - tests/unit/test_neuro_integration_workbench.py
   - tests/integration/test_cli.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/neuro_integration_workbench.py
+  - specs/schemas/neuro_integration_collection_run.schema
+  - specs/schemas/neuro_integration_measurement_quality_gate.schema
+  - specs/schemas/neuro_integration_cross_modal_analysis_plan.schema
+  - specs/schemas/neuro_integration_cross_modal_analysis_run.schema
+  - specs/schemas/neuro_integration_interpretation_synthesis.schema
+  - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+  - specs/catalog.yaml
 ---
 
 # Decision

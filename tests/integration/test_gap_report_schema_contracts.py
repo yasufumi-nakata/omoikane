@@ -103,6 +103,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             counts["decision_log_index_inventory_count"],
         )
         self.assertEqual(
+            report["decision_log_metadata_violation_count"],
+            counts["decision_log_metadata_violation_count"],
+        )
+        self.assertEqual(
             report["decision_log_residual_count"],
             counts["decision_log_residual_count"],
         )

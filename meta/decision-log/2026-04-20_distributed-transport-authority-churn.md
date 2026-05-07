@@ -1,3 +1,11 @@
+---
+date: 2026-04-20
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - specs/schemas/README.md
+status: decided
+---
+
 # Context
 
 - distributed transport reference runtime は live root directory と bounded authority-plane fleet までは machine-checkable でしたが、

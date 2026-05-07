@@ -6,7 +6,8 @@ description: >
   including top-level eval inventory drift and duplicate-entry checks, tracked
   worktree marker-residue checks, tracked/untracked generated artifact hygiene
   checks for build output, caches, and platform metadata, decision-log README
-  index inventory checks, agent source definition validation, truth-source
+  index inventory checks, decision-log metadata conformance checks, agent source
+  definition validation, truth-source
   residual marker checks, and a digest-bound scan receipt for automation gating.
 type: object
 additionalProperties: false
@@ -27,6 +28,7 @@ required:
   - tracked_generated_artifact_count
   - untracked_generated_artifact_count
   - decision_log_index_inventory_count
+  - decision_log_metadata_violation_count
   - decision_log_residual_count
   - decision_log_frontier_count
   - open_questions
@@ -46,6 +48,7 @@ required:
   - tracked_generated_artifact_hits
   - untracked_generated_artifact_hits
   - decision_log_index_inventory_hits
+  - decision_log_metadata_violation_hits
   - decision_log_residual_hits
   - decision_log_frontier_hits
   - prioritized_tasks
@@ -97,6 +100,9 @@ properties:
     type: integer
     minimum: 0
   decision_log_index_inventory_count:
+    type: integer
+    minimum: 0
+  decision_log_metadata_violation_count:
     type: integer
     minimum: 0
   decision_log_residual_count:
@@ -187,6 +193,13 @@ properties:
     description: >
       Decision-log markdown files that are missing from meta/decision-log/README.md,
       or stale README index entries whose target files no longer exist.
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  decision_log_metadata_violation_hits:
+    description: >
+      Dated decision-log markdown files whose frontmatter is missing or does not
+      carry the required date, deciders, related_docs, and status metadata.
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -334,6 +347,7 @@ properties:
           - tracked_generated_artifact_count
           - untracked_generated_artifact_count
           - decision_log_index_inventory_count
+          - decision_log_metadata_violation_count
           - decision_log_residual_count
           - decision_log_frontier_count
           - catalog_pending_count
@@ -382,6 +396,9 @@ properties:
             type: integer
             minimum: 0
           decision_log_index_inventory_count:
+            type: integer
+            minimum: 0
+          decision_log_metadata_violation_count:
             type: integer
             minimum: 0
           decision_log_residual_count:
@@ -540,6 +557,8 @@ $defs:
       decision_log_file:
         type: string
         pattern: "^[0-9]{4}-[0-9]{2}-[0-9]{2}_.+\\.md$"
+      metadata_policy_id:
+        const: decision-log-frontmatter-conformance-v1
       required_section:
         type: string
         minLength: 1
@@ -574,6 +593,7 @@ examples:
     tracked_generated_artifact_count: 0
     untracked_generated_artifact_count: 0
     decision_log_index_inventory_count: 0
+    decision_log_metadata_violation_count: 0
     decision_log_residual_count: 0
     decision_log_frontier_count: 0
     open_questions: []
@@ -593,6 +613,7 @@ examples:
     tracked_generated_artifact_hits: []
     untracked_generated_artifact_hits: []
     decision_log_index_inventory_hits: []
+    decision_log_metadata_violation_hits: []
     decision_log_residual_hits: []
     decision_log_frontier_hits: []
     prioritized_tasks: []
@@ -639,6 +660,7 @@ examples:
         tracked_generated_artifact_count: 0
         untracked_generated_artifact_count: 0
         decision_log_index_inventory_count: 0
+        decision_log_metadata_violation_count: 0
         decision_log_residual_count: 0
         decision_log_frontier_count: 0
         catalog_pending_count: 0

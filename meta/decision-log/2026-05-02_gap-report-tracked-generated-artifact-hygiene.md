@@ -1,6 +1,9 @@
 ---
 date: 2026-05-02
 status: decided
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/07-reference-implementation/README.md
 ---
 
 # Decision: gap-report は tracked generated artifact も surfacing する

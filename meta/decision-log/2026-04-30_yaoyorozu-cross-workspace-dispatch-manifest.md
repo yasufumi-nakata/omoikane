@@ -14,6 +14,16 @@ touchpoints:
   - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
   - evals/agentic/yaoyorozu_local_worker_dispatch.yaml
   - agents/guardians/integrity-guardian.yaml
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/agentic/yaoyorozu.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/agentic.yaoyorozu.v0.idl
+  - specs/schemas/yaoyorozu_cross_workspace_dispatch_manifest.schema
+  - specs/schemas/yaoyorozu_worker_dispatch_plan.schema
+  - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+  - evals/agentic/yaoyorozu_local_worker_dispatch.yaml
+  - agents/guardians/integrity-guardian.yaml
 ---
 
 # Decision

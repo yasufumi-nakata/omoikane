@@ -1,6 +1,9 @@
 ---
 date: 2026-05-02
 status: decided
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - agents/**/*.yaml
 ---
 
 # Decision: gap-report は agent source definition violation も all-zero gate に含める

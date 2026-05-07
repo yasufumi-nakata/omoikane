@@ -1,0 +1,13 @@
+eval_id: gap_scanner_decision_log_metadata
+layer: L5
+target: self_construction.gap_report
+description: gap-report が dated decision log の frontmatter metadata 欠落を high-priority task として検出し、complete metadata を all-zero gate に通すこと
+must_hold:
+  missing_frontmatter_log:
+    decision_log_metadata_violation_count: 1
+    prioritized_task_kind: decision-log-metadata
+    metadata_policy_id: decision-log-frontmatter-conformance-v1
+  complete_metadata_log:
+    decision_log_metadata_violation_count: 0
+    decision_log_metadata_violation_hits: []
+claim_ceiling: decision-log-metadata-hygiene-only

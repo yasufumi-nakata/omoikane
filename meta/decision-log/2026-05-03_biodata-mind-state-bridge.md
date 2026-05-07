@@ -18,6 +18,16 @@ touchpoints:
   - tests/unit/test_biodata_transmitter.py
   - tests/integration/test_interface_schema_contracts.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/biodata_transmitter.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/interface.biodata_transmitter.v0.idl
+  - specs/schemas/biodata_mind_state_bridge.schema
+  - specs/schemas/README.md
+  - specs/catalog.yaml
+  - evals/interface/biodata_transmitter_roundtrip.yaml
+  - evals/interface/README.md
 ---
 
 # Decision

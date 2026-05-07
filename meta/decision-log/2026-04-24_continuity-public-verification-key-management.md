@@ -6,6 +6,12 @@ surface:
   - evals/continuity/continuity_public_verification_key_management.yaml
 closes_next_gaps:
   - docs/02-subsystems/kernel/continuity-ledger.md#public-verification-key-management
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/kernel/continuity.py
+  - specs/schemas/continuity_public_verification_bundle.schema
+  - evals/continuity/continuity_public_verification_key_management.yaml
+status: decided
 ---
 
 # Decision: ContinuityLedger の public verification key roster を固定する

@@ -23,6 +23,16 @@ touchpoints:
   - tests/integration/test_cli.py
   - tests/integration/test_interface_schema_contracts.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/sensory_loopback.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/interface.sensory_loopback.v0.idl
+  - specs/schemas/sensory_loopback_session.schema
+  - specs/schemas/sensory_loopback_receipt.schema
+  - specs/schemas/sensory_loopback_artifact_family.schema
+  - specs/schemas/sensory_loopback_biodata_arbitration_binding.schema
+  - specs/schemas/sensory_loopback_calibration_refresh_state_guard.schema
 ---
 
 # Decision

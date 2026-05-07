@@ -3,6 +3,10 @@ date: 2026-05-02
 status: decided
 closes_next_gaps:
   - gap-report-decision-log-index-inventory
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - meta/decision-log/README.md
+  - meta/decision-log/YYYY-MM-DD_*.md
 ---
 
 # Decision: gap-report は decision-log README index drift も監査する

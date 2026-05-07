@@ -20,6 +20,16 @@ touchpoints:
   - tests/integration/test_interface_schema_contracts.py
   - tests/integration/test_cli.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/neuro_integration_workbench.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/interface.neuro_integration_workbench.v0.idl
+  - specs/schemas/neuro_integration_collection_run.schema
+  - specs/catalog.yaml
+  - specs/schemas/README.md
+  - evals/interface/neuro_integration_workbench.yaml
+  - docs/02-subsystems/interface/neuro-integration-workbench.md
 ---
 
 # Decision

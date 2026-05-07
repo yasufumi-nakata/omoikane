@@ -3,6 +3,11 @@ date: 2026-05-02
 status: decided
 closes_next_gaps:
   - gap-report-top-level-eval-inventory
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - evals/*/README.md
+  - evals/README.md
+  - evals/**/*.yaml
 ---
 
 # Decision: gap-report は top-level eval inventory drift も監査する

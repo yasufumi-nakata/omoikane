@@ -1,3 +1,13 @@
+---
+date: 2026-04-20
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/07-reference-implementation/README.md
+  - specs/ から runtime への自動生成ループ
+  - evals/continuity/council_output_build_request_pipeline.yaml
+status: decided
+---
+
 # 2026-04-20 Builder Pipeline Reference Loop
 
 ## Context

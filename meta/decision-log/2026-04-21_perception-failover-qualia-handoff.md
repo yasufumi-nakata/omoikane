@@ -1,3 +1,13 @@
+---
+date: 2026-04-21
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/02-subsystems/cognitive/README.md
+  - docs/07-reference-implementation/README.md
+  - specs/catalog.yaml
+status: decided
+---
+
 # 2026-04-21 Perception Failover Qualia Handoff
 
 deciders: [yasufumi, codex-builder]

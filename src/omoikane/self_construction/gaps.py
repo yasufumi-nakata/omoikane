@@ -51,6 +51,14 @@ DECISION_LOG_FOLLOWUP_SECTIONS = {
 DECISION_LOG_IGNORED_NAME_SNIPPETS = ("gap-report",)
 DECISION_LOG_NEXT_GAP_IDS_KEY = "next_gap_ids"
 DECISION_LOG_CLOSES_NEXT_GAPS_KEY = "closes_next_gaps"
+DECISION_LOG_METADATA_POLICY_ID = "decision-log-frontmatter-conformance-v1"
+DECISION_LOG_REQUIRED_METADATA_KEYS = (
+    "date",
+    "deciders",
+    "related_docs",
+    "status",
+)
+DECISION_LOG_ALLOWED_STATUSES = ("accepted", "decided", "superseded")
 REQUIRED_REFERENCE_FILES = (
     "references/daily-automation-direction.md",
     "references/operating-playbook.md",
@@ -239,6 +247,9 @@ class GapScanner:
         decision_log_index_inventory_hits = (
             self._decision_log_index_inventory_hits(repo_root)
         )
+        decision_log_metadata_violation_hits = (
+            self._decision_log_metadata_violation_hits(repo_root)
+        )
         decision_log_gap_hits = self._decision_log_gap_hits(repo_root)
         decision_log_residual_hits = [
             hit for hit in decision_log_gap_hits if hit["kind"] == "decision-log-residual"
@@ -360,6 +371,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in decision_log_metadata_violation_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "decision-log-metadata",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in decision_log_frontier_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -420,6 +439,9 @@ class GapScanner:
             "decision_log_index_inventory_count": len(
                 decision_log_index_inventory_hits
             ),
+            "decision_log_metadata_violation_count": len(
+                decision_log_metadata_violation_hits
+            ),
             "decision_log_residual_count": len(decision_log_residual_hits),
             "decision_log_frontier_count": len(decision_log_frontier_hits),
             "open_questions": open_questions,
@@ -441,6 +463,9 @@ class GapScanner:
             "tracked_generated_artifact_hits": tracked_generated_artifact_hits,
             "untracked_generated_artifact_hits": untracked_generated_artifact_hits,
             "decision_log_index_inventory_hits": decision_log_index_inventory_hits,
+            "decision_log_metadata_violation_hits": (
+                decision_log_metadata_violation_hits
+            ),
             "decision_log_residual_hits": decision_log_residual_hits,
             "decision_log_frontier_hits": decision_log_frontier_hits,
             "prioritized_tasks": prioritized_tasks,
@@ -478,6 +503,9 @@ class GapScanner:
             ),
             "decision_log_index_inventory_count": int(
                 report["decision_log_index_inventory_count"]
+            ),
+            "decision_log_metadata_violation_count": int(
+                report["decision_log_metadata_violation_count"]
             ),
             "decision_log_residual_count": int(report["decision_log_residual_count"]),
             "decision_log_frontier_count": int(report["decision_log_frontier_count"]),
@@ -1276,6 +1304,72 @@ class GapScanner:
             entries.append(candidate)
         return entries
 
+    def _decision_log_metadata_violation_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, str]]:
+        decision_log_root = repo_root / "meta" / "decision-log"
+        if not decision_log_root.exists():
+            return []
+
+        hits: List[Dict[str, str]] = []
+        for path in sorted(decision_log_root.glob("*.md")):
+            if not path.is_file() or path.name == "README.md":
+                continue
+            date_prefix = path.name[:10]
+            if not self._looks_like_iso_date(date_prefix):
+                continue
+            metadata = self._decision_log_frontmatter(path)
+            missing_fields: List[str] = []
+            if not metadata:
+                missing_fields.append("frontmatter")
+            if not self._decision_log_date_matches_filename(metadata, date_prefix):
+                missing_fields.append("date")
+            if not self._decision_log_metadata_string_list(metadata, "deciders"):
+                missing_fields.append("deciders")
+            if not self._decision_log_metadata_string_list(metadata, "related_docs"):
+                missing_fields.append("related_docs")
+            if not self._decision_log_status_is_allowed(metadata):
+                missing_fields.append("status")
+            if not missing_fields:
+                continue
+            relative_path = str(path.relative_to(repo_root))
+            hits.append(
+                {
+                    "kind": "decision-log-metadata",
+                    "path": relative_path,
+                    "line": (
+                        f"violates {DECISION_LOG_METADATA_POLICY_ID}: "
+                        f"missing-or-invalid {', '.join(missing_fields)}"
+                    ),
+                    "decision_log_file": path.name,
+                    "metadata_policy_id": DECISION_LOG_METADATA_POLICY_ID,
+                }
+            )
+        return hits
+
+    @staticmethod
+    def _decision_log_date_matches_filename(
+        metadata: Dict[str, Any], date_prefix: str
+    ) -> bool:
+        date_value = metadata.get("date")
+        return isinstance(date_value, str) and date_value.strip() == date_prefix
+
+    @staticmethod
+    def _decision_log_metadata_string_list(
+        metadata: Dict[str, Any], key: str
+    ) -> List[str]:
+        value = metadata.get(key, [])
+        if isinstance(value, list):
+            return [str(item).strip() for item in value if str(item).strip()]
+        return []
+
+    @staticmethod
+    def _decision_log_status_is_allowed(metadata: Dict[str, Any]) -> bool:
+        status = metadata.get("status")
+        if not isinstance(status, str):
+            return False
+        return status.strip().lower() in DECISION_LOG_ALLOWED_STATUSES
+
     def _catalog_coverage_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         catalog_path = repo_root / "specs" / "catalog.yaml"
         if not catalog_path.exists():
@@ -1595,7 +1689,14 @@ class GapScanner:
             try:
                 parsed = ast.literal_eval(candidate)
             except (SyntaxError, ValueError):
-                return candidate.strip("'\"")
+                inner = candidate[1:-1].strip()
+                if not inner:
+                    return []
+                return [
+                    item.strip().strip("'\"")
+                    for item in inner.split(",")
+                    if item.strip().strip("'\"")
+                ]
             if isinstance(parsed, list):
                 return [str(item).strip() for item in parsed if str(item).strip()]
         return candidate.strip("'\"")

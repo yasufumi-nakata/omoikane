@@ -17,6 +17,16 @@ touchpoints:
   - tests/unit/test_neuro_integration_workbench.py
   - tests/integration/test_cli.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/reference_os.py
+  - specs/schemas/neuro_integration_source_bundle.schema
+  - specs/catalog.yaml
+  - specs/schemas/README.md
+  - evals/interface/neuro_integration_workbench.yaml
+  - docs/02-subsystems/interface/neuro-integration-workbench.md
+  - docs/02-subsystems/interface/README.md
+  - docs/05-research-frontiers/biosignal-transmitter.md
 ---
 
 # Decision

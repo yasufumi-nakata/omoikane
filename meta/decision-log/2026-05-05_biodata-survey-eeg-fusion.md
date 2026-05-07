@@ -17,6 +17,16 @@ tags:
   - biodata-survey-eeg-fusion
   - llm-native-no-ml-operator
   - digest-only-analysis-window
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/biodata_transmitter.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/interface.biodata_transmitter.v0.idl
+  - specs/schemas/biodata_survey_eeg_fusion_receipt.schema
+  - evals/interface/biodata_transmitter_roundtrip.yaml
+  - docs/02-subsystems/interface/biodata-transmitter.md
+  - docs/05-research-frontiers/biosignal-transmitter.md
+  - docs/07-reference-implementation/README.md
 ---
 
 # Decision: アンケートと EEG は digest-only fusion receipt で統合する

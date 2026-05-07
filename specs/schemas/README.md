@@ -171,6 +171,7 @@
 - `gap_report.schema`
   - `evals/README.md` の top-level eval inventory 欠落を all-zero gate の外へ出す
   - `meta/decision-log/README.md` の dated decision-log index drift を all-zero gate の外へ出す
+  - dated decision log の frontmatter metadata 欠落を all-zero gate の外へ出す
   - `agents/**/*.yaml` の Yaoyorozu agent source definition violation を all-zero gate の外へ出す
   - repo-local reference runbook の存在に加えて、必須 section-level policy 欠落を all-zero gate の外へ出す
   - tracked worktree diff を digest-bound scan surface として扱い、workspace marker residue を all-zero gate の外へ出す

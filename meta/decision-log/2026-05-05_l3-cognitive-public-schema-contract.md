@@ -25,6 +25,16 @@ tags:
   - l3-cognitive-contract
   - public-schema-validation
   - subagent-gap-candidate
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - tests/integration/test_interface_schema_contracts.py
+  - specs/schemas/affect_state.schema
+  - specs/schemas/affect_transition.schema
+  - specs/schemas/attention_focus.schema
+  - specs/schemas/attention_shift.schema
+  - specs/schemas/imagination_scene.schema
+  - specs/schemas/imagination_shift.schema
+  - specs/schemas/language_render.schema
 ---
 
 # Decision: L3 cognitive demos must validate against public schemas

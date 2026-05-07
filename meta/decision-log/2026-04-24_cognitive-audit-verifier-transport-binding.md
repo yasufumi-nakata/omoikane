@@ -6,6 +6,12 @@ surface:
   - evals/cognitive/cognitive_audit_verifier_transport.yaml
 closes_next_gaps:
   - evals/cognitive/README.md#actual-non-loopback-verifier-transport
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/agentic/cognitive_audit_governance.py
+  - specs/schemas/cognitive_audit_verifier_transport_binding.schema
+  - evals/cognitive/cognitive_audit_verifier_transport.yaml
+status: decided
 ---
 
 # Decision: cognitive audit reviewer quorum は non-loopback verifier transport に束縛する

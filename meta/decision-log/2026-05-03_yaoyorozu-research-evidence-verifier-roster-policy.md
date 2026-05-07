@@ -21,6 +21,16 @@ touchpoints:
   - tests/integration/test_yaoyorozu_schema_contracts.py
   - tests/integration/test_reference_runtime.py
   - tests/integration/test_cli.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/agentic/yaoyorozu.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/agentic.yaoyorozu.v0.idl
+  - specs/schemas/yaoyorozu_research_evidence_verifier_receipt.schema
+  - specs/schemas/yaoyorozu_research_evidence_exchange.schema
+  - specs/schemas/yaoyorozu_research_evidence_synthesis.schema
+  - specs/catalog.yaml
+  - evals/agentic/yaoyorozu_research_evidence_verifier.yaml
 ---
 
 # Decision

@@ -12,7 +12,7 @@ date: YYYY-MM-DD
 deciders: [yasufumi, claude-council]
 related_docs:
   - docs/...
-status: decided | superseded
+status: accepted | decided | superseded
 ---
 
 # Decision: <題>
@@ -411,3 +411,4 @@ status: decided | superseded
 - [2026-05-05_l3-cognitive-public-schema-contract.md](2026-05-05_l3-cognitive-public-schema-contract.md)
 - [2026-05-06_neuro-integration-semantic-thought-ceiling.md](2026-05-06_neuro-integration-semantic-thought-ceiling.md)
 - [2026-05-07_gap-report-inventory-duplicate-detection.md](2026-05-07_gap-report-inventory-duplicate-detection.md)
+- [2026-05-07_decision-log-metadata-hygiene.md](2026-05-07_decision-log-metadata-hygiene.md)

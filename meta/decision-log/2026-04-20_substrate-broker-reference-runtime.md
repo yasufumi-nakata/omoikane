@@ -1,3 +1,12 @@
+---
+date: 2026-04-20
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/02-subsystems/kernel/substrate-broker.md
+  - evals/safety/substrate_neutrality_rotation.yaml
+status: decided
+---
+
 # 2026-04-20 SubstrateBroker Reference Runtime
 
 ## Context

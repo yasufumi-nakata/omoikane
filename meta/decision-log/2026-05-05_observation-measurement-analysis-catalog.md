@@ -17,6 +17,16 @@ touchpoints:
   - tests/integration/test_interface_schema_contracts.py
   - tests/integration/test_cli.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/observation_integration_workbench.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/interface.observation_integration_workbench.v0.idl
+  - specs/schemas/observation_measurement_analysis_catalog.schema
+  - specs/schemas/observation_analysis_plan.schema
+  - specs/catalog.yaml
+  - evals/interface/observation_integration_workbench.yaml
+  - docs/02-subsystems/interface/observation-integration-workbench.md
 ---
 
 # Decision

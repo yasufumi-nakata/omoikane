@@ -1,3 +1,12 @@
+---
+date: 2026-04-19
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/07-reference-implementation/README.md
+  - evals/continuity/scheduler_governance_artifacts.yaml
+status: decided
+---
+
 # 2026-04-19 AscensionScheduler Governance Artifacts
 
 ## Decision

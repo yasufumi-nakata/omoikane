@@ -1,3 +1,13 @@
+---
+date: 2026-04-18
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/governance/versioning.py
+  - specs/schemas/release_manifest.schema
+  - evals/continuity/release_manifest_contract.yaml
+status: decided
+---
+
 # 2026-04-18 Versioning Policy
 
 ## 決定

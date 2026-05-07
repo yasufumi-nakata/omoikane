@@ -3,6 +3,12 @@ status: decided
 related:
   - 2026-04-23_gap-report-eval-inventory-drift.md
   - 2026-04-27_catalog-coverage-gap-report.md
+date: 2026-04-28
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/
+  - src/omoikane/**/*.py
+  - evals/continuity/gap_scanner_implementation_stub_detection.yaml
 ---
 
 # Decision: gap-report は非抽象 runtime stub も検出する

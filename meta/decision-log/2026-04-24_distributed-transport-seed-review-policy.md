@@ -8,6 +8,13 @@ surface:
   - evals/agentic/distributed_transport_authority_seed_review_policy.yaml
 closes_next_gaps:
   - 2026-04-21_distributed-transport-privileged-capture-acquisition.md#gap-1
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/agentic/distributed_transport.py
+  - specs/schemas/distributed_transport_authority_seed_review_policy.schema
+  - specs/interfaces/agentic.distributed_transport.v0.idl
+  - evals/agentic/distributed_transport_authority_seed_review_policy.yaml
+status: decided
 ---
 
 # Decision: remote authority-cluster seed review policy を first-class artifact にする

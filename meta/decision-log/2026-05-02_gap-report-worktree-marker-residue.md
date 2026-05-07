@@ -18,6 +18,16 @@ touchpoints:
   - tests/unit/test_gap_scanner.py
   - tests/integration/test_gap_report_schema_contracts.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/self_construction/gaps.py
+  - specs/interfaces/selfctor.gap_report.v0.idl
+  - specs/schemas/gap_report.schema
+  - specs/schemas/README.md
+  - specs/catalog.yaml
+  - evals/continuity/gap_report_scan_receipt.yaml
+  - evals/continuity/README.md
+  - docs/07-reference-implementation/README.md
 ---
 
 # Decision

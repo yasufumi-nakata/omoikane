@@ -3,6 +3,11 @@ status: decided
 related:
   - 2026-04-18_versioning-policy.md
   - 2026-04-27_catalog-coverage-gap-report.md
+date: 2026-04-28
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - specs/catalog.yaml
+  - evals/continuity/catalog_inventory_receipt.yaml
 ---
 
 # Decision: catalog hash を generated inventory receipt に昇格する

@@ -152,6 +152,10 @@ frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
 `meta/decision-log/README.md` は全ての dated decision-log markdown file を列挙する
 append-only index として扱い、実在 log の未掲載や存在しない log への stale link を
 `decision_log_index_inventory_hits` として all-zero gate の外へ出す。
+各 dated decision-log markdown file は `decision-log-frontmatter-conformance-v1` として
+`date`、`deciders`、`related_docs`、`status` の frontmatter を要求され、
+欠落や filename date との不一致は `decision_log_metadata_violation_hits` として
+all-zero gate の外へ出す。
 同じ report は `self-construction-gap-report-scan-receipt-v1` の `scan_receipt` を返し、
 counts、prioritized task count、scan surface、report digest、
 truth-source ごとの digest-only `scan_surface_digests` / `surface_manifest_digest`、

@@ -4,6 +4,9 @@ status: accepted
 date: 2026-05-02
 closes_next_gaps:
   - parallel-codex-yaoyorozu-upstream-dispatch-validation
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/07-reference-implementation/README.md
 ---
 
 # Parallel Codex Yaoyorozu Dispatch Validation

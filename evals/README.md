@@ -86,6 +86,7 @@ reference runtime では、不可侵境界と append-only 性を壊さないた�
 - `continuity/differential_eval_execution_binding.yaml`
 - `continuity/episodic_stream_handoff.yaml`
 - `continuity/gap_report_scan_receipt.yaml`
+- `continuity/gap_scanner_decision_log_metadata.yaml`
 - `continuity/gap_scanner_implementation_stub_detection.yaml`
 - `continuity/gap_scanner_required_reference_files.yaml`
 - `continuity/ledger_integrity.yaml`

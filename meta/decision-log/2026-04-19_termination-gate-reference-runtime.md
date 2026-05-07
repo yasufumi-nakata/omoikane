@@ -1,3 +1,11 @@
+---
+date: 2026-04-19
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/07-reference-implementation/README.md
+status: decided
+---
+
 # 2026-04-19 TerminationGate Reference Runtime
 
 ## Decision

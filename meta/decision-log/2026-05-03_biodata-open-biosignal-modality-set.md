@@ -27,6 +27,16 @@ touchpoints:
   - docs/07-reference-implementation/README.md
   - tests/unit/test_biodata_transmitter.py
   - tests/integration/test_interface_schema_contracts.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/interface/biodata_transmitter.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/interface.biodata_transmitter.v0.idl
+  - specs/schemas/biodata_human_biosignal_catalog.schema
+  - specs/schemas/biodata_transmitter_session.schema
+  - specs/schemas/biodata_body_state_latent.schema
+  - specs/schemas/biodata_signal_bundle.schema
+  - specs/schemas/biodata_dataset_adapter_receipt.schema
 ---
 
 # Decision

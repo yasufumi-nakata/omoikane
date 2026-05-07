@@ -19,6 +19,16 @@ touchpoints:
   - docs/07-reference-implementation/README.md
   - agents/guardians/integrity-guardian.yaml
   - agents/guardians/integrity-guardian.policy.md
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - references/parallel-codex-orchestration.md
+  - src/omoikane/self_construction/parallel_orchestration.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/selfctor.parallel_orchestration.v0.idl
+  - specs/schemas/parallel_codex_worker_result_receipt.schema
+  - specs/schemas/README.md
+  - specs/catalog.yaml
+  - evals/continuity/parallel_codex_result_ingestion.yaml
 ---
 
 # Decision

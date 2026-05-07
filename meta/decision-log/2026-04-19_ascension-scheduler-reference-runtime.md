@@ -1,3 +1,13 @@
+---
+date: 2026-04-19
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - docs/07-reference-implementation/README.md
+  - docs/02-subsystems/kernel/ascension-scheduler.md
+  - evals/continuity/scheduler_stage_rollback.yaml
+status: decided
+---
+
 # 2026-04-19 AscensionScheduler Reference Runtime
 
 ## Decision

@@ -134,6 +134,7 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(0, receipt["counts"]["tracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["untracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["decision_log_index_inventory_count"])
+            self.assertEqual(0, receipt["counts"]["decision_log_metadata_violation_count"])
             self.assertEqual(
                 0,
                 receipt["counts"]["agent_source_definition_violation_count"],
@@ -1025,6 +1026,66 @@ class GapScannerTests(unittest.TestCase):
             self.assertTrue(
                 any(task["kind"] == "implementation-stub" for task in report["prioritized_tasks"])
             )
+
+    def test_scan_reports_decision_log_metadata_violations(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_path = (
+                repo_root / "meta" / "decision-log" / "2026-04-23_missing-metadata.md"
+            )
+            decision_log_path.write_text(
+                "# Decision: missing metadata\n\n"
+                "## Context\n"
+                "Metadata is absent.\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["decision_log_metadata_violation_count"])
+            self.assertEqual(
+                "meta/decision-log/2026-04-23_missing-metadata.md",
+                report["decision_log_metadata_violation_hits"][0]["path"],
+            )
+            self.assertIn(
+                "frontmatter",
+                report["decision_log_metadata_violation_hits"][0]["line"],
+            )
+            self.assertEqual(
+                "decision-log-frontmatter-conformance-v1",
+                report["decision_log_metadata_violation_hits"][0]["metadata_policy_id"],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "decision-log-metadata"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+
+    def test_scan_accepts_complete_decision_log_metadata(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            decision_log_path = (
+                repo_root / "meta" / "decision-log" / "2026-04-23_complete-metadata.md"
+            )
+            decision_log_path.write_text(
+                "---\n"
+                "date: 2026-04-23\n"
+                "deciders: [yasufumi, codex-builder]\n"
+                "related_docs:\n"
+                "  - docs/07-reference-implementation/README.md\n"
+                "status: accepted\n"
+                "---\n\n"
+                "# Decision: complete metadata\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(0, report["decision_log_metadata_violation_count"])
+            self.assertEqual([], report["decision_log_metadata_violation_hits"])
 
     def test_scan_ignores_abstract_backend_not_implemented_hooks(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:

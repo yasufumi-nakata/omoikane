@@ -22,6 +22,16 @@ touchpoints:
   - tests/unit/test_parallel_orchestration.py
   - tests/integration/test_parallel_orchestration_schema_contracts.py
   - tests/integration/test_reference_runtime.py
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - references/parallel-codex-orchestration.md
+  - src/omoikane/self_construction/parallel_orchestration.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/selfctor.parallel_orchestration.v0.idl
+  - specs/schemas/parallel_codex_post_commit_publication_receipt.schema
+  - specs/schemas/README.md
+  - specs/catalog.yaml
+  - evals/continuity/parallel_codex_post_commit_publication.yaml
 ---
 
 # Decision

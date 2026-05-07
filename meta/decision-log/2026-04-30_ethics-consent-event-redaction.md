@@ -15,6 +15,16 @@ touchpoints:
   - docs/02-subsystems/kernel/ethics-enforcement.md
   - docs/07-reference-implementation/README.md
   - agents/guardians/integrity-guardian.yaml
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - src/omoikane/kernel/ethics.py
+  - src/omoikane/reference_os.py
+  - specs/interfaces/kernel.ethics.v0.idl
+  - specs/schemas/ethics_event.schema
+  - specs/schemas/ethics_consent_authenticity_receipt.schema
+  - evals/safety/ethics_rule_tree_contract.yaml
+  - docs/02-subsystems/kernel/ethics-enforcement.md
+  - docs/07-reference-implementation/README.md
 ---
 
 # Decision: consent-bound EthicsLedger events use digest-only receipts

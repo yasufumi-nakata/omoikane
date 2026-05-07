@@ -145,6 +145,9 @@ all-zero gate の外へ出せるか。cache / platform metadata 生成物も同�
 path manifest に含められるか。`meta/decision-log/README.md` が dated
 decision log file を全て列挙し、存在しない stale link を残していないことも
 `decision_log_index_inventory_hits` として all-zero gate の外へ出せるか。
+さらに dated decision log が `date`、`deciders`、`related_docs`、`status` の
+frontmatter metadata を持つかを `decision_log_metadata_violation_hits` として
+all-zero gate の外へ出せるか。
 
 ### Parallel Codex Result Ingestion
 parallel-orchestration-demo が worker result の patch digest、changed file manifest、
@@ -193,6 +196,7 @@ commit finalization gate 未 ready execution を fail-closed にできるか。
 - `differential_eval_execution_binding.yaml`
 - `episodic_stream_handoff.yaml`
 - `gap_report_scan_receipt.yaml`
+- `gap_scanner_decision_log_metadata.yaml`
 - `gap_scanner_required_reference_files.yaml`
 - `gap_scanner_implementation_stub_detection.yaml`
 - `ledger_integrity.yaml`

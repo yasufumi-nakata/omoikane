@@ -1,3 +1,12 @@
+---
+date: 2026-04-18
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - meta/open-questions.md
+  - evals/agentic/multi_council_externalization.yaml
+status: decided
+---
+
 # 2026-04-18 Multi-Council Trigger
 
 ## Context

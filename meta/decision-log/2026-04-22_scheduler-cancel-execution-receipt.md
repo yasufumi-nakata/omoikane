@@ -1,3 +1,12 @@
+---
+date: 2026-04-22
+deciders: [yasufumi, codex-builder]
+related_docs:
+  - evals/continuity
+  - evals/continuity/scheduler_cancellation.yaml
+status: decided
+---
+
 # Decision: AscensionScheduler の cancel を execution receipt まで昇格する
 
 ## Context
