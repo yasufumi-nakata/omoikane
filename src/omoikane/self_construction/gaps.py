@@ -151,6 +151,7 @@ WORKTREE_DIFF_SCAN_SURFACE = "git:tracked-worktree-diff"
 WORKTREE_WORKSPACE_MARKER_PREFIX = "# workspace-enacted:"
 TRACKED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:tracked-generated-artifacts"
 UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:untracked-generated-artifacts"
+IGNORED_PLATFORM_METADATA_SCAN_SURFACE = "git:ignored-platform-metadata"
 GENERATED_ARTIFACT_PATCH_PREFIXES = (
     "artifacts/",
 )
@@ -215,6 +216,7 @@ SCAN_RECEIPT_SURFACES = (
     WORKTREE_DIFF_SCAN_SURFACE,
     TRACKED_GENERATED_ARTIFACT_SCAN_SURFACE,
     UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE,
+    IGNORED_PLATFORM_METADATA_SCAN_SURFACE,
 )
 
 
@@ -243,6 +245,9 @@ class GapScanner:
         )
         untracked_generated_artifact_hits = (
             self._untracked_generated_artifact_hits(repo_root)
+        )
+        ignored_platform_metadata_hits = (
+            self._ignored_platform_metadata_hits(repo_root)
         )
         decision_log_index_inventory_hits = (
             self._decision_log_index_inventory_hits(repo_root)
@@ -363,6 +368,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in ignored_platform_metadata_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "ignored-platform-metadata",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in decision_log_index_inventory_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -436,6 +449,9 @@ class GapScanner:
             "untracked_generated_artifact_count": len(
                 untracked_generated_artifact_hits
             ),
+            "ignored_platform_metadata_count": len(
+                ignored_platform_metadata_hits
+            ),
             "decision_log_index_inventory_count": len(
                 decision_log_index_inventory_hits
             ),
@@ -462,6 +478,7 @@ class GapScanner:
             "worktree_workspace_marker_hits": worktree_workspace_marker_hits,
             "tracked_generated_artifact_hits": tracked_generated_artifact_hits,
             "untracked_generated_artifact_hits": untracked_generated_artifact_hits,
+            "ignored_platform_metadata_hits": ignored_platform_metadata_hits,
             "decision_log_index_inventory_hits": decision_log_index_inventory_hits,
             "decision_log_metadata_violation_hits": (
                 decision_log_metadata_violation_hits
@@ -500,6 +517,9 @@ class GapScanner:
             ),
             "untracked_generated_artifact_count": int(
                 report["untracked_generated_artifact_count"]
+            ),
+            "ignored_platform_metadata_count": int(
+                report["ignored_platform_metadata_count"]
             ),
             "decision_log_index_inventory_count": int(
                 report["decision_log_index_inventory_count"]
@@ -718,6 +738,19 @@ class GapScanner:
                     }
                 )
                 continue
+            if pattern == IGNORED_PLATFORM_METADATA_SCAN_SURFACE:
+                artifact_text = GapScanner._ignored_platform_metadata_manifest_text(
+                    repo_root
+                )
+                entries.append(
+                    {
+                        "surface_pattern": pattern,
+                        "path": pattern,
+                        "sha256": sha256_text(artifact_text),
+                        "byte_length": len(artifact_text.encode("utf-8")),
+                    }
+                )
+                continue
             if any(marker in pattern for marker in ("*", "?", "[")):
                 candidates = sorted(path for path in repo_root.glob(pattern) if path.is_file())
             else:
@@ -779,6 +812,31 @@ class GapScanner:
                     str(repo_root),
                     "ls-files",
                     "--others",
+                    "--exclude-standard",
+                    "-z",
+                ],
+                check=False,
+                capture_output=True,
+                timeout=10,
+            )
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+        if result.returncode != 0:
+            return []
+        decoded = result.stdout.decode("utf-8", errors="ignore")
+        return sorted(path for path in decoded.split("\0") if path)
+
+    @staticmethod
+    def _ignored_files(repo_root: Path) -> List[str]:
+        try:
+            result = subprocess.run(
+                [
+                    "git",
+                    "-C",
+                    str(repo_root),
+                    "ls-files",
+                    "--others",
+                    "--ignored",
                     "--exclude-standard",
                     "-z",
                 ],
@@ -856,6 +914,14 @@ class GapScanner:
         ]
 
     @classmethod
+    def _ignored_platform_metadata_paths(cls, repo_root: Path) -> List[str]:
+        return [
+            path
+            for path in cls._ignored_files(repo_root)
+            if cls._is_platform_metadata_path(path)
+        ]
+
+    @classmethod
     def _tracked_generated_artifact_manifest_text(cls, repo_root: Path) -> str:
         paths = cls._tracked_generated_artifact_paths(repo_root)
         return "\n".join(paths) + ("\n" if paths else "")
@@ -863,6 +929,11 @@ class GapScanner:
     @classmethod
     def _untracked_generated_artifact_manifest_text(cls, repo_root: Path) -> str:
         paths = cls._untracked_generated_artifact_paths(repo_root)
+        return "\n".join(paths) + ("\n" if paths else "")
+
+    @classmethod
+    def _ignored_platform_metadata_manifest_text(cls, repo_root: Path) -> str:
+        paths = cls._ignored_platform_metadata_paths(repo_root)
         return "\n".join(paths) + ("\n" if paths else "")
 
     def _tracked_generated_artifact_hits(
@@ -904,6 +975,35 @@ class GapScanner:
                 }
             )
         return hits
+
+    def _ignored_platform_metadata_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, Any]]:
+        hits: List[Dict[str, Any]] = []
+        for path in self._ignored_platform_metadata_paths(repo_root):
+            hits.append(
+                {
+                    "kind": "ignored-platform-metadata",
+                    "path": path,
+                    "line": (
+                        "ignored platform metadata remains inside the "
+                        "completion contract"
+                    ),
+                    "artifact_class": "platform-metadata-output",
+                    "ignored_artifact_status": "ignored-platform-metadata",
+                    "raw_artifact_payload_stored": False,
+                }
+            )
+        return hits
+
+    @staticmethod
+    def _is_platform_metadata_path(path: str) -> bool:
+        normalized = path.strip()
+        if normalized.startswith("./"):
+            normalized = normalized[2:]
+        if not normalized:
+            return False
+        return normalized.split("/")[-1] in GENERATED_ARTIFACT_PLATFORM_FILENAMES
 
     @staticmethod
     def _generated_artifact_class(path: str) -> str:

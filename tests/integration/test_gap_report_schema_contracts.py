@@ -99,6 +99,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             counts["untracked_generated_artifact_count"],
         )
         self.assertEqual(
+            report["ignored_platform_metadata_count"],
+            counts["ignored_platform_metadata_count"],
+        )
+        self.assertEqual(
             report["decision_log_index_inventory_count"],
             counts["decision_log_index_inventory_count"],
         )
@@ -178,6 +182,13 @@ class GapReportSchemaContractTests(unittest.TestCase):
             any(
                 entry["path"] == "git:untracked-generated-artifacts"
                 and entry["surface_pattern"] == "git:untracked-generated-artifacts"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+        self.assertTrue(
+            any(
+                entry["path"] == "git:ignored-platform-metadata"
+                and entry["surface_pattern"] == "git:ignored-platform-metadata"
                 for entry in receipt["scan_surface_digests"]
             )
         )

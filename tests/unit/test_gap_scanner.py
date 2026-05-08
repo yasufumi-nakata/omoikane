@@ -133,6 +133,7 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(0, receipt["counts"]["worktree_workspace_marker_count"])
             self.assertEqual(0, receipt["counts"]["tracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["untracked_generated_artifact_count"])
+            self.assertEqual(0, receipt["counts"]["ignored_platform_metadata_count"])
             self.assertEqual(0, receipt["counts"]["decision_log_index_inventory_count"])
             self.assertEqual(0, receipt["counts"]["decision_log_metadata_violation_count"])
             self.assertEqual(
@@ -423,6 +424,77 @@ class GapScannerTests(unittest.TestCase):
                 surface_digest["sha256"],
             )
 
+    def test_scan_reports_ignored_platform_metadata_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            (repo_root / ".gitignore").write_text(
+                ".DS_Store\n"
+                "Thumbs.db\n"
+                "**/.DS_Store\n"
+                "**/Thumbs.db\n",
+                encoding="utf-8",
+            )
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap with platform ignore rules",
+            )
+            root_metadata = repo_root / ".DS_Store"
+            nested_metadata = repo_root / "docs" / "Thumbs.db"
+            nested_metadata.parent.mkdir(parents=True, exist_ok=True)
+            root_metadata.write_bytes(b"Finder metadata")
+            nested_metadata.write_bytes(b"Windows Explorer metadata")
+
+            report = GapScanner().scan(repo_root)
+            hits = {
+                hit["path"]: hit for hit in report["ignored_platform_metadata_hits"]
+            }
+
+            self.assertEqual(0, report["untracked_generated_artifact_count"])
+            self.assertEqual([], report["untracked_generated_artifact_hits"])
+            self.assertEqual(2, report["ignored_platform_metadata_count"])
+            self.assertEqual({".DS_Store", "docs/Thumbs.db"}, set(hits))
+            for hit in hits.values():
+                self.assertEqual("ignored-platform-metadata", hit["kind"])
+                self.assertEqual("platform-metadata-output", hit["artifact_class"])
+                self.assertEqual(
+                    "ignored-platform-metadata",
+                    hit["ignored_artifact_status"],
+                )
+                self.assertFalse(hit["raw_artifact_payload_stored"])
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertEqual(
+                2,
+                report["scan_receipt"]["counts"]["ignored_platform_metadata_count"],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "ignored-platform-metadata"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:ignored-platform-metadata"
+            )
+            self.assertEqual(
+                "git:ignored-platform-metadata",
+                surface_digest["surface_pattern"],
+            )
+            self.assertEqual(
+                sha256_text(".DS_Store\ndocs/Thumbs.db\n"),
+                surface_digest["sha256"],
+            )
+
     def test_scan_reports_tracked_nested_platform_metadata_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -614,6 +686,8 @@ class GapScannerTests(unittest.TestCase):
 
             self.assertEqual(0, report["untracked_generated_artifact_count"])
             self.assertEqual([], report["untracked_generated_artifact_hits"])
+            self.assertEqual(0, report["ignored_platform_metadata_count"])
+            self.assertEqual([], report["ignored_platform_metadata_hits"])
             self.assertTrue(report["scan_receipt"]["all_zero"])
             surface_digest = next(
                 entry

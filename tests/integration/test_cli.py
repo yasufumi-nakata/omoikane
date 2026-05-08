@@ -64,6 +64,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual([], result["tracked_generated_artifact_hits"])
         self.assertEqual(0, result["untracked_generated_artifact_count"])
         self.assertEqual([], result["untracked_generated_artifact_hits"])
+        self.assertEqual(0, result["ignored_platform_metadata_count"])
+        self.assertEqual([], result["ignored_platform_metadata_hits"])
         self.assertEqual(0, result["decision_log_index_inventory_count"])
         self.assertEqual([], result["decision_log_index_inventory_hits"])
         self.assertEqual(0, result["decision_log_metadata_violation_count"])

@@ -1977,6 +1977,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual([], report["tracked_generated_artifact_hits"])
         self.assertEqual(0, report["untracked_generated_artifact_count"])
         self.assertEqual([], report["untracked_generated_artifact_hits"])
+        self.assertEqual(0, report["ignored_platform_metadata_count"])
+        self.assertEqual([], report["ignored_platform_metadata_hits"])
         self.assertEqual(0, report["decision_log_index_inventory_count"])
         self.assertEqual([], report["decision_log_index_inventory_hits"])
         self.assertEqual(0, report["decision_log_metadata_violation_count"])

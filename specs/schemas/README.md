@@ -176,6 +176,7 @@
   - repo-local reference runbook の存在に加えて、必須 section-level policy 欠落を all-zero gate の外へ出す
   - tracked worktree diff を digest-bound scan surface として扱い、workspace marker residue を all-zero gate の外へ出す
   - 追跡対象生成物 path manifest を git:tracked-generated-artifacts scan surface として digest-bound にし、raw artifact payload を読まずに all-zero gate の外へ出す
+  - ignored platform metadata path manifest を git:ignored-platform-metadata scan surface として digest-bound にし、raw platform metadata payload を読まずに all-zero gate の外へ出す
   - 未追跡生成物 path manifest を git:untracked-generated-artifacts scan surface として digest-bound にし、raw artifact payload を読まずに all-zero gate の外へ出す
 - `governance_artifact_sync.schema`
 - `governance_verifier_connectivity_receipt.schema`

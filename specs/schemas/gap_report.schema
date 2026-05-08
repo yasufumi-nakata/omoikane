@@ -5,9 +5,10 @@ description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
   including top-level eval inventory drift and duplicate-entry checks, tracked
   worktree marker-residue checks, tracked/untracked generated artifact hygiene
-  checks for build output, caches, and platform metadata, decision-log README
-  index inventory checks, decision-log metadata conformance checks, agent source
-  definition validation, truth-source
+  checks for build output, caches, and platform metadata, ignored platform
+  metadata hygiene checks, decision-log README index inventory checks,
+  decision-log metadata conformance checks, agent source definition validation,
+  truth-source
   residual marker checks, and a digest-bound scan receipt for automation gating.
 type: object
 additionalProperties: false
@@ -27,6 +28,7 @@ required:
   - worktree_workspace_marker_count
   - tracked_generated_artifact_count
   - untracked_generated_artifact_count
+  - ignored_platform_metadata_count
   - decision_log_index_inventory_count
   - decision_log_metadata_violation_count
   - decision_log_residual_count
@@ -47,6 +49,7 @@ required:
   - worktree_workspace_marker_hits
   - tracked_generated_artifact_hits
   - untracked_generated_artifact_hits
+  - ignored_platform_metadata_hits
   - decision_log_index_inventory_hits
   - decision_log_metadata_violation_hits
   - decision_log_residual_hits
@@ -97,6 +100,9 @@ properties:
     type: integer
     minimum: 0
   untracked_generated_artifact_count:
+    type: integer
+    minimum: 0
+  ignored_platform_metadata_count:
     type: integer
     minimum: 0
   decision_log_index_inventory_count:
@@ -186,6 +192,13 @@ properties:
     items:
       $ref: "#/$defs/gap_hit"
   untracked_generated_artifact_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  ignored_platform_metadata_hits:
+    description: >
+      Platform metadata files that are hidden by .gitignore or global git
+      excludes, but still live inside the repo checkout.
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -346,6 +359,7 @@ properties:
           - worktree_workspace_marker_count
           - tracked_generated_artifact_count
           - untracked_generated_artifact_count
+          - ignored_platform_metadata_count
           - decision_log_index_inventory_count
           - decision_log_metadata_violation_count
           - decision_log_residual_count
@@ -393,6 +407,9 @@ properties:
             type: integer
             minimum: 0
           untracked_generated_artifact_count:
+            type: integer
+            minimum: 0
+          ignored_platform_metadata_count:
             type: integer
             minimum: 0
           decision_log_index_inventory_count:
@@ -552,6 +569,8 @@ $defs:
         const: untracked-generated-artifact
       tracked_artifact_status:
         const: tracked-generated-artifact
+      ignored_artifact_status:
+        const: ignored-platform-metadata
       raw_artifact_payload_stored:
         const: false
       decision_log_file:
@@ -592,6 +611,7 @@ examples:
     worktree_workspace_marker_count: 0
     tracked_generated_artifact_count: 0
     untracked_generated_artifact_count: 0
+    ignored_platform_metadata_count: 0
     decision_log_index_inventory_count: 0
     decision_log_metadata_violation_count: 0
     decision_log_residual_count: 0
@@ -612,6 +632,7 @@ examples:
     worktree_workspace_marker_hits: []
     tracked_generated_artifact_hits: []
     untracked_generated_artifact_hits: []
+    ignored_platform_metadata_hits: []
     decision_log_index_inventory_hits: []
     decision_log_metadata_violation_hits: []
     decision_log_residual_hits: []
@@ -659,6 +680,7 @@ examples:
         worktree_workspace_marker_count: 0
         tracked_generated_artifact_count: 0
         untracked_generated_artifact_count: 0
+        ignored_platform_metadata_count: 0
         decision_log_index_inventory_count: 0
         decision_log_metadata_violation_count: 0
         decision_log_residual_count: 0
