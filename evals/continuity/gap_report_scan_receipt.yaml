@@ -5,8 +5,8 @@ description: >
   gap-report が all-zero / non-zero 判定、prioritized task count、scan surface、
   top-level eval inventory、report digest、各 truth-source の surface digest manifest、continuity ledger 用
   event ref / digest と実 ContinuityLedger append entry を public schema と digest-bound receipt に固定し、
-  build / cache / platform metadata 生成物の path manifest、ignored platform metadata、
-  decision-log README index drift も含めて
+  build / cache / platform metadata 生成物の path manifest、ignored generated artifact、
+  ignored platform metadata、decision-log README index drift も含めて
   automation gate の判定形を reviewer-facing に検証できること
 inputs:
   - source: reference-runtime
@@ -19,6 +19,7 @@ expected:
   worktree_workspace_marker_count: 0
   tracked_generated_artifact_count: 0
   untracked_generated_artifact_count: 0
+  ignored_generated_artifact_count: 0
   ignored_platform_metadata_count: 0
   decision_log_index_inventory_count: 0
   validation_ok: true
@@ -42,6 +43,7 @@ expected:
   tracked_worktree_diff_surface_bound: true
   tracked_generated_artifacts_surface_bound: true
   untracked_generated_artifacts_surface_bound: true
+  ignored_generated_artifacts_surface_bound: true
   ignored_platform_metadata_surface_bound: true
   decision_log_index_inventory_gate_bound: true
   raw_artifact_payload_stored: false

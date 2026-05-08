@@ -146,6 +146,13 @@ raw artifact payload は読まず、path manifest digest だけを保持する�
 `.DS_Store` / `Thumbs.db` に該当する path を `ignored_platform_metadata_hits` として
 all-zero gate の外へ出す。
 同じく raw platform metadata payload は読まず、path manifest digest だけを保持する。
+さらに同じ ignored file surface から、`build/` / `dist/` / `artifacts/` /
+`htmlcov/` / `.coverage` / `coverage.xml` / `*.patch` / `*.egg-info` に該当する
+packaging / release / patch / coverage 生成物を
+`git:ignored-generated-artifacts` の digest-bound scan surface として扱い、
+`ignored_generated_artifact_hits` として all-zero gate の外へ出す。
+unittest 後に自然発生する `.pytest_cache/` や `__pycache__/` はこの ignored 専用 gate
+には含めず、raw artifact payload は読まずに path manifest digest だけを保持する。
 最新 decision log 日付に残る `residual gap` / `unresolved gap` の bullet も
 `decision_log_residual_hits` として JSON で列挙する。
 同じ最新日付の後続 decision log が `closes_next_gaps` で閉じた item は除外され、

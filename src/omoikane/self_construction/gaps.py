@@ -151,6 +151,7 @@ WORKTREE_DIFF_SCAN_SURFACE = "git:tracked-worktree-diff"
 WORKTREE_WORKSPACE_MARKER_PREFIX = "# workspace-enacted:"
 TRACKED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:tracked-generated-artifacts"
 UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:untracked-generated-artifacts"
+IGNORED_GENERATED_ARTIFACT_SCAN_SURFACE = "git:ignored-generated-artifacts"
 IGNORED_PLATFORM_METADATA_SCAN_SURFACE = "git:ignored-platform-metadata"
 GENERATED_ARTIFACT_PATCH_PREFIXES = (
     "artifacts/",
@@ -198,6 +199,16 @@ UNTRACKED_GENERATED_ARTIFACT_PREFIXES = GENERATED_ARTIFACT_PREFIXES
 UNTRACKED_GENERATED_ARTIFACT_FILENAMES = GENERATED_ARTIFACT_FILENAMES
 UNTRACKED_GENERATED_ARTIFACT_SUFFIXES = GENERATED_ARTIFACT_SUFFIXES
 UNTRACKED_GENERATED_ARTIFACT_PART_SUFFIXES = GENERATED_ARTIFACT_PART_SUFFIXES
+IGNORED_GENERATED_ARTIFACT_PREFIXES = (
+    *GENERATED_ARTIFACT_PATCH_PREFIXES,
+    *GENERATED_ARTIFACT_PACKAGING_PREFIXES,
+    *GENERATED_ARTIFACT_COVERAGE_PREFIXES,
+)
+IGNORED_GENERATED_ARTIFACT_FILENAMES = GENERATED_ARTIFACT_COVERAGE_FILENAMES
+IGNORED_GENERATED_ARTIFACT_SUFFIXES = (
+    ".patch",
+)
+IGNORED_GENERATED_ARTIFACT_PART_SUFFIXES = GENERATED_ARTIFACT_PART_SUFFIXES
 SCAN_RECEIPT_SURFACES = (
     "meta/open-questions.md",
     "references/*.md",
@@ -216,6 +227,7 @@ SCAN_RECEIPT_SURFACES = (
     WORKTREE_DIFF_SCAN_SURFACE,
     TRACKED_GENERATED_ARTIFACT_SCAN_SURFACE,
     UNTRACKED_GENERATED_ARTIFACT_SCAN_SURFACE,
+    IGNORED_GENERATED_ARTIFACT_SCAN_SURFACE,
     IGNORED_PLATFORM_METADATA_SCAN_SURFACE,
 )
 
@@ -245,6 +257,9 @@ class GapScanner:
         )
         untracked_generated_artifact_hits = (
             self._untracked_generated_artifact_hits(repo_root)
+        )
+        ignored_generated_artifact_hits = (
+            self._ignored_generated_artifact_hits(repo_root)
         )
         ignored_platform_metadata_hits = (
             self._ignored_platform_metadata_hits(repo_root)
@@ -368,6 +383,14 @@ class GapScanner:
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
+        for hit in ignored_generated_artifact_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "ignored-generated-artifact",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
         for hit in ignored_platform_metadata_hits[:10]:
             prioritized_tasks.append(
                 {
@@ -449,6 +472,9 @@ class GapScanner:
             "untracked_generated_artifact_count": len(
                 untracked_generated_artifact_hits
             ),
+            "ignored_generated_artifact_count": len(
+                ignored_generated_artifact_hits
+            ),
             "ignored_platform_metadata_count": len(
                 ignored_platform_metadata_hits
             ),
@@ -478,6 +504,7 @@ class GapScanner:
             "worktree_workspace_marker_hits": worktree_workspace_marker_hits,
             "tracked_generated_artifact_hits": tracked_generated_artifact_hits,
             "untracked_generated_artifact_hits": untracked_generated_artifact_hits,
+            "ignored_generated_artifact_hits": ignored_generated_artifact_hits,
             "ignored_platform_metadata_hits": ignored_platform_metadata_hits,
             "decision_log_index_inventory_hits": decision_log_index_inventory_hits,
             "decision_log_metadata_violation_hits": (
@@ -517,6 +544,9 @@ class GapScanner:
             ),
             "untracked_generated_artifact_count": int(
                 report["untracked_generated_artifact_count"]
+            ),
+            "ignored_generated_artifact_count": int(
+                report["ignored_generated_artifact_count"]
             ),
             "ignored_platform_metadata_count": int(
                 report["ignored_platform_metadata_count"]
@@ -738,6 +768,19 @@ class GapScanner:
                     }
                 )
                 continue
+            if pattern == IGNORED_GENERATED_ARTIFACT_SCAN_SURFACE:
+                artifact_text = GapScanner._ignored_generated_artifact_manifest_text(
+                    repo_root
+                )
+                entries.append(
+                    {
+                        "surface_pattern": pattern,
+                        "path": pattern,
+                        "sha256": sha256_text(artifact_text),
+                        "byte_length": len(artifact_text.encode("utf-8")),
+                    }
+                )
+                continue
             if pattern == IGNORED_PLATFORM_METADATA_SCAN_SURFACE:
                 artifact_text = GapScanner._ignored_platform_metadata_manifest_text(
                     repo_root
@@ -897,6 +940,26 @@ class GapScanner:
     def _is_untracked_generated_artifact(path: str) -> bool:
         return GapScanner._is_generated_artifact_path(path)
 
+    @staticmethod
+    def _is_ignored_generated_artifact(path: str) -> bool:
+        normalized = path.strip()
+        if normalized.startswith("./"):
+            normalized = normalized[2:]
+        if not normalized:
+            return False
+        path_parts = normalized.split("/")
+        basename = path_parts[-1]
+        if basename in IGNORED_GENERATED_ARTIFACT_FILENAMES:
+            return True
+        if normalized.startswith(IGNORED_GENERATED_ARTIFACT_PREFIXES):
+            return True
+        if normalized.endswith(IGNORED_GENERATED_ARTIFACT_SUFFIXES):
+            return True
+        return any(
+            part.endswith(IGNORED_GENERATED_ARTIFACT_PART_SUFFIXES)
+            for part in path_parts
+        )
+
     @classmethod
     def _tracked_generated_artifact_paths(cls, repo_root: Path) -> List[str]:
         return [
@@ -911,6 +974,15 @@ class GapScanner:
             path
             for path in cls._untracked_files(repo_root)
             if cls._is_untracked_generated_artifact(path)
+        ]
+
+    @classmethod
+    def _ignored_generated_artifact_paths(cls, repo_root: Path) -> List[str]:
+        return [
+            path
+            for path in cls._ignored_files(repo_root)
+            if cls._is_ignored_generated_artifact(path)
+            and not cls._is_platform_metadata_path(path)
         ]
 
     @classmethod
@@ -929,6 +1001,11 @@ class GapScanner:
     @classmethod
     def _untracked_generated_artifact_manifest_text(cls, repo_root: Path) -> str:
         paths = cls._untracked_generated_artifact_paths(repo_root)
+        return "\n".join(paths) + ("\n" if paths else "")
+
+    @classmethod
+    def _ignored_generated_artifact_manifest_text(cls, repo_root: Path) -> str:
+        paths = cls._ignored_generated_artifact_paths(repo_root)
         return "\n".join(paths) + ("\n" if paths else "")
 
     @classmethod
@@ -971,6 +1048,26 @@ class GapScanner:
                     ),
                     "artifact_class": self._generated_artifact_class(path),
                     "untracked_artifact_status": "untracked-generated-artifact",
+                    "raw_artifact_payload_stored": False,
+                }
+            )
+        return hits
+
+    def _ignored_generated_artifact_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, Any]]:
+        hits: List[Dict[str, Any]] = []
+        for path in self._ignored_generated_artifact_paths(repo_root):
+            hits.append(
+                {
+                    "kind": "ignored-generated-artifact",
+                    "path": path,
+                    "line": (
+                        "ignored generated artifact remains inside the "
+                        "completion contract"
+                    ),
+                    "artifact_class": self._generated_artifact_class(path),
+                    "ignored_artifact_status": "ignored-generated-artifact",
                     "raw_artifact_payload_stored": False,
                 }
             )

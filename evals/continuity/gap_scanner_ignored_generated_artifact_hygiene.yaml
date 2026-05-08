@@ -1,0 +1,28 @@
+eval_id: gap_scanner_ignored_generated_artifact_hygiene
+target: self_construction.gap_report
+level: L5
+description: >
+  gap-report が .gitignore や global excludes に隠れた build / dist / egg-info /
+  patch / coverage 生成物を ignored_generated_artifact_hits として検出し、
+  unittest 後に自然発生する bytecode / test cache は ignored-only gate から除外すること。
+inputs:
+  - action: scan_repo
+    git_surface: git:ignored-generated-artifacts
+    ignored_artifact_examples:
+      - build/lib/omoikane/cli.py
+      - dist/omoikane_os-0.1.0.tar.gz
+      - src/omoikane_os.egg-info/PKG-INFO
+    excluded_ignored_examples:
+      - src/omoikane/__pycache__/cli.pyc
+      - .pytest_cache/README.md
+expected:
+  ignored_generated_artifact_count: 0
+  ignored_generated_artifact_hits: []
+  ignored_generated_artifacts_surface_bound: true
+  ignored_generated_artifacts_reported_when_present: true
+  ignored_bytecode_and_test_cache_excluded: true
+  prioritized_task_kind: ignored-generated-artifact
+  raw_artifact_payload_stored: false
+metric: boolean
+threshold: 1.0
+ethics_check: true

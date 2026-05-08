@@ -133,6 +133,7 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual(0, receipt["counts"]["worktree_workspace_marker_count"])
             self.assertEqual(0, receipt["counts"]["tracked_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["untracked_generated_artifact_count"])
+            self.assertEqual(0, receipt["counts"]["ignored_generated_artifact_count"])
             self.assertEqual(0, receipt["counts"]["ignored_platform_metadata_count"])
             self.assertEqual(0, receipt["counts"]["decision_log_index_inventory_count"])
             self.assertEqual(0, receipt["counts"]["decision_log_metadata_violation_count"])
@@ -495,6 +496,97 @@ class GapScannerTests(unittest.TestCase):
                 surface_digest["sha256"],
             )
 
+    def test_scan_reports_ignored_generated_artifacts(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            self._run_git(repo_root, "init")
+            (repo_root / ".gitignore").write_text(
+                "build/\n"
+                "dist/\n"
+                "*.egg-info/\n"
+                "__pycache__/\n"
+                ".pytest_cache/\n",
+                encoding="utf-8",
+            )
+            self._run_git(repo_root, "add", ".")
+            self._run_git(
+                repo_root,
+                "-c",
+                "user.email=codex@example.invalid",
+                "-c",
+                "user.name=Codex",
+                "commit",
+                "-m",
+                "bootstrap with generated artifact ignore rules",
+            )
+            package_artifact = repo_root / "dist" / "omoikane_os-0.1.0.tar.gz"
+            build_artifact = repo_root / "build" / "lib" / "omoikane" / "cli.py"
+            egg_artifact = repo_root / "src" / "omoikane_os.egg-info" / "PKG-INFO"
+            bytecode = repo_root / "src" / "omoikane" / "__pycache__" / "cli.pyc"
+            cache = repo_root / ".pytest_cache" / "README.md"
+            for path, payload in (
+                (package_artifact, b"sdist"),
+                (build_artifact, b"print('generated')\n"),
+                (egg_artifact, b"Metadata-Version: 2.1\n"),
+                (bytecode, b"pyc"),
+                (cache, b"cache\n"),
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(payload)
+
+            report = GapScanner().scan(repo_root)
+            hits = {
+                hit["path"]: hit for hit in report["ignored_generated_artifact_hits"]
+            }
+
+            self.assertEqual(0, report["untracked_generated_artifact_count"])
+            self.assertEqual([], report["untracked_generated_artifact_hits"])
+            self.assertEqual(3, report["ignored_generated_artifact_count"])
+            self.assertEqual(
+                {
+                    "build/lib/omoikane/cli.py",
+                    "dist/omoikane_os-0.1.0.tar.gz",
+                    "src/omoikane_os.egg-info/PKG-INFO",
+                },
+                set(hits),
+            )
+            for hit in hits.values():
+                self.assertEqual("ignored-generated-artifact", hit["kind"])
+                self.assertEqual(
+                    "ignored-generated-artifact",
+                    hit["ignored_artifact_status"],
+                )
+                self.assertFalse(hit["raw_artifact_payload_stored"])
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertEqual(
+                3,
+                report["scan_receipt"]["counts"]["ignored_generated_artifact_count"],
+            )
+            self.assertTrue(
+                any(
+                    task["kind"] == "ignored-generated-artifact"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+            surface_digest = next(
+                entry
+                for entry in report["scan_receipt"]["scan_surface_digests"]
+                if entry["path"] == "git:ignored-generated-artifacts"
+            )
+            self.assertEqual(
+                "git:ignored-generated-artifacts",
+                surface_digest["surface_pattern"],
+            )
+            self.assertEqual(
+                sha256_text(
+                    "build/lib/omoikane/cli.py\n"
+                    "dist/omoikane_os-0.1.0.tar.gz\n"
+                    "src/omoikane_os.egg-info/PKG-INFO\n"
+                ),
+                surface_digest["sha256"],
+            )
+
     def test_scan_reports_tracked_nested_platform_metadata_artifact(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -686,6 +778,8 @@ class GapScannerTests(unittest.TestCase):
 
             self.assertEqual(0, report["untracked_generated_artifact_count"])
             self.assertEqual([], report["untracked_generated_artifact_hits"])
+            self.assertEqual(0, report["ignored_generated_artifact_count"])
+            self.assertEqual([], report["ignored_generated_artifact_hits"])
             self.assertEqual(0, report["ignored_platform_metadata_count"])
             self.assertEqual([], report["ignored_platform_metadata_hits"])
             self.assertTrue(report["scan_receipt"]["all_zero"])

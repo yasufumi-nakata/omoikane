@@ -142,7 +142,11 @@ path manifest に含められるか。未追跡生成物も
 `git:untracked-generated-artifacts` の path manifest digest と
 `untracked_generated_artifact_hits` により raw artifact payload なしで
 all-zero gate の外へ出せるか。cache / platform metadata 生成物も同じ
-path manifest に含められるか。ignored platform metadata も
+path manifest に含められるか。ignored generated artifact も
+`git:ignored-generated-artifacts` の path manifest digest と
+`ignored_generated_artifact_hits` により build / dist / egg-info などの
+ignored packaging output を raw artifact payload なしで all-zero gate の外へ
+出せるか。ignored platform metadata も
 `git:ignored-platform-metadata` の path manifest digest と
 `ignored_platform_metadata_hits` により raw platform metadata payload なしで
 all-zero gate の外へ出せるか。`meta/decision-log/README.md` が dated
@@ -199,6 +203,7 @@ commit finalization gate 未 ready execution を fail-closed にできるか。
 - `differential_eval_execution_binding.yaml`
 - `episodic_stream_handoff.yaml`
 - `gap_report_scan_receipt.yaml`
+- `gap_scanner_ignored_generated_artifact_hygiene.yaml`
 - `gap_scanner_decision_log_metadata.yaml`
 - `gap_scanner_required_reference_files.yaml`
 - `gap_scanner_implementation_stub_detection.yaml`

@@ -99,6 +99,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             counts["untracked_generated_artifact_count"],
         )
         self.assertEqual(
+            report["ignored_generated_artifact_count"],
+            counts["ignored_generated_artifact_count"],
+        )
+        self.assertEqual(
             report["ignored_platform_metadata_count"],
             counts["ignored_platform_metadata_count"],
         )

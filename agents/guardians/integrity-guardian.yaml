@@ -226,6 +226,8 @@ when_to_invoke: |
   - gap-report が tracked worktree diff の workspace marker residue を `worktree_workspace_marker_hits` として検出し、raw diff payload を保存しないことを検証する時
   - gap-report が Git index に入った追跡対象の build・cache・platform metadata 生成物を `tracked_generated_artifact_hits` として検出し、`git:tracked-generated-artifacts` surface digest だけに束縛して raw artifact payload を読まないことを検証する時
   - gap-report が未追跡の build・cache・platform metadata 生成物を `untracked_generated_artifact_hits` として検出し、`git:untracked-generated-artifacts` surface digest だけに束縛して raw artifact payload を読まないことを検証する時
+  - gap-report が .gitignore / global excludes に隠れた build・dist・egg-info・patch・coverage 生成物を `ignored_generated_artifact_hits` として検出し、`git:ignored-generated-artifacts` surface digest だけに束縛して raw artifact payload を読まず、unittest 由来の bytecode / test cache は ignored-only gate から除外していることを検証する時
+  - gap-report が .gitignore / global excludes に隠れた platform metadata を `ignored_platform_metadata_hits` として検出し、`git:ignored-platform-metadata` surface digest だけに束縛して raw platform metadata payload を読まないことを検証する時
   - gap-report の scan_receipt が all-zero 判定、prioritized task count、scan surface、report digest、surface digest manifest、raw report / raw surface payload 非保存に束縛されていることを検証する時
   - gap-report の scan_receipt が continuity_event_ref / continuity_event_digest を返し、raw continuity event payload を保存しないことを検証する時
   - gap-report の scan_receipt が実 ContinuityLedger entry ref / hash / payload ref と self+guardian 署名 role に束縛されていることを検証する時
