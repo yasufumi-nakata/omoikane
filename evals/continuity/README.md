@@ -132,7 +132,10 @@ rollback-approved へ到達するか。
 ### Gap Scanner Required Reference Files
 gap-report が automation の pull-first / coverage / verification / parallel Codex
 orchestration runbook 欠落と必須 section-level policy 欠落を
-high-priority task として検出できるか。tracked worktree diff に残った
+high-priority task として検出できるか。root `README.md` の runnable CLI command inventory と
+`src/omoikane/cli.py` の parser 定義の drift も
+`inventory_drift_hits` として all-zero gate の外へ出せるか。
+tracked worktree diff に残った
 workspace marker residue も `worktree_workspace_marker_hits` として
 all-zero gate の外へ出せるか。追跡対象生成物も
 `git:tracked-generated-artifacts` の path manifest digest と

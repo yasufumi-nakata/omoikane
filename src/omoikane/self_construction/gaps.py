@@ -132,6 +132,10 @@ TRUTH_SOURCE_INVENTORY_SPECS = (
     ("specs/interfaces/README.md", "specs/interfaces", (".idl",)),
     ("specs/schemas/README.md", "specs/schemas", (".schema", ".yaml")),
 )
+ROOT_README_CLI_INVENTORY_README = "README.md"
+ROOT_README_CLI_SOURCE = "src/omoikane/cli.py"
+ROOT_README_UNITTEST_COMMAND = "PYTHONPATH=src python3 -m unittest discover -s tests -t ."
+ROOT_README_CLI_COMMAND_PREFIX = "PYTHONPATH=src python3 -m omoikane.cli "
 CATALOG_COVERAGE_SPECS = (
     ("specs/interfaces", (".idl",)),
     ("specs/schemas", (".schema", ".yaml")),
@@ -1364,6 +1368,7 @@ class GapScanner:
 
     def _inventory_drift_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []
+        hits.extend(self._root_readme_cli_inventory_hits(repo_root))
         inventory_specs = list(TRUTH_SOURCE_INVENTORY_SPECS)
         top_level_eval_readme = repo_root / TOP_LEVEL_EVAL_INVENTORY_SPEC[0]
         top_level_eval_root = repo_root / TOP_LEVEL_EVAL_INVENTORY_SPEC[1]
@@ -1434,6 +1439,108 @@ class GapScanner:
                     }
                 )
         return hits
+
+    def _root_readme_cli_inventory_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, str]]:
+        readme_path = repo_root / ROOT_README_CLI_INVENTORY_README
+        cli_path = repo_root / ROOT_README_CLI_SOURCE
+        if not readme_path.exists() or not cli_path.exists():
+            return []
+
+        listed_commands = self._root_readme_cli_command_names(readme_path)
+        implemented_commands = self._implemented_cli_command_names(cli_path)
+        if not implemented_commands:
+            return []
+
+        hits: List[Dict[str, str]] = []
+        if ROOT_README_UNITTEST_COMMAND not in self._root_readme_command_entries(readme_path):
+            hits.append(
+                {
+                    "path": ROOT_README_CLI_INVENTORY_README,
+                    "line": (
+                        f"`{ROOT_README_UNITTEST_COMMAND}` is missing from the "
+                        "root README runnable command inventory"
+                    ),
+                }
+            )
+        for missing_command in sorted(implemented_commands - listed_commands):
+            hits.append(
+                {
+                    "path": ROOT_README_CLI_INVENTORY_README,
+                    "line": (
+                        f"`{missing_command}` is implemented in src/omoikane/cli.py "
+                        "but missing from the root README runnable command inventory"
+                    ),
+                    "missing_cli_command": missing_command,
+                }
+            )
+        for stale_command in sorted(listed_commands - implemented_commands):
+            hits.append(
+                {
+                    "path": ROOT_README_CLI_INVENTORY_README,
+                    "line": (
+                        f"`{stale_command}` is listed in the root README runnable "
+                        "command inventory but is not implemented in src/omoikane/cli.py"
+                    ),
+                    "stale_cli_command": stale_command,
+                }
+            )
+        return hits
+
+    @staticmethod
+    def _root_readme_command_entries(readme_path: Path) -> List[str]:
+        entries: List[str] = []
+        try:
+            lines = readme_path.read_text(encoding="utf-8").splitlines()
+        except UnicodeDecodeError:
+            return entries
+        for line in lines:
+            if not line.startswith("- ") or "`" not in line:
+                continue
+            parts = line.strip().split("`")
+            for index in range(1, len(parts), 2):
+                candidate = parts[index].strip()
+                if candidate.startswith("PYTHONPATH=src python3 -m "):
+                    entries.append(candidate)
+        return entries
+
+    @classmethod
+    def _root_readme_cli_command_names(cls, readme_path: Path) -> set[str]:
+        command_names: set[str] = set()
+        for entry in cls._root_readme_command_entries(readme_path):
+            if not entry.startswith(ROOT_README_CLI_COMMAND_PREFIX):
+                continue
+            remainder = entry[len(ROOT_README_CLI_COMMAND_PREFIX) :].strip()
+            command_name = remainder.split()[0] if remainder else ""
+            if command_name:
+                command_names.add(command_name)
+        return command_names
+
+    @staticmethod
+    def _implemented_cli_command_names(cli_path: Path) -> set[str]:
+        try:
+            tree = ast.parse(cli_path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            return set()
+
+        command_names: set[str] = set()
+
+        class ParserVisitor(ast.NodeVisitor):
+            def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+                func = node.func
+                if (
+                    isinstance(func, ast.Attribute)
+                    and func.attr == "add_parser"
+                    and node.args
+                    and isinstance(node.args[0], ast.Constant)
+                    and isinstance(node.args[0].value, str)
+                ):
+                    command_names.add(node.args[0].value)
+                self.generic_visit(node)
+
+        ParserVisitor().visit(tree)
+        return command_names
 
     def _decision_log_index_inventory_hits(
         self, repo_root: Path

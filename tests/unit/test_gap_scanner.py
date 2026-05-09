@@ -1007,6 +1007,37 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_root_readme_cli_inventory_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "README.md").write_text(
+                "# OmoikaneOS\n\n"
+                "## すぐ動かせるもの\n\n"
+                "- `PYTHONPATH=src python3 -m unittest discover -s tests -t .`\n"
+                "- `PYTHONPATH=src python3 -m omoikane.cli demo --json`\n",
+                encoding="utf-8",
+            )
+            cli_path = repo_root / "src" / "omoikane" / "cli.py"
+            cli_path.parent.mkdir(parents=True, exist_ok=True)
+            cli_path.write_text(
+                "def _build_parser():\n"
+                "    subparsers.add_parser('demo')\n"
+                "    subparsers.add_parser('attention-demo')\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            hit = report["inventory_drift_hits"][0]
+            self.assertEqual("README.md", hit["path"])
+            self.assertEqual("attention-demo", hit["missing_cli_command"])
+            self.assertIn("root README runnable command inventory", hit["line"])
+            self.assertTrue(
+                any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
+            )
+
     def test_scan_reports_decision_log_index_inventory_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

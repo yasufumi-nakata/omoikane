@@ -169,6 +169,7 @@
 - `ewa_stop_signal_path.schema`
 - `external_actuation_authorization.schema`
 - `gap_report.schema`
+  - root `README.md` の runnable CLI command inventory と `src/omoikane/cli.py` の parser 定義 drift を all-zero gate の外へ出す
   - `evals/README.md` の top-level eval inventory 欠落を all-zero gate の外へ出す
   - `meta/decision-log/README.md` の dated decision-log index drift を all-zero gate の外へ出す
   - dated decision log の frontmatter metadata 欠落を all-zero gate の外へ出す

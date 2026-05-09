@@ -110,6 +110,8 @@ automation が前提にする repo-local `references/*.md` の欠落
 `repo-coverage-checklist.md` / `verification-checklist.md`) と、
 各 runbook の必須 section-level policy
 (`Preflight` / `Gate Order` / `Worker Boundaries` / `Verification` など) の欠落、
+root `README.md` の runnable CLI command inventory と `src/omoikane/cli.py` の
+`add_parser` 定義の drift、
 `specs/interfaces/README.md` / `specs/schemas/README.md` / `evals/*/README.md` の inventory drift、
 同じ inventory item の重複掲載、
 実装済みの `specs/interfaces/*.idl` / `specs/schemas/*` が

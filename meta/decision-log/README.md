@@ -415,3 +415,4 @@ status: accepted | decided | superseded
 - [2026-05-08_gap-report-nested-platform-metadata.md](2026-05-08_gap-report-nested-platform-metadata.md)
 - [2026-05-09_gap-report-ignored-platform-metadata.md](2026-05-09_gap-report-ignored-platform-metadata.md)
 - [2026-05-09_gap-report-ignored-generated-artifacts.md](2026-05-09_gap-report-ignored-generated-artifacts.md)
+- [2026-05-10_root-readme-cli-inventory-gate.md](2026-05-10_root-readme-cli-inventory-gate.md)

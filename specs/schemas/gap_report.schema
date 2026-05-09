@@ -3,11 +3,12 @@ $id: "https://omoikane.dev/specs/schemas/gap_report.schema"
 title: GapReport
 description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
-  including top-level eval inventory drift and duplicate-entry checks, tracked
-  worktree marker-residue checks, tracked/untracked generated artifact hygiene
-  checks for build output, caches, and platform metadata, ignored generated
-  artifact hygiene checks for packaging/release output, ignored platform metadata
-  hygiene checks, decision-log README index inventory checks,
+  including root README runnable CLI command inventory drift, top-level eval
+  inventory drift and duplicate-entry checks, tracked worktree marker-residue
+  checks, tracked/untracked generated artifact hygiene checks for build output,
+  caches, and platform metadata, ignored generated artifact hygiene checks for
+  packaging/release output, ignored platform metadata hygiene checks,
+  decision-log README index inventory checks,
   decision-log metadata conformance checks, agent source definition validation,
   truth-source
   residual marker checks, and a digest-bound scan receipt for automation gating.
@@ -167,6 +168,9 @@ properties:
     items:
       $ref: "#/$defs/gap_hit"
   inventory_drift_hits:
+    description: >
+      README/spec/eval inventory drift hits, including root README runnable CLI
+      commands that are missing from or stale against src/omoikane/cli.py.
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -551,6 +555,12 @@ $defs:
         type: string
         minLength: 1
       missing_catalog_file:
+        type: string
+        minLength: 1
+      missing_cli_command:
+        type: string
+        minLength: 1
+      stale_cli_command:
         type: string
         minLength: 1
       symbol:
