@@ -171,6 +171,7 @@
 - `gap_report.schema`
   - root `README.md` の runnable CLI command inventory と `src/omoikane/cli.py` の parser 定義 drift を all-zero gate の外へ出す
   - `evals/README.md` の top-level eval inventory 欠落を all-zero gate の外へ出す
+  - 実装済み eval YAML の `specs/catalog.yaml` 未登録を catalog coverage gap として all-zero gate の外へ出す
   - `meta/decision-log/README.md` の dated decision-log index drift を all-zero gate の外へ出す
   - dated decision log の frontmatter metadata 欠落を all-zero gate の外へ出す
   - `agents/**/*.yaml` の Yaoyorozu agent source definition violation を all-zero gate の外へ出す

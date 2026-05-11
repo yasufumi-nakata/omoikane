@@ -114,7 +114,7 @@ root `README.md` の runnable CLI command inventory と `src/omoikane/cli.py` �
 `add_parser` 定義の drift、
 `specs/interfaces/README.md` / `specs/schemas/README.md` / `evals/*/README.md` の inventory drift、
 同じ inventory item の重複掲載、
-実装済みの `specs/interfaces/*.idl` / `specs/schemas/*` が
+実装済みの `specs/interfaces/*.idl` / `specs/schemas/*` / `evals/**/*.yaml` が
 `specs/catalog.yaml` entries に未登録の catalog coverage gap、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
@@ -163,6 +163,8 @@ decision log 側で append-only に gap chain を保つ時は、
 frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
 `evals/README.md` は全 eval YAML を repo-local eval path で列挙する top-level inventory として扱い、
 `evals/*/README.md` の surface 別 inventory と同じ `inventory_drift_hits` gate に入る。
+同じ eval YAML は `specs/catalog.yaml` の catalog coverage gate にも入り、
+未登録なら `catalog_coverage_gap_hits` として all-zero gate の外へ出る。
 `meta/decision-log/README.md` は全ての dated decision-log markdown file を列挙する
 append-only index として扱い、実在 log の未掲載や存在しない log への stale link を
 `decision_log_index_inventory_hits` として all-zero gate の外へ出す。

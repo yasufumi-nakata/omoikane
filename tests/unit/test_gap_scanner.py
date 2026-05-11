@@ -1161,6 +1161,40 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "catalog-coverage-gap" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_uncataloged_implemented_eval_files(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            eval_root = repo_root / "evals" / "continuity"
+            eval_root.mkdir(parents=True, exist_ok=True)
+            (eval_root / "README.md").write_text(
+                "# Continuity Evals\n\n- `ledger_integrity.yaml`\n",
+                encoding="utf-8",
+            )
+            (eval_root / "ledger_integrity.yaml").write_text(
+                "eval_id: ledger_integrity\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "catalog.yaml").write_text(
+                "catalog_version: 1\nentries: []\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["catalog_coverage_gap_count"])
+            self.assertEqual(
+                "specs/catalog.yaml",
+                report["catalog_coverage_gap_hits"][0]["path"],
+            )
+            self.assertEqual(
+                "evals/continuity/ledger_integrity.yaml",
+                report["catalog_coverage_gap_hits"][0]["missing_catalog_file"],
+            )
+            self.assertTrue(
+                any(task["kind"] == "catalog-coverage-gap" for task in report["prioritized_tasks"])
+            )
+
     def test_scan_ignores_cross_surface_eval_references(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)

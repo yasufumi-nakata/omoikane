@@ -4,8 +4,9 @@ title: GapReport
 description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
   including root README runnable CLI command inventory drift, top-level eval
-  inventory drift and duplicate-entry checks, tracked worktree marker-residue
-  checks, tracked/untracked generated artifact hygiene checks for build output,
+  inventory drift and duplicate-entry checks, catalog coverage checks for
+  implemented schemas, interfaces, and eval YAML files, tracked worktree
+  marker-residue checks, tracked/untracked generated artifact hygiene checks for build output,
   caches, and platform metadata, ignored generated artifact hygiene checks for
   packaging/release output, ignored platform metadata hygiene checks,
   decision-log README index inventory checks,

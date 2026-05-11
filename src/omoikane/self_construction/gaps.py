@@ -139,6 +139,7 @@ ROOT_README_CLI_COMMAND_PREFIX = "PYTHONPATH=src python3 -m omoikane.cli "
 CATALOG_COVERAGE_SPECS = (
     ("specs/interfaces", (".idl",)),
     ("specs/schemas", (".schema", ".yaml")),
+    ("evals", (".yaml", ".yml")),
 )
 TOP_LEVEL_EVAL_INVENTORY_SPEC = (
     "evals/README.md",
@@ -1689,7 +1690,7 @@ class GapScanner:
             directory_path = repo_root / directory_name
             if not directory_path.exists():
                 continue
-            for path in sorted(directory_path.iterdir()):
+            for path in sorted(directory_path.rglob("*")):
                 if not path.is_file() or path.suffix not in suffixes:
                     continue
                 relative_path = str(path.relative_to(repo_root))

@@ -4253,5 +4253,144 @@ entries:
       - tests/integration/test_reference_runtime.py
       - docs/02-subsystems/interface/observation-integration-workbench.md
     rationale: Guards that the universal observation workbench keeps taxonomy, source bundle, graph, analysis plan, operator guide, and analysis run digest-bound while raw payloads, complete knowledge, truth unification, consciousness reproduction, and identity replacement remain false.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/council_guardian_veto.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/agentic/council.py
+      - tests/unit/test_agentic.py
+      - docs/02-subsystems/agentic/council-session.md
+    rationale: Guards that Guardian veto authority remains stronger than ordinary Council approval when a self-modification proposal crosses immutable safety boundaries.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/distributed_transport_authority_route_target_discovery.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/agentic/distributed_transport.py
+      - tests/integration/test_distributed_transport_schema_contracts.py
+      - tests/unit/test_transport.py
+      - docs/02-subsystems/agentic/distributed-transport-attestation.md
+    rationale: Guards that distributed transport route-target discovery covers active authority-plane members and binds remote host, attestation, and cluster evidence before non-loopback route tracing.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_fork_request_optional_eval_dispatch.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/agentic/yaoyorozu.py
+      - tests/integration/test_reference_runtime.py
+      - tests/integration/test_yaoyorozu_schema_contracts.py
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+    rationale: Guards that fork-request dispatch can opt into eval coverage without losing deterministic three-root TaskGraph bundling or worker coverage completeness.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_memory_edit_optional_schema_dispatch.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/agentic/yaoyorozu.py
+      - tests/integration/test_reference_runtime.py
+      - tests/integration/test_yaoyorozu_schema_contracts.py
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+    rationale: Guards that memory-edit dispatch can opt into schema coverage while retaining deterministic TaskGraph roots and complete worker handoff coverage.
+  - priority: P1
+    kind: eval
+    file: evals/agentic/yaoyorozu_worker_patch_candidate_receipt.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/agentic/yaoyorozu.py
+      - specs/schemas/yaoyorozu_worker_dispatch_receipt.schema
+      - tests/integration/test_yaoyorozu_schema_contracts.py
+      - docs/02-subsystems/agentic/yaoyorozu-roster.md
+    rationale: Guards that Yaoyorozu worker delta evidence is converted into patch-descriptor-compatible candidate receipts before a dispatch receipt reaches the ready gate.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/builder_live_oversight_network.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/self_construction/builders.py
+      - tests/integration/test_reference_runtime.py
+      - tests/integration/test_builder_schema_contracts.py
+      - docs/07-reference-implementation/README.md
+    rationale: Guards that builder live enactment remains bound to integrity Guardian oversight, live reviewer verification, and network-attested reviewer quorum before approval.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/connectome_snapshot_contract.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/mind/connectome.py
+      - tests/unit/test_connectome.py
+      - tests/integration/test_mind_schema_contracts.py
+      - docs/03-protocols/connectome-format.md
+    rationale: Guards that ConnectomeDocument snapshots retain substrate-neutral node, edge, hierarchy, and invariant validation without claiming upload readiness.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/diff_evaluator_direct_contract.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/self_construction/builders.py
+      - tests/integration/test_reference_runtime.py
+      - tests/integration/test_builder_schema_contracts.py
+      - docs/07-reference-implementation/README.md
+    rationale: Guards that DifferentialEvaluator classifies promote, hold, and rollback paths from parsed observations and temp-workspace execution receipts.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/ledger_integrity.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/kernel/continuity.py
+      - tests/unit/test_kernel.py
+      - tests/integration/test_continuity_schema_contracts.py
+      - docs/02-subsystems/kernel/continuity-ledger.md
+    rationale: Guards that ContinuityLedger hash-chain integrity and cursor monotonicity remain intact across identity, substrate, and Council events.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/patch_generator_direct_contract.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/self_construction/builders.py
+      - tests/integration/test_reference_runtime.py
+      - tests/integration/test_builder_schema_contracts.py
+      - docs/07-reference-implementation/README.md
+    rationale: Guards that PatchGenerator emits planning-cue-aligned ready artifacts and fail-closes workspace escape, immutable boundary, and planning cue violations.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_cancellation.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/kernel/scheduler.py
+      - tests/integration/test_scheduler_schema_contracts.py
+      - tests/integration/test_reference_runtime.py
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+    rationale: Guards that AscensionScheduler cancellation before protected handoff leaves a cancelled handle and digest-bound execution receipt.
+  - priority: P1
+    kind: eval
+    file: evals/continuity/scheduler_execution_receipt.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/kernel/scheduler.py
+      - tests/integration/test_scheduler_schema_contracts.py
+      - tests/integration/test_reference_runtime.py
+      - docs/02-subsystems/kernel/ascension-scheduler.md
+    rationale: Guards that AscensionScheduler Method A/B/C histories compile into first-class execution receipts with protected gates and fail-closed outcomes.
+  - priority: P1
+    kind: eval
+    file: evals/safety/ethics_rule_tree_contract.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/kernel/ethics.py
+      - specs/interfaces/kernel.ethics.v0.idl
+      - tests/integration/test_ethics_schema_contracts.py
+      - docs/02-subsystems/kernel/ethics-enforcement.md
+    rationale: Guards that EthicsEnforcer preserves deterministic rule-tree semantics, priority conflict resolution, consent redaction, and raw consent payload exclusion.
+  - priority: P1
+    kind: eval
+    file: evals/safety/immutable_boundary.yaml
+    consumers:
+      - reference-runtime
+      - src/omoikane/kernel/ethics.py
+      - src/omoikane/kernel/continuity.py
+      - tests/unit/test_kernel.py
+      - docs/02-subsystems/kernel/ethics-enforcement.md
+    rationale: Guards that self-modification proposals targeting EthicsEnforcer or ContinuityLedger continue to be vetoed as immutable safety boundaries.
 next_priority:
   # Future automation can append the next missing contract here.

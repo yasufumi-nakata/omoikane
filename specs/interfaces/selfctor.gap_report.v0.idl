@@ -2,12 +2,12 @@ idl_version: 1
 kind: service
 namespace: selfctor.gap_report.v0
 service: GapReportService
-summary: Emit a schema-bound self-construction gap report with root README runnable CLI inventory checks, top-level eval inventory drift checks, decision-log README index checks, decision-log metadata conformance checks, agent source definition validation, truth-source residual marker checks, tracked worktree marker-residue checks, tracked/untracked generated artifact hygiene checks for build output, caches, and platform metadata, ignored generated artifact hygiene checks for packaging/release output, ignored platform metadata hygiene checks, and a digest-bound scan receipt for automation gates.
+summary: Emit a schema-bound self-construction gap report with root README runnable CLI inventory checks, top-level eval inventory drift checks, eval catalog coverage checks, decision-log README index checks, decision-log metadata conformance checks, agent source definition validation, truth-source residual marker checks, tracked worktree marker-residue checks, tracked/untracked generated artifact hygiene checks for build output, caches, and platform metadata, ignored generated artifact hygiene checks for packaging/release output, ignored platform metadata hygiene checks, and a digest-bound scan receipt for automation gates.
 imports:
   gap_report: ../schemas/gap_report.schema
 operations:
   scan_repo:
-    summary: Scan one repository root for open questions, required automation references, root README runnable CLI inventory drift, top-level and per-surface inventory drift, decision-log README index drift, decision-log frontmatter metadata violations, catalog coverage gaps, truth-source residual markers, agent source definition violations, runtime stubs, tracked worktree workspace marker residue, tracked/untracked build/cache/platform generated artifacts, ignored packaging/release generated artifacts, ignored platform metadata, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
+    summary: Scan one repository root for open questions, required automation references, root README runnable CLI inventory drift, top-level and per-surface inventory drift, decision-log README index drift, decision-log frontmatter metadata violations, spec/interface/schema/eval catalog coverage gaps, truth-source residual markers, agent source definition violations, runtime stubs, tracked worktree workspace marker residue, tracked/untracked build/cache/platform generated artifacts, ignored packaging/release generated artifacts, ignored platform metadata, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
     input:
       inline_schema:
         type: object
@@ -30,6 +30,7 @@ operations:
       - inventory README scans must treat only top-level bullets as inventory entries and must report duplicate top-level entries before all-zero completion
       - root README runnable command bullets must enumerate every implemented src/omoikane/cli.py add_parser command at least once and must not point at stale CLI command names before all-zero completion
       - evals/README.md must enumerate every implemented eval YAML by repo-local eval path, while evals/*/README.md must continue to enumerate each local eval surface
+      - specs/catalog.yaml must enumerate every implemented specs/interfaces file, specs/schemas file, and evals/* YAML file before all-zero completion
       - meta/decision-log/README.md must enumerate every repo-local dated decision-log markdown file and must not list missing decision-log files
       - every repo-local dated decision-log markdown file must carry frontmatter with date, deciders, related_docs, and an accepted/decided/superseded status before all-zero completion
       - agents/**/*.yaml must satisfy the schema-bound-agent-source-definition-v1 contract before all-zero completion, and violations must be reported without storing raw agent source payloads

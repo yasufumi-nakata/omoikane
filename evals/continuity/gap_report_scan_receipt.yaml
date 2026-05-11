@@ -3,7 +3,8 @@ target: self_construction.gap_report
 level: L5
 description: >
   gap-report が all-zero / non-zero 判定、prioritized task count、scan surface、
-  root README runnable CLI inventory、top-level eval inventory、report digest、各 truth-source の
+  root README runnable CLI inventory、top-level eval inventory、eval catalog coverage、
+  report digest、各 truth-source の
   surface digest manifest、continuity ledger 用 event ref / digest と実 ContinuityLedger append entry を
   public schema と digest-bound receipt に固定し、
   build / cache / platform metadata 生成物の path manifest、ignored generated artifact、
@@ -29,6 +30,7 @@ expected:
   scan_surface_digests_bound: true
   root_readme_cli_inventory_gate_bound: true
   top_level_eval_inventory_surface_bound: true
+  eval_catalog_coverage_gate_bound: true
   surface_manifest_digest_bound: true
   continuity_ledger_bound: true
   continuity_event_digest_bound: true
