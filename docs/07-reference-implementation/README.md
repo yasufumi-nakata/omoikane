@@ -116,6 +116,8 @@ root `README.md` の runnable CLI command inventory と `src/omoikane/cli.py` �
 同じ inventory item の重複掲載、
 実装済みの `specs/interfaces/*.idl` / `specs/schemas/*` / `evals/**/*.yaml` が
 `specs/catalog.yaml` entries に未登録の catalog coverage gap、
+`specs/schemas/*.schema` に含まれる public `example` / `examples` が
+repo-local `$ref` 解決後の自 schema に通らない schema example validation drift、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
 `future work`、日本語の実装 backlog marker、残差 marker に加え、

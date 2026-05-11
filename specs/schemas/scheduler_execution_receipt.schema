@@ -322,6 +322,7 @@ examples:
       resume: 2
       rollback: 1
       sync: 2
+    cancel_count: 0
     rollback_count: 1
     pause_count: 2
     sync_count: 2
@@ -346,6 +347,7 @@ examples:
       signal_pause_observed: true
       signal_rollback_observed: true
       signal_fail_closed_observed: false
+      cancelled: false
       artifact_revoked_fail_closed: false
       verifier_revoked_fail_closed: false
       method_b_broker_prepared: true

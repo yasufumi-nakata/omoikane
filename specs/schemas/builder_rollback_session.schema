@@ -1283,8 +1283,12 @@ examples:
           verifier_ref: verifier://guardian-oversight.jp/reviewer-rollback-alpha
           challenge_digest: sha256:rollback-reviewer-alpha-20260421
           transport_profile: reviewer-live-proof-bridge-v1
+          jurisdiction: JP-13
           jurisdiction_bundle_ref: legal://jp-13/rollback-integrity/v1
           jurisdiction_bundle_digest: sha256:jp13-rollback-integrity-v1
+          legal_execution_id: legal-execution-0123456789ab
+          legal_execution_digest: 4d4974b93c43805cfe9847d6fe405e92b25f670e24a1d1f2a59fdf62e4d5fc6b
+          legal_policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
           network_receipt_id: verifier-network-receipt-0123456789ab
           authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
           trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki
@@ -1301,8 +1305,12 @@ examples:
           verifier_ref: verifier://guardian-oversight.jp/reviewer-rollback-beta
           challenge_digest: sha256:rollback-reviewer-beta-20260421
           transport_profile: reviewer-live-proof-bridge-v1
+          jurisdiction: JP-13
           jurisdiction_bundle_ref: legal://jp-13/rollback-integrity/v1
           jurisdiction_bundle_digest: sha256:jp13-rollback-integrity-v1
+          legal_execution_id: legal-execution-fedcba987654
+          legal_execution_digest: 5d4974b93c43805cfe9847d6fe405e92b25f670e24a1d1f2a59fdf62e4d5fc6c
+          legal_policy_ref: policy://guardian-oversight/jp-13/reviewer-attestation/v1
           network_receipt_id: verifier-network-receipt-fedcba987654
           authority_chain_ref: authority://guardian-oversight.jp/reviewer-attestation
           trust_root_ref: root://guardian-oversight.jp/reviewer-live-pki

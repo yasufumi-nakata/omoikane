@@ -248,7 +248,7 @@ examples:
         target_path: src/omoikane/agentic/local_worker_stub.py
         target_path_scope: src/omoikane/
         target_path_observation_digest: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-        delta_entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
+        delta_entry_digest: "9999999999999999999999999999999999999999999999999999999999999999"
         change_status: modified
         priority_rank: 1
         priority_score: 84
@@ -276,5 +276,5 @@ examples:
           target_subsystem: L4.Yaoyorozu.RuntimeWorker
           rollback_hint: Restore src/omoikane/agentic/local_worker_stub.py from the dispatch-bound HEAD baseline.
           applies_cleanly: true
-        candidate_digest: fedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafedcbafe
-    receipt_digest: 1111111111111111111111111111111111111111111111111111111111111111
+        candidate_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
+    receipt_digest: "1111111111111111111111111111111111111111111111111111111111111111"

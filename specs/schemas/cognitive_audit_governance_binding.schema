@@ -395,7 +395,7 @@ examples:
       authority_plane_ref: authority-plane://federation/cognitive-audit-window
       authority_plane_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
       route_target_discovery_ref: authority-route-targets://federation/cognitive-audit-window
-      route_target_discovery_digest: 1111111111111111111111111111111111111111111111111111111111111111
+      route_target_discovery_digest: "1111111111111111111111111111111111111111111111111111111111111111"
       council_tier: federation
       transport_profile: distributed-council-handoff-v1
       trace_profile: non-loopback-mtls-authority-route-v1
@@ -419,7 +419,7 @@ examples:
         - verifier-network-receipt-89abcdef0123
       reviewer_jurisdiction_count: 2
       reviewer_binding_digest: fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210
-      route_binding_digest: 2222222222222222222222222222222222222222222222222222222222222222
+      route_binding_digest: "2222222222222222222222222222222222222222222222222222222222222222"
       non_loopback_verified: true
       cross_host_verified: true
       route_trace_authenticated: true
@@ -427,7 +427,7 @@ examples:
       os_observer_complete: true
       route_target_discovery_bound: true
       no_raw_socket_payload_exposed: true
-      digest: 3333333333333333333333333333333333333333333333333333333333333333
+      digest: "3333333333333333333333333333333333333333333333333333333333333333"
     continuity_guard:
       local_resolution_preserved: true
       distributed_refs_present: true

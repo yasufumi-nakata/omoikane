@@ -246,8 +246,8 @@ examples:
     external_resolution_refs: []
     follow_up_action: execute-federated-review
     rationale_trace:
-      - identity://amaterasu-endpoint: approve - self approved the shared reality rehearsal
-      - identity://shared-peer: approve - peer approved the shared reality rehearsal
-      - guardian://neutral-federation: approve - guardian confirmed continuity guardrails
+      - identity://amaterasu-endpoint approve - self approved the shared reality rehearsal
+      - identity://shared-peer approve - peer approved the shared reality rehearsal
+      - guardian://neutral-federation approve - guardian confirmed continuity guardrails
     recorded_at: "2026-04-19T08:10:00Z"
     digest: 8b75218c0607a775f7e43332f8bc2b54ac44fa34f20b23182f2b1c8f427d6aa5

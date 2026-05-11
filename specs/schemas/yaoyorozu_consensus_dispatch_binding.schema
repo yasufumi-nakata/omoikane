@@ -259,7 +259,9 @@ examples:
       - worker-dispatch-000000000003
       - worker-dispatch-000000000004
     messages:
-      - message_id: consensus-msg-000000000001
+      - kind: consensus_message
+        schema_version: 1.0.0
+        message_id: consensus-msg-000000000001
         session_id: council-convocation-0123456789ab
         sender_role: Council
         recipient: broadcast
@@ -275,7 +277,9 @@ examples:
         emitted_at: "2026-04-23T08:10:05Z"
         signature_ref: sig://consensus-bus/consensus-msg-000000000001
         message_digest: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-      - message_id: consensus-msg-000000000002
+      - kind: consensus_message
+        schema_version: 1.0.0
+        message_id: consensus-msg-000000000002
         session_id: council-convocation-0123456789ab
         sender_role: codex-builder
         recipient: council
@@ -291,7 +295,9 @@ examples:
         emitted_at: "2026-04-23T08:10:10Z"
         signature_ref: sig://consensus-bus/consensus-msg-000000000002
         message_digest: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
-      - message_id: consensus-msg-000000000003
+      - kind: consensus_message
+        schema_version: 1.0.0
+        message_id: consensus-msg-000000000003
         session_id: council-convocation-0123456789ab
         sender_role: schema-builder
         recipient: council
@@ -307,7 +313,9 @@ examples:
         emitted_at: "2026-04-23T08:10:11Z"
         signature_ref: sig://consensus-bus/consensus-msg-000000000003
         message_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
-      - message_id: consensus-msg-000000000004
+      - kind: consensus_message
+        schema_version: 1.0.0
+        message_id: consensus-msg-000000000004
         session_id: council-convocation-0123456789ab
         sender_role: eval-builder
         recipient: council
@@ -323,7 +331,9 @@ examples:
         emitted_at: "2026-04-23T08:10:12Z"
         signature_ref: sig://consensus-bus/consensus-msg-000000000004
         message_digest: dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd
-      - message_id: consensus-msg-000000000005
+      - kind: consensus_message
+        schema_version: 1.0.0
+        message_id: consensus-msg-000000000005
         session_id: council-convocation-0123456789ab
         sender_role: doc-sync-builder
         recipient: council
@@ -339,7 +349,9 @@ examples:
         emitted_at: "2026-04-23T08:10:13Z"
         signature_ref: sig://consensus-bus/consensus-msg-000000000005
         message_digest: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
-      - message_id: consensus-msg-000000000006
+      - kind: consensus_message
+        schema_version: 1.0.0
+        message_id: consensus-msg-000000000006
         session_id: council-convocation-0123456789ab
         sender_role: integrity-guardian
         recipient: council
@@ -354,7 +366,9 @@ examples:
         emitted_at: "2026-04-23T08:10:14Z"
         signature_ref: sig://consensus-bus/consensus-msg-000000000006
         message_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-      - message_id: consensus-msg-000000000007
+      - kind: consensus_message
+        schema_version: 1.0.0
+        message_id: consensus-msg-000000000007
         session_id: council-convocation-0123456789ab
         sender_role: Council
         recipient: broadcast
@@ -369,7 +383,7 @@ examples:
           - yaoyorozu-dispatch-receipt-0123456789ab
         emitted_at: "2026-04-23T08:10:15Z"
         signature_ref: sig://consensus-bus/consensus-msg-000000000007
-        message_digest: 9999999999999999999999999999999999999999999999999999999999999999
+        message_digest: "9999999999999999999999999999999999999999999999999999999999999999"
     blocked_direct_attempt:
       attempt_id: consensus-block-0123456789ab
       session_id: council-convocation-0123456789ab
@@ -403,12 +417,12 @@ examples:
         - worker-dispatch-000000000004
       message_refs:
         - 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
-        - 1111111111111111111111111111111111111111111111111111111111111111
-        - 2222222222222222222222222222222222222222222222222222222222222222
-        - 3333333333333333333333333333333333333333333333333333333333333333
-        - 4444444444444444444444444444444444444444444444444444444444444444
-        - 5555555555555555555555555555555555555555555555555555555555555555
-        - 6666666666666666666666666666666666666666666666666666666666666666
+        - "1111111111111111111111111111111111111111111111111111111111111111"
+        - "2222222222222222222222222222222222222222222222222222222222222222"
+        - "3333333333333333333333333333333333333333333333333333333333333333"
+        - "4444444444444444444444444444444444444444444444444444444444444444"
+        - "5555555555555555555555555555555555555555555555555555555555555555"
+        - "6666666666666666666666666666666666666666666666666666666666666666"
     validation:
       same_session_bound: true
       dispatch_plan_bound: true

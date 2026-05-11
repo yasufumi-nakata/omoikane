@@ -282,8 +282,24 @@ examples:
         reversibility: reversible
         alignment_tags: [continuity, consent, audit]
         requires_guardian_review: true
+      - intent_id: continuity-hold
+        objective: hold state until continuity pressure stabilizes
+        urgency: 0.52
+        risk: 0.05
+        reversibility: reversible
+        alignment_tags: [continuity, audit]
+        requires_guardian_review: false
+      - intent_id: sandbox-stabilization
+        objective: stabilize in sandbox before any external action
+        urgency: 0.49
+        risk: 0.04
+        reversibility: reversible
+        alignment_tags: [continuity, consent, audit]
+        requires_guardian_review: false
     candidate_scores:
       guardian-review: 0.747
+      continuity-hold: 0.613
+      sandbox-stabilization: 0.584
     selected_intent: guardian-review
     execution_mode: review
     degraded: true

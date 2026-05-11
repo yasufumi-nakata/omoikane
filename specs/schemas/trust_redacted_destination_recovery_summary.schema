@@ -187,7 +187,7 @@ examples:
       execution_scope_summary:
         scope_profile_id: bounded-trust-recovery-legal-execution-scope-v1
         scope_ref: trust-recovery-execution-scope://0123456789ab
-        scope_digest: 1111111111111111111111111111111111111111111111111111111111111111
+        scope_digest: "1111111111111111111111111111111111111111111111111111111111111111"
         jurisdiction_count: 3
         allowed_action_count: 3
         blocked_action_count: 3
@@ -199,4 +199,4 @@ examples:
       - destination_lifecycle.history[].recovery_review.rationale
       - destination_lifecycle.history[].recovery_review.legal_ack_refs
       - destination_lifecycle.history[].recovery_review.execution_scope_manifest
-    summary_digest: 1212121212121212121212121212121212121212121212121212121212121212
+    summary_digest: "1212121212121212121212121212121212121212121212121212121212121212"

@@ -188,6 +188,9 @@ examples:
         agent_id: design-architect
         display_name: DesignArchitect
         role: councilor
+        deliberation_scope_refs:
+          - docs/04-ai-governance/
+        deliberation_policy_ref: agents/councilors/design-architect.policy.md
         source_ref: agents/councilors/design-architect.yaml
         capabilities:
           - docs.propose-change

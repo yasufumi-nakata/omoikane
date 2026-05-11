@@ -223,7 +223,7 @@ examples:
         current_digest: abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789
         baseline_bytes: 2048
         current_bytes: 2432
-        entry_digest: 9999999999999999999999999999999999999999999999999999999999999999
+        entry_digest: "9999999999999999999999999999999999999999999999999999999999999999"
       - path: tests/unit/test_agentic.py
         path_kind: file
         working_tree_state: added
@@ -233,10 +233,10 @@ examples:
         baseline_present: false
         current_present: true
         baseline_digest: ""
-        current_digest: 1111111111111111111111111111111111111111111111111111111111111111
+        current_digest: "1111111111111111111111111111111111111111111111111111111111111111"
         baseline_bytes: 0
         current_bytes: 512
-        entry_digest: 2222222222222222222222222222222222222222222222222222222222222222
+        entry_digest: "2222222222222222222222222222222222222222222222222222222222222222"
     command_receipts:
       - command_label: git-rev-parse-head
         command: git -C /Users/example/omoikane rev-parse HEAD

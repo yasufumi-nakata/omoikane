@@ -335,6 +335,3 @@ properties:
         const: true
       ok:
         const: true
-examples:
-  - kind: yaoyorozu_build_request_binding
-    schema_version: 1.0.0

@@ -166,7 +166,7 @@ Researcher の evidence seed や調査補助メモは [agents/researchers/](agen
 | `memory-edit-demo` / `memory-replication-demo` / `semantic-demo` / `procedural-demo` / `cognitive-demo` | MemoryCrystal、reversible memory edit、semantic / procedural projection、L3 reasoning failover の安全な代理シナリオ | 記憶の実改変、技能の実世界実行、汎用推論エンジン |
 | `cognitive-audit-governance-demo` / `council-demo` / `task-graph-demo` / `consensus-bus-demo` / `trust-demo` / `trust-transfer-demo` | Council、TaskGraph、ConsensusBus、TrustService、audit governance の policy / receipt / timeout / quorum 結果 | 人間監督の代替、法的承認、外部組織の実署名 |
 | `patch-generator-demo` / `diff-eval-demo` / `sandbox-demo` / `yaoyorozu-demo` / `builder-live-demo` / `rollback-demo` | Builder 系の patch plan、diff evaluation、sandbox freeze、worker dispatch、temp workspace 実行、rollback receipt | 現 checkout への無断永続変更、本番 worker 実行、秘密情報を含む長いログ保存 |
-| `gap-report --json` | open question、missing file、inventory drift、stub、生成物混入などの count と all-zero gate | 問題の自動解決、研究判断の代替 |
+| `gap-report --json` | open question、missing file、inventory drift、schema example drift、stub、生成物混入などの count と all-zero gate | 問題の自動解決、研究判断の代替 |
 
 大きな JSON が出る場合は、先頭の summary field と末尾の `validation` / `all_zero` を見れば十分です。
 

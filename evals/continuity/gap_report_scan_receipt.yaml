@@ -4,6 +4,7 @@ level: L5
 description: >
   gap-report が all-zero / non-zero 判定、prioritized task count、scan surface、
   root README runnable CLI inventory、top-level eval inventory、eval catalog coverage、
+  schema example self-validation、
   report digest、各 truth-source の
   surface digest manifest、continuity ledger 用 event ref / digest と実 ContinuityLedger append entry を
   public schema と digest-bound receipt に固定し、
@@ -23,6 +24,7 @@ expected:
   untracked_generated_artifact_count: 0
   ignored_generated_artifact_count: 0
   ignored_platform_metadata_count: 0
+  schema_example_validation_count: 0
   decision_log_index_inventory_count: 0
   validation_ok: true
   counts_match_report: true
@@ -31,6 +33,7 @@ expected:
   root_readme_cli_inventory_gate_bound: true
   top_level_eval_inventory_surface_bound: true
   eval_catalog_coverage_gate_bound: true
+  schema_example_validation_gate_bound: true
   surface_manifest_digest_bound: true
   continuity_ledger_bound: true
   continuity_event_digest_bound: true

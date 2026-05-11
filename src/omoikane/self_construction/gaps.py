@@ -8,6 +8,9 @@ from collections import Counter
 from pathlib import Path
 from typing import Any, Dict, List
 
+import jsonschema
+import yaml
+
 from ..common import canonical_json, new_id, sha256_text, utc_now_iso
 
 
@@ -141,6 +144,7 @@ CATALOG_COVERAGE_SPECS = (
     ("specs/schemas", (".schema", ".yaml")),
     ("evals", (".yaml", ".yml")),
 )
+SCHEMA_EXAMPLE_GLOB = "specs/schemas/*.schema"
 TOP_LEVEL_EVAL_INVENTORY_SPEC = (
     "evals/README.md",
     "evals",
@@ -226,6 +230,7 @@ SCAN_RECEIPT_SURFACES = (
     "docs/07-reference-implementation/README.md",
     "specs/interfaces/**/*.idl",
     "specs/schemas/README.md",
+    SCHEMA_EXAMPLE_GLOB,
     AGENT_SOURCE_DEFINITION_GLOB,
     "src/omoikane/**/*.py",
     "meta/decision-log/*.md",
@@ -253,6 +258,7 @@ class GapScanner:
         placeholder_hits = self._placeholder_hits(repo_root)
         inventory_drift_hits = self._inventory_drift_hits(repo_root)
         catalog_coverage_hits = self._catalog_coverage_hits(repo_root)
+        schema_example_validation_hits = self._schema_example_validation_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
         agent_source_definition_hits = self._agent_source_definition_hits(repo_root)
         implementation_stub_hits = self._implementation_stub_hits(repo_root)
@@ -337,6 +343,14 @@ class GapScanner:
                 {
                     "priority": "high",
                     "kind": "catalog-coverage-gap",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
+        for hit in schema_example_validation_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "schema-example-validation",
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
@@ -465,6 +479,7 @@ class GapScanner:
             "placeholder_hit_count": len(placeholder_hits),
             "inventory_drift_count": len(inventory_drift_hits),
             "catalog_coverage_gap_count": len(catalog_coverage_hits),
+            "schema_example_validation_count": len(schema_example_validation_hits),
             "future_work_hit_count": len(future_work_hits),
             "agent_source_definition_violation_count": len(
                 agent_source_definition_hits
@@ -503,6 +518,7 @@ class GapScanner:
             "placeholder_hits": placeholder_hits,
             "inventory_drift_hits": inventory_drift_hits,
             "catalog_coverage_gap_hits": catalog_coverage_hits,
+            "schema_example_validation_hits": schema_example_validation_hits,
             "future_work_hits": future_work_hits,
             "agent_source_definition_violation_hits": agent_source_definition_hits,
             "implementation_stub_hits": implementation_stub_hits,
@@ -536,6 +552,9 @@ class GapScanner:
             "placeholder_hit_count": int(report["placeholder_hit_count"]),
             "inventory_drift_count": int(report["inventory_drift_count"]),
             "catalog_coverage_gap_count": int(report["catalog_coverage_gap_count"]),
+            "schema_example_validation_count": int(
+                report["schema_example_validation_count"]
+            ),
             "future_work_hit_count": int(report["future_work_hit_count"]),
             "agent_source_definition_violation_count": int(
                 report["agent_source_definition_violation_count"]
@@ -1717,6 +1736,150 @@ class GapScanner:
             if candidate:
                 files.add(candidate)
         return files
+
+    def _schema_example_validation_hits(
+        self, repo_root: Path
+    ) -> List[Dict[str, Any]]:
+        """Validate public schema examples without storing the example payloads."""
+
+        schema_root = repo_root / "specs" / "schemas"
+        if not schema_root.exists():
+            return []
+
+        hits: List[Dict[str, Any]] = []
+        for schema_path in sorted(schema_root.glob("*.schema")):
+            relative_path = str(schema_path.relative_to(repo_root))
+            try:
+                loaded = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeDecodeError, yaml.YAMLError) as exc:
+                hits.append(
+                    self._schema_example_validation_hit(
+                        relative_path,
+                        "schema",
+                        f"schema YAML cannot be loaded: {exc}",
+                        1,
+                    )
+                )
+                continue
+            if not isinstance(loaded, dict):
+                hits.append(
+                    self._schema_example_validation_hit(
+                        relative_path,
+                        "schema",
+                        "schema root must be an object before examples can be validated",
+                        1,
+                    )
+                )
+                continue
+
+            example_entries: List[tuple[str, Any]] = []
+            if "example" in loaded:
+                example_entries.append(("example", loaded["example"]))
+            examples_value = loaded.get("examples", [])
+            if examples_value is None:
+                examples_value = []
+            if not isinstance(examples_value, list):
+                hits.append(
+                    self._schema_example_validation_hit(
+                        relative_path,
+                        "examples",
+                        "examples must be an array",
+                        1,
+                    )
+                )
+                continue
+            for index, example in enumerate(examples_value):
+                example_entries.append((f"examples[{index}]", example))
+            if not example_entries:
+                continue
+
+            try:
+                resolved_schema = self._resolve_local_schema_refs(
+                    loaded,
+                    schema_path.parent,
+                )
+                validator = jsonschema.Draft202012Validator(resolved_schema)
+            except (OSError, UnicodeDecodeError, yaml.YAMLError, jsonschema.SchemaError) as exc:
+                hits.append(
+                    self._schema_example_validation_hit(
+                        relative_path,
+                        "schema",
+                        f"schema references cannot be resolved: {exc}",
+                        1,
+                    )
+                )
+                continue
+
+            for label, payload in example_entries:
+                errors = sorted(
+                    validator.iter_errors(payload),
+                    key=lambda error: (
+                        tuple(str(part) for part in error.path),
+                        tuple(str(part) for part in error.schema_path),
+                    ),
+                )
+                if not errors:
+                    continue
+                first_error = errors[0]
+                hits.append(
+                    self._schema_example_validation_hit(
+                        relative_path,
+                        label,
+                        (
+                            f"{label} fails schema validation at "
+                            f"{self._json_error_path(first_error.path)}: "
+                            f"{first_error.message}"
+                        ),
+                        len(errors),
+                    )
+                )
+        return hits
+
+    @classmethod
+    def _schema_example_validation_hit(
+        cls,
+        relative_path: str,
+        label: str,
+        message: str,
+        error_count: int,
+    ) -> Dict[str, Any]:
+        return {
+            "kind": "schema-example-validation",
+            "path": relative_path,
+            "line": message,
+            "schema_example_label": label,
+            "schema_example_error_count": error_count,
+            "raw_schema_example_payload_stored": False,
+        }
+
+    @classmethod
+    def _resolve_local_schema_refs(cls, node: Any, base_dir: Path) -> Any:
+        if isinstance(node, dict):
+            ref = node.get("$ref")
+            if isinstance(ref, str) and not ref.startswith("#"):
+                ref_path = (base_dir / ref).resolve()
+                loaded = yaml.safe_load(ref_path.read_text(encoding="utf-8"))
+                return cls._resolve_local_schema_refs(loaded, ref_path.parent)
+            return {
+                key: cls._resolve_local_schema_refs(value, base_dir)
+                for key, value in node.items()
+            }
+        if isinstance(node, list):
+            return [cls._resolve_local_schema_refs(item, base_dir) for item in node]
+        return node
+
+    @staticmethod
+    def _json_error_path(path: Any) -> str:
+        parts = list(path)
+        if not parts:
+            return "$"
+        formatted = "$"
+        for part in parts:
+            if isinstance(part, int):
+                formatted += f"[{part}]"
+            else:
+                formatted += f".{part}"
+        return formatted
 
     def _future_work_hits(self, repo_root: Path) -> List[Dict[str, str]]:
         hits: List[Dict[str, str]] = []

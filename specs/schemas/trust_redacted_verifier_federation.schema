@@ -134,6 +134,7 @@ examples:
     summary_profile_id: bounded-trust-transfer-redacted-verifier-federation-v1
     federation_policy_id: bounded-live-trust-transfer-verifier-federation-v1
     network_profile_id: guardian-reviewer-remote-attestation-v1
+    quorum_policy_id: bounded-trust-transfer-fixed-verifier-pair-v1
     human_reviewer_ref: human://yasufumi
     required_verifier_count: 2
     received_verifier_count: 2
@@ -217,6 +218,11 @@ examples:
       - verifier://guardian-oversight.jp/reviewer-beta
     trust_root_refs:
       - root://guardian-oversight.jp/reviewer-live-pki
+    jurisdictions:
+      - JP-13
+      - US-CA
+    trust_root_quorum: 1
+    jurisdiction_quorum: 2
     authority_chain_refs:
       - authority://guardian-oversight.jp/reviewer-attestation
     reviewer_binding_digest: cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc

@@ -141,6 +141,7 @@ class GapScannerTests(unittest.TestCase):
                 0,
                 receipt["counts"]["agent_source_definition_violation_count"],
             )
+            self.assertEqual(0, receipt["counts"]["schema_example_validation_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
             self.assertFalse(receipt["validation"]["raw_surface_payload_stored"])
@@ -1193,6 +1194,54 @@ class GapScannerTests(unittest.TestCase):
             )
             self.assertTrue(
                 any(task["kind"] == "catalog-coverage-gap" for task in report["prioritized_tasks"])
+            )
+
+    def test_scan_reports_schema_example_validation_hits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            schemas_root = repo_root / "specs" / "schemas"
+            (schemas_root / "README.md").write_text(
+                "# Schemas\n\n- `volition_intent.schema`\n",
+                encoding="utf-8",
+            )
+            (schemas_root / "volition_intent.schema").write_text(
+                "type: object\n"
+                "additionalProperties: false\n"
+                "required:\n"
+                "  - kind\n"
+                "  - name\n"
+                "properties:\n"
+                "  kind:\n"
+                "    const: volition_intent\n"
+                "  name:\n"
+                "    type: string\n"
+                "examples:\n"
+                "  - kind: volition_intent\n"
+                "    name: 123\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+            hit = report["schema_example_validation_hits"][0]
+
+            self.assertEqual(1, report["schema_example_validation_count"])
+            self.assertEqual("specs/schemas/volition_intent.schema", hit["path"])
+            self.assertEqual("examples[0]", hit["schema_example_label"])
+            self.assertEqual(1, hit["schema_example_error_count"])
+            self.assertFalse(hit["raw_schema_example_payload_stored"])
+            self.assertIn("$.name", hit["line"])
+            self.assertIn("not of type 'string'", hit["line"])
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"]["schema_example_validation_count"],
+            )
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertTrue(
+                any(
+                    task["kind"] == "schema-example-validation"
+                    for task in report["prioritized_tasks"]
+                )
             )
 
     def test_scan_ignores_cross_surface_eval_references(self) -> None:

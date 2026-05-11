@@ -114,6 +114,9 @@ examples:
         applied_delta: 0.04
         applied: true
         triggered_by: Council
+        triggered_by_agent_id: design-architect
+        provenance_status: accepted
+        provenance_policy_id: reference-trust-provenance-v1
         rationale: timeout-aware decision left no policy regression
         global_before: 0.58
         global_after: 0.62

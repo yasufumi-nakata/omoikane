@@ -366,17 +366,17 @@ examples:
       instruction_digest: eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
       intent_summary_digest: ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
       motor_plan_id: ewa-plan-0123456789ab
-      motor_plan_digest: 1111111111111111111111111111111111111111111111111111111111111111
+      motor_plan_digest: "1111111111111111111111111111111111111111111111111111111111111111"
       stop_signal_path_id: ewa-stop-path-0123456789ab
-      stop_signal_path_digest: 2222222222222222222222222222222222222222222222222222222222222222
+      stop_signal_path_digest: "2222222222222222222222222222222222222222222222222222222222222222"
       stop_signal_adapter_receipt_id: ewa-stop-adapter-0123456789ab
-      stop_signal_adapter_receipt_digest: 9999999999999999999999999999999999999999999999999999999999999999
+      stop_signal_adapter_receipt_digest: "9999999999999999999999999999999999999999999999999999999999999999"
       production_connector_attestation_id: ewa-connector-0123456789ab
-      production_connector_attestation_digest: 8888888888888888888888888888888888888888888888888888888888888888
+      production_connector_attestation_digest: "8888888888888888888888888888888888888888888888888888888888888888"
       legal_execution_id: ewa-legal-0123456789ab
-      legal_execution_digest: 3333333333333333333333333333333333333333333333333333333333333333
+      legal_execution_digest: "3333333333333333333333333333333333333333333333333333333333333333"
       guardian_oversight_gate_id: ewa-oversight-gate-0123456789ab
-      guardian_oversight_gate_digest: 4444444444444444444444444444444444444444444444444444444444444444
+      guardian_oversight_gate_digest: "4444444444444444444444444444444444444444444444444444444444444444"
       guardian_oversight_event_id: oversight-event-0123456789ab
       notice_authority_ref: authority://jp-13/procedural-actuation-oversight-desk
       jurisdiction: JP-13
@@ -427,4 +427,4 @@ examples:
       delivery_scope: physical-device-actuation
       ok: true
       errors: []
-    digest: 5555555555555555555555555555555555555555555555555555555555555555
+    digest: "5555555555555555555555555555555555555555555555555555555555555555"

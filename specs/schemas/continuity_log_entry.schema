@@ -176,7 +176,7 @@ allOf:
             - guardian
             - third_party
 examples:
-  - entry_id: log-0002
+  - entry_id: log-entry-0002ab
     entry_hash: 6a3f8f2797052ceeb0e4f4d4781abacd5892c04f65de3a07802340f9b7c625d3
     prev_hash: 2fdbe46de6c34074ea9c8eacf4fca08f32b3b1824a2dfd4fe6106f1d0fbdbd9d
     identity_id: self-001

@@ -77,6 +77,10 @@ class GapReportSchemaContractTests(unittest.TestCase):
             report["catalog_coverage_gap_count"],
             counts["catalog_coverage_gap_count"],
         )
+        self.assertEqual(
+            report["schema_example_validation_count"],
+            counts["schema_example_validation_count"],
+        )
         self.assertEqual(report["future_work_hit_count"], counts["future_work_hit_count"])
         self.assertEqual(
             report["agent_source_definition_violation_count"],

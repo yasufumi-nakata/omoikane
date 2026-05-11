@@ -9,6 +9,7 @@ description: >
   marker-residue checks, tracked/untracked generated artifact hygiene checks for build output,
   caches, and platform metadata, ignored generated artifact hygiene checks for
   packaging/release output, ignored platform metadata hygiene checks,
+  public schema example self-validation checks,
   decision-log README index inventory checks,
   decision-log metadata conformance checks, agent source definition validation,
   truth-source
@@ -25,6 +26,7 @@ required:
   - placeholder_hit_count
   - inventory_drift_count
   - catalog_coverage_gap_count
+  - schema_example_validation_count
   - future_work_hit_count
   - agent_source_definition_violation_count
   - implementation_stub_count
@@ -47,6 +49,7 @@ required:
   - placeholder_hits
   - inventory_drift_hits
   - catalog_coverage_gap_hits
+  - schema_example_validation_hits
   - future_work_hits
   - agent_source_definition_violation_hits
   - implementation_stub_hits
@@ -87,6 +90,9 @@ properties:
     type: integer
     minimum: 0
   catalog_coverage_gap_count:
+    type: integer
+    minimum: 0
+  schema_example_validation_count:
     type: integer
     minimum: 0
   future_work_hit_count:
@@ -176,6 +182,14 @@ properties:
     items:
       $ref: "#/$defs/gap_hit"
   catalog_coverage_gap_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  schema_example_validation_hits:
+    description: >
+      Public specs/schemas/*.schema example payloads that do not validate against
+      their own schema after repo-local $ref resolution. Raw example payloads are
+      not stored in the gap report.
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -371,6 +385,7 @@ properties:
           - placeholder_hit_count
           - inventory_drift_count
           - catalog_coverage_gap_count
+          - schema_example_validation_count
           - future_work_hit_count
           - agent_source_definition_violation_count
           - implementation_stub_count
@@ -408,6 +423,9 @@ properties:
             type: integer
             minimum: 0
           catalog_coverage_gap_count:
+            type: integer
+            minimum: 0
+          schema_example_validation_count:
             type: integer
             minimum: 0
           future_work_hit_count:
@@ -558,6 +576,14 @@ $defs:
       missing_catalog_file:
         type: string
         minLength: 1
+      schema_example_label:
+        type: string
+        minLength: 1
+      schema_example_error_count:
+        type: integer
+        minimum: 1
+      raw_schema_example_payload_stored:
+        const: false
       missing_cli_command:
         type: string
         minLength: 1
@@ -635,6 +661,7 @@ examples:
     placeholder_hit_count: 0
     inventory_drift_count: 0
     catalog_coverage_gap_count: 0
+    schema_example_validation_count: 0
     future_work_hit_count: 0
     agent_source_definition_violation_count: 0
     implementation_stub_count: 0
@@ -657,6 +684,7 @@ examples:
     placeholder_hits: []
     inventory_drift_hits: []
     catalog_coverage_gap_hits: []
+    schema_example_validation_hits: []
     future_work_hits: []
     agent_source_definition_violation_hits: []
     implementation_stub_hits: []
@@ -706,6 +734,7 @@ examples:
         placeholder_hit_count: 0
         inventory_drift_count: 0
         catalog_coverage_gap_count: 0
+        schema_example_validation_count: 0
         future_work_hit_count: 0
         agent_source_definition_violation_count: 0
         implementation_stub_count: 0

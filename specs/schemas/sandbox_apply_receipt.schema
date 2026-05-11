@@ -157,7 +157,7 @@ examples:
       sandbox_profile: forked-self
       require_clean_apply: true
       require_rollback_plan: true
-      max_patch_count: 4
+      max_patch_count: 5
       external_effects_allowed: false
     status: applied
     sandbox_snapshot_ref: mirage://build-l5-0001/snapshot/current
