@@ -9,7 +9,7 @@ description: >
   marker-residue checks, tracked/untracked generated artifact hygiene checks for build output,
   caches, and platform metadata, ignored generated artifact hygiene checks for
   packaging/release output, ignored platform metadata hygiene checks,
-  public schema example self-validation checks,
+  public .schema/.yaml schema example self-validation checks,
   decision-log README index inventory checks,
   decision-log metadata conformance checks, agent source definition validation,
   truth-source
@@ -187,9 +187,9 @@ properties:
       $ref: "#/$defs/gap_hit"
   schema_example_validation_hits:
     description: >
-      Public specs/schemas/*.schema example payloads that do not validate against
-      their own schema after repo-local $ref resolution. Raw example payloads are
-      not stored in the gap report.
+      Public specs/schemas/*.schema and specs/schemas/*.yaml example payloads
+      that do not validate against their own schema after repo-local $ref
+      resolution. Raw example payloads are not stored in the gap report.
     type: array
     items:
       $ref: "#/$defs/gap_hit"

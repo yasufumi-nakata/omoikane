@@ -31,7 +31,8 @@ operations:
       - root README runnable command bullets must enumerate every implemented src/omoikane/cli.py add_parser command at least once and must not point at stale CLI command names before all-zero completion
       - evals/README.md must enumerate every implemented eval YAML by repo-local eval path, while evals/*/README.md must continue to enumerate each local eval surface
       - specs/catalog.yaml must enumerate every implemented specs/interfaces file, specs/schemas file, and evals/* YAML file before all-zero completion
-      - every public specs/schemas/*.schema example payload must validate against its own schema after repo-local $ref resolution before all-zero completion, without storing raw example payloads in gap_report output
+      - every public specs/schemas/*.schema and specs/schemas/*.yaml example payload must validate against its own schema after repo-local $ref resolution before all-zero completion, without storing raw example payloads in gap_report output
+      - scan_receipt must bind tests/**/*.py alongside runtime, specs, eval, docs, agents, decision-log, and git hygiene surfaces so test-surface drift cannot pass through an all-zero automation gate unseen
       - meta/decision-log/README.md must enumerate every repo-local dated decision-log markdown file and must not list missing decision-log files
       - every repo-local dated decision-log markdown file must carry frontmatter with date, deciders, related_docs, and an accepted/decided/superseded status before all-zero completion
       - agents/**/*.yaml must satisfy the schema-bound-agent-source-definition-v1 contract before all-zero completion, and violations must be reported without storing raw agent source payloads

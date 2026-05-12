@@ -116,7 +116,7 @@ root `README.md` の runnable CLI command inventory と `src/omoikane/cli.py` �
 同じ inventory item の重複掲載、
 実装済みの `specs/interfaces/*.idl` / `specs/schemas/*` / `evals/**/*.yaml` が
 `specs/catalog.yaml` entries に未登録の catalog coverage gap、
-`specs/schemas/*.schema` に含まれる public `example` / `examples` が
+`specs/schemas/*.schema` / `specs/schemas/*.yaml` に含まれる public `example` / `examples` が
 repo-local `$ref` 解決後の自 schema に通らない schema example validation drift、
 current truth-source (`README.md` / `docs/07-reference-implementation/README.md` /
 `specs/interfaces/**/*.idl` / `specs/schemas/README.md`) に残る
@@ -179,6 +179,8 @@ counts、prioritized task count、scan surface、report digest、
 truth-source ごとの digest-only `scan_surface_digests` / `surface_manifest_digest`、
 raw report / raw surface payload 非保存を
 `gap_report.schema` で machine-checkable に固定する。
+scan surface には `tests/**/*.py` も含め、test contract 自体の drift を
+all-zero scan receipt の digest 束縛から外さない。
 さらに scan receipt は `gap-report-scan-continuity-ledger-binding-v1` として
 `continuity_event_ref` / `continuity_event_digest` を返し、report digest と
 surface manifest digest を continuity ledger 用 evidence に束縛する。

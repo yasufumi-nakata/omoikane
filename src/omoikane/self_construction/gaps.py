@@ -144,7 +144,10 @@ CATALOG_COVERAGE_SPECS = (
     ("specs/schemas", (".schema", ".yaml")),
     ("evals", (".yaml", ".yml")),
 )
-SCHEMA_EXAMPLE_GLOB = "specs/schemas/*.schema"
+SCHEMA_EXAMPLE_GLOBS = (
+    "specs/schemas/*.schema",
+    "specs/schemas/*.yaml",
+)
 TOP_LEVEL_EVAL_INVENTORY_SPEC = (
     "evals/README.md",
     "evals",
@@ -230,7 +233,8 @@ SCAN_RECEIPT_SURFACES = (
     "docs/07-reference-implementation/README.md",
     "specs/interfaces/**/*.idl",
     "specs/schemas/README.md",
-    SCHEMA_EXAMPLE_GLOB,
+    *SCHEMA_EXAMPLE_GLOBS,
+    "tests/**/*.py",
     AGENT_SOURCE_DEFINITION_GLOB,
     "src/omoikane/**/*.py",
     "meta/decision-log/*.md",
@@ -1747,7 +1751,15 @@ class GapScanner:
             return []
 
         hits: List[Dict[str, Any]] = []
-        for schema_path in sorted(schema_root.glob("*.schema")):
+        schema_paths = sorted(
+            {
+                path
+                for pattern in SCHEMA_EXAMPLE_GLOBS
+                for path in repo_root.glob(pattern)
+                if path.is_file()
+            }
+        )
+        for schema_path in schema_paths:
             relative_path = str(schema_path.relative_to(repo_root))
             try:
                 loaded = yaml.safe_load(schema_path.read_text(encoding="utf-8"))

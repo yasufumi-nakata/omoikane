@@ -113,6 +113,13 @@ class GapScannerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
             self._bootstrap_repo(repo_root)
+            test_path = repo_root / "tests" / "unit" / "test_receipt_surface.py"
+            test_path.parent.mkdir(parents=True, exist_ok=True)
+            test_path.write_text(
+                "def test_receipt_surface():\n"
+                "    assert True\n",
+                encoding="utf-8",
+            )
 
             report = GapScanner().scan(repo_root)
 
@@ -171,6 +178,16 @@ class GapScannerTests(unittest.TestCase):
             self.assertEqual("meta/open-questions.md", open_question_digest["surface_pattern"])
             self.assertEqual(sha256_text("# Open Questions\n"), open_question_digest["sha256"])
             self.assertEqual(len("# Open Questions\n".encode("utf-8")), open_question_digest["byte_length"])
+            test_digest = next(
+                entry
+                for entry in receipt["scan_surface_digests"]
+                if entry["path"] == "tests/unit/test_receipt_surface.py"
+            )
+            self.assertEqual("tests/**/*.py", test_digest["surface_pattern"])
+            self.assertEqual(
+                sha256_text("def test_receipt_surface():\n    assert True\n"),
+                test_digest["sha256"],
+            )
 
     def test_scan_receipt_marks_non_zero_gap_report(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1241,6 +1258,55 @@ class GapScannerTests(unittest.TestCase):
                 any(
                     task["kind"] == "schema-example-validation"
                     for task in report["prioritized_tasks"]
+                )
+            )
+
+    def test_scan_reports_yaml_schema_example_validation_hits(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            schemas_root = repo_root / "specs" / "schemas"
+            (schemas_root / "README.md").write_text(
+                "# Schemas\n\n- `volition_intent.yaml`\n",
+                encoding="utf-8",
+            )
+            (schemas_root / "volition_intent.yaml").write_text(
+                "type: object\n"
+                "additionalProperties: false\n"
+                "required:\n"
+                "  - kind\n"
+                "  - name\n"
+                "properties:\n"
+                "  kind:\n"
+                "    const: volition_intent\n"
+                "  name:\n"
+                "    type: string\n"
+                "examples:\n"
+                "  - kind: volition_intent\n"
+                "    name: 123\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+            hit = report["schema_example_validation_hits"][0]
+
+            self.assertEqual(1, report["schema_example_validation_count"])
+            self.assertEqual("specs/schemas/volition_intent.yaml", hit["path"])
+            self.assertEqual("examples[0]", hit["schema_example_label"])
+            self.assertEqual(1, hit["schema_example_error_count"])
+            self.assertFalse(hit["raw_schema_example_payload_stored"])
+            self.assertIn("$.name", hit["line"])
+            self.assertIn("not of type 'string'", hit["line"])
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"]["schema_example_validation_count"],
+            )
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertTrue(
+                any(
+                    entry["path"] == "specs/schemas/volition_intent.yaml"
+                    and entry["surface_pattern"] == "specs/schemas/*.yaml"
+                    for entry in report["scan_receipt"]["scan_surface_digests"]
                 )
             )
 

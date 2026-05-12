@@ -10,6 +10,7 @@ import yaml
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SCHEMA_ROOT = REPO_ROOT / "specs" / "schemas"
+SCHEMA_EXAMPLE_PATTERNS = ("*.schema", "*.yaml")
 
 
 def _load_schema(path: Path) -> dict[str, Any]:
@@ -59,8 +60,22 @@ class SchemaExampleContractTests(unittest.TestCase):
     def test_all_schema_examples_validate_against_their_schema(self) -> None:
         failures: list[str] = []
         example_count = 0
+        yaml_example_count = 0
 
-        for schema_path in sorted(SCHEMA_ROOT.glob("*.schema")):
+        schema_paths = sorted(
+            {
+                path
+                for pattern in SCHEMA_EXAMPLE_PATTERNS
+                for path in SCHEMA_ROOT.glob(pattern)
+                if path.is_file()
+            }
+        )
+        self.assertTrue(
+            any(path.suffix == ".yaml" for path in schema_paths),
+            "schema example contract must include YAML schema files",
+        )
+
+        for schema_path in schema_paths:
             raw_schema = yaml.safe_load(schema_path.read_text(encoding="utf-8"))
             if not isinstance(raw_schema, dict):
                 failures.append(f"{schema_path.relative_to(REPO_ROOT)}: schema root is not an object")
@@ -69,6 +84,8 @@ class SchemaExampleContractTests(unittest.TestCase):
                 schema = _load_schema(schema_path)
                 validator = jsonschema.Draft202012Validator(schema)
                 entries = _example_entries(raw_schema)
+                if schema_path.suffix == ".yaml":
+                    yaml_example_count += len(entries)
             except Exception as exc:  # pragma: no cover - failure path is test output only
                 failures.append(f"{schema_path.relative_to(REPO_ROOT)}: {exc}")
                 continue
@@ -89,6 +106,7 @@ class SchemaExampleContractTests(unittest.TestCase):
                     )
 
         self.assertGreater(example_count, 0)
+        self.assertGreater(yaml_example_count, 0)
         if failures:
             self.fail("\n".join(failures[:50]))
 

@@ -418,3 +418,4 @@ status: accepted | decided | superseded
 - [2026-05-10_root-readme-cli-inventory-gate.md](2026-05-10_root-readme-cli-inventory-gate.md)
 - [2026-05-11_eval-catalog-coverage-gate.md](2026-05-11_eval-catalog-coverage-gate.md)
 - [2026-05-11_schema-example-validation-gate.md](2026-05-11_schema-example-validation-gate.md)
+- [2026-05-13_gap-report-schema-yaml-test-surface.md](2026-05-13_gap-report-schema-yaml-test-surface.md)

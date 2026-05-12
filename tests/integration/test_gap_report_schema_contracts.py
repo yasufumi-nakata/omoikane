@@ -167,6 +167,20 @@ class GapReportSchemaContractTests(unittest.TestCase):
         )
         self.assertTrue(
             any(
+                entry["path"] == "specs/schemas/build_request.yaml"
+                and entry["surface_pattern"] == "specs/schemas/*.yaml"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+        self.assertTrue(
+            any(
+                entry["path"] == "tests/integration/test_schema_examples.py"
+                and entry["surface_pattern"] == "tests/**/*.py"
+                for entry in receipt["scan_surface_digests"]
+            )
+        )
+        self.assertTrue(
+            any(
                 entry["path"].startswith("agents/")
                 and entry["surface_pattern"] == "agents/**/*.yaml"
                 for entry in receipt["scan_surface_digests"]
