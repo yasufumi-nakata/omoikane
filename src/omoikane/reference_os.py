@@ -302,6 +302,22 @@ class OmoikaneReferenceOS:
         self._bootstrap_trust()
         self._bootstrap_council()
 
+    @staticmethod
+    def _cognitive_failover_event_binding(
+        ledger_event: Any,
+        expected_event_type: str,
+    ) -> Dict[str, Any]:
+        payload_ref = str(getattr(ledger_event, "payload_ref", ""))
+        signatures = getattr(ledger_event, "signatures", {})
+        return {
+            "ledger_event": ledger_event.event_type,
+            "ledger_event_bound": ledger_event.event_type == expected_event_type,
+            "ledger_event_category": ledger_event.category,
+            "ledger_event_category_bound": ledger_event.category == "cognitive-failover",
+            "ledger_event_guardian_signed": "guardian" in signatures,
+            "ledger_event_payload_ref_bound": payload_ref.startswith("cas://sha256/"),
+        }
+
     def _repo_release_contracts_available(self) -> bool:
         return (
             (self.repo_root / "pyproject.toml").is_file()
@@ -20956,7 +20972,7 @@ json.dump(response, sys.stdout)
 
         frame_validation = self.perception.validate_frame(perception["frame"])
         shift_validation = self.perception.validate_shift(perception["shift"])
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.perception.failover",
             payload=perception["shift"],
@@ -20965,6 +20981,10 @@ json.dump(response, sys.stdout)
             layer="L3",
             signature_roles=["guardian"],
             substrate="classical-silicon",
+        )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.perception.failover",
         )
 
         return {
@@ -20984,7 +21004,12 @@ json.dump(response, sys.stdout)
                 **perception,
             },
             "validation": {
-                "ok": frame_validation["ok"] and shift_validation["ok"],
+                "ok": frame_validation["ok"]
+                and shift_validation["ok"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "frame": frame_validation,
                 "shift": shift_validation,
                 "baseline_primary": baseline["selected_backend"] == "salience_encoder_v1",
@@ -20995,6 +21020,7 @@ json.dump(response, sys.stdout)
                 "qualia_bound": perception["frame"]["qualia_binding_ref"]
                 == f"qualia://tick/{failover_tick.tick_id}",
                 "perception_gate": perception["frame"]["perception_gate"],
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -21035,7 +21061,7 @@ json.dump(response, sys.stdout)
         finally:
             self.reasoning.set_backend_health("symbolic_v1", True)
 
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.reasoning.failover",
             payload={
@@ -21052,6 +21078,10 @@ json.dump(response, sys.stdout)
             signature_roles=["guardian"],
             substrate="classical-silicon",
         )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.reasoning.failover",
+        )
         baseline_trace_validation = self.reasoning.validate_trace(dict(baseline["trace"]))
         reasoning_trace_validation = self.reasoning.validate_trace(dict(reasoning["trace"]))
         reasoning_shift_validation = self.reasoning.validate_shift(dict(reasoning["shift"]))
@@ -21067,7 +21097,11 @@ json.dump(response, sys.stdout)
                 and reasoning_trace_validation["ok"]
                 and reasoning_shift_validation["ok"]
                 and not baseline["degraded"]
-                and reasoning["degraded"],
+                and reasoning["degraded"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "baseline_primary": not baseline["degraded"]
                 and baseline["selected_backend"] == "symbolic_v1",
                 "selected_backend": reasoning["selected_backend"],
@@ -21075,6 +21109,8 @@ json.dump(response, sys.stdout)
                 "trace_ok": reasoning_trace_validation["ok"],
                 "shift_ok": reasoning_shift_validation["ok"],
                 "shift_safe": reasoning_shift_validation["safe_summary_only"],
+                "shift_safe_summary_only": reasoning_shift_validation["safe_summary_only"],
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -21129,7 +21165,7 @@ json.dump(response, sys.stdout)
 
         state_validation = self.affect.validate_state(affect["state"])
         transition_validation = self.affect.validate_transition(affect["transition"])
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.affect.failover",
             payload=affect["transition"],
@@ -21138,6 +21174,10 @@ json.dump(response, sys.stdout)
             layer="L3",
             signature_roles=["guardian"],
             substrate="classical-silicon",
+        )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.affect.failover",
         )
 
         return {
@@ -21149,7 +21189,12 @@ json.dump(response, sys.stdout)
             "baseline": baseline,
             "affect": affect,
             "validation": {
-                "ok": state_validation["ok"] and transition_validation["ok"],
+                "ok": state_validation["ok"]
+                and transition_validation["ok"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "state": state_validation,
                 "transition": transition_validation,
                 "continuity_guard_preserved": state_validation["continuity_guard_preserved"],
@@ -21157,6 +21202,7 @@ json.dump(response, sys.stdout)
                 "smoothed": affect["transition"]["smoothed"],
                 "consent_preserved": affect["transition"]["consent_preserved"],
                 "recommended_guard": affect["state"]["recommended_guard"],
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -21272,7 +21318,7 @@ json.dump(response, sys.stdout)
 
         focus_validation = self.attention.validate_focus(attention["focus"])
         shift_validation = self.attention.validate_shift(attention["shift"])
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.attention.failover",
             payload=attention["shift"],
@@ -21281,6 +21327,10 @@ json.dump(response, sys.stdout)
             layer="L3",
             signature_roles=["guardian"],
             substrate="classical-silicon",
+        )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.attention.failover",
         )
 
         return {
@@ -21300,13 +21350,19 @@ json.dump(response, sys.stdout)
                 **attention,
             },
             "validation": {
-                "ok": focus_validation["ok"] and shift_validation["ok"],
+                "ok": focus_validation["ok"]
+                and shift_validation["ok"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "focus": focus_validation,
                 "shift": shift_validation,
                 "selected_backend": attention["selected_backend"],
                 "guard_aligned": focus_validation["guard_aligned"] and shift_validation["guard_aligned"],
                 "safe_target_selected": attention["focus"]["focus_target"] == "guardian-review",
                 "dwell_ms": attention["focus"]["dwell_ms"],
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -21541,7 +21597,7 @@ json.dump(response, sys.stdout)
 
         intent_validation = self.volition.validate_intent(volition["intent"])
         shift_validation = self.volition.validate_shift(volition["shift"])
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.volition.failover",
             payload=volition["shift"],
@@ -21550,6 +21606,10 @@ json.dump(response, sys.stdout)
             layer="L3",
             signature_roles=["guardian"],
             substrate="classical-silicon",
+        )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.volition.failover",
         )
 
         return {
@@ -21571,13 +21631,19 @@ json.dump(response, sys.stdout)
                 **volition,
             },
             "validation": {
-                "ok": intent_validation["ok"] and shift_validation["ok"],
+                "ok": intent_validation["ok"]
+                and shift_validation["ok"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "intent": intent_validation,
                 "shift": shift_validation,
                 "selected_backend": volition["selected_backend"],
                 "guard_aligned": intent_validation["guard_aligned"] and shift_validation["guard_aligned"],
                 "selected_intent": volition["intent"]["selected_intent"],
                 "execution_mode": volition["intent"]["execution_mode"],
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -21779,7 +21845,7 @@ json.dump(response, sys.stdout)
         baseline_scene_validation = self.imagination.validate_scene(baseline_imagination["scene"])
         scene_validation = self.imagination.validate_scene(imagination["scene"])
         shift_validation = self.imagination.validate_shift(imagination["shift"])
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.imagination.failover",
             payload=imagination["shift"],
@@ -21788,6 +21854,10 @@ json.dump(response, sys.stdout)
             layer="L3",
             signature_roles=["guardian"],
             substrate="classical-silicon",
+        )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.imagination.failover",
         )
 
         return {
@@ -21817,7 +21887,13 @@ json.dump(response, sys.stdout)
                 "fallback_wms_state": self.wms.snapshot(failover_wms_session["session_id"]),
             },
             "validation": {
-                "ok": baseline_scene_validation["ok"] and scene_validation["ok"] and shift_validation["ok"],
+                "ok": baseline_scene_validation["ok"]
+                and scene_validation["ok"]
+                and shift_validation["ok"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "baseline_scene": baseline_scene_validation,
                 "scene": scene_validation,
                 "shift": shift_validation,
@@ -21837,6 +21913,7 @@ json.dump(response, sys.stdout)
                 ),
                 "imc_delivery_redacted": baseline_imc_message["delivery_status"]
                 == "delivered-with-redactions",
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -22010,7 +22087,7 @@ json.dump(response, sys.stdout)
         baseline_validation = self.language.validate_render(baseline_language["render"])
         render_validation = self.language.validate_render(language["render"])
         shift_validation = self.language.validate_shift(language["shift"])
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.language.failover",
             payload=language["shift"],
@@ -22019,6 +22096,10 @@ json.dump(response, sys.stdout)
             layer="L3",
             signature_roles=["guardian"],
             substrate="classical-silicon",
+        )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.language.failover",
         )
 
         return {
@@ -22040,7 +22121,13 @@ json.dump(response, sys.stdout)
                 **language,
             },
             "validation": {
-                "ok": baseline_validation["ok"] and render_validation["ok"] and shift_validation["ok"],
+                "ok": baseline_validation["ok"]
+                and render_validation["ok"]
+                and shift_validation["ok"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "baseline_primary": baseline_language["selected_backend"] == "semantic_frame_v1"
                 and not baseline_language["degraded"],
                 "selected_backend": language["selected_backend"],
@@ -22052,6 +22139,7 @@ json.dump(response, sys.stdout)
                 "private_channel_locked": language["render"]["disclosure_floor"][
                     "private_channel_locked"
                 ],
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),
@@ -22164,7 +22252,7 @@ json.dump(response, sys.stdout)
         report_validation = self.metacognition.validate_report(metacognition["report"])
         shift_validation = self.metacognition.validate_shift(metacognition["shift"])
 
-        self.ledger.append(
+        ledger_event = self.ledger.append(
             identity_id=identity.identity_id,
             event_type="cognitive.metacognition.failover",
             payload={
@@ -22181,6 +22269,10 @@ json.dump(response, sys.stdout)
             signature_roles=["guardian"],
             substrate="classical-silicon",
         )
+        ledger_event_validation = self._cognitive_failover_event_binding(
+            ledger_event,
+            "cognitive.metacognition.failover",
+        )
 
         return {
             "identity": {
@@ -22192,7 +22284,13 @@ json.dump(response, sys.stdout)
             "self_model_history": self.self_model.history()[-2:],
             "qualia_recent": self.qualia.recent(2),
             "validation": {
-                "ok": baseline_validation["ok"] and report_validation["ok"] and shift_validation["ok"],
+                "ok": baseline_validation["ok"]
+                and report_validation["ok"]
+                and shift_validation["ok"]
+                and ledger_event_validation["ledger_event_bound"]
+                and ledger_event_validation["ledger_event_category_bound"]
+                and ledger_event_validation["ledger_event_guardian_signed"]
+                and ledger_event_validation["ledger_event_payload_ref_bound"],
                 "selected_backend": metacognition["selected_backend"],
                 "baseline_primary": baseline["selected_backend"] == "reflective_loop_v1"
                 and not baseline["degraded"],
@@ -22202,6 +22300,7 @@ json.dump(response, sys.stdout)
                 "escalation_target": metacognition["report"]["escalation_target"],
                 "coherence_score": metacognition["report"]["coherence_score"],
                 "sealed_notes_present": bool(metacognition["report"]["sealed_notes"]),
+                **ledger_event_validation,
             },
             "ledger_profile": self.ledger.profile(),
             "ledger_snapshot": self.ledger.snapshot(),

@@ -8,6 +8,19 @@ from omoikane.reference_os import OmoikaneReferenceOS
 
 
 class ReferenceRuntimeTests(unittest.TestCase):
+    def assert_cognitive_failover_event(
+        self,
+        result: dict,
+        expected_event_type: str,
+    ) -> None:
+        validation = result["validation"]
+        self.assertEqual(expected_event_type, validation["ledger_event"])
+        self.assertTrue(validation["ledger_event_bound"])
+        self.assertTrue(validation["ledger_event_category_bound"])
+        self.assertTrue(validation["ledger_event_guardian_signed"])
+        self.assertTrue(validation["ledger_event_payload_ref_bound"])
+        self.assertEqual(expected_event_type, result["ledger_snapshot"][-1]["event_type"])
+
     def test_version_demo_emits_release_manifest(self) -> None:
         runtime = OmoikaneReferenceOS()
 
@@ -2785,6 +2798,8 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["reasoning"]["degraded"])
         self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
         self.assertTrue(result["validation"]["shift_safe"])
+        self.assertTrue(result["validation"]["shift_safe_summary_only"])
+        self.assert_cognitive_failover_event(result, "cognitive.reasoning.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_affect_demo_records_smoothed_failover(self) -> None:
@@ -2799,6 +2814,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["smoothed"])
         self.assertTrue(result["validation"]["consent_preserved"])
         self.assertEqual("observe", result["validation"]["recommended_guard"])
+        self.assert_cognitive_failover_event(result, "cognitive.affect.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_attention_demo_records_guard_aligned_failover(self) -> None:
@@ -2812,6 +2828,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["guard_aligned"])
         self.assertTrue(result["validation"]["safe_target_selected"])
         self.assertEqual("guardian-review", result["attention"]["focus"]["focus_target"])
+        self.assert_cognitive_failover_event(result, "cognitive.attention.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_perception_demo_records_qualia_bound_safe_scene_failover(self) -> None:
@@ -2828,6 +2845,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["qualia_bound"])
         self.assertEqual("guardian-review-scene", result["perception"]["frame"]["scene_label"])
         self.assertEqual("guardian-review", result["validation"]["perception_gate"])
+        self.assert_cognitive_failover_event(result, "cognitive.perception.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_volition_demo_records_guard_aligned_failover(self) -> None:
@@ -2842,6 +2860,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("guardian-review", result["validation"]["selected_intent"])
         self.assertEqual("review", result["validation"]["execution_mode"])
         self.assertEqual("guardian-review", result["volition"]["intent"]["selected_intent"])
+        self.assert_cognitive_failover_event(result, "cognitive.volition.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_imagination_demo_records_private_fallback_and_shared_baseline(self) -> None:
@@ -2857,6 +2876,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["failover_private"])
         self.assertEqual("co_imagination", result["baseline"]["handoff"]["imc_session"]["mode"])
         self.assertEqual("private-sandbox", result["imagination"]["scene"]["handoff"]["mode"])
+        self.assert_cognitive_failover_event(result, "cognitive.imagination.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_language_demo_records_redacted_guarded_bridge(self) -> None:
@@ -2873,6 +2893,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertEqual("guardian", result["validation"]["delivery_target"])
         self.assertEqual("guardian-brief", result["validation"]["discourse_mode"])
         self.assertTrue(result["validation"]["private_channel_locked"])
+        self.assert_cognitive_failover_event(result, "cognitive.language.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_metacognition_demo_records_guarded_fallback_and_identity_anchor(self) -> None:
@@ -2888,6 +2909,7 @@ class ReferenceRuntimeTests(unittest.TestCase):
         self.assertTrue(result["validation"]["abrupt_change_flagged"])
         self.assertEqual("guardian-review", result["validation"]["escalation_target"])
         self.assertIn("continuity-first", result["metacognition"]["report"]["salient_values"])
+        self.assert_cognitive_failover_event(result, "cognitive.metacognition.failover")
         self.assertEqual(1, result["ledger_verification"]["category_counts"]["cognitive-failover"])
 
     def test_qualia_demo_reports_reference_sampling_profile(self) -> None:

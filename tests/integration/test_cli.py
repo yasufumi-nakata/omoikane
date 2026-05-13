@@ -11,6 +11,19 @@ from omoikane.cli import _print_result, main
 
 
 class CliIntegrationTests(unittest.TestCase):
+    def assert_cognitive_failover_event(
+        self,
+        result: dict,
+        expected_event_type: str,
+    ) -> None:
+        validation = result["validation"]
+        self.assertEqual(expected_event_type, validation["ledger_event"])
+        self.assertTrue(validation["ledger_event_bound"])
+        self.assertTrue(validation["ledger_event_category_bound"])
+        self.assertTrue(validation["ledger_event_guardian_signed"])
+        self.assertTrue(validation["ledger_event_payload_ref_bound"])
+        self.assertEqual(expected_event_type, result["ledger_snapshot"][-1]["event_type"])
+
     def test_json_output_reconfigures_windows_stdout_to_utf8(self) -> None:
         buffer = io.BytesIO()
         stdout = io.TextIOWrapper(buffer, encoding="cp1252")
@@ -2173,6 +2186,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["baseline_primary"])
         self.assertEqual("narrative_v1", result["validation"]["selected_backend"])
         self.assertTrue(result["validation"]["shift_safe"])
+        self.assertTrue(result["validation"]["shift_safe_summary_only"])
+        self.assert_cognitive_failover_event(result, "cognitive.reasoning.failover")
         self.assertEqual("reasoning_trace", result["reasoning"]["trace"]["kind"])
         self.assertEqual("reasoning_shift", result["reasoning"]["shift"]["kind"])
 
@@ -2186,6 +2201,8 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["ok"])
         self.assertEqual("narrative_v1", result["reasoning"]["selected_backend"])
         self.assertTrue(result["reasoning"]["shift"]["safe_summary_only"])
+        self.assertTrue(result["validation"]["shift_safe_summary_only"])
+        self.assert_cognitive_failover_event(result, "cognitive.reasoning.failover")
 
     def test_substrate_demo_emits_valid_json(self) -> None:
         stdout = io.StringIO()
@@ -2441,6 +2458,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["smoothed"])
         self.assertTrue(result["validation"]["consent_preserved"])
         self.assertEqual("observe", result["validation"]["recommended_guard"])
+        self.assert_cognitive_failover_event(result, "cognitive.affect.failover")
 
     def test_attention_demo_emits_guard_aligned_failover_json(self) -> None:
         stdout = io.StringIO()
@@ -2455,6 +2473,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["safe_target_selected"])
         self.assertEqual("guardian-review", result["attention"]["focus"]["focus_target"])
         self.assertTrue(result["ledger_verification"]["ok"])
+        self.assert_cognitive_failover_event(result, "cognitive.attention.failover")
 
     def test_perception_demo_emits_qualia_bound_safe_scene_json(self) -> None:
         stdout = io.StringIO()
@@ -2472,6 +2491,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("guardian-review-scene", result["perception"]["frame"]["scene_label"])
         self.assertEqual("guardian-review", result["validation"]["perception_gate"])
         self.assertTrue(result["ledger_verification"]["ok"])
+        self.assert_cognitive_failover_event(result, "cognitive.perception.failover")
 
     def test_volition_demo_emits_guard_aligned_failover_json(self) -> None:
         stdout = io.StringIO()
@@ -2487,6 +2507,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("review", result["validation"]["execution_mode"])
         self.assertEqual("guardian-review", result["volition"]["intent"]["selected_intent"])
         self.assertTrue(result["ledger_verification"]["ok"])
+        self.assert_cognitive_failover_event(result, "cognitive.volition.failover")
 
     def test_imagination_demo_emits_bounded_handoff_json(self) -> None:
         stdout = io.StringIO()
@@ -2502,6 +2523,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["failover_private"])
         self.assertTrue(result["validation"]["imc_delivery_redacted"])
         self.assertTrue(result["ledger_verification"]["ok"])
+        self.assert_cognitive_failover_event(result, "cognitive.imagination.failover")
 
     def test_language_demo_emits_redacted_guarded_bridge_json(self) -> None:
         stdout = io.StringIO()
@@ -2518,6 +2540,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertEqual("guardian", result["validation"]["delivery_target"])
         self.assertEqual("guardian-brief", result["validation"]["discourse_mode"])
         self.assertTrue(result["validation"]["private_channel_locked"])
+        self.assert_cognitive_failover_event(result, "cognitive.language.failover")
 
     def test_metacognition_demo_emits_guarded_self_monitor_json(self) -> None:
         stdout = io.StringIO()
@@ -2533,6 +2556,7 @@ class CliIntegrationTests(unittest.TestCase):
         self.assertTrue(result["validation"]["abrupt_change_flagged"])
         self.assertEqual("guardian-review", result["validation"]["escalation_target"])
         self.assertTrue(result["validation"]["sealed_notes_present"])
+        self.assert_cognitive_failover_event(result, "cognitive.metacognition.failover")
 
     def test_sandbox_demo_emits_freeze_signal(self) -> None:
         stdout = io.StringIO()
