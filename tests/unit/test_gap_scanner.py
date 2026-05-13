@@ -148,6 +148,7 @@ class GapScannerTests(unittest.TestCase):
                 0,
                 receipt["counts"]["agent_source_definition_violation_count"],
             )
+            self.assertEqual(0, receipt["counts"]["catalog_consumer_reference_count"])
             self.assertEqual(0, receipt["counts"]["schema_example_validation_count"])
             self.assertTrue(receipt["validation"]["scan_surface_digests_bound"])
             self.assertTrue(receipt["validation"]["surface_manifest_digest_bound"])
@@ -989,6 +990,31 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_stale_eval_inventory_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            eval_root = repo_root / "evals" / "continuity"
+            eval_root.mkdir(parents=True, exist_ok=True)
+            (eval_root / "README.md").write_text(
+                "# Continuity Evals\n\n"
+                "- `ledger_integrity.yaml`\n"
+                "- `missing_eval.yaml`\n",
+                encoding="utf-8",
+            )
+            (eval_root / "ledger_integrity.yaml").write_text(
+                "eval_id: ledger_integrity\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            hit = report["inventory_drift_hits"][0]
+            self.assertEqual("evals/continuity/README.md", hit["path"])
+            self.assertIn("missing_eval.yaml", hit["line"])
+            self.assertIn("file is missing", hit["line"])
+
     def test_scan_reports_top_level_eval_inventory_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -1025,6 +1051,31 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_stale_top_level_eval_inventory_entry(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "evals" / "README.md").write_text(
+                "# Evals\n\n"
+                "- `continuity/ledger_integrity.yaml`\n"
+                "- `continuity/missing_eval.yaml`\n",
+                encoding="utf-8",
+            )
+            continuity_root = repo_root / "evals" / "continuity"
+            continuity_root.mkdir(parents=True, exist_ok=True)
+            (continuity_root / "ledger_integrity.yaml").write_text(
+                "eval_id: ledger_integrity\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            hit = report["inventory_drift_hits"][0]
+            self.assertEqual("evals/README.md", hit["path"])
+            self.assertIn("continuity/missing_eval.yaml", hit["line"])
+            self.assertIn("eval file is missing", hit["line"])
+
     def test_scan_reports_root_readme_cli_inventory_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -1041,7 +1092,12 @@ class GapScannerTests(unittest.TestCase):
             cli_path.write_text(
                 "def _build_parser():\n"
                 "    subparsers.add_parser('demo')\n"
-                "    subparsers.add_parser('attention-demo')\n",
+                "    subparsers.add_parser('attention-demo')\n\n"
+                "def main(args):\n"
+                "    if args.command == 'demo':\n"
+                "        return\n"
+                "    if args.command == 'attention-demo':\n"
+                "        return\n",
                 encoding="utf-8",
             )
 
@@ -1051,10 +1107,110 @@ class GapScannerTests(unittest.TestCase):
             hit = report["inventory_drift_hits"][0]
             self.assertEqual("README.md", hit["path"])
             self.assertEqual("attention-demo", hit["missing_cli_command"])
-            self.assertIn("root README runnable command inventory", hit["line"])
+            self.assertIn("runnable command inventory", hit["line"])
             self.assertTrue(
                 any(task["kind"] == "inventory-drift" for task in report["prioritized_tasks"])
             )
+
+    def test_scan_reports_reference_readme_cli_inventory_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            reference_readme = repo_root / "docs" / "07-reference-implementation" / "README.md"
+            reference_readme.parent.mkdir(parents=True, exist_ok=True)
+            reference_readme.write_text(
+                "# Reference Runtime\n\n"
+                "```bash\n"
+                "PYTHONPATH=src python3 -m omoikane.cli demo --json\n"
+                "```\n",
+                encoding="utf-8",
+            )
+            cli_path = repo_root / "src" / "omoikane" / "cli.py"
+            cli_path.parent.mkdir(parents=True, exist_ok=True)
+            cli_path.write_text(
+                "def _build_parser():\n"
+                "    subparsers.add_parser('demo')\n"
+                "    subparsers.add_parser('attention-demo')\n\n"
+                "def main(args):\n"
+                "    if args.command == 'demo':\n"
+                "        return\n"
+                "    if args.command == 'attention-demo':\n"
+                "        return\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            hit = report["inventory_drift_hits"][0]
+            self.assertEqual(
+                "docs/07-reference-implementation/README.md",
+                hit["path"],
+            )
+            self.assertEqual("attention-demo", hit["missing_cli_command"])
+
+    def test_scan_reports_cli_parser_without_dispatch_handler(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "README.md").write_text(
+                "# OmoikaneOS\n\n"
+                "## すぐ動かせるもの\n\n"
+                "- `PYTHONPATH=src python3 -m unittest discover -s tests -t .`\n"
+                "- `PYTHONPATH=src python3 -m omoikane.cli demo --json`\n",
+                encoding="utf-8",
+            )
+            cli_path = repo_root / "src" / "omoikane" / "cli.py"
+            cli_path.parent.mkdir(parents=True, exist_ok=True)
+            cli_path.write_text(
+                "def _build_parser():\n"
+                "    subparsers.add_parser('demo')\n"
+                "    subparsers.add_parser('orphan-demo')\n\n"
+                "def main(args):\n"
+                "    if args.command == 'demo':\n"
+                "        return\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            hit = report["inventory_drift_hits"][0]
+            self.assertEqual("src/omoikane/cli.py", hit["path"])
+            self.assertEqual("orphan-demo", hit["missing_cli_handler_command"])
+            self.assertIn("no main dispatch handler", hit["line"])
+
+    def test_scan_reports_cli_dispatch_without_parser(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            (repo_root / "README.md").write_text(
+                "# OmoikaneOS\n\n"
+                "## すぐ動かせるもの\n\n"
+                "- `PYTHONPATH=src python3 -m unittest discover -s tests -t .`\n"
+                "- `PYTHONPATH=src python3 -m omoikane.cli demo --json`\n",
+                encoding="utf-8",
+            )
+            cli_path = repo_root / "src" / "omoikane" / "cli.py"
+            cli_path.parent.mkdir(parents=True, exist_ok=True)
+            cli_path.write_text(
+                "def _build_parser():\n"
+                "    subparsers.add_parser('demo')\n\n"
+                "def main(args):\n"
+                "    if args.command == 'demo':\n"
+                "        return\n"
+                "    if args.command == 'ghost-demo':\n"
+                "        return\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["inventory_drift_count"])
+            hit = report["inventory_drift_hits"][0]
+            self.assertEqual("src/omoikane/cli.py", hit["path"])
+            self.assertEqual("ghost-demo", hit["stale_cli_handler_command"])
+            self.assertIn("no argparse subparser", hit["line"])
 
     def test_scan_reports_decision_log_index_inventory_drift(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -1213,6 +1369,64 @@ class GapScannerTests(unittest.TestCase):
                 any(task["kind"] == "catalog-coverage-gap" for task in report["prioritized_tasks"])
             )
 
+    def test_scan_reports_missing_catalog_consumer_reference(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            repo_root = Path(temp_dir)
+            self._bootstrap_repo(repo_root)
+            eval_root = repo_root / "evals" / "agentic"
+            eval_root.mkdir(parents=True, exist_ok=True)
+            (eval_root / "README.md").write_text(
+                "# Agentic Evals\n\n- `council_guardian_veto.yaml`\n",
+                encoding="utf-8",
+            )
+            (eval_root / "council_guardian_veto.yaml").write_text(
+                "eval_id: council_guardian_veto\n",
+                encoding="utf-8",
+            )
+            (repo_root / "tests" / "unit").mkdir(parents=True, exist_ok=True)
+            (repo_root / "tests" / "unit" / "test_agentic.py").write_text(
+                "def test_guardian_veto():\n"
+                "    assert True\n",
+                encoding="utf-8",
+            )
+            (repo_root / "specs" / "catalog.yaml").write_text(
+                "catalog_version: 1\n"
+                "entries:\n"
+                "  - priority: P1\n"
+                "    kind: eval\n"
+                "    file: evals/agentic/council_guardian_veto.yaml\n"
+                "    consumers:\n"
+                "      - reference-runtime\n"
+                "      - tests/unit/test_agentic.py\n"
+                "      - docs/02-subsystems/agentic/council-session.md\n",
+                encoding="utf-8",
+            )
+
+            report = GapScanner().scan(repo_root)
+
+            self.assertEqual(1, report["catalog_consumer_reference_count"])
+            hit = report["catalog_consumer_reference_hits"][0]
+            self.assertEqual("specs/catalog.yaml", hit["path"])
+            self.assertEqual(
+                "docs/02-subsystems/agentic/council-session.md",
+                hit["missing_consumer_path"],
+            )
+            self.assertEqual(
+                "evals/agentic/council_guardian_veto.yaml",
+                hit["catalog_entry_file"],
+            )
+            self.assertEqual(
+                1,
+                report["scan_receipt"]["counts"]["catalog_consumer_reference_count"],
+            )
+            self.assertFalse(report["scan_receipt"]["all_zero"])
+            self.assertTrue(
+                any(
+                    task["kind"] == "catalog-consumer-reference"
+                    for task in report["prioritized_tasks"]
+                )
+            )
+
     def test_scan_reports_schema_example_validation_hits(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
             repo_root = Path(temp_dir)
@@ -1318,7 +1532,7 @@ class GapScannerTests(unittest.TestCase):
             eval_root.mkdir(parents=True, exist_ok=True)
             (eval_root / "README.md").write_text(
                 "# Cognitive Evals\n\n"
-                "- `qualia_contract.yaml`\n"
+                "- `qualia_contract.yaml` (`cognitive.reasoning.v0` explanatory label)\n"
                 "- `../agentic/cognitive_audit_governance_binding.yaml`\n",
                 encoding="utf-8",
             )

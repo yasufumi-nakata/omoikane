@@ -3812,7 +3812,7 @@ entries:
       - evals/continuity/gap_scanner_ignored_generated_artifact_hygiene.yaml
       - evals/agentic/gap_report_agent_source_definition_validation.yaml
       - agents/guardians/integrity-guardian.yaml
-    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including root README runnable CLI inventory drift, top-level eval inventory drift, schema example validation drift, decision-log README index drift, decision-log metadata violations, agent source definition violations, missing reference policy sections, tracked worktree marker residue checks, tracked/untracked build/cache/platform generated artifact hygiene checks, ignored generated artifact hygiene checks for packaging output, source surface digests, continuity-ledger event binding, and actual ledger entry append evidence for automation gate review.
+    rationale: Required to serialize gap-report output and its digest-bound scan receipt, including root/reference README runnable CLI inventory drift, CLI parser/dispatch drift, top-level eval inventory drift, eval README stale-entry drift, catalog consumer reference drift, schema example validation drift, decision-log README index drift, decision-log metadata violations, agent source definition violations, missing reference policy sections, tracked worktree marker residue checks, tracked/untracked build/cache/platform generated artifact hygiene checks, ignored generated artifact hygiene checks for packaging output, source surface digests, continuity-ledger event binding, and actual ledger entry append evidence for automation gate review.
   - priority: P1
     kind: interface
     file: specs/interfaces/selfctor.gap_report.v0.idl
@@ -3821,7 +3821,7 @@ entries:
       - specs/schemas/gap_report.schema
       - evals/continuity/gap_report_scan_receipt.yaml
       - docs/07-reference-implementation/README.md
-    rationale: Required to bind the self-construction gap-report scan operation to the public schema, root README runnable CLI inventory scan, top-level eval inventory scan, schema example self-validation, decision-log README index scan, decision-log metadata conformance scan, agent source definition validation, required reference policy section scan, tracked worktree marker residue detection, tracked/untracked build/cache/platform generated artifact detection, ignored generated artifact detection, scan receipt contract, and continuity-ledger event plus appended entry evidence.
+    rationale: Required to bind the self-construction gap-report scan operation to the public schema, root/reference README runnable CLI inventory scan, CLI parser/dispatch binding scan, top-level eval inventory scan, eval README stale-entry scan, catalog consumer reference scan, schema example self-validation, decision-log README index scan, decision-log metadata conformance scan, agent source definition validation, required reference policy section scan, tracked worktree marker residue detection, tracked/untracked build/cache/platform generated artifact detection, ignored generated artifact detection, scan receipt contract, and continuity-ledger event plus appended entry evidence.
   - priority: P1
     kind: eval
     file: evals/continuity/gap_report_scan_receipt.yaml
@@ -3830,7 +3830,7 @@ entries:
       - specs/schemas/gap_report.schema
       - src/omoikane/self_construction/gaps.py
       - agents/guardians/integrity-guardian.yaml
-    rationale: Protects gap-report all-zero gate receipts from count drift, root README runnable CLI inventory drift, top-level eval inventory drift, schema example validation drift, decision-log README index drift, decision-log metadata drift, unbound report/surface/continuity-event digests, tracked worktree marker residue, tracked/untracked build/cache/platform generated artifacts, ignored generated artifacts, missing ledger append evidence, and raw report, raw surface, raw diff, raw artifact, or raw continuity event payload storage.
+    rationale: Protects gap-report all-zero gate receipts from count drift, root/reference README runnable CLI inventory drift, CLI parser/dispatch drift, top-level eval inventory drift, stale eval README entries, stale catalog consumer references, schema example validation drift, decision-log README index drift, decision-log metadata drift, unbound report/surface/continuity-event digests, tracked worktree marker residue, tracked/untracked build/cache/platform generated artifacts, ignored generated artifacts, missing ledger append evidence, and raw report, raw surface, raw diff, raw artifact, or raw continuity event payload storage.
   - priority: P1
     kind: eval
     file: evals/continuity/gap_scanner_ignored_generated_artifact_hygiene.yaml
@@ -4260,7 +4260,7 @@ entries:
       - reference-runtime
       - src/omoikane/agentic/council.py
       - tests/unit/test_agentic.py
-      - docs/02-subsystems/agentic/council-session.md
+      - docs/02-subsystems/agentic/README.md
     rationale: Guards that Guardian veto authority remains stronger than ordinary Council approval when a self-modification proposal crosses immutable safety boundaries.
   - priority: P1
     kind: eval
@@ -4269,7 +4269,7 @@ entries:
       - reference-runtime
       - src/omoikane/agentic/distributed_transport.py
       - tests/integration/test_distributed_transport_schema_contracts.py
-      - tests/unit/test_transport.py
+      - tests/unit/test_agentic.py
       - docs/02-subsystems/agentic/distributed-transport-attestation.md
     rationale: Guards that distributed transport route-target discovery covers active authority-plane members and binds remote host, attestation, and cluster evidence before non-loopback route tracing.
   - priority: P1

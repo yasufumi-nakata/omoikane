@@ -136,6 +136,13 @@ TRUTH_SOURCE_INVENTORY_SPECS = (
     ("specs/schemas/README.md", "specs/schemas", (".schema", ".yaml")),
 )
 ROOT_README_CLI_INVENTORY_README = "README.md"
+REFERENCE_IMPLEMENTATION_CLI_INVENTORY_README = (
+    "docs/07-reference-implementation/README.md"
+)
+CLI_INVENTORY_READMES = (
+    ROOT_README_CLI_INVENTORY_README,
+    REFERENCE_IMPLEMENTATION_CLI_INVENTORY_README,
+)
 ROOT_README_CLI_SOURCE = "src/omoikane/cli.py"
 ROOT_README_UNITTEST_COMMAND = "PYTHONPATH=src python3 -m unittest discover -s tests -t ."
 ROOT_README_CLI_COMMAND_PREFIX = "PYTHONPATH=src python3 -m omoikane.cli "
@@ -262,6 +269,7 @@ class GapScanner:
         placeholder_hits = self._placeholder_hits(repo_root)
         inventory_drift_hits = self._inventory_drift_hits(repo_root)
         catalog_coverage_hits = self._catalog_coverage_hits(repo_root)
+        catalog_consumer_reference_hits = self._catalog_consumer_reference_hits(repo_root)
         schema_example_validation_hits = self._schema_example_validation_hits(repo_root)
         future_work_hits = self._future_work_hits(repo_root)
         agent_source_definition_hits = self._agent_source_definition_hits(repo_root)
@@ -347,6 +355,14 @@ class GapScanner:
                 {
                     "priority": "high",
                     "kind": "catalog-coverage-gap",
+                    "summary": f"{hit['path']}: {hit['line']}",
+                }
+            )
+        for hit in catalog_consumer_reference_hits[:10]:
+            prioritized_tasks.append(
+                {
+                    "priority": "high",
+                    "kind": "catalog-consumer-reference",
                     "summary": f"{hit['path']}: {hit['line']}",
                 }
             )
@@ -483,6 +499,7 @@ class GapScanner:
             "placeholder_hit_count": len(placeholder_hits),
             "inventory_drift_count": len(inventory_drift_hits),
             "catalog_coverage_gap_count": len(catalog_coverage_hits),
+            "catalog_consumer_reference_count": len(catalog_consumer_reference_hits),
             "schema_example_validation_count": len(schema_example_validation_hits),
             "future_work_hit_count": len(future_work_hits),
             "agent_source_definition_violation_count": len(
@@ -522,6 +539,7 @@ class GapScanner:
             "placeholder_hits": placeholder_hits,
             "inventory_drift_hits": inventory_drift_hits,
             "catalog_coverage_gap_hits": catalog_coverage_hits,
+            "catalog_consumer_reference_hits": catalog_consumer_reference_hits,
             "schema_example_validation_hits": schema_example_validation_hits,
             "future_work_hits": future_work_hits,
             "agent_source_definition_violation_hits": agent_source_definition_hits,
@@ -556,6 +574,9 @@ class GapScanner:
             "placeholder_hit_count": int(report["placeholder_hit_count"]),
             "inventory_drift_count": int(report["inventory_drift_count"]),
             "catalog_coverage_gap_count": int(report["catalog_coverage_gap_count"]),
+            "catalog_consumer_reference_count": int(
+                report["catalog_consumer_reference_count"]
+            ),
             "schema_example_validation_count": int(
                 report["schema_example_validation_count"]
             ),
@@ -1341,13 +1362,12 @@ class GapScanner:
             if "`" not in stripped:
                 continue
             parts = stripped.split("`")
-            for index in range(1, len(parts), 2):
-                candidate = parts[index].strip()
-                if not candidate:
-                    continue
-                if "/" in candidate and not allow_paths:
-                    continue
-                entries.append(candidate)
+            candidate = parts[1].strip() if len(parts) > 1 else ""
+            if not candidate:
+                continue
+            if "/" in candidate and not allow_paths:
+                continue
+            entries.append(candidate)
         return entries
 
     @staticmethod
@@ -1424,6 +1444,13 @@ class GapScanner:
                         "line": f"`{missing_entry}` is implemented but missing from the top-level eval inventory",
                     }
                 )
+            for stale_entry in sorted(listed_eval_entries - actual_eval_entries):
+                hits.append(
+                    {
+                        "path": TOP_LEVEL_EVAL_INVENTORY_SPEC[0],
+                        "line": f"`{stale_entry}` is listed in the top-level eval inventory but the eval file is missing",
+                    }
+                )
 
         for readme_path in sorted(repo_root.glob(EVAL_INVENTORY_GLOB)):
             relative_path = readme_path.relative_to(repo_root)
@@ -1462,26 +1489,83 @@ class GapScanner:
                         "line": f"`{missing_entry}` is implemented but missing from the README inventory",
                     }
                 )
+            for stale_entry in sorted(listed_entries - actual_entries):
+                hits.append(
+                    {
+                        "path": readme_name,
+                        "line": f"`{stale_entry}` is listed in the README inventory but the file is missing",
+                    }
+                )
         return hits
 
     def _root_readme_cli_inventory_hits(
         self, repo_root: Path
     ) -> List[Dict[str, str]]:
-        readme_path = repo_root / ROOT_README_CLI_INVENTORY_README
         cli_path = repo_root / ROOT_README_CLI_SOURCE
-        if not readme_path.exists() or not cli_path.exists():
+        if not cli_path.exists():
             return []
 
-        listed_commands = self._root_readme_cli_command_names(readme_path)
-        implemented_commands = self._implemented_cli_command_names(cli_path)
-        if not implemented_commands:
+        parser_commands = self._implemented_cli_command_names(cli_path)
+        handler_commands = self._implemented_cli_dispatch_command_names(cli_path)
+        if not parser_commands and not handler_commands:
             return []
 
         hits: List[Dict[str, str]] = []
-        if ROOT_README_UNITTEST_COMMAND not in self._root_readme_command_entries(readme_path):
+        implemented_commands = parser_commands & handler_commands
+        for missing_handler in sorted(parser_commands - handler_commands):
             hits.append(
                 {
-                    "path": ROOT_README_CLI_INVENTORY_README,
+                    "path": ROOT_README_CLI_SOURCE,
+                    "line": (
+                        f"`{missing_handler}` has an argparse subparser but no "
+                        "main dispatch handler"
+                    ),
+                    "missing_cli_handler_command": missing_handler,
+                }
+            )
+        for stale_handler in sorted(handler_commands - parser_commands):
+            hits.append(
+                {
+                    "path": ROOT_README_CLI_SOURCE,
+                    "line": (
+                        f"`{stale_handler}` has a main dispatch handler but no "
+                        "argparse subparser"
+                    ),
+                    "stale_cli_handler_command": stale_handler,
+                }
+            )
+
+        for readme_name in CLI_INVENTORY_READMES:
+            readme_path = repo_root / readme_name
+            if not readme_path.exists():
+                continue
+            hits.extend(
+                self._cli_inventory_readme_hits(
+                    readme_path,
+                    readme_name,
+                    implemented_commands,
+                    require_unittest=readme_name == ROOT_README_CLI_INVENTORY_README,
+                )
+            )
+        return hits
+
+    def _cli_inventory_readme_hits(
+        self,
+        readme_path: Path,
+        readme_name: str,
+        implemented_commands: set[str],
+        *,
+        require_unittest: bool,
+    ) -> List[Dict[str, str]]:
+        listed_commands = self._root_readme_cli_command_names(readme_path)
+        hits: List[Dict[str, str]] = []
+        if (
+            require_unittest
+            and ROOT_README_UNITTEST_COMMAND not in self._root_readme_command_entries(readme_path)
+        ):
+            hits.append(
+                {
+                    "path": readme_name,
                     "line": (
                         f"`{ROOT_README_UNITTEST_COMMAND}` is missing from the "
                         "root README runnable command inventory"
@@ -1491,10 +1575,10 @@ class GapScanner:
         for missing_command in sorted(implemented_commands - listed_commands):
             hits.append(
                 {
-                    "path": ROOT_README_CLI_INVENTORY_README,
+                    "path": readme_name,
                     "line": (
                         f"`{missing_command}` is implemented in src/omoikane/cli.py "
-                        "but missing from the root README runnable command inventory"
+                        f"but missing from {readme_name} runnable command inventory"
                     ),
                     "missing_cli_command": missing_command,
                 }
@@ -1502,9 +1586,9 @@ class GapScanner:
         for stale_command in sorted(listed_commands - implemented_commands):
             hits.append(
                 {
-                    "path": ROOT_README_CLI_INVENTORY_README,
+                    "path": readme_name,
                     "line": (
-                        f"`{stale_command}` is listed in the root README runnable "
+                        f"`{stale_command}` is listed in {readme_name} runnable "
                         "command inventory but is not implemented in src/omoikane/cli.py"
                     ),
                     "stale_cli_command": stale_command,
@@ -1520,13 +1604,20 @@ class GapScanner:
         except UnicodeDecodeError:
             return entries
         for line in lines:
-            if not line.startswith("- ") or "`" not in line:
+            stripped = line.strip()
+            if not stripped:
                 continue
-            parts = line.strip().split("`")
-            for index in range(1, len(parts), 2):
-                candidate = parts[index].strip()
-                if candidate.startswith("PYTHONPATH=src python3 -m "):
-                    entries.append(candidate)
+            if "`" in stripped:
+                if not stripped.startswith("- "):
+                    continue
+                parts = stripped.split("`")
+                for index in range(1, len(parts), 2):
+                    candidate = parts[index].strip()
+                    if candidate.startswith("PYTHONPATH=src python3 -m "):
+                        entries.append(candidate)
+                continue
+            if stripped.startswith("PYTHONPATH=src python3 -m "):
+                entries.append(stripped)
         return entries
 
     @classmethod
@@ -1565,6 +1656,43 @@ class GapScanner:
 
         ParserVisitor().visit(tree)
         return command_names
+
+    @staticmethod
+    def _implemented_cli_dispatch_command_names(cli_path: Path) -> set[str]:
+        try:
+            tree = ast.parse(cli_path.read_text(encoding="utf-8"))
+        except (OSError, SyntaxError, UnicodeDecodeError):
+            return set()
+
+        command_names: set[str] = set()
+
+        class DispatchVisitor(ast.NodeVisitor):
+            def visit_Compare(self, node: ast.Compare) -> None:  # noqa: N802
+                if len(node.ops) != 1 or not isinstance(node.ops[0], ast.Eq):
+                    self.generic_visit(node)
+                    return
+                for candidate in [node.left, *node.comparators]:
+                    if not (
+                        isinstance(candidate, ast.Constant)
+                        and isinstance(candidate.value, str)
+                    ):
+                        continue
+                    other_side = node.comparators[0] if candidate is node.left else node.left
+                    if GapScanner._is_args_command_reference(other_side):
+                        command_names.add(candidate.value)
+                self.generic_visit(node)
+
+        DispatchVisitor().visit(tree)
+        return command_names
+
+    @staticmethod
+    def _is_args_command_reference(node: ast.AST) -> bool:
+        return (
+            isinstance(node, ast.Attribute)
+            and node.attr == "command"
+            and isinstance(node.value, ast.Name)
+            and node.value.id == "args"
+        )
 
     def _decision_log_index_inventory_hits(
         self, repo_root: Path
@@ -1727,6 +1855,62 @@ class GapScanner:
                     }
                 )
         return hits
+
+    def _catalog_consumer_reference_hits(self, repo_root: Path) -> List[Dict[str, str]]:
+        catalog_path = repo_root / "specs" / "catalog.yaml"
+        if not catalog_path.exists():
+            return []
+
+        hits: List[Dict[str, str]] = []
+        current_catalog_entry_file = ""
+        in_consumers = False
+        for line_number, line in enumerate(
+            catalog_path.read_text(encoding="utf-8").splitlines(),
+            start=1,
+        ):
+            stripped = line.strip()
+            if stripped.startswith("- priority:"):
+                current_catalog_entry_file = ""
+                in_consumers = False
+                continue
+            if stripped.startswith("file:"):
+                _, _, value = stripped.partition(":")
+                current_catalog_entry_file = value.strip().strip("'\"")
+                continue
+            if stripped == "consumers:":
+                in_consumers = True
+                continue
+            if not in_consumers:
+                continue
+            if stripped.startswith("- "):
+                candidate = stripped[2:].strip().strip("'\"")
+                if not self._catalog_consumer_is_repo_path(candidate):
+                    continue
+                if (repo_root / candidate).exists():
+                    continue
+                hits.append(
+                    {
+                        "path": "specs/catalog.yaml",
+                        "line": (
+                            f"line {line_number}: `{candidate}` consumer for "
+                            f"`{current_catalog_entry_file}` does not exist"
+                        ),
+                        "missing_consumer_path": candidate,
+                        "catalog_entry_file": current_catalog_entry_file,
+                    }
+                )
+                continue
+            if stripped and not stripped.startswith("#"):
+                in_consumers = False
+        return hits
+
+    @staticmethod
+    def _catalog_consumer_is_repo_path(candidate: str) -> bool:
+        if not candidate or "://" in candidate or candidate.startswith("#"):
+            return False
+        return "/" in candidate or candidate.endswith(
+            (".py", ".md", ".yaml", ".yml", ".schema", ".idl")
+        )
 
     @staticmethod
     def _catalog_declared_files(catalog_path: Path) -> set[str]:

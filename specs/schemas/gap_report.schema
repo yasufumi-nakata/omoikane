@@ -5,7 +5,8 @@ description: >
   Public self-construction gap report emitted by `omoikane.cli gap-report`,
   including root README runnable CLI command inventory drift, top-level eval
   inventory drift and duplicate-entry checks, catalog coverage checks for
-  implemented schemas, interfaces, and eval YAML files, tracked worktree
+  implemented schemas, interfaces, and eval YAML files, catalog consumer
+  reference existence checks, tracked worktree
   marker-residue checks, tracked/untracked generated artifact hygiene checks for build output,
   caches, and platform metadata, ignored generated artifact hygiene checks for
   packaging/release output, ignored platform metadata hygiene checks,
@@ -26,6 +27,7 @@ required:
   - placeholder_hit_count
   - inventory_drift_count
   - catalog_coverage_gap_count
+  - catalog_consumer_reference_count
   - schema_example_validation_count
   - future_work_hit_count
   - agent_source_definition_violation_count
@@ -49,6 +51,7 @@ required:
   - placeholder_hits
   - inventory_drift_hits
   - catalog_coverage_gap_hits
+  - catalog_consumer_reference_hits
   - schema_example_validation_hits
   - future_work_hits
   - agent_source_definition_violation_hits
@@ -90,6 +93,9 @@ properties:
     type: integer
     minimum: 0
   catalog_coverage_gap_count:
+    type: integer
+    minimum: 0
+  catalog_consumer_reference_count:
     type: integer
     minimum: 0
   schema_example_validation_count:
@@ -182,6 +188,13 @@ properties:
     items:
       $ref: "#/$defs/gap_hit"
   catalog_coverage_gap_hits:
+    type: array
+    items:
+      $ref: "#/$defs/gap_hit"
+  catalog_consumer_reference_hits:
+    description: >
+      specs/catalog.yaml consumer entries that look like repo-local file paths
+      but no longer exist in the checkout.
     type: array
     items:
       $ref: "#/$defs/gap_hit"
@@ -385,6 +398,7 @@ properties:
           - placeholder_hit_count
           - inventory_drift_count
           - catalog_coverage_gap_count
+          - catalog_consumer_reference_count
           - schema_example_validation_count
           - future_work_hit_count
           - agent_source_definition_violation_count
@@ -423,6 +437,9 @@ properties:
             type: integer
             minimum: 0
           catalog_coverage_gap_count:
+            type: integer
+            minimum: 0
+          catalog_consumer_reference_count:
             type: integer
             minimum: 0
           schema_example_validation_count:
@@ -576,6 +593,12 @@ $defs:
       missing_catalog_file:
         type: string
         minLength: 1
+      missing_consumer_path:
+        type: string
+        minLength: 1
+      catalog_entry_file:
+        type: string
+        minLength: 1
       schema_example_label:
         type: string
         minLength: 1
@@ -588,6 +611,12 @@ $defs:
         type: string
         minLength: 1
       stale_cli_command:
+        type: string
+        minLength: 1
+      missing_cli_handler_command:
+        type: string
+        minLength: 1
+      stale_cli_handler_command:
         type: string
         minLength: 1
       symbol:
@@ -661,6 +690,7 @@ examples:
     placeholder_hit_count: 0
     inventory_drift_count: 0
     catalog_coverage_gap_count: 0
+    catalog_consumer_reference_count: 0
     schema_example_validation_count: 0
     future_work_hit_count: 0
     agent_source_definition_violation_count: 0
@@ -684,6 +714,7 @@ examples:
     placeholder_hits: []
     inventory_drift_hits: []
     catalog_coverage_gap_hits: []
+    catalog_consumer_reference_hits: []
     schema_example_validation_hits: []
     future_work_hits: []
     agent_source_definition_violation_hits: []
@@ -734,6 +765,7 @@ examples:
         placeholder_hit_count: 0
         inventory_drift_count: 0
         catalog_coverage_gap_count: 0
+        catalog_consumer_reference_count: 0
         schema_example_validation_count: 0
         future_work_hit_count: 0
         agent_source_definition_violation_count: 0

@@ -2,12 +2,12 @@ idl_version: 1
 kind: service
 namespace: selfctor.gap_report.v0
 service: GapReportService
-summary: Emit a schema-bound self-construction gap report with root README runnable CLI inventory checks, top-level eval inventory drift checks, eval catalog coverage checks, schema example self-validation checks, decision-log README index checks, decision-log metadata conformance checks, agent source definition validation, truth-source residual marker checks, tracked worktree marker-residue checks, tracked/untracked generated artifact hygiene checks for build output, caches, and platform metadata, ignored generated artifact hygiene checks for packaging/release output, ignored platform metadata hygiene checks, and a digest-bound scan receipt for automation gates.
+summary: Emit a schema-bound self-construction gap report with root/reference README runnable CLI inventory checks, CLI parser/dispatch binding checks, top-level eval inventory drift checks, eval catalog coverage checks, catalog consumer reference checks, schema example self-validation checks, decision-log README index checks, decision-log metadata conformance checks, agent source definition validation, truth-source residual marker checks, tracked worktree marker-residue checks, tracked/untracked generated artifact hygiene checks for build output, caches, and platform metadata, ignored generated artifact hygiene checks for packaging/release output, ignored platform metadata hygiene checks, and a digest-bound scan receipt for automation gates.
 imports:
   gap_report: ../schemas/gap_report.schema
 operations:
   scan_repo:
-    summary: Scan one repository root for open questions, required automation references, root README runnable CLI inventory drift, top-level and per-surface inventory drift, decision-log README index drift, decision-log frontmatter metadata violations, spec/interface/schema/eval catalog coverage gaps, schema example validation drift, truth-source residual markers, agent source definition violations, runtime stubs, tracked worktree workspace marker residue, tracked/untracked build/cache/platform generated artifacts, ignored packaging/release generated artifacts, ignored platform metadata, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
+    summary: Scan one repository root for open questions, required automation references, root/reference README runnable CLI inventory drift, CLI parser/dispatch drift, top-level and per-surface inventory drift, decision-log README index drift, decision-log frontmatter metadata violations, spec/interface/schema/eval catalog coverage gaps, catalog consumer reference gaps, schema example validation drift, truth-source residual markers, agent source definition violations, runtime stubs, tracked worktree workspace marker residue, tracked/untracked build/cache/platform generated artifacts, ignored packaging/release generated artifacts, ignored platform metadata, and latest decision-log follow-up, then append a digest-only scan event to ContinuityLedger.
     input:
       inline_schema:
         type: object
@@ -28,9 +28,11 @@ operations:
       - scan_receipt must expose the real continuity ledger entry ref, entry hash, payload ref, and self+guardian signature roles after the reference runtime append path succeeds
       - all_zero must be true only when every gap count and prioritized_task_count is zero
       - inventory README scans must treat only top-level bullets as inventory entries and must report duplicate top-level entries before all-zero completion
-      - root README runnable command bullets must enumerate every implemented src/omoikane/cli.py add_parser command at least once and must not point at stale CLI command names before all-zero completion
-      - evals/README.md must enumerate every implemented eval YAML by repo-local eval path, while evals/*/README.md must continue to enumerate each local eval surface
+      - root README and docs/07-reference-implementation/README.md runnable command inventories must enumerate every CLI command that has both an argparse subparser and a main dispatch handler, and must not point at stale CLI command names before all-zero completion
+      - every src/omoikane/cli.py argparse subparser must have a matching main dispatch handler, and every main dispatch handler must have a matching argparse subparser before all-zero completion
+      - evals/README.md must enumerate every implemented eval YAML by repo-local eval path and must not list missing eval YAML paths, while evals/*/README.md must continue to enumerate each local eval surface without stale local entries
       - specs/catalog.yaml must enumerate every implemented specs/interfaces file, specs/schemas file, and evals/* YAML file before all-zero completion
+      - specs/catalog.yaml consumer entries that look like repo-local file paths must resolve to existing files before all-zero completion
       - every public specs/schemas/*.schema and specs/schemas/*.yaml example payload must validate against its own schema after repo-local $ref resolution before all-zero completion, without storing raw example payloads in gap_report output
       - scan_receipt must bind tests/**/*.py alongside runtime, specs, eval, docs, agents, decision-log, and git hygiene surfaces so test-surface drift cannot pass through an all-zero automation gate unseen
       - meta/decision-log/README.md must enumerate every repo-local dated decision-log markdown file and must not list missing decision-log files

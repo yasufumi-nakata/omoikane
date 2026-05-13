@@ -163,10 +163,17 @@ unittest 後に自然発生する `.pytest_cache/` や `__pycache__/` はこの 
 `next-stage frontier` bullet は `decision_log_frontier_hits` として別枠で surfacing する。
 decision log 側で append-only に gap chain を保つ時は、
 frontmatter の `next_gap_ids` と `closes_next_gaps` を使う。
+root `README.md` とこの reference implementation README の runnable CLI command inventory は、
+`src/omoikane/cli.py` の argparse subparser と `main()` dispatch handler の両方を持つ
+command set と同期する。parser だけ、handler だけ、README だけの command は
+`inventory_drift_hits` として all-zero gate の外へ出る。
 `evals/README.md` は全 eval YAML を repo-local eval path で列挙する top-level inventory として扱い、
 `evals/*/README.md` の surface 別 inventory と同じ `inventory_drift_hits` gate に入る。
+存在しない eval YAML を README 側だけに残した stale entry も同じ gate に入る。
 同じ eval YAML は `specs/catalog.yaml` の catalog coverage gate にも入り、
 未登録なら `catalog_coverage_gap_hits` として all-zero gate の外へ出る。
+`specs/catalog.yaml` の `consumers` が repo-local file path に見える場合は実在確認を行い、
+stale consumer は `catalog_consumer_reference_hits` として all-zero gate の外へ出る。
 `meta/decision-log/README.md` は全ての dated decision-log markdown file を列挙する
 append-only index として扱い、実在 log の未掲載や存在しない log への stale link を
 `decision_log_index_inventory_hits` として all-zero gate の外へ出す。
