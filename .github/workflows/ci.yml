@@ -19,9 +19,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install -e ".[dev]"
+      - name: Remove editable install metadata
+        run: find src -maxdepth 1 -name "*.egg-info" -type d -prune -exec rm -rf {} +
       - name: Run tests and smoke checks
         run: |
           python -m unittest discover -s tests -t .
           python -m omoikane.cli demo --json > demo.json
           python -m omoikane.cli gap-report --json > gap-report.json
-

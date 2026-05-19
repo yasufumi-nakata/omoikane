@@ -20,12 +20,14 @@ classifiers = [
   "Programming Language :: Python :: 3.12",
   "Operating System :: OS Independent"
 ]
+dependencies = [
+  "jsonschema>=4.0",
+  "PyYAML>=6.0"
+]
 
 [project.optional-dependencies]
 dev = [
   "build>=1.2",
-  "jsonschema>=4.0",
-  "PyYAML>=6.0",
   "tomli>=2.0; python_version < '3.11'"
 ]
 
