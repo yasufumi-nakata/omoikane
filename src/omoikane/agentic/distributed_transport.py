@@ -3602,7 +3602,26 @@ class DistributedTransportService:
         raise ValueError(f"could not resolve a network interface for local_ip {normalized_ip}")
 
     @staticmethod
-    def _interface_has_ipv4(interface_name: str, local_ip: str) -> bool:
+    def _interface_ipv4_via_ioctl(interface_name: str) -> str | None:
+        try:
+            import fcntl
+        except ImportError:
+            return None
+        siocgifaddr = 0x8915  # Linux SIOCGIFADDR; other platforms fall through on OSError
+        probe = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            request = struct.pack("256s", interface_name.encode("utf-8")[:15])
+            response = fcntl.ioctl(probe.fileno(), siocgifaddr, request)
+            return socket.inet_ntoa(response[20:24])
+        except OSError:
+            return None
+        finally:
+            probe.close()
+
+    @classmethod
+    def _interface_has_ipv4(cls, interface_name: str, local_ip: str) -> bool:
+        if cls._interface_ipv4_via_ioctl(interface_name) == local_ip:
+            return True
         ipconfig_path = shutil.which("ipconfig")
         if ipconfig_path:
             result = subprocess.run(
